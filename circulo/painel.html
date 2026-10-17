@@ -36,6 +36,9 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .state{display:flex;align-items:center;gap:8px;color:var(--muted)}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}
 .state[data-s="pausado_humano"] .dot,.state[data-s="parado"] .dot{background:var(--idle)}
+.state[data-s="desligado"] .dot{background:var(--bad)}
+.state[data-s="trabalhando"] .dot{background:var(--jev);animation:beat .8s ease-in-out infinite}
+.state[data-s="aguardando"] .dot{animation:beat 1.6s ease-in-out infinite}
 .state[data-s="pausado_orcamento"] .dot{background:var(--llm)}
 .state[data-s="modo_seguro"] .dot{background:var(--jev)}
 .state[data-s="rodando"] .dot{animation:beat 1.6s ease-in-out infinite}
@@ -280,8 +283,9 @@ function meter(name, value, frac, limit, why, inverse) {
 function render(s) {
   S = s;
   const L = s.loop, st = $("#state");
-  st.dataset.s = L.status; $("#stateText").textContent = STATUS[L.status] || L.status;
-  document.body.classList.toggle("paused", L.status.startsWith("pausado") || L.status === "parado");
+  const V = L.vivo || {estado: L.status, titulo: STATUS[L.status] || L.status};
+  st.dataset.s = V.estado; $("#stateText").textContent = V.titulo;
+  document.body.classList.toggle("paused", V.estado.startsWith("pausado") || V.estado === "desligado");
   $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
   const P = s.projeto;

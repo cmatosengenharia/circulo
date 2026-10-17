@@ -43,4 +43,13 @@ def run_demo(data_dir: str, porta: int = 8765, giro: float = 0.6) -> None:
                     submit(f"ok {row['id']}")
 
     threading.Thread(target=usuario, daemon=True).start()
-    c.run_forever(sleep=lambda s: c._stop.wait(min(s, giro)))
+    # giros acelerados, mas com o mesmo batimento e os mesmos controles do loop real
+    try:
+        while not c._stop.is_set():
+            c.heartbeat()
+            c.tick()
+            c._rest(giro, lambda s: c._stop.wait(s), wake_on_input=False)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        c.store.set("batimento", None)

@@ -43,6 +43,37 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .switch[aria-checked="true"] i{background:var(--jev)}
 .switch[aria-checked="true"] i::after{transform:translateX(14px)}
 
+/* estado do loop ao vivo */
+.live{--st:var(--idle);display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center;background:var(--surface);
+  border:1px solid var(--line);border-left:6px solid var(--st);border-radius:22px;padding:18px 22px;margin-bottom:28px}
+.live[data-s="trabalhando"]{--st:var(--jev)}
+.live[data-s="aguardando"]{--st:var(--ok)}
+.live[data-s="pausado_humano"]{--st:var(--idle)}
+.live[data-s="pausado_orcamento"]{--st:var(--llm)}
+.live[data-s="desligado"],.live[data-s="sem_conexao"]{--st:var(--bad)}
+.live.seguro{--st:var(--jev)}
+.orb{width:56px;height:56px}
+.orb circle{fill:none;stroke-width:4}
+.orb .t{stroke:var(--line)}
+.orb .a{stroke:var(--st);stroke-linecap:round;stroke-dasharray:34 200;transform-origin:center}
+.orb .c{fill:var(--st);stroke:none}
+.live[data-s="trabalhando"] .orb .a{animation:spin .9s linear infinite}
+.live[data-s="aguardando"] .orb .a{animation:spin 6s linear infinite}
+.live[data-s="aguardando"] .orb .c{animation:beat 2s ease-in-out infinite}
+.live[data-s="desligado"] .orb .a,.live[data-s="sem_conexao"] .orb .a,.live[data-s^="pausado"] .orb .a{stroke-dasharray:0 200}
+.lt{display:flex;flex-direction:column;min-width:0}
+.lt .lbl{font-size:13px;color:var(--muted)}
+.lt strong{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--st)}
+.live[data-s="aguardando"] .lt strong,.live[data-s="pausado_humano"] .lt strong{color:var(--ink)}
+.lt span#ldetail{color:var(--muted)}
+.lt code{font-size:.92em;background:var(--bg);padding:1px 6px;border-radius:6px}
+.facts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 28px;margin:8px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.facts div{display:flex;flex-direction:column}
+.facts dt{font-size:12px;color:var(--muted)}
+.facts dd{margin:0;font-weight:700}
+.chip.agora{background:var(--jev);color:var(--surface)}
+.chip.fila{background:var(--jev-soft);color:var(--jev)}
+.chip.parado{background:var(--bad);color:var(--surface)}
 .intro{max-width:62ch;margin:0 0 22px}
 .intro h2{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
 .intro p{margin:0;color:var(--muted)}
@@ -98,12 +129,21 @@ a.card:hover{border-color:var(--ink)}
 <div class="wrap">
   <header>
     <h1>Círculo</h1>
-    <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
       <button class="btn primary" id="pause">Pausar o círculo</button>
     </div>
   </header>
+
+  <section class="live" id="live" data-s="conectando" aria-live="polite">
+    <svg class="orb" viewBox="0 0 56 56" aria-hidden="true"><circle class="t" cx="28" cy="28" r="22"/><circle class="a" cx="28" cy="28" r="22"/><circle class="c" cx="28" cy="28" r="7"/></svg>
+    <div class="lt">
+      <span class="lbl">Estado do loop</span>
+      <strong id="ltitle">Conectando…</strong>
+      <span id="ldetail">Buscando o estado do loop.</span>
+    </div>
+    <dl class="facts" id="facts"></dl>
+  </section>
 
   <div class="intro">
     <h2>Projetos</h2>
@@ -131,6 +171,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
   pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
+const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", meta_learner:"no Meta-Learner",
+  shadow:"avaliando shadow", saude:"checando a saúde"};
 const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado"};
 function ago(ts) {
   const s = Math.max(0, Date.now() / 1000 - ts);
@@ -138,11 +180,22 @@ function ago(ts) {
   if (s < 86400) return `há ${Math.round(s / 3600)} h`; return `há ${Math.round(s / 86400)} dias`;
 }
 let S = null, known = new Set();
+let V = null;   // estado vivo do loop (SSE)
+function cardLive(p) {
+  const e = V ? V.estado : "";
+  if (p.status === "ativo" && e === "desligado") return `<span class="chip parado">Loop desligado</span> ${p.na_fila ? p.na_fila + " na fila" : ""}`;
+  if (p.status === "ativo" && e.startsWith("pausado")) return `<span class="chip">Pausado</span> ${p.na_fila ? p.na_fila + " na fila" : ""}`;
+  if (V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id)) return `<span class="chip agora">Trabalhando agora</span> ${esc(ETAPA[V.etapa] || V.etapa)}`;
+  if (p.na_fila) return `<span class="chip fila">${p.na_fila} na fila</span> o loop chega aqui no próximo giro`;
+  if (p.status === "aguardando_kit") return `Registrado; espera o kit do tipo`;
+  return "Última atividade " + ago(p.ultima_atividade);
+}
 function card(p) {
   const max = Math.max(1, ...p.atividade_24h);
   const bars = p.atividade_24h.map(v => `<i class="${v ? "" : "zero"}" style="height:${v ? Math.max(12, v / max * 100) : 8}%"></i>`).join("");
   const semLlm = p.sem_llm == null ? "—" : Math.round(p.sem_llm * 100) + "%";
-  return `<a class="card${p.agora ? " agora" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
+  const agora = V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id);
+  return `<a class="card${agora ? " agora" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
     <svg class="mini" viewBox="0 0 34 34" aria-hidden="true"><circle class="t" cx="17" cy="17" r="13"/><circle class="a" cx="17" cy="17" r="13"/></svg>
     <div class="top"><span class="chip">${esc(p.tipo_rotulo)}</span><span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
     <h3>${esc(p.nome)}</h3>
@@ -155,13 +208,49 @@ function card(p) {
       <div><b>${p.evolucoes_aplicadas}</b><span>evoluções</span></div>
     </div>
     <div class="pulse" title="Atividade nas últimas 24 horas">${bars}</div>
-    <div class="foot"><span>${p.agora ? "<strong>O loop está aqui agora</strong>" : "Última atividade " + ago(p.ultima_atividade)}</span><span>Abrir projeto</span></div>
+    <div class="foot"><span>${cardLive(p)}</span><span>Abrir projeto</span></div>
   </a>`;
 }
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return sec + "s"; if (sec < 3600) return Math.floor(sec / 60) + "min " + String(sec % 60).padStart(2, "0") + "s";
+  return Math.floor(sec / 3600) + "h " + String(Math.floor(sec % 3600 / 60)).padStart(2, "0") + "min";
+}
+function live(v) {
+  if (!v) return;
+  V = v;
+  const box = $("#live");
+  box.dataset.s = v.estado; box.classList.toggle("seguro", !!v.modo_seguro && v.estado !== "desligado" && !v.estado.startsWith("pausado"));
+  $("#ltitle").textContent = v.titulo;
+  $("#ldetail").innerHTML = esc(v.detalhe || "").replace(/`([^`]+)`/g, "<code>$1</code>");
+  facts();
+}
+function facts() {
+  if (!V) return;
+  const now = Date.now() / 1000, f = [];
+  const add = (k, v) => f.push(`<div><dt>${k}</dt><dd>${v}</dd></div>`);
+  if (V.estado === "desligado") {
+    add("Último sinal", V.visto_em ? "há " + fmtDur(now - V.visto_em) : "nunca");
+  } else if (V.estado !== "sem_conexao") {
+    add("Giro", V.tick);
+    add("Batimento", V.batimento_ha == null ? "—" : "há " + fmtDur(V.batimento_ha + (now - V.agora)));
+    if (V.estado === "aguardando" && V.proximo_giro_em) add("Próximo giro", V.proximo_giro_em - now > 1 ? "em " + fmtDur(V.proximo_giro_em - now) : "agora");
+    if (V.estado === "pausado_orcamento" && V.retoma_em) add("Retoma em", fmtDur(V.retoma_em - now));
+  }
+  add("Fila", V.pendentes == null ? "—" : V.pendentes + (V.pendentes === 1 ? " pedido" : " pedidos"));
+  add("Modo seguro", V.modo_seguro ? "ligado" : "desligado");
+  if (S) {
+    const o = S.orcamento; add("Orçamento hoje", (o.tokens / o.limite * 100).toFixed(1).replace(".", ",") + "% usado");
+    add("Decisões sem LLM (24h)", S.saude.decisoes_24h ? Math.round(S.saude.sem_llm * 100) + "%" : "—");
+    if (S.novos_na_fila) add("Projetos sendo criados", S.novos_na_fila);
+  }
+  $("#facts").innerHTML = f.join("");
+}
+setInterval(facts, 1000);
 function render(d) {
   S = d;
   const L = d.loop;
-  $("#state").dataset.s = L.status; $("#stateText").textContent = STATUS[L.status] || L.status;
+  if (!V) live(L.vivo);
   $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
   const box = $("#cards"), novo = $("#novo");
@@ -172,7 +261,7 @@ function render(d) {
 }
 async function refresh() {
   try { render(await (await fetch("/api/projetos")).json()); }
-  catch { $("#state").dataset.s = "parado"; $("#stateText").textContent = "Sem conexão com o painel"; }
+  catch { live({estado:"sem_conexao", titulo:"Sem conexão com o painel", detalhe:"O servidor do painel não respondeu. Ele roda junto com `circulo run --painel`."}); }
 }
 async function post(path, body) {
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify(body)});
@@ -192,7 +281,15 @@ $("#novo").onsubmit = async e => {
   pending = true; $("#pedido").value = "";
   if (S && S.loop.controle.pausado) $("#msg").textContent = "Pedido na fila. O círculo está pausado: ele cria o projeto quando você retomar.";
 };
-refresh(); setInterval(refresh, 2500);
+function connect() {
+  const es = new EventSource("/api/eventos?tipo=status");
+  es.addEventListener("status", m => {
+    const prev = V; live(JSON.parse(m.data));
+    if (!prev || prev.estado !== V.estado || prev.projeto_id !== V.projeto_id || prev.pendentes !== V.pendentes) refresh();
+  });
+  es.onerror = () => { es.close(); live({estado:"sem_conexao", titulo:"Sem conexão com o painel", detalhe:"Tentando reconectar…"}); setTimeout(connect, 2000); };
+}
+refresh(); connect(); setInterval(refresh, 4000);
 </script>
 </body>
 </html>

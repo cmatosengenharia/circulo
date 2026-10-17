@@ -118,3 +118,13 @@ def test_estado_filtrado_por_projeto(circle):
     s = estado(circle.store, lp)
     assert s["projeto"]["status"] == "aguardando_kit" and s["projetos"] == [] and s["aguardando"] == []
     assert estado(circle.store, 1)["projeto"]["decisoes"] >= 2
+
+
+def test_painel_sobe_antes_do_loop_e_mostra_desligado(tmp_path):
+    srv = serve(tmp_path / "novo.db", port=0, background=True)
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/projetos", timeout=5) as r:
+            data = json.loads(r.read())
+        assert data["loop"]["vivo"]["estado"] == "desligado" and data["projetos"][0]["kit"] == "financas"
+    finally:
+        srv.shutdown()

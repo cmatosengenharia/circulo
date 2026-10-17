@@ -79,6 +79,12 @@ decisões, % sem LLM, evoluções, atividade nas últimas 24h; o mini-círculo g
 está agora). O card "Novo pedido" manda o texto para o Intake, que classifica o tipo com o Jev. Se já existe
 kit para o tipo (hoje: finanças), o projeto nasce ativo; senão fica "aguardando kit", registrado.
 
+**Estado do loop ao vivo** (topo da tela de projetos, via SSE): Trabalhando (em qual projeto e etapa),
+Rodando (entre giros, com contagem até o próximo), Modo seguro, Pausado por você, Pausado por orçamento
+(com contagem até a meia-noite), Desligado (sem batimento há mais de 20s: o processo não está rodando) e
+Sem conexão (o servidor do painel caiu). O loop emite batimento a cada 5s, inclusive descansando, e acorda
+cedo quando chega pedido novo. Cada card mostra também o que o loop está fazendo com aquele projeto.
+
 **Tela do projeto** (`/projeto/<id>`): Mostra o giro atual no círculo, cada decisão do Jev ao vivo (com confiança e se subiu
 para LLM), saúde contra os limites, orçamento, o que aguarda você, evoluções e versões da política.
 

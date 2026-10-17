@@ -15,7 +15,8 @@ from urllib.parse import parse_qs, urlparse
 
 from . import finance
 from .money import fmt_brl
-from .projects import cards
+from .projects import cards, novos_na_fila
+from .status import loop_status
 from .state import Store
 
 HOST = "127.0.0.1"
@@ -78,6 +79,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
             "controle": {"pausado": bool(controle.get("pausado")), "modo_seguro": bool(controle.get("modo_seguro"))},
             "pendentes": s.pending_count(), "politica": pol["version"],
             "shadow": dict(shadow) if shadow else None, "jev_erro": s.get("jev_last_error"),
+            "vivo": loop_status(s, now),
         },
         "orcamento": {"dia": budget["day"] if budget else day, "tokens": budget["tokens"] if budget else 0,
                       "limite": policy["budget"]["daily_token_limit"],
@@ -145,21 +147,34 @@ def make_handler(db_path: str):
                 self._json(estado(self._store(), projeto))
             elif u.path == "/api/projetos":
                 st = self._store()
-                self._json({"projetos": cards(st), "loop": estado(st)["loop"]})
+                e = estado(st)
+                self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"],
+                            "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
             elif u.path == "/api/eventos":
-                self._sse(int(q.get("desde", ["0"])[0] or 0), projeto)
+                self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
                 self._json({"erro": "não encontrado"}, 404)
 
-        def _sse(self, desde: int, projeto: int | None = None):
+        def _sse(self, desde: int, projeto: int | None = None, so_status: bool = False):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             store = self._store()
             last_stage = None
+            last_status, last_sent = None, 0.0
             try:
                 while True:
+                    st = loop_status(store)
+                    key = (st["estado"], st["titulo"], st["detalhe"], st["pendentes"], st["tick"], st.get("etapa"))
+                    if key != last_status or time.time() - last_sent > 5:
+                        last_status, last_sent = key, time.time()
+                        self.wfile.write(f"event: status\ndata: {json.dumps(st, ensure_ascii=False)}\n\n".encode())
+                    if so_status:
+                        self.wfile.write(b": ping\n\n")
+                        self.wfile.flush()
+                        time.sleep(0.5)
+                        continue
                     for d in novidades(store, desde, projeto):
                         desde = d["id"]
                         self.wfile.write(f"event: decisao\ndata: {json.dumps(d, ensure_ascii=False)}\n\n".encode())
@@ -219,7 +234,13 @@ def make_handler(db_path: str):
 
 
 def serve(db_path: str | Path, port: int = 8765, background: bool = False) -> ThreadingHTTPServer:
-    Store(db_path)  # garante o schema
+    # O painel pode subir antes do loop: prepara o banco do mesmo jeito que o loop faria.
+    from .policy import PolicyStore
+    from .projects import ensure_seed
+    st = Store(db_path)
+    PolicyStore(st)
+    ensure_seed(st)
+    finance.base(st)
     srv = ThreadingHTTPServer((HOST, port), make_handler(str(db_path)))
     srv.daemon_threads = True
     if background:

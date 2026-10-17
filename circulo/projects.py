@@ -80,10 +80,19 @@ def intake(store: Store, dl: DecisionLayer, pedido: str) -> dict:
     return {"id": pid, "novo": True, "tipo": tipo, "status": status, "confianca": d.confidence}
 
 
+def novos_na_fila(store: Store) -> int:
+    return store.one("SELECT COUNT(*) n FROM events WHERE kind='novo_projeto' AND status IN ('pending','processing')")["n"]
+
+
 def cards(store: Store) -> list[dict]:
     """Resumo de cada projeto para a tela inicial."""
     out = []
     etapa = store.get("etapa") or {}
+    fin = kit_project_id(store, "financas")
+    fila: dict[int | None, int] = {}
+    for r in store.q("SELECT kind, json_extract(payload,'$.projeto') pid FROM events WHERE status IN ('pending','processing')"):
+        key = None if r["kind"] == "novo_projeto" else (r["pid"] or fin)
+        fila[key] = fila.get(key, 0) + 1
     for p in store.q("SELECT * FROM projects WHERE status!='arquivado' ORDER BY updated_at DESC"):
         pid = p["id"]
         dec = store.one("""SELECT COUNT(*) n, SUM(source!='llm') sem_llm, MAX(created_at) ultima, COUNT(DISTINCT tick) giros
@@ -103,7 +112,7 @@ def cards(store: Store) -> list[dict]:
             "giros": dec["giros"] or 0, "ultima_atividade": dec["ultima"] or p["updated_at"],
             "evolucoes_aplicadas": ev.get("applied", 0), "evolucoes_total": sum(ev.values()),
             "atividade_24h": atividade, "agora": etapa.get("projeto") == pid,
-            "criado_em": p["created_at"],
+            "criado_em": p["created_at"], "na_fila": fila.get(pid, 0),
         })
     # ativos primeiro; dentro de cada grupo, o que teve atividade mais recente
     out.sort(key=lambda c: (c["status"] != "ativo", -c["ultima_atividade"]))

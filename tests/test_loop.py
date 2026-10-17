@@ -64,7 +64,21 @@ def test_recupera_evento_interrompido(tmp_path, clock):
 def test_run_forever_respeita_max_ticks(circle):
     slept = []
     circle.run_forever(max_ticks=3, sleep=slept.append)
-    assert circle.store.tick == 3 and len(slept) == 2
+    idle = circle.ctx.policy["loop"]["idle_interval_seconds"]
+    assert circle.store.tick == 3 and sum(slept) == 2 * idle and max(slept) <= circle.HEARTBEAT_EVERY
+    assert circle.store.get("batimento") is None          # ao sair, o loop some do painel como "desligado"
+
+
+def test_descanso_acorda_cedo_com_pedido_novo(circle):
+    slept = []
+
+    def sleep(sec):
+        slept.append(sec)
+        if len(slept) == 2:
+            circle.store.enqueue("mensagem", {"text": "10 uber"})
+
+    circle._rest(300, sleep)
+    assert len(slept) == 2 and circle.store.get("batimento")["proximo_giro_em"] is not None
 
 
 def test_metricas_por_tick(circle):

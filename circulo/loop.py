@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import signal
 import threading
 import time
@@ -333,26 +334,48 @@ class Circle:
     def stop(self, *_):
         self._stop.set()
 
+    HEARTBEAT_EVERY = 5.0   # segundos; o painel considera o loop desligado sem batimento por 3x isso
+
+    def heartbeat(self, proximo_giro: float | None = None) -> None:
+        self.store.set("batimento", {"em": time.time(), "pid": os.getpid(), "proximo_giro_em": proximo_giro})
+
+    def _rest(self, total: float, sleep: Callable[[float], None], wake_on_input: bool = True) -> None:
+        """Descansa em pedaços curtos: mantém o batimento e acorda cedo se chegar pedido novo."""
+        remaining = max(0.0, float(total))
+        self.heartbeat(time.time() + remaining)
+        while remaining > 0 and not self._stop.is_set():
+            chunk = min(self.HEARTBEAT_EVERY, remaining)
+            sleep(chunk)
+            remaining -= chunk
+            self.heartbeat(time.time() + remaining)
+            if wake_on_input and self.store.pending_count() > 0 and not self.controls()["pausado"]:
+                return
+
     def run_forever(self, max_ticks: int | None = None, sleep: Callable[[float], None] | None = None) -> None:
         sleep = sleep or (lambda sec: self._stop.wait(sec))
         if threading.current_thread() is threading.main_thread():
             signal.signal(signal.SIGTERM, self.stop)
             signal.signal(signal.SIGINT, self.stop)
+        self.store.set("loop_iniciado_em", time.time())
         n = 0
-        while not self._stop.is_set():
-            r = self.tick()
-            n += 1
-            if max_ticks is not None and n >= max_ticks:
-                break
-            loop = self.ctx.policy["loop"]
-            if r.paused and r.pause_reason == "humano":
-                sleep(2)                                                  # confere o botão com frequência
-            elif r.paused:
-                sleep(min(self.ctx.budget.seconds_until_reset(), 600))   # acorda e confere de novo
-            elif self.store.pending_count() > 0:
-                continue
-            elif r.handled_event:
-                sleep(loop["interval_seconds"])
-            else:
-                sleep(loop["idle_interval_seconds"])
+        try:
+            while not self._stop.is_set():
+                self.heartbeat()
+                r = self.tick()
+                n += 1
+                if max_ticks is not None and n >= max_ticks:
+                    break
+                loop = self.ctx.policy["loop"]
+                if r.paused and r.pause_reason == "humano":
+                    self._rest(2, sleep, wake_on_input=False)                    # confere o botão com frequência
+                elif r.paused:
+                    self._rest(min(self.ctx.budget.seconds_until_reset(), 600), sleep, wake_on_input=False)
+                elif self.store.pending_count() > 0:
+                    continue
+                elif r.handled_event:
+                    self._rest(loop["interval_seconds"], sleep)
+                else:
+                    self._rest(loop["idle_interval_seconds"], sleep)
+        finally:
+            self.store.set("batimento", None)
         self.store.set("loop_status", "parado")
