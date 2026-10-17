@@ -124,6 +124,35 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS incidents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fingerprint TEXT NOT NULL UNIQUE,
+  stage TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  message TEXT NOT NULL,
+  trace TEXT,
+  project_id INTEGER,
+  count INTEGER NOT NULL,
+  first_seen REAL NOT NULL,
+  last_seen REAL NOT NULL,
+  first_tick INTEGER NOT NULL,
+  last_tick INTEGER NOT NULL,
+  status TEXT NOT NULL,          -- aberto | isolado | resolvido
+  resolution TEXT
+);
+
+CREATE TABLE IF NOT EXISTS roadmap (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  titulo TEXT NOT NULL,
+  detalhe TEXT NOT NULL,
+  origem TEXT NOT NULL,          -- pedido_cassio | erro | circulo
+  status TEXT NOT NULL,          -- feito | parcial | em_andamento | pendente
+  evidencia TEXT NOT NULL,
+  ordem INTEGER NOT NULL,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,

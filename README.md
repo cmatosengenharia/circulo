@@ -96,3 +96,19 @@ Controles que funcionam no loop de verdade:
 
 Os comandos exigem o cabeçalho `X-Circulo` e origem local, então outro site aberto no navegador não
 consegue mandar comandos para o painel.
+
+## O próprio círculo (projeto zero)
+
+O loop é o primeiro projeto dele mesmo. O card "O próprio círculo" fica fixado no topo e mostra:
+
+- **Roteiro**: os pedidos que criaram o círculo, cada um com estado honesto (feito, parcial, pendente) e
+  evidência (commit ou seção do Prompt Mestre), mais os erros recorrentes que o próprio círculo registrou.
+- **Erros registrados**: todo erro vira incidente, agrupado por impressão digital (mesmo erro com números
+  diferentes conta como um só). Incidente que se repete vira item do roteiro.
+- **Autocorreção**: etapa isolável que falha 3x em 20 giros é colocada em quarentena (o Jev decide antes)
+  por 10 giros, dobrando a cada reincidência (até 640). O resto do círculo segue. `health` e pedidos nunca
+  entram em quarentena. Incidente que não ocorre há 200 giros é marcado como resolvido.
+- Decisões fora de um pedido (evolução natural, meta-learner, shadow, saúde) e evoluções de nível 2
+  pertencem a este projeto.
+
+O `circulo demo` injeta uma falha simulada (rotulada) na análise de padrões para você ver isso acontecendo.

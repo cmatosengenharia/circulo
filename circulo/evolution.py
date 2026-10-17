@@ -110,7 +110,7 @@ class MetaLearner:
             return row["id"]
         # regra de domínio pertence ao projeto do kit; mudança do círculo não pertence a projeto nenhum
         from .projects import kit_project_id
-        pid = kit_project_id(s, "financas") if level == 1 else None
+        pid = kit_project_id(s, "financas" if level == 1 else "circulo")
         return s.x("INSERT INTO proposals(level,kind,fingerprint,description,patch,evidence,status,notes,created_at,updated_at,project_id) "
                    "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                    (level, c.kind, fp, c.description, json.dumps(c.patch, ensure_ascii=False), json.dumps(c.evidence), status, notes, now, now, pid))

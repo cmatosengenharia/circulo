@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import finance
 from .money import fmt_brl
-from .projects import cards, novos_na_fila
+from .projects import cards, incidentes, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
 
@@ -99,6 +99,8 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "serie": serie,
         "respostas": _rows(s.q(f"SELECT id, message, created_at FROM alerts WHERE kind='resposta'{pf} ORDER BY id DESC LIMIT 6", pa)),
         "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
+        **({"roteiro": roteiro(s), "incidentes": incidentes(s), "quarentena": {
+            k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
     }
 
 

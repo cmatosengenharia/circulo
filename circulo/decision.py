@@ -250,6 +250,10 @@ class LocalJev:
             return Decision("project_type", "choice", min(hits, key=order.index), 0.55, self.source)
         return Decision("project_type", "choice", "outro", 0.3, self.source)
 
+    def _q_isolate_stage(self, q, s):
+        n = int(s.get("falhas_recentes", 0))
+        return self._noul("isolate_stage", 0.0 if n < 3 else min(1.0, 0.55 + 0.1 * n))
+
     def _q_idle_task(self, q, s):
         stale = s.get("staleness", {})
         opts = q.options()

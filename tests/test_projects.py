@@ -10,9 +10,10 @@ def criar(circle, pedido):
     return circle.store.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
 
 
-def test_financas_e_o_projeto_semente(circle):
-    rows = circle.store.q("SELECT * FROM projects")
-    assert len(rows) == 1 and rows[0]["kit"] == "financas" and rows[0]["status"] == "ativo"
+def test_projetos_semente_financas_e_o_proprio_circulo(circle):
+    rows = {r["kit"]: r for r in circle.store.q("SELECT * FROM projects")}
+    assert set(rows) == {"financas", "circulo"} and all(r["status"] == "ativo" for r in rows.values())
+    assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE origem='pedido_cassio'")["n"] >= 15
 
 
 @pytest.mark.parametrize("pedido,tipo,status", [
@@ -29,7 +30,7 @@ def test_intake_classifica_com_jev(circle, pedido, tipo, status):
 
 def test_pedido_de_financas_nao_duplica_projeto(circle):
     criar(circle, "Me ajude a economizar dinheiro com os gastos da família")
-    assert circle.store.one("SELECT COUNT(*) n FROM projects")["n"] == 1
+    assert circle.store.one("SELECT COUNT(*) n FROM projects")["n"] == 2
 
 
 def test_decisoes_e_evolucoes_ficam_no_projeto(circle):

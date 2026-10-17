@@ -18,6 +18,7 @@ from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev, build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
+from .incidents import Incidents
 from .projects import ensure_seed, intake, kit_project_id
 from .money import fmt_brl
 from .policy import PolicyStore
@@ -60,6 +61,7 @@ class Circle:
         self.shadow = Shadow(self.ctx)
         self.health = HealthMonitor(self.ctx)
         self.gate = gate if gate is not None else build_gate(self.ctx)
+        self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
         finance.base(store)
         ensure_seed(store)
         recovered = store.recover_interrupted()
@@ -84,7 +86,8 @@ class Circle:
 
     def _stage(self, name: str, extra: dict | None = None) -> None:
         """Etapa atual do giro, para o painel ao vivo."""
-        self.store.set("etapa", {"nome": name, "tick": self.store.tick, "em": time.time(), **(extra or {})})
+        self.store.set("etapa", {"nome": name, "tick": self.store.tick, "em": time.time(),
+                                 "projeto": self.ctx.dl.project_id, **(extra or {})})
 
     # ------------------------------------------------------------ entrada
     def submit(self, text: str, at: float | None = None) -> int:
@@ -104,7 +107,10 @@ class Circle:
             return TickResult(s.tick, paused=True, pause_reason="orcamento")
         s.set("loop_status", "modo_seguro" if ctl["modo_seguro"] else "rodando")
         r = TickResult(s.next_tick())
+        circulo_pid = kit_project_id(s, "circulo")
+        ctx.dl.project_id = circulo_pid          # fora de um pedido, quem trabalha é o próprio círculo
         self._stage("orquestrador")
+        self.incidents.resolve_stale()
         finance.age_open_transactions(s)
 
         # 1) pedido (prioridade) ou 2) evolução natural
@@ -125,13 +131,16 @@ class Circle:
             except Exception as exc:  # noqa: BLE001 — o círculo não pode morrer
                 s.finish_event(ev["id"], False, repr(exc))
                 r.errors.append(f"evento {ev['id']}: {exc!r}")
+                self.incidents.record(f"pedido:{ev['kind']}", exc, pid)
             finally:
-                ctx.dl.project_id = None
+                ctx.dl.project_id = circulo_pid
         else:
             try:
                 r.idle_task = self.idle()
             except Exception as exc:  # noqa: BLE001
                 r.errors.append(f"idle: {exc!r}")
+                if not getattr(exc, "_registrado", False):
+                    self.incidents.record("idle", exc, circulo_pid)
 
         # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar).
         #    Modo seguro congela os níveis 2 e 3: só a saúde continua rodando (e pode fazer rollback).
@@ -139,6 +148,8 @@ class Circle:
         if not ctl["modo_seguro"]:
             stages = [("meta", self.meta.step), ("shadow", self.shadow.evaluate)] + stages
         for stage, fn in stages:
+            if self.incidents.isolated(stage):
+                continue                       # autocorreção: etapa em quarentena não roda
             self._stage({"meta": "meta_learner", "shadow": "shadow", "health": "saude"}[stage])
             try:
                 out = fn()
@@ -150,6 +161,7 @@ class Circle:
                     r.health = out
             except Exception as exc:  # noqa: BLE001
                 r.errors.append(f"{stage}: {exc!r}\n{traceback.format_exc(limit=3)}")
+                self.incidents.record(stage, exc, circulo_pid)
 
         self._record(r)
         self._stage("descanso")
@@ -252,6 +264,11 @@ class Circle:
                          {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
         if float(run.value) < 0.5:
             return None
+        componente = {"revisar_baixa_confianca": "meta"}   # tarefa que usa uma etapa isolada também fica de fora
+        tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}")
+                 and not (t in componente and self.incidents.isolated(componente[t]))]
+        if not tasks:
+            return None
         last = s.get("idle_last", {})
         staleness = {t: s.tick - int(last.get(t, 0)) for t in tasks}
         pick = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de evolução natural tem mais valor agora?",
@@ -259,6 +276,17 @@ class Circle:
         gate = ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST.get(pick, 0), "value_signal": 0.6, "task": pick})
         if not gate.allowed:
             return None
+        try:
+            self._run_idle_task(pick)
+        except Exception as exc:  # noqa: BLE001
+            self.incidents.record(f"idle:{pick}", exc, ctx.dl.project_id)
+            exc._registrado = True
+            raise
+        last[pick] = s.tick
+        s.set("idle_last", last)
+        return pick
+
+    def _run_idle_task(self, pick: str) -> None:
         if pick == "analisar_padroes":
             self.analyst.scan()
         elif pick == "revisar_baixa_confianca":
@@ -271,9 +299,6 @@ class Circle:
             self.developer.idle()
         elif pick == "revisar_prs":
             self.gate.run()
-        last[pick] = s.tick
-        s.set("idle_last", last)
-        return pick
 
     def regression(self) -> dict:
         """Replay da política ativa sobre todo o histórico resolvido; guarda a acurácia como linha de base."""

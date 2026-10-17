@@ -75,6 +75,15 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .chip.fila{background:var(--jev-soft);color:var(--jev)}
 .chip.parado{background:var(--bad);color:var(--surface)}
 .intro{max-width:62ch;margin:0 0 22px}
+.card.zero{border-color:var(--jev);box-shadow:inset 0 4px 0 var(--jev)}
+.zero-box{display:grid;gap:8px;padding:12px 14px;border-radius:14px;background:var(--bg)}
+.zero-row{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.zero-row b{font-weight:700;text-align:right}
+.zero-row span{white-space:nowrap}
+.rbar{height:8px;border-radius:999px;background:var(--line);overflow:hidden;display:flex}
+.rbar i{display:block;height:100%}
+.rbar .f{background:var(--ok)}.rbar .p{background:var(--jev);opacity:.55}
+.err-on{color:var(--bad)}
 .intro h2{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
 .intro p{margin:0;color:var(--muted)}
 
@@ -195,12 +204,17 @@ function card(p) {
   const bars = p.atividade_24h.map(v => `<i class="${v ? "" : "zero"}" style="height:${v ? Math.max(12, v / max * 100) : 8}%"></i>`).join("");
   const semLlm = p.sem_llm == null ? "—" : Math.round(p.sem_llm * 100) + "%";
   const agora = V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id);
-  return `<a class="card${agora ? " agora" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
+  return `<a class="card${agora ? " agora" : ""}${p.kit === "circulo" ? " zero" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
     <svg class="mini" viewBox="0 0 34 34" aria-hidden="true"><circle class="t" cx="17" cy="17" r="13"/><circle class="a" cx="17" cy="17" r="13"/></svg>
-    <div class="top"><span class="chip">${esc(p.tipo_rotulo)}</span><span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
+    <div class="top">${p.kit === "circulo" ? `<span class="chip manutencao">Projeto zero</span>` : `<span class="chip">${esc(p.tipo_rotulo)}</span>`}<span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
     <h3>${esc(p.nome)}</h3>
     <p class="pedido">${esc(p.pedido)}</p>
     <p class="proposito">${esc(p.proposito)}</p>
+    ${p.roteiro ? `<div class="zero-box">
+      <div class="zero-row"><span>Roteiro</span><b>${p.roteiro.feito} de ${p.roteiro.total} feitos${p.roteiro.parcial ? ` · ${p.roteiro.parcial} parciais` : ""}</b></div>
+      <div class="rbar" aria-hidden="true"><i class="f" style="width:${p.roteiro.feito / p.roteiro.total * 100}%"></i><i class="p" style="width:${p.roteiro.parcial / p.roteiro.total * 100}%"></i></div>
+      <div class="zero-row"><span>Erros</span><b class="${p.erros.abertos ? "err-on" : ""}">${p.erros.abertos} abertos${p.erros.isolados ? ` (${p.erros.isolados} isolados)` : ""} · ${p.erros.resolvidos} resolvidos</b></div>
+    </div>` : ""}
     <div class="stats">
       <div><b>${p.giros}</b><span>giros</span></div>
       <div><b>${p.decisoes}</b><span>decisões</span></div>

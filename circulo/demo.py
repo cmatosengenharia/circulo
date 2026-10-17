@@ -19,9 +19,18 @@ MENSAGENS = [
 
 def run_demo(data_dir: str, porta: int = 8765, giro: float = 0.6) -> None:
     c = Circle(data_dir, jev=LocalJev(), llm=None)
-    if c.store.one("SELECT COUNT(*) n FROM projects")["n"] == 1:
+    if c.store.one("SELECT COUNT(*) n FROM projects WHERE kit IS NULL")["n"] == 0:
         c.submit_project("Crie uma landing page para captar leads do Instagram")
         c.submit_project("Crie um portal admin para fotógrafos")
+    # Falha simulada (rotulada) para ver o registro de erros e a autocorreção funcionando no painel.
+    original_scan, rnd_falha = c.analyst.scan, random.Random(3)
+
+    def scan_instavel():
+        if rnd_falha.random() < 0.7:
+            raise RuntimeError("falha simulada do demo na análise de padrões")
+        return original_scan()
+
+    c.analyst.scan = scan_instavel
     serve(c.store.path, porta, background=True)
     print(f"demo: painel em http://127.0.0.1:{porta} (dados em {data_dir}). Ctrl+C para parar.")
 

@@ -110,7 +110,11 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .list li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline;justify-content:space-between}
 .list li:first-child{border-top:0}
 .chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--muted)}
-.chip.applied{background:var(--ok-soft);color:var(--ok)}
+.chip.applied,.chip.feito,.chip.resolvido{background:var(--ok-soft);color:var(--ok)}
+.chip.parcial,.chip.em_andamento{background:var(--jev-soft);color:var(--jev)}
+.chip.aberto{background:var(--llm-soft);color:var(--llm)}
+.chip.isolado{background:var(--bad-soft);color:var(--bad)}
+.list .meta{display:block;color:var(--muted);font-size:13px}
 .chip.shadow{background:var(--jev-soft);color:var(--jev)}
 .chip.rejected,.chip.rolled_back{background:var(--bad-soft);color:var(--bad)}
 .empty{color:var(--muted);padding:6px 0}
@@ -179,6 +183,16 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       </section>
     </div>
 
+    <section class="panel c7 zero-only" hidden>
+      <h2>Roteiro do círculo</h2>
+      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o círculo, mais os erros recorrentes que ele mesmo registrou para corrigir.</p>
+      <ul class="list" id="roadmap"></ul>
+    </section>
+    <section class="panel c5 zero-only" hidden>
+      <h2>Erros registrados</h2>
+      <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
+      <ul class="list" id="incidents"></ul>
+    </section>
     <section class="panel c7">
       <h2>Números do projeto</h2>
       <div id="projects"></div>
@@ -294,6 +308,15 @@ function render(s) {
     if (P.kit !== "financas") $("#askText").placeholder = "Um detalhe ou orientação para este projeto";
     $("#about").innerHTML = `<p class="pedido">Pedido: “${esc(P.pedido)}”</p><p>${esc(P.proposito)}</p>` +
       (P.status === "aguardando_kit" ? `<div class="banner" style="margin-top:12px">Este projeto foi registrado como <strong>${esc(P.tipo_rotulo)}</strong>, mas o círculo ainda não tem o kit para construir este tipo de solução. O pedido não se perde: ele passa a ser atendido quando o kit existir. As decisões abaixo são as que o círculo já tomou sobre ele.</div>` : "");
+  }
+  const zero = P && P.kit === "circulo";
+  document.querySelectorAll(".zero-only").forEach(e => e.hidden = !zero);
+  if (zero) {
+    const RS = {feito:"feito", parcial:"parcial", em_andamento:"em andamento", pendente:"pendente"};
+    $("#roadmap").innerHTML = (s.roteiro || []).map(r => `<li><span>${esc(r.titulo)}<span class="meta">${r.origem === "erro" ? "Registrado pelo círculo · " : "Seu pedido · "}${esc(r.detalhe)}${r.evidencia ? " · " + esc(r.evidencia) : ""}</span></span><span class="chip ${esc(r.status)}">${RS[r.status] || esc(r.status)}</span></li>`).join("");
+    const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
+    $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
+      : `<li class="empty">Nenhum erro registrado até agora.</li>`;
   }
   showStage(L.etapa && (!PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
 

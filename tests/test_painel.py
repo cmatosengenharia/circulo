@@ -103,7 +103,8 @@ def test_home_e_cards(circle, painel):
     circle.tick()
     with urllib.request.urlopen(painel + "/api/projetos", timeout=5) as r:
         data = json.loads(r.read())
-    assert {p["tipo"] for p in data["projetos"]} == {"financas", "produto_software"}
+    assert {p["tipo"] for p in data["projetos"]} == {"circulo", "financas", "produto_software"}
+    assert data["projetos"][0]["kit"] == "circulo"             # o próprio círculo fica fixado no topo
 
 
 def test_pedido_curto_demais_e_recusado(painel):
@@ -125,6 +126,6 @@ def test_painel_sobe_antes_do_loop_e_mostra_desligado(tmp_path):
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/projetos", timeout=5) as r:
             data = json.loads(r.read())
-        assert data["loop"]["vivo"]["estado"] == "desligado" and data["projetos"][0]["kit"] == "financas"
+        assert data["loop"]["vivo"]["estado"] == "desligado" and data["projetos"][0]["kit"] == "circulo"
     finally:
         srv.shutdown()
