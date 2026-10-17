@@ -204,6 +204,16 @@ CREATE TABLE IF NOT EXISTS cycles (
   created_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS harness_experiments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  role TEXT NOT NULL,
+  variante TEXT NOT NULL,
+  trials TEXT NOT NULL,
+  status TEXT NOT NULL,          -- rodando | promovido | descartado | rejeitado
+  notes TEXT,
+  created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -231,7 +241,8 @@ class Store:
                   ("alerts", "project_id", "INTEGER"), ("metrics", "project_id", "INTEGER"),
                   ("projects", "melhor_nota", "REAL"), ("projects", "ciclos", "INTEGER"), ("projects", "plateau", "INTEGER"),
                   ("projects", "ultima_pesquisa_tick", "INTEGER"), ("projects", "ultimo_ciclo_tick", "INTEGER"),
-                  ("projects", "ultimo_ciclo_em", "REAL"))
+                  ("projects", "ultimo_ciclo_em", "REAL"), ("proposals", "rollbacks", "INTEGER"),
+                  ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

@@ -60,7 +60,7 @@ class Memory:
         n, avg = len(docs), (sum(len(t) for t in toks) / len(docs)) or 1
         df = Counter(w for t in toks for w in set(t))
         scores = []
-        for d, t in zip(docs, toks, strict=True):
+        for t in toks:
             tf = Counter(t)
             sc = 0.0
             for w in q:

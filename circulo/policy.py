@@ -173,6 +173,7 @@ def fingerprint(obj: Any) -> str:
 class PolicyStore:
     def __init__(self, store: Store):
         self.s = store
+        self.before_change = None   # guardrail: snapshot antes de qualquer mudança de política
         if not self.s.one("SELECT 1 FROM policy_versions WHERE status='active'"):
             guard(DEFAULT_POLICY)
             self.s.x(
@@ -196,8 +197,13 @@ class PolicyStore:
     def body(self, version: int) -> dict:
         return json.loads(self.s.one("SELECT body FROM policy_versions WHERE version=?", (version,))["body"])
 
+    def _snap(self) -> None:
+        if self.before_change:
+            self.before_change()
+
     def add_version(self, body: dict, status: str, reason: str, proposal_id: int | None = None) -> int:
         guard(body)
+        self._snap()
         parent, _ = self.active()
         with self.s.tx():
             if status == "active":
@@ -210,6 +216,7 @@ class PolicyStore:
             )
 
     def promote_shadow(self, version: int) -> None:
+        self._snap()
         with self.s.tx():
             parent, _ = self.active()
             self.s.x("UPDATE policy_versions SET status='retired' WHERE status='active'")
@@ -233,13 +240,14 @@ class PolicyStore:
         row = self.s.one("SELECT version, parent, proposal_id FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")
         if not row or row["parent"] is None:
             return None
+        self._snap()
         with self.s.tx():
             self.s.x("UPDATE policy_versions SET status='rolled_back', reason=reason || ' | rollback: ' || ? WHERE version=?",
                      (reason, row["version"]))
             self.s.x("UPDATE policy_versions SET status='active', activated_tick=? WHERE version=?",
                      (self.s.tick, row["parent"]))
             if row["proposal_id"]:
-                self.s.x("UPDATE proposals SET status='rolled_back', notes=?, updated_at=? WHERE id=?",
+                self.s.x("UPDATE proposals SET status='rolled_back', notes=?, updated_at=?, rollbacks=COALESCE(rollbacks,0)+1 WHERE id=?",
                          (reason, time.time(), row["proposal_id"]))
         return row["parent"]
 

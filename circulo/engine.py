@@ -75,10 +75,12 @@ def _strip_fences(text: str) -> str:
 
 
 class Engine:
-    def __init__(self, ctx: Ctx, memory: Memory):
+    def __init__(self, ctx: Ctx, memory: Memory, lab=None):
         self.ctx = ctx
         self.s = ctx.store
         self.mem = memory
+        self.lab = lab
+        self._arm: tuple[str | None, int | None] = (None, None)
 
     # ------------------------------------------------------------ utilidades
     @property
@@ -94,8 +96,12 @@ class Engine:
 
     def _gen(self, role: str, prompt: str, res: CycleResult, project: dict) -> tuple[str, list[dict]]:
         cfg = self._role(role)
+        system = cfg["system"]
+        if self.lab and role in ("builder", "improver"):
+            system, arm, exp = self.lab.system_for(role)
+            self._arm = (arm, exp)
         model = self.ctx.dl.pick_model(role, {"tipo": project["tipo"]})
-        out = self.llm.generate(system=cfg["system"], prompt=prompt, model=model,
+        out = self.llm.generate(system=system, prompt=prompt, model=model,
                                 max_tokens=int(cfg["max_tokens"]), web_search=int(cfg.get("web_search", 0)))
         self.ctx.budget.charge(out.tokens, "llm")
         res.tokens += out.tokens
@@ -153,10 +159,14 @@ class Engine:
         finally:
             self.ctx.dl.project_id = prev_dl
         now = time.time()
-        self.s.x("INSERT INTO cycles(project_id,tick,fase,nota_antes,nota_depois,ganho,aceita,tokens,lessons,resultado,created_at) "
-                 "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        arm, exp = self._arm
+        self._arm = (None, None)
+        if self.lab and arm and res.aceita is not None:
+            self.lab.record(exp, arm, res.ganho, bool(res.aceita))
+        self.s.x("INSERT INTO cycles(project_id,tick,fase,nota_antes,nota_depois,ganho,aceita,tokens,lessons,resultado,created_at,braco,experimento) "
+                 "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                  (pid, self.s.tick, res.fase, res.nota_antes, res.nota_depois, res.ganho,
-                  None if res.aceita is None else int(res.aceita), res.tokens, json.dumps(res.lessons), res.nota, now))
+                  None if res.aceita is None else int(res.aceita), res.tokens, json.dumps(res.lessons), res.nota, now, arm, exp))
         self.s.x("UPDATE projects SET ultimo_ciclo_tick=?, ultimo_ciclo_em=?, ciclos=COALESCE(ciclos,0)+1, updated_at=? WHERE id=?",
                  (self.s.tick, now, now, pid))
         self._plateau(p, res)

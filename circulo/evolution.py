@@ -69,6 +69,22 @@ class MetaLearner:
         out.sort(key=lambda c: (-c.evidence["consistency"], c.evidence["seen"], -len(c.patch[0]["rule"]["keywords"][0])))
         return out
 
+    def distillation_candidates(self) -> list[Candidate]:
+        """Destilação: se a LLM só confirma o que o Jev já tinha respondido, o fallback é desperdício → subir na cascata."""
+        rows = self.ctx.store.q("""SELECT j.value jv, l.value lv FROM decisions l JOIN decisions j
+            ON j.tick=l.tick AND j.question=l.question AND j.source!='llm' AND j.id < l.id
+            WHERE l.source='llm' AND l.question NOT LIKE 'llm:%' ORDER BY l.id DESC LIMIT 200""")
+        if len(rows) < 20:
+            return []
+        agree = sum(r["jv"] == r["lv"] for r in rows) / len(rows)
+        thr = float(self.ctx.policy["thresholds"]["llm_fallback_below"])
+        if agree >= 0.9 and thr > 0.2:
+            new = round(max(0.2, thr - 0.05), 2)
+            return [Candidate("distillation", f"Destilar: LLM concordou com o Jev em {agree:.0%}; fallback só abaixo de {new}",
+                              [{"op": "set", "path": "thresholds.llm_fallback_below", "value": new}],
+                              {"occurrences": len(rows), "consistency": round(agree, 3)})]
+        return []
+
     def circle_candidates(self) -> list[Candidate]:
         s, policy = self.ctx.store, self.ctx.policy
         thr = float(policy["thresholds"]["auto_accept_category"])
@@ -95,7 +111,7 @@ class MetaLearner:
     # ---------------------------------------------------- decisão + apply
     def step(self) -> list[str]:
         log = []
-        for c in self.domain_candidates() + self.circle_candidates():
+        for c in self.domain_candidates() + self.circle_candidates() + self.distillation_candidates():
             r = self.process(c)
             if r:
                 log.append(r)
@@ -118,9 +134,14 @@ class MetaLearner:
     def process(self, c: Candidate) -> str | None:
         s = self.ctx.store
         fp = fingerprint(c.patch)
-        prev = s.one("SELECT status, evidence FROM proposals WHERE fingerprint=?", (fp,))
-        if prev and prev["status"] in ("applied", "shadow", "rejected"):
+        prev = s.one("SELECT status, evidence, COALESCE(rollbacks,0) rb FROM proposals WHERE fingerprint=?", (fp,))
+        if prev and prev["status"] in ("applied", "shadow", "rejected", "bloqueada"):
             return None
+        from .guardrails import MAX_ROLLBACKS, can_change_level2
+        if prev and prev["rb"] >= MAX_ROLLBACKS:
+            # oscilação: revertida 2x → bloqueada; só o humano reabre
+            s.x("UPDATE proposals SET status='bloqueada', notes='revertida 2 vezes: oscilação' WHERE fingerprint=?", (fp,))
+            return f"bloqueada por oscilação: {c.description}"
         if prev and prev["status"] == "rolled_back":
             old_n = json.loads(prev["evidence"]).get("occurrences", 0)
             if c.evidence.get("occurrences", 0) < 2 * old_n:
@@ -136,6 +157,9 @@ class MetaLearner:
             self._upsert(c, 2, fp, "rejected", f"guard: {exc}")
             return f"rejeitada pelo guard: {c.description}"
         level = level_of_change(old, new)
+        if level == 2 and not can_change_level2(s):
+            self._upsert(c, level, fp, "deferred", "orçamento de mudanças de nível 2 do dia esgotado")
+            return None
         if level == 2 and self.ctx.policies.shadow():
             self._upsert(c, level, fp, "deferred", "já existe um shadow em avaliação")
             return None

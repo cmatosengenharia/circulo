@@ -19,7 +19,9 @@ from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
+from . import guardrails
 from .engine import Engine
+from .harness_lab import HarnessLab
 from .incidents import Incidents
 from .memory import Memory
 from .projects import ensure_seed, intake, kit_project_id
@@ -27,7 +29,7 @@ from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
 
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 9000}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 9000, "evoluir_harness": 800}
 
 
 @dataclass
@@ -65,7 +67,9 @@ class Circle:
         self.health = HealthMonitor(self.ctx)
         self.gate = gate if gate is not None else build_gate(self.ctx)
         self.memory = Memory(self.ctx.store, self.ctx.dl)
-        self.engine = Engine(self.ctx, self.memory)
+        self.lab = HarnessLab(self.ctx)
+        self.engine = Engine(self.ctx, self.memory, self.lab)
+        self.ctx.policies.before_change = lambda: guardrails.snapshot(self.ctx.store, self.data_dir, "mudanca")
         self.ctx.store.set("motor_pronto", self.engine.ready)
         self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
         finance.base(store)
@@ -118,6 +122,9 @@ class Circle:
         self._stage("orquestrador")
         self.incidents.resolve_stale()
         self.engine.reopen_stale()
+        if r.tick % 50 == 1:
+            guardrails.daily_snapshot(s, self.data_dir)
+            guardrails.check_stagnation(s, ctx.reply)
         finance.age_open_transactions(s)
 
         # 1) pedido (prioridade) ou 2) evolução natural
@@ -268,6 +275,8 @@ class Circle:
             tasks.append("propor_feature")
         if self.engine.ready and self.engine.candidates() and "evoluir_projeto" not in tasks:
             tasks.append("evoluir_projeto")
+        if self.engine.ready and "evoluir_harness" not in tasks:
+            tasks.append("evoluir_harness")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
         if self.controls()["modo_seguro"]:
@@ -277,7 +286,7 @@ class Circle:
                          {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
         if float(run.value) < 0.5:
             return None
-        componente = {"revisar_baixa_confianca": "meta"}   # tarefa que usa uma etapa isolada também fica de fora
+        componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # tarefa que usa uma etapa isolada também fica de fora
         tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}")
                  and not (t in componente and self.incidents.isolated(componente[t]))]
         if not tasks:
@@ -312,6 +321,8 @@ class Circle:
             self.developer.idle()
         elif pick == "revisar_prs":
             self.gate.run()
+        elif pick == "evoluir_harness":
+            self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "evoluir_projeto":
             pid = self.engine.next_project()
             if pid is not None:

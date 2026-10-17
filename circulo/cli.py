@@ -26,6 +26,9 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("status")
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
+    sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
+    rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
+    rs.add_argument("arquivo")
     args = ap.parse_args(argv)
 
     if args.cmd == "painel":
@@ -38,7 +41,17 @@ def main(argv: list[str] | None = None) -> None:
         run_demo(args.data + "-demo", args.porta)
         return
 
+    if args.cmd == "restaurar":
+        from .guardrails import restore
+        safety = restore(os.path.join(args.data, "circulo.db"), args.arquivo)
+        print(f"restaurado. O banco anterior ficou guardado em {safety}")
+        return
+
     c = Circle(args.data)
+    if args.cmd == "snapshot":
+        from .guardrails import snapshot
+        print(snapshot(c.store, c.data_dir, "manual"))
+        return
     if args.cmd == "run":
         if args.painel:
             from .painel import serve
