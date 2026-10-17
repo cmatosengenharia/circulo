@@ -97,6 +97,10 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "versoes": _rows(s.q("SELECT version, status, reason, created_at FROM policy_versions ORDER BY version DESC LIMIT 12")),
         "merges": _rows(s.q("SELECT pr, merged, reason, created_at FROM merges ORDER BY id DESC LIMIT 10")),
         "aguardando": aguardando,
+        "autonomia": autonomia(s),
+        **({"conexoes": conexoes(s, projeto), "evidencias": _rows(s.q(
+            "SELECT tick, fase, versao, antes, depois, oculta_antes, oculta_depois, jev_avanca, jev_contraprova, decisao, motivo, created_at "
+            "FROM evidence WHERE project_id=? ORDER BY id DESC LIMIT 15", (projeto,)))} if projeto else {}),
         "projetos": projetos,
         "serie": serie,
         "respostas": _rows(s.q(f"SELECT id, message, created_at FROM alerts WHERE kind='resposta'{pf} ORDER BY id DESC LIMIT 6", pa)),
@@ -105,6 +109,35 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         **({"roteiro": roteiro(s), "incidentes": incidentes(s), "quarentena": {
             k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
     }
+
+
+def autonomia(s: Store) -> dict:
+    """Quanto o loop dependeu de você — a meta é zero intervenção."""
+    semana = time.time() - 7 * 86400
+    hum = "COALESCE(json_extract(payload,'$.origem'),'') != 'demo'"
+    return {
+        "intervencoes_7d": s.one(f"SELECT COUNT(*) n FROM events WHERE kind='mensagem' AND created_at>? AND {hum}", (semana,))["n"],
+        "pedidos_7d": s.one(f"SELECT COUNT(*) n FROM events WHERE kind='novo_projeto' AND created_at>? AND {hum}", (semana,))["n"],
+        "decisoes_7d": s.one("SELECT COUNT(*) n FROM decisions WHERE created_at>?", (semana,))["n"],
+        "evolucoes_7d": s.one("SELECT COUNT(*) n FROM evidence WHERE created_at>? AND decisao IN ('avancar','base','cumprida')", (semana,))["n"],
+        "fora_do_alcance": _rows(s.q("SELECT message, created_at FROM alerts WHERE kind='fora_alcance' ORDER BY id DESC LIMIT 6")),
+        "configuracao": _rows(s.q("SELECT titulo, detalhe FROM roadmap WHERE status!='feito' AND evidencia LIKE '%depende de você%' ORDER BY ordem")),
+        "paralelo": int((json.loads(s.one("SELECT body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")["body"])
+                         .get("portfolio", {}) or {}).get("parallel", 1)),
+    }
+
+
+def conexoes(s: Store, pid: int) -> list[dict]:
+    rows = s.q("""SELECT pr.id, pr.nome, pr.tipo, l.relacao, l.forca, l.evidencia FROM links l
+                  JOIN projects pr ON pr.id = CASE WHEN l.a=? THEN l.b ELSE l.a END
+                  WHERE (l.a=? OR l.b=?) AND l.relacao!='nenhuma' ORDER BY l.forca DESC""", (pid, pid, pid))
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["licoes_trocadas"] = s.one("SELECT COUNT(*) n FROM transfers WHERE (de=? AND para=?) OR (de=? AND para=?)",
+                                     (pid, r["id"], r["id"], pid))["n"]
+        out.append(d)
+    return out
 
 
 def motor(s: Store, pid: int) -> dict:
@@ -177,6 +210,7 @@ def make_handler(db_path: str):
                 st = self._store()
                 e = estado(st)
                 self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")),
+                            "autonomia": e["autonomia"],
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
             elif u.path == "/api/eventos":
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")

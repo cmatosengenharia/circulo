@@ -48,7 +48,8 @@ class DemoLLM:
         return "".join(partes[: min(k + 1, len(partes))])
 
     def generate(self, *, system, prompt, model, max_tokens, web_search=0):
-        tipo = "landing_page" if "landing" in prompt.lower() else "outro"
+        linha_pedido = prompt.split("Pedido:", 1)[1].split("\n", 1)[0] if "Pedido:" in prompt else prompt[:200]
+        tipo = "landing_page" if ("landing" in linha_pedido.lower() or "Tipo: landing_page" in prompt) else "outro"
         if "Researcher" in system:
             return LLMResult("- Formulário curto com até 3 campos aumenta a conversão de leads | https://exemplo.org/form\n"
                              "- Prova social perto do botão aumenta a conversão | https://exemplo.org/prova\n"
@@ -65,7 +66,12 @@ class DemoLLM:
         if "Builder" in system or "Improver" in system:
             k = self.n[key]
             pedido = (prompt.split("Pedido:", 1)[1].split("\n", 1)[0].strip() if "Pedido:" in prompt else "Plano")
-            return LLMResult(self._lp(k) if tipo == "landing_page" else self._md(pedido, k), 2500, model)
+            out = self._lp(k) if tipo == "landing_page" else self._md(pedido, k)
+            if "Missões relacionadas" in prompt and k >= 2:    # a partir da v2, integra com a missão ligada
+                rel = prompt.split("Missões relacionadas", 1)[1].split("“", 1)[1].split("”", 1)[0]
+                linha = f"Integra com a missão “{rel}”: os contatos captados aqui vão direto para lá."
+                out = out.replace("</body>", f"<p>{linha}</p></body>") if "</body>" in out else out + f"\n\n## Integração\n{linha}"
+            return LLMResult(out, 2500, model)
         return LLMResult("Acrescentar uma seção por ciclo, começando pelos critérios de maior peso, fez a nota subir.", 60, model)
 
 
@@ -73,8 +79,8 @@ def run_demo(data_dir: str, porta: int = 8765, giro: float = 0.6) -> None:
     c = Circle(data_dir, jev=LocalJev(), llm=DemoLLM())
     c.store.set("demo", True)
     if c.store.one("SELECT COUNT(*) n FROM projects WHERE kit IS NULL")["n"] == 0:
-        c.submit_project("Crie uma landing page para captar leads do Instagram")
-        c.submit_project("Crie um portal admin para fotógrafos")
+        c.submit_project("Crie uma landing page para captar leads de fotógrafos no Instagram")
+        c.submit_project("Crie um portal admin para fotógrafos gerenciarem leads e clientes")
         c.submit_project("Monte um plano para a construção da casa no lote")
     # Falha simulada (rotulada) para ver o registro de erros e a autocorreção funcionando no painel.
     original_scan, rnd_falha = c.analyst.scan, random.Random(3)
@@ -98,12 +104,7 @@ def run_demo(data_dir: str, porta: int = 8765, giro: float = 0.6) -> None:
                 continue
             submit(rnd.choice(MENSAGENS))
             time.sleep(1.2)
-            row = s.one("SELECT id, description, category, status FROM ledger ORDER BY id DESC LIMIT 1")
-            if row and row["status"] == "open":
-                if "sacol" in row["description"] and row["category"] != "mercado":
-                    submit(f"corrige {row['id']} mercado necessario")
-                elif rnd.random() < 0.5:
-                    submit(f"ok {row['id']}")
+            # sem correções nem confirmações: o loop decide e se corrige sozinho (zero intervenção)
 
     threading.Thread(target=usuario, daemon=True).start()
     # giros acelerados, mas com o mesmo batimento e os mesmos controles do loop real

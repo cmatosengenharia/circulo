@@ -373,6 +373,10 @@ class Engine:
         if aceita:
             self.s.x("UPDATE projects SET melhor_nota=? WHERE id=?", (ev["visivel"], p["id"]))
             self._talvez_cumprida(p, ev)
+            if self.graph:   # uma missão mudou: as que se integram com ela voltam a evoluir sozinhas
+                for lg in self.graph.ligadas(p["id"]):
+                    if lg["relacao"] in ("complementa", "consome") and lg["status"] in ("manutencao", "cumprida"):
+                        self.reopen(lg["id"], f"missão ligada “{p['nome']}” ganhou v{ver}")
         if not res.nota:
             res.nota = f"v{ver} {'aceita' if aceita else 'descartada pela catraca'} (nota {ev['visivel']:.2f}, oculta {ev['oculta']:.2f})"
         ativadas = self.mem.lesson_outcome(res.lessons, res.ganho if aceita else 0.0, self.ctx.policy["portfolio"]["min_gain"])

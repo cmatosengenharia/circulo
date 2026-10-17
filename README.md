@@ -156,3 +156,36 @@ Cada card mostra um indicador principal ligado ao propósito (nota na régua, % 
 concluído), versão, ciclos, evoluções, PRs, % de decisões sem LLM, erros abertos, as IAs que trabalharam nela
 e indicadores do tipo (versões aceitas, tokens por ponto de régua, tokens gastos, lançamentos, missões ativas).
 Na tela do Loop, o círculo toca cada etapa de cada giro em tempo real (trilha via SSE), de todas as missões.
+
+## Autonomia (nada espera você)
+
+O loop não pergunta e não aguarda. Onde antes havia uma confirmação humana, agora há uma de três coisas:
+
+| Antes | Agora |
+|---|---|
+| "confere? responda corrige…" em finanças | Baixa confiança fica registrada e é **reclassificada sozinha** quando as regras evoluem |
+| Label `aprovado-humano` para código protegido | **Constituição** (gate, guardrails, política, orçamento, Developer, CI): o loop nunca altera — PR de agente é **recusado na hora** e a missão segue. **Código de dinheiro**: entra sozinho com o check **Evidência reforçada** (propriedades financeiras em 5.000 casos aleatórios) |
+| "Mande uma orientação para reabrir" | Missão parada volta sozinha: pesquisa nova, missão ligada que mudou, ou tempo |
+
+Suas mensagens continuam aceitas (viram feedback ou pedido no roteiro), mas nenhuma é necessária. O painel mostra
+"intervenções suas (7 dias)" — a meta é zero. O único ponto humano é a **configuração única** (chaves e máquina).
+
+### Como o loop sabe que acertou (evidência por ciclo)
+
+Cada versão nova gera um registro em `evidence`: nota antes/depois na régua visível e nos critérios ocultos,
+verificação pós-LLM, integração com as missões ligadas, e duas perguntas ao Jev feitas do jeito oposto —
+"é melhor e segura para seguir?" e "piorou algo importante?". Só avança se a catraca passa **e** as duas
+respostas concordam. Se o Jev se contradiz, a versão é refeita. Bateu a meta (`portfolio.target_score`) e o
+Jev não vê ganho que pague outro ciclo: **missão cumprida**, com o motivo registrado.
+
+### Missões que se conhecem
+
+O Jev decide a relação entre missões (mesmo público, complementa, usa a saída, compartilha dados). Missões
+ligadas consultam a memória umas das outras, recebem o contexto da entrega atual da outra (como dado, nunca
+instrução), ganham critério de integração na régua, trocam lições confirmadas (que chegam em quarentena) e se
+reabrem quando a outra muda.
+
+### Paralelo
+
+`portfolio.parallel` (padrão 3, entre 1 e 8) missões evoluem no mesmo giro. As chamadas de LLM correm em paralelo;
+o banco serializa as escritas; o orçamento é reservado antes de disparar.

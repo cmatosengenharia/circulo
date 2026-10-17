@@ -130,7 +130,17 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .chip.atual,.chip.ativa{background:var(--ok-soft);color:var(--ok)}
 .chip.quarentena{background:var(--llm-soft);color:var(--llm)}
 .preview{width:100%;height:420px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;margin-top:10px}
-.gain-up{color:var(--ok);font-weight:700}.gain-down{color:var(--bad);font-weight:700}
+.gain-up{color:var(--ok);font-weight:700}
+.auto-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.auto-nums div{display:flex;flex-direction:column;padding:10px 12px;border-radius:var(--r-sm);background:var(--bg)}
+.auto-nums b{font-size:22px;font-weight:800}
+.auto-nums b.zero{color:var(--ok)}
+.auto-nums span{font-size:12px;color:var(--muted)}
+.list .grupo{display:block;font-size:12px;font-weight:700;color:var(--muted);padding:10px 0 2px;border:0}
+.chip.avancar,.chip.base,.chip.cumprida{background:var(--ok-soft);color:var(--ok)}
+.chip.refazer{background:var(--llm-soft);color:var(--llm)}
+.chip.descartar{background:var(--bad-soft);color:var(--bad)}
+.lanes{display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;margin-top:4px}.gain-down{color:var(--bad);font-weight:700}
 .chip.shadow{background:var(--jev-soft);color:var(--jev)}
 .chip.rejected,.chip.rolled_back{background:var(--bad-soft);color:var(--bad)}
 .empty{color:var(--muted);padding:6px 0}
@@ -160,6 +170,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
   <div class="grid">
     <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
       <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
+      <div class="lanes" id="lanes" aria-label="Missões evoluindo em paralelo neste giro"></div>
       <svg id="ring" viewBox="-310 -250 620 500" role="img" aria-label="Etapa atual do giro"></svg>
       <div class="legend">
         <span><b style="background:var(--jev)"></b>Resolvido pelo Jev</span>
@@ -191,7 +202,9 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
         <ul class="list" id="replies" style="margin-top:10px"></ul>
       </section>
       <section class="panel">
-        <h2>Aguardando você</h2>
+        <h2>Autonomia</h2>
+        <p class="sub" style="margin:-6px 0 8px">Nada aqui espera você. O que o loop não pode fazer, ele recusa e segue por outro caminho.</p>
+        <div class="auto-nums" id="autoNums"></div>
         <ul class="list" id="waiting"></ul>
       </section>
       <section class="panel">
@@ -200,6 +213,16 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       </section>
     </div>
 
+    <section class="panel c7 ev-only" hidden>
+      <h2>Evidências</h2>
+      <p class="sub" style="margin:-6px 0 8px">Como o loop sabe que acertou antes de seguir: medição antes e depois (inclusive nos critérios ocultos), verificação, o Jev a favor e a contraprova do Jev contra a piora.</p>
+      <ul class="list" id="evidencias"></ul>
+    </section>
+    <section class="panel c5 ev-only" hidden>
+      <h2>Conexões</h2>
+      <p class="sub" style="margin:-6px 0 8px">Missões relacionadas pelo Jev. Compartilham memória e contexto; quando se complementam, a integração entra na régua.</p>
+      <ul class="list" id="conexoes"></ul>
+    </section>
     <section class="panel c7 geral-only" hidden>
       <h2>Entrega</h2>
       <div id="entrega"></div>
@@ -325,7 +348,16 @@ function showStage(e) {
 // a trilha chega em rajadas (um giro inteiro pode levar milissegundos): toca etapa por etapa
 const fila = [];
 let tocando = false;
+const lanes = {tick: null, ids: new Set()};
+function marcarLane(t) {
+  if (t.tick !== lanes.tick) { lanes.tick = t.tick; lanes.ids = new Set(); }
+  if (t.etapa === "projeto" && t.project_id) lanes.ids.add(t.project_id);
+  if (!S || !S.nomes) return;
+  $("#lanes").innerHTML = lanes.ids.size ? `<span class="sub">Em paralelo neste giro:</span>` +
+    [...lanes.ids].map(id => `<span class="mission">${esc(S.nomes[id] || "missão " + id)}</span>`).join("") : "";
+}
 function enfileirar(t) {
+  marcarLane(t);
   fila.push({nome: t.etapa, tick: t.tick, projeto: t.project_id});
   if (fila.length > 40) fila.splice(0, fila.length - 40);
   if (!tocando) tocar();
@@ -404,7 +436,7 @@ function render(s) {
     $("#askTitle").textContent = ASK[0]; $("#askHelp").textContent = ASK[1]; $("#askText").placeholder = ASK[2];
     $("#about").innerHTML = `<p class="pedido">Pedido: “${esc(P.pedido)}”</p><p>${esc(P.proposito)}</p>` +
       (P.kit === "geral" && !P.motor_pronto ? `<div class="banner" style="margin-top:12px">O motor de construção está parado: falta a chave da LLM (<code>ANTHROPIC_API_KEY</code>) na máquina do loop. O projeto está registrado e classificado; ele começa a pesquisar e construir assim que a chave existir.</div>` : "") +
-      (P.status === "manutencao" ? `<div class="banner" style="margin-top:12px">Em manutenção: os últimos ciclos não trouxeram ganho relevante. Mande uma orientação em “Falar com a missão” para reabrir.</div>` : "");
+      (P.status === "manutencao" ? `<div class="banner" style="margin-top:12px">Em manutenção: os últimos ciclos não trouxeram ganho que pagasse o custo. Volta sozinha quando a pesquisa achar algo novo, quando uma missão ligada mudar, ou com o tempo.</div>` : "");
   }
   const geral = P && P.kit === "geral" && s.motor;
   document.querySelectorAll(".geral-only").forEach(e => e.hidden = !geral);
@@ -454,12 +486,29 @@ function render(s) {
   $("#budget").innerHTML = meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
     o.tokens / o.limite, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Ao esgotar, o círculo pausa e retoma à meia-noite.`);
 
-  $("#waiting").innerHTML = s.aguardando.length ? s.aguardando.map(a =>
-    `<li><span>${esc(a.texto)}</span>${a.acao ? `<button class="mini" data-send="${esc(a.acao)}">Está certo</button>` : ""}</li>`).join("")
-    : `<li class="empty">Nada pendente. O círculo está decidindo sozinho.</li>`;
+  const A = s.autonomia;
+  $("#autoNums").innerHTML = `<div><b class="${A.intervencoes_7d ? "" : "zero"}">${A.intervencoes_7d}</b><span>intervenções suas (7 dias)</span></div>
+    <div><b>${A.evolucoes_7d}</b><span>avanços com evidência (7 dias)</span></div>
+    <div><b>${A.paralelo}</b><span>missões em paralelo por giro</span></div>`;
+  const avisos = s.aguardando.filter(a => a.tipo === "aviso");
+  $("#waiting").innerHTML =
+    (avisos.length ? `<li class="grupo">Resolvido sozinho</li>` + avisos.map(a => `<li><span>${esc(a.texto)}</span></li>`).join("") : "") +
+    (A.fora_do_alcance.length ? `<li class="grupo">Fora do alcance (recusado, sem espera)</li>` + A.fora_do_alcance.map(a => `<li><span>${esc(a.message)}</span><span class="sub">${hora(a.created_at)}</span></li>`).join("") : "") +
+    (A.configuracao.length ? `<li class="grupo">Configuração única, só uma vez</li>` + A.configuracao.map(c => `<li><span>${esc(c.titulo)}<span class="meta">${esc(c.detalhe)}</span></span></li>`).join("") : "") ||
+    `<li class="empty">Nada pendente. O loop está decidindo sozinho.</li>`;
+  const temEv = P && (s.evidencias || []).length + (s.conexoes || []).length > 0;
+  document.querySelectorAll(".ev-only").forEach(e => e.hidden = !temEv);
+  if (temEv) {
+    const DEC = {base:"primeira versão", avancar:"avançou", refazer:"refazer", descartar:"descartada", cumprida:"missão cumprida"};
+    $("#evidencias").innerHTML = s.evidencias.length ? s.evidencias.map(e => `<li><span>${e.versao ? "v" + e.versao + " · " : ""}giro ${e.tick}<span class="meta">${esc(e.motivo)}</span></span><span class="chip ${esc(e.decisao)}">${DEC[e.decisao] || esc(e.decisao)}</span></li>`).join("")
+      : `<li class="empty">Nenhum ciclo avaliado ainda.</li>`;
+    const REL = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
+    $("#conexoes").innerHTML = s.conexoes.length ? s.conexoes.map(c => `<li><span><a href="/missao/${c.id}">${esc(c.nome)}</a><span class="meta">${esc(c.evidencia)}${c.licoes_trocadas ? ` · ${c.licoes_trocadas} lições trocadas` : ""}</span></span><span class="chip">${REL[c.relacao] || esc(c.relacao)}</span></li>`).join("")
+      : `<li class="empty">Nenhuma missão relacionada por enquanto.</li>`;
+  }
   $("#evol").innerHTML = s.evolucoes.length ? s.evolucoes.map(e =>
     `<li><span>${esc(e.description)}<br><span class="sub">nível ${e.level}</span></span><span class="chip ${esc(e.status)}">${EVOL[e.status] || esc(e.status)}</span></li>`).join("")
-    : `<li class="empty">Nenhuma evolução ainda. Ela aparece quando houver correções suficientes para aprender.</li>`;
+    : `<li class="empty">Nenhuma mudança de regra ou de política ainda. Elas aparecem aqui quando o loop tiver evidência para mudar.</li>`;
   $("#versions").innerHTML = s.versoes.map(v =>
     `<li><span>v${v.version} · ${esc(v.reason)}</span><span class="chip ${v.status === "active" ? "applied" : esc(v.status)}">${{active:"ativa",retired:"anterior",shadow:"shadow",rolled_back:"revertida",rejected:"rejeitada"}[v.status] || esc(v.status)}</span></li>`).join("");
   $("#projects").innerHTML = (P ? `<div class="proj"><span class="sub">${P.giros} giros · ${P.decisoes} decisões · ${P.evolucoes_aplicadas} evoluções aplicadas</span></div>` : "") + s.projetos.map(p =>

@@ -96,6 +96,9 @@ a.card:hover{border-color:var(--ink)}
 .chip.ativo{background:var(--ok-soft);color:var(--ok)}
 .chip.aguardando_kit{background:var(--llm-soft);color:var(--llm)}
 .chip.manutencao{background:var(--jev-soft);color:var(--jev)}
+.chip.cumprida{background:var(--ok);color:var(--surface)}
+.links{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.links b{color:var(--ink);font-weight:600}
 .card h3{font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.015em;margin:0;padding-right:44px}
 .pedido{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pedido::before{content:"“"}.pedido::after{content:"”"}
@@ -194,7 +197,8 @@ const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado
   pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
 const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", projeto:"construindo",
   developer:"corrigindo o próprio código", meta_learner:"no Meta-Learner", shadow:"avaliando shadow", saude:"checando a saúde"};
-const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado"};
+const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado", cumprida:"Cumprida"};
+const REL = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
 function ago(ts) {
   const s = Math.max(0, Date.now() / 1000 - ts);
   if (s < 60) return "agora há pouco"; if (s < 3600) return `há ${Math.round(s / 60)} min`;
@@ -210,6 +214,7 @@ function cardLive(p) {
   if (p.na_fila) return `<span class="chip fila">${p.na_fila} na fila</span> o loop chega aqui no próximo giro`;
   if (p.kit === "geral" && !p.motor_pronto) return `<span class="chip">Parado</span> falta a chave da LLM`;
   if (p.status === "manutencao") return `Em manutenção: sem ganho relevante nos últimos ciclos`;
+  if (p.status === "cumprida") return `Meta atingida com evidência; volta se a pesquisa achar algo novo`;
   if (p.kit === "geral" && !p.regua) return `Próximo ciclo: pesquisar e montar a régua`;
   if (p.kit === "circulo" && p.roteiro) return `Roteiro: ${p.roteiro.feito} de ${p.roteiro.total} feitos`;
   return "Última atividade " + ago(p.ultima_atividade);
@@ -269,6 +274,7 @@ function card(p) {
     <p class="proposito">${esc(p.proposito)}</p>
     ${kpi(m)}
     <div class="stats">${stats(p)}</div>
+    ${m.conexoes && m.conexoes.length ? `<div class="links"><span>Conectada a</span>${m.conexoes.map(c => `<b>${esc(c.nome)}</b><span>(${REL[c.relacao] || esc(c.relacao)})</span>`).join("")}${m.licoes_recebidas ? `<span>· ${m.licoes_recebidas} lições recebidas</span>` : ""}</div>` : ""}
     <div class="ias"><span>IA:</span>${m.modelos.map(x => `<span class="chip">${esc(x)}</span>`).join("")}</div>
     <div class="pulse" title="Atividade nas últimas 24 horas">${bars}</div>
     <div class="foot"><span>${cardLive(p)}</span><span>Abrir</span></div>
@@ -306,6 +312,7 @@ function facts() {
     const o = S.orcamento; add("Orçamento hoje", (o.tokens / o.limite * 100).toFixed(1).replace(".", ",") + "% usado");
     add("Decisões sem LLM (24h)", S.saude.decisoes_24h ? Math.round(S.saude.sem_llm * 100) + "%" : "—");
     if (S.novos_na_fila) add("Missões sendo criadas", S.novos_na_fila);
+    if (S.autonomia) { add("Intervenções suas (7 dias)", S.autonomia.intervencoes_7d); add("Em paralelo", S.autonomia.paralelo + " missões por giro"); }
     if (S.demo) add("Modo", "demonstração (LLM simulada)");
   }
   $("#facts").innerHTML = f.join("");

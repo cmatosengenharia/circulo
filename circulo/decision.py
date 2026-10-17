@@ -341,9 +341,9 @@ class LocalJev:
     def _relacao(self, qid, q, s):
         me = s.get("missao", {})
         o = next((x for x in s.get("outras", []) if f"rel_{x['id']}" == qid), {})
-        def pal(p):
-            return {w for w in re.findall(r"[a-z]{4,}", norm(" ".join([p.get("pedido", ""), p.get("proposito", ""), " ".join(p.get("achados", []))])))
-                    if w not in _STOP and w not in ("crie", "criar", "monte", "pedido", "missao")}
+        def pal(p):   # só o que a pessoa pediu: achados de pesquisa parecidos não tornam missões parentes
+            return {w for w in re.findall(r"[a-z]{4,}", norm(p.get("pedido", "") + " " + p.get("proposito", "")))
+                    if w not in _STOP and w not in ("crie", "criar", "monte", "pedido", "missao", "plano", "para", "minha", "meus")}
         a, b = pal(me), pal(o)
         comum = a & b
         tipos = {me.get("tipo"), o.get("tipo")}

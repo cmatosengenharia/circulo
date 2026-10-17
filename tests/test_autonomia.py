@@ -172,3 +172,12 @@ def test_nenhuma_mensagem_do_loop_pede_acao_sua(eco):
 
 
 _ = LANDING_V1
+
+
+def test_missao_ligada_que_muda_reabre_a_outra(eco):
+    c, gen, lp, portal, plano = eco
+    c.store.x("UPDATE projects SET status='manutencao' WHERE id=?", (lp,))
+    c.engine.cycle(portal)
+    c.engine.cycle(portal)          # portal ganha v1
+    assert c.store.one("SELECT status FROM projects WHERE id=?", (lp,))["status"] == "ativo"
+    assert c.store.one("SELECT status FROM projects WHERE id=?", (plano,))["status"] == "ativo"   # (não estava parado)
