@@ -1,0 +1,39 @@
+name: Release
+
+# Lança sozinho: quando a versão do pyproject.toml ainda não tem tag, cria a tag vX.Y.Z e a release
+# com a seção correspondente do CHANGELOG. Só depois que o CI da mesma versão passar.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Versão e notas
+        id: v
+        run: |
+          VER=$(python3 -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$VER" >/dev/null 2>&1; then echo "existe=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          awk -v v="$VER" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Versão $VER." > notes.md
+          echo "existe=0" >> "$GITHUB_OUTPUT"
+      - name: Criar tag e release
+        if: steps.v.outputs.existe == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.v.outputs.ver }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          gh release create "v$VER" --target "$SHA" --title "Círculo $VER" --notes-file notes.md
