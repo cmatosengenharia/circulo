@@ -68,3 +68,21 @@ def test_registrar_fecha_itens_de_configuracao_do_roteiro(circle):
     st = {r["titulo"]: r["status"] for r in circle.store.q("SELECT titulo, status FROM roadmap")}
     assert st["Ligar as chaves e o Claude Code na máquina do loop"] == "feito" and st["Rodar 24/7"] == "feito"
     assert circle.store.get("configuracao")["pecas"][0]["nome"] == "Jev (decisões)"
+
+
+def test_loop_reinicia_sozinho_quando_a_configuracao_muda(circle, casa, monkeypatch):
+    _, env = casa
+    cfg.configurar(env)
+    monkeypatch.setattr(cfg, "ENV_FILE", env)
+    import time as _t
+    passos = []
+
+    def sleep(sec):
+        passos.append(sec)
+        if len(passos) == 2:
+            _t.sleep(0.01)
+            env.write_text(env.read_text().replace("TYPESAFE_API_KEY=", "TYPESAFE_API_KEY=nova"))
+            os.utime(env, (env.stat().st_atime, env.stat().st_mtime + 5))
+
+    circle.run_forever(max_ticks=50, sleep=sleep)
+    assert circle.store.tick < 50 and circle.store.get("ultimo_reinicio")["motivo"] == "configuração alterada"

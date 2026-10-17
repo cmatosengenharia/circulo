@@ -466,9 +466,16 @@ class Circle:
             signal.signal(signal.SIGTERM, self.stop)
             signal.signal(signal.SIGINT, self.stop)
         self.store.set("loop_iniciado_em", time.time())
+        from .configuracao import ENV_FILE
+        env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
         n = 0
         try:
             while not self._stop.is_set():
+                # configuração mudou (você salvou as chaves): sai limpo; o serviço 24/7 sobe de novo já com elas
+                atual = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
+                if atual != env_mtime and self.store.get("reiniciar_ao_mudar_config", True):
+                    self.store.set("ultimo_reinicio", {"em": time.time(), "motivo": "configuração alterada"})
+                    break
                 self.heartbeat()
                 r = self.tick()
                 n += 1

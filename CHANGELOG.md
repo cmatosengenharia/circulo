@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — 2026-10-17
+
+- O loop percebe quando o arquivo de configuração muda (você salvou as chaves) e reinicia sozinho já com elas; o serviço 24/7 o sobe de novo.
+
 ## 1.0.0 — 2026-10-17 · primeira versão
 
 O loop autoevolutivo completo, pronto para rodar 24/7 sem depender de interação.
