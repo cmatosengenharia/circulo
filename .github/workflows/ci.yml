@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]" ruff
+      - name: Lint
+        run: ruff check circulo tests --select E,F,W,B --ignore E501
+      - name: Testes
+        run: pytest -q
+      - name: Fumaça do loop (50 giros sem input)
+        run: |
+          circulo --data "$RUNNER_TEMP/d" add "38,90 ifood almoço"
+          circulo --data "$RUNNER_TEMP/d" tick -n 50 > ticks.jsonl
+          python - <<'EOF'
+          import json
+          rows = [json.loads(l) for l in open("ticks.jsonl")]
+          errs = [e for r in rows for e in r["erros"]]
+          assert len(rows) == 50 and not errs, errs
+          print("50 giros, 0 erros")
+          EOF
+
+  arquivos-protegidos:
+    # Cálculos, dinheiro e o guard de proteções só mudam com aprovação humana explícita.
+    name: Arquivos protegidos
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bloqueia mudança em código de dinheiro sem o label aprovado-humano
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          changed=$(git diff --name-only "$BASE" HEAD -- circulo/finance.py circulo/money.py circulo/policy.py circulo/budget.py .github/)
+          if [ -z "$changed" ]; then echo "Nenhum arquivo protegido alterado."; exit 0; fi
+          echo "Arquivos protegidos alterados:"; echo "$changed"
+          case ",$LABELS," in
+            *,aprovado-humano,*) echo "Label aprovado-humano presente."; exit 0 ;;
+            *) echo "::error::Este PR altera código de dinheiro/proteções. Precisa do label 'aprovado-humano' para entrar."; exit 1 ;;
+          esac

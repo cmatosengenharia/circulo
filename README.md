@@ -45,3 +45,9 @@ limiares em [0,1] · `should_evolve.circle ≥ 0.7` · auto-accept ≥ 0.6 · in
 
 Estado em `data/circulo.db` (SQLite/WAL). Matar o processo a qualquer momento é seguro: o evento em
 andamento volta para a fila na próxima partida.
+
+## CI
+
+`.github/workflows/ci.yml` roda lint, testes (Python 3.11–3.13) e 50 giros do loop em todo push/PR.
+PRs que mexem em `finance.py`, `money.py`, `policy.py`, `budget.py` ou `.github/` só passam com o label
+`aprovado-humano` — é o gate que impede os agentes de alterarem dinheiro e proteções sozinhos.
