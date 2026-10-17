@@ -87,21 +87,21 @@ class MissionGraph:
     def contexto(self, pid: int, limite: int = 1800) -> str:
         """Bloco de contexto das missões ligadas, para o Builder/Improver (dado, nunca instrução)."""
         partes = []
-        for l in self.ligadas(pid)[:4]:
+        for lg in self.ligadas(pid)[:4]:
             cur = self.s.one("SELECT content, formato, version FROM deliverables WHERE project_id=? AND status='atual' "
-                             "ORDER BY version DESC LIMIT 1", (l["id"],))
+                             "ORDER BY version DESC LIMIT 1", (lg["id"],))
             resumo = ""
             if cur:
                 txt = re.sub(r"<[^>]+>", " ", cur["content"]) if cur["formato"] == "html" else cur["content"]
                 resumo = " ".join(txt.split())[:350]
-            pedido = self.s.one("SELECT pedido FROM projects WHERE id=?", (l["id"],))["pedido"]
-            partes.append(f"- “{l['nome']}” ({l['relacao'].replace('_', ' ')}): pedido “{pedido[:160]}”."
+            pedido = self.s.one("SELECT pedido FROM projects WHERE id=?", (lg["id"],))["pedido"]
+            partes.append(f"- “{lg['nome']}” ({lg['relacao'].replace('_', ' ')}): pedido “{pedido[:160]}”."
                           + (f" Entrega atual v{cur['version']}: {resumo}" if cur else " Ainda sem entrega."))
         texto = "\n".join(partes)
         return texto[:limite]
 
     def ids_ligados(self, pid: int) -> list[int]:
-        return [l["id"] for l in self.ligadas(pid)]
+        return [lg["id"] for lg in self.ligadas(pid)]
 
     # ------------------------------------------------------------ integração vira critério
     def _criterio_integracao(self, pid: int, outra: dict) -> None:
@@ -124,9 +124,9 @@ class MissionGraph:
     def aplicar_pendentes(self, pid: int) -> None:
         if not self.s.get(f"integracao_pendente:{pid}"):
             return
-        for l in self.ligadas(pid):
-            if l["relacao"] in INTEGRA:
-                self._criterio_integracao(pid, {"id": l["id"], "nome": l["nome"]})
+        for lg in self.ligadas(pid):
+            if lg["relacao"] in INTEGRA:
+                self._criterio_integracao(pid, {"id": lg["id"], "nome": lg["nome"]})
         self.s.set(f"integracao_pendente:{pid}", False)
 
     # ------------------------------------------------------------ lições viajam entre missões
@@ -135,19 +135,19 @@ class MissionGraph:
         if not lic or lic["status"] != "ativa" or not lic["project_id"]:
             return 0
         n = 0
-        for l in self.ligadas(lic["project_id"]):
-            if l["tipo"] == lic["tipo"]:
+        for lg in self.ligadas(lic["project_id"]):
+            if lg["tipo"] == lic["tipo"]:
                 continue   # mesmo tipo já enxerga a lição pelo playbook
             ok = self.ctx.dl.ask("transfer_lesson", Question(
-                "noul", f"A lição “{lic['text'][:200]}” provavelmente ajuda também a missão “{l['nome']}”?"),
-                {"licao": lic["text"], "origem_tipo": lic["tipo"], "destino": l})
+                "noul", f"A lição “{lic['text'][:200]}” provavelmente ajuda também a missão “{lg['nome']}”?"),
+                {"licao": lic["text"], "origem_tipo": lic["tipo"], "destino": lg})
             if float(ok.value) < 0.5:
                 continue
-            mid = self.mem.add("licao", lic["text"], tipo=l["tipo"], project_id=l["id"],
+            mid = self.mem.add("licao", lic["text"], tipo=lg["tipo"], project_id=lg["id"],
                                source=f"transferida da missão {lic['project_id']}", status="quarentena",
                                meta={"transferida_de": lesson_id})
             self.s.x("INSERT INTO transfers(lesson_id,copia_id,de,para,created_at) VALUES(?,?,?,?,?)",
-                     (lesson_id, mid, lic["project_id"], l["id"], time.time()))
+                     (lesson_id, mid, lic["project_id"], lg["id"], time.time()))
             n += 1
         return n
 
