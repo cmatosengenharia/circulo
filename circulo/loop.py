@@ -16,11 +16,12 @@ from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev, build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
+from .merge_gate import MergeGate, build_gate
 from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
 
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0}
 
 
 @dataclass
@@ -37,7 +38,8 @@ class TickResult:
 
 class Circle:
     def __init__(self, data_dir: str | Path = "data", jev: JevClient | None = None, llm: LLMClient | None = None,
-                 now: Callable[[], datetime] | None = None, db_path: str | None = None):
+                 now: Callable[[], datetime] | None = None, db_path: str | None = None,
+                 gate: MergeGate | None = None):
         self.data_dir = Path(data_dir)
         store = Store(db_path or (self.data_dir / "circulo.db"))
         policies = PolicyStore(store)
@@ -54,6 +56,7 @@ class Circle:
         self.meta = MetaLearner(self.ctx)
         self.shadow = Shadow(self.ctx)
         self.health = HealthMonitor(self.ctx)
+        self.gate = gate if gate is not None else build_gate(self.ctx)
         finance.base(store)
         recovered = store.recover_interrupted()
         if recovered:
@@ -177,6 +180,8 @@ class Circle:
         tasks = list(ctx.policy["idle"]["tasks"])
         if ctx.dl.llm is not None and "propor_feature" not in tasks:
             tasks.append("propor_feature")
+        if self.gate is not None and "revisar_prs" not in tasks:
+            tasks.append("revisar_prs")
         run = ctx.dl.ask("should_run_idle", Question("noul", "Vale rodar uma tarefa de evolução natural agora?"),
                          {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
         if float(run.value) < 0.5:
@@ -198,6 +203,8 @@ class Circle:
             self.write_summary()
         elif pick == "propor_feature":
             self.developer.idle()
+        elif pick == "revisar_prs":
+            self.gate.run()
         last[pick] = s.tick
         s.set("idle_last", last)
         return pick

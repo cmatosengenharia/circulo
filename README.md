@@ -51,3 +51,19 @@ andamento volta para a fila na próxima partida.
 `.github/workflows/ci.yml` roda lint, testes (Python 3.11–3.13) e 50 giros do loop em todo push/PR.
 PRs que mexem em `finance.py`, `money.py`, `policy.py`, `budget.py` ou `.github/` só passam com o label
 `aprovado-humano` — é o gate que impede os agentes de alterarem dinheiro e proteções sozinhos.
+
+## Gate de merge (no próprio círculo)
+
+O GitHub Free não aplica proteção de branch em repositório privado, então o gate mora em `circulo/merge_gate.py`
+e roda como tarefa de evolução natural (`revisar_prs`) quando `GITHUB_TOKEN` e `CIRCULO_REPO` estão definidos.
+
+Regras duras (não evoluem; o arquivo é protegido pelo CI):
+1. Só PRs de agente (branch `circulo/…`), sem rascunho.
+2. Os 4 checks obrigatórios verdes na última execução, e nenhum outro check falhando.
+3. Até 800 linhas.
+4. Mexeu em `finance.py`, `money.py`, `policy.py`, `budget.py`, `merge_gate.py` ou `.github/` → precisa do
+   label `aprovado-humano` colocado **por você** (`CIRCULO_HUMANO`), e não removido depois.
+5. Reviewer Code (Jev) aprova — o Jev pode endurecer, nunca liberar o que as regras barraram.
+6. Merge squash com o SHA avaliado travado: commit novo depois da avaliação faz o GitHub recusar.
+
+Limite honesto: é convenção, não bloqueio do GitHub. Quem tem push direto (você, um token) ainda escreve na `main`.

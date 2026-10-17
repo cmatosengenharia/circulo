@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -58,7 +59,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
-          changed=$(git diff --name-only "$BASE" HEAD -- circulo/finance.py circulo/money.py circulo/policy.py circulo/budget.py .github/)
+          changed=$(git diff --name-only "$BASE" HEAD -- circulo/finance.py circulo/money.py circulo/policy.py circulo/budget.py circulo/merge_gate.py .github/)
           if [ -z "$changed" ]; then echo "Nenhum arquivo protegido alterado."; exit 0; fi
           echo "Arquivos protegidos alterados:"; echo "$changed"
           case ",$LABELS," in
