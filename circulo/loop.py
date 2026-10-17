@@ -28,6 +28,7 @@ IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regress
 class TickResult:
     tick: int
     paused: bool = False
+    pause_reason: str | None = None
     handled_event: int | None = None
     idle_task: str | None = None
     evolutions: list[str] = field(default_factory=list)
@@ -67,6 +68,21 @@ class Circle:
     def store(self) -> Store:
         return self.ctx.store
 
+    # ------------------------------------------------------------ controles do humano
+    def controls(self) -> dict:
+        c = self.store.get("controle", {}) or {}
+        return {"pausado": bool(c.get("pausado")), "modo_seguro": bool(c.get("modo_seguro"))}
+
+    def set_control(self, **kw) -> dict:
+        c = self.controls()
+        c.update({k: bool(v) for k, v in kw.items() if k in ("pausado", "modo_seguro")})
+        self.store.set("controle", c)
+        return c
+
+    def _stage(self, name: str, extra: dict | None = None) -> None:
+        """Etapa atual do giro, para o painel ao vivo."""
+        self.store.set("etapa", {"nome": name, "tick": self.store.tick, "em": time.time(), **(extra or {})})
+
     # ------------------------------------------------------------ entrada
     def submit(self, text: str, at: float | None = None) -> int:
         return self.store.enqueue("mensagem", {"text": text, "at": at if at is not None else time.time()})
@@ -74,17 +90,25 @@ class Circle:
     # ------------------------------------------------------------ um giro do círculo
     def tick(self) -> TickResult:
         s, ctx = self.store, self.ctx
+        ctl = self.controls()
+        if ctl["pausado"]:
+            s.set("loop_status", "pausado_humano")
+            self._stage("pausado")
+            return TickResult(s.tick, paused=True, pause_reason="humano")
         if ctx.budget.exhausted():
             s.set("loop_status", "pausado_orcamento")
-            return TickResult(s.tick, paused=True)
-        s.set("loop_status", "rodando")
+            self._stage("pausado")
+            return TickResult(s.tick, paused=True, pause_reason="orcamento")
+        s.set("loop_status", "modo_seguro" if ctl["modo_seguro"] else "rodando")
         r = TickResult(s.next_tick())
+        self._stage("orquestrador")
         finance.age_open_transactions(s)
 
         # 1) pedido (prioridade) ou 2) evolução natural
         ev = s.claim_next_event()
         if ev:
             r.handled_event = ev["id"]
+            self._stage("pedido", {"evento": ev["id"]})
             try:
                 with s.tx():
                     self.handle(json.loads(ev["payload"]), ev["id"])
@@ -98,8 +122,13 @@ class Circle:
             except Exception as exc:  # noqa: BLE001
                 r.errors.append(f"idle: {exc!r}")
 
-        # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar)
-        for stage, fn in (("meta", self.meta.step), ("shadow", self.shadow.evaluate), ("health", self.health.check)):
+        # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar).
+        #    Modo seguro congela os níveis 2 e 3: só a saúde continua rodando (e pode fazer rollback).
+        stages = [("health", self.health.check)]
+        if not ctl["modo_seguro"]:
+            stages = [("meta", self.meta.step), ("shadow", self.shadow.evaluate)] + stages
+        for stage, fn in stages:
+            self._stage({"meta": "meta_learner", "shadow": "shadow", "health": "saude"}[stage])
             try:
                 out = fn()
                 if stage == "meta":
@@ -112,6 +141,7 @@ class Circle:
                 r.errors.append(f"{stage}: {exc!r}\n{traceback.format_exc(limit=3)}")
 
         self._record(r)
+        self._stage("descanso")
         every = int(ctx.policy["loop"]["summary_every_ticks"])
         if r.tick % every == 0:
             self.write_summary()
@@ -177,11 +207,15 @@ class Circle:
     # ------------------------------------------------------------ evolução natural (sem input)
     def idle(self) -> str | None:
         ctx, s = self.ctx, self.store
+        self._stage("idle")
         tasks = list(ctx.policy["idle"]["tasks"])
         if ctx.dl.llm is not None and "propor_feature" not in tasks:
             tasks.append("propor_feature")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
+        if self.controls()["modo_seguro"]:
+            # só tarefas de baixo risco: nada de evoluir regras, gerar features ou mergear
+            tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo")]
         run = ctx.dl.ask("should_run_idle", Question("noul", "Vale rodar uma tarefa de evolução natural agora?"),
                          {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
         if float(run.value) < 0.5:
@@ -280,7 +314,9 @@ class Circle:
             if max_ticks is not None and n >= max_ticks:
                 break
             loop = self.ctx.policy["loop"]
-            if r.paused:
+            if r.paused and r.pause_reason == "humano":
+                sleep(2)                                                  # confere o botão com frequência
+            elif r.paused:
                 sleep(min(self.ctx.budget.seconds_until_reset(), 600))   # acorda e confere de novo
             elif self.store.pending_count() > 0:
                 continue

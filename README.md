@@ -13,7 +13,8 @@ export TYPESAFE_API_KEY=...        # opcional: sem chave usa o decisor local (me
 export ANTHROPIC_API_KEY=...       # opcional: fallback LLM, só quando o Jev autorizar
 
 circulo add "38,90 ifood almoço"   # enfileira
-circulo run                        # loop infinito (Ctrl+C para; o estado fica salvo)
+circulo run --painel               # loop infinito + painel em http://127.0.0.1:8765
+circulo demo                       # loop acelerado com pedidos simulados, para ver o painel vivo
 circulo respostas                  # o que o círculo respondeu
 circulo status                     # painel + orçamento + versão da política
 circulo resumo                     # resumo diário (também gerado sozinho)
@@ -67,3 +68,18 @@ Regras duras (não evoluem; o arquivo é protegido pelo CI):
 6. Merge squash com o SHA avaliado travado: commit novo depois da avaliação faz o GitHub recusar.
 
 Limite honesto: é convenção, não bloqueio do GitHub. Quem tem push direto (você, um token) ainda escreve na `main`.
+
+## Painel local
+
+`circulo run --painel` (ou `circulo painel` em outro processo) serve o painel em `http://127.0.0.1:8765`,
+só na sua máquina. Mostra o giro atual no círculo, cada decisão do Jev ao vivo (com confiança e se subiu
+para LLM), saúde contra os limites, orçamento, o que aguarda você, evoluções e versões da política.
+
+Controles que funcionam no loop de verdade:
+- **Pausar / Retomar**: o loop para no próximo giro e confere o botão a cada 2s.
+- **Modo seguro**: congela a evolução das regras e do próprio círculo (meta-learner, shadow, merges,
+  features); pedidos continuam sendo atendidos e a saúde continua podendo fazer rollback.
+- **Novo pedido**: entra na mesma fila das mensagens.
+
+Os comandos exigem o cabeçalho `X-Circulo` e origem local, então outro site aberto no navegador não
+consegue mandar comandos para o painel.

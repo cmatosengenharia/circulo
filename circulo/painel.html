@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
+  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2;
+  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --bad-soft:#F6DCD8; --idle:#AEB8C2;
+  --r-lg:22px; --r-sm:10px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
+  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14;
+  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--jev);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:18px}
+header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
+.state{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}
+.state[data-s="pausado_humano"] .dot,.state[data-s="parado"] .dot{background:var(--idle)}
+.state[data-s="pausado_orcamento"] .dot{background:var(--llm)}
+.state[data-s="modo_seguro"] .dot{background:var(--jev)}
+.state[data-s="rodando"] .dot{animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{50%{opacity:.35}}
+.controls{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.switch{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px 6px 8px;cursor:pointer;font-weight:600}
+.switch i{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background .2s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--surface);transition:transform .2s}
+.switch[aria-checked="true"] i{background:var(--jev)}
+.switch[aria-checked="true"] i::after{transform:translateX(14px)}
+
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px}
+.panel h2{font-size:17px;font-weight:700;margin:0 0 12px}
+.sub{color:var(--muted);font-size:13px}
+.c7{grid-column:span 7}.c5{grid-column:span 5}.c12{grid-column:span 12}
+@media (max-width:900px){.c7,.c5{grid-column:span 12}}
+
+/* o círculo */
+.ringbox{position:relative;display:flex;flex-direction:column;align-items:center}
+#ring{width:100%;max-width:520px;height:auto;overflow:visible}
+.track{fill:none;stroke:var(--line);stroke-width:2}
+.arc{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .5s ease}
+.node circle{fill:var(--surface);stroke:var(--line);stroke-width:2;transition:fill .3s,stroke .3s}
+.node text{fill:var(--muted);font-size:13px;font-weight:500}
+.node.on circle{fill:var(--ink);stroke:var(--ink)}
+.node.on text{fill:var(--ink);font-weight:700}
+.hub{fill:var(--jev-soft);stroke:var(--jev);stroke-width:1.5}
+.hubnum{fill:var(--ink);font-size:44px;font-weight:800;letter-spacing:-.03em}
+.hublbl{fill:var(--muted);font-size:13px}
+.spark{transition:transform .9s cubic-bezier(.2,.7,.2,1),opacity .9s}
+.paused #ring .arc{stroke:var(--idle)}
+.now{align-self:flex-start;margin:0;font-weight:600}
+.now span{color:var(--muted);font-weight:400}
+.legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:13px;margin-top:6px}
+.legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* saúde */
+.meter{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line)}
+.meter:first-of-type{border-top:0;padding-top:0}
+.meter .name{font-weight:600}
+.meter .val{font-weight:700;text-align:right}
+.meter .why{grid-column:1/-1;color:var(--muted);font-size:13px}
+.bar{grid-column:1/-1;height:8px;border-radius:999px;background:var(--bg);position:relative;overflow:hidden}
+.bar span{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--ok);transition:width .5s}
+.bar.warn span{background:var(--llm)}.bar.bad span{background:var(--bad)}
+.bar em{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+
+/* feed */
+.feed{list-style:none;margin:0;padding:0;max-height:620px;overflow:auto}
+.feed li{display:grid;grid-template-columns:62px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.feed li:first-child{border-top:0}
+.feed .t{color:var(--muted);font-size:13px}
+.feed .q{font-weight:600}
+.feed .v{color:var(--muted)}
+.src{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--jev-soft);color:var(--jev)}
+.src.llm{background:var(--llm-soft);color:var(--llm)}
+.src.local{background:transparent;border:1px solid var(--jev);}
+.conf{height:4px;border-radius:999px;background:var(--bg);margin-top:4px;overflow:hidden}
+.conf span{display:block;height:100%;background:var(--jev)}
+.feed li.new{animation:in .6s ease}
+@keyframes in{from{background:var(--jev-soft)}}
+
+.list{list-style:none;margin:0;padding:0}
+.list li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.list li:first-child{border-top:0}
+.chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--muted)}
+.chip.applied{background:var(--ok-soft);color:var(--ok)}
+.chip.shadow{background:var(--jev-soft);color:var(--jev)}
+.chip.rejected,.chip.rolled_back{background:var(--bad-soft);color:var(--bad)}
+.empty{color:var(--muted);padding:6px 0}
+.mini{border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 12px;cursor:pointer;font-weight:600;font-size:13px}
+form.ask{display:flex;gap:8px;margin-top:4px}
+form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:9px 16px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.proj{display:grid;gap:6px}
+.proj .bar span{background:var(--jev)}
+.budget{margin-top:14px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1>Círculo</h1>
+    <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
+    <div class="controls">
+      <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
+      <button class="btn primary" id="pause">Pausar o círculo</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
+      <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
+      <svg id="ring" viewBox="-310 -250 620 500" role="img" aria-label="Etapa atual do giro"></svg>
+      <div class="legend">
+        <span><b style="background:var(--jev)"></b>Resolvido pelo Jev</span>
+        <span><b style="border:1.5px solid var(--jev)"></b>Decisor local</span>
+        <span><b style="background:var(--llm)"></b>Subiu para LLM</span>
+      </div>
+    </section>
+
+    <section class="panel c5" aria-label="Saúde">
+      <h2>Saúde</h2>
+      <div id="health"></div>
+      <div class="budget" id="budget"></div>
+    </section>
+
+    <section class="panel c7">
+      <h2>Decisões ao vivo</h2>
+      <p class="sub" style="margin:-6px 0 8px">Cada pergunta que o círculo faz antes de gastar, com a confiança e quem respondeu.</p>
+      <ul class="feed" id="feed"><li class="empty">Esperando a próxima decisão…</li></ul>
+    </section>
+
+    <div class="c5 stack">
+      <section class="panel">
+        <h2>Novo pedido</h2>
+        <form class="ask" id="ask">
+          <input id="askText" placeholder="38,90 ifood almoço" aria-label="Texto do pedido" autocomplete="off">
+          <button class="btn primary" type="submit">Enviar</button>
+        </form>
+        <ul class="list" id="replies" style="margin-top:10px"></ul>
+      </section>
+      <section class="panel">
+        <h2>Aguardando você</h2>
+        <ul class="list" id="waiting"></ul>
+      </section>
+      <section class="panel">
+        <h2>Evoluções</h2>
+        <ul class="list" id="evol"></ul>
+      </section>
+    </div>
+
+    <section class="panel c7">
+      <h2>Projetos</h2>
+      <div id="projects"></div>
+    </section>
+    <section class="panel c5">
+      <h2>Versões da política</h2>
+      <ul class="list" id="versions"></ul>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = x => Math.round(x * 100) + "%";
+const hora = ts => new Date(ts * 1000).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
+  pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
+const EVOL = {applied:"aplicada", shadow:"em shadow", deferred:"adiada", rejected:"rejeitada", rolled_back:"revertida", backlog:"backlog"};
+const QUEST = {input_type:"Que tipo de mensagem é?", category:"Qual categoria?", spend_tag:"Necessário, escolha ou impulso?",
+  worth_spending:"Vale gastar?", should_evolve:"Vale evoluir?", should_run_idle:"Rodar evolução natural?", idle_task:"Qual tarefa agora?",
+  alert_pattern:"Esse padrão merece alerta?", review_finance:"Revisão financeira", review_code:"Revisão de código", health_rollback:"Precisa de rollback?"};
+
+/* ---------- o círculo ---------- */
+const STAGES = [["orquestrador","Orquestrador"],["pedido","Pedido"],["idle","Evolução natural"],
+  ["meta_learner","Meta-Learner"],["shadow","Shadow"],["saude","Saúde"]];
+const R = 190, svg = $("#ring"), NS = "http://www.w3.org/2000/svg";
+const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+const ang = i => (-90 + i * 360 / STAGES.length) * Math.PI / 180;
+svg.append(el("circle", {class:"track", r:R}));
+const arc = el("circle", {class:"arc", r:R, transform:"rotate(-90)", "stroke-dasharray": 2*Math.PI*R, "stroke-dashoffset": 2*Math.PI*R});
+svg.append(arc);
+const sparks = el("g"); svg.append(sparks);
+svg.append(el("circle", {class:"hub", r:92}));
+const hubNum = el("text", {class:"hubnum", "text-anchor":"middle", y:8}); hubNum.textContent = "—";
+const hubLbl = el("text", {class:"hublbl", "text-anchor":"middle", y:34}); hubLbl.textContent = "decisões sem LLM";
+const hubTick = el("text", {class:"hublbl", "text-anchor":"middle", y:-38});
+svg.append(hubNum, hubLbl, hubTick);
+const nodes = STAGES.map(([id, label], i) => {
+  const a = ang(i), x = Math.cos(a) * R, y = Math.sin(a) * R;
+  const g = el("g", {class:"node"}); g.append(el("circle", {cx:x, cy:y, r:11}));
+  const lx = Math.cos(a) * (R + 30), ly = Math.sin(a) * (R + 30) + 4;
+  const t = el("text", {x:lx, y:ly, "text-anchor": Math.abs(lx) < 20 ? "middle" : lx > 0 ? "start" : "end"});
+  t.textContent = label; g.append(t); svg.append(g); return [id, g];
+});
+function showStage(e) {
+  const name = e && e.nome;
+  const i = STAGES.findIndex(s => s[0] === name);
+  nodes.forEach(([id, g]) => g.classList.toggle("on", id === name));
+  const C = 2 * Math.PI * R;
+  arc.setAttribute("stroke-dashoffset", i < 0 ? C : C - C * (i + 1) / STAGES.length);
+  if (e && e.tick) hubTick.textContent = "giro " + e.tick;
+  const NOW = {orquestrador:"Orquestrador escolhendo o que fazer", pedido:"Atendendo um pedido", idle:"Evolução natural: sem pedido, o círculo melhora a si mesmo",
+    meta_learner:"Meta-Learner procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
+    descanso:"Entre giros", pausado:"Parado até você retomar ou o orçamento renovar"};
+  if (name) $("#now").innerHTML = esc(NOW[name] || name) + (e.tick ? ` <span>· giro ${e.tick}</span>` : "");
+}
+function spark(d) {
+  if (reduce) return;
+  const color = d.source === "llm" ? "var(--llm)" : "var(--jev)";
+  const c = el("circle", {r:6, class:"spark", fill: d.source === "local" ? "var(--surface)" : color, stroke: color, "stroke-width": 2});
+  sparks.append(c);
+  const a = Math.random() * Math.PI * 2, dist = 120 + d.confidence * (R - 130);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    c.style.transform = `translate(${Math.cos(a) * dist}px, ${Math.sin(a) * dist}px)`; c.style.opacity = 0;
+  }));
+  setTimeout(() => c.remove(), 1000);
+}
+
+/* ---------- feed ao vivo ---------- */
+let lastId = 0, feedCount = 0;
+function addDecision(d) {
+  const ul = $("#feed");
+  if (!feedCount) ul.innerHTML = "";
+  feedCount++;
+  const v = typeof d.value === "number" ? d.value.toFixed(2) : d.value;
+  const li = document.createElement("li"); li.className = "new";
+  li.innerHTML = `<span class="t">${hora(d.created_at)}</span>
+    <div><div class="q">${esc(QUEST[d.question] || d.question)}</div>
+      <div class="v">${esc(v)} · confiança ${pct(d.confidence)}</div>
+      <div class="conf"><span style="width:${pct(d.confidence)}"></span></div></div>
+    <span class="src ${esc(d.source)}">${d.source === "llm" ? "LLM" : d.source === "local" ? "local" : "Jev"}</span>`;
+  ul.prepend(li);
+  while (ul.children.length > 80) ul.lastChild.remove();
+  spark(d);
+}
+
+/* ---------- estado ---------- */
+let S = null;
+function meter(name, value, frac, limit, why, inverse) {
+  const bad = inverse ? frac > limit : frac < limit;
+  const warn = !bad && (inverse ? frac > limit * .75 : frac < limit * 1.1);
+  return `<div class="meter"><span class="name">${name}</span><span class="val">${value}</span>
+    <div class="bar ${bad ? "bad" : warn ? "warn" : ""}"><span style="width:${Math.min(100, frac * 100)}%"></span>
+    ${limit != null ? `<em style="left:${Math.min(100, limit * 100)}%" title="limite"></em>` : ""}</div>
+    <span class="why">${why}</span></div>`;
+}
+function render(s) {
+  S = s;
+  const L = s.loop, st = $("#state");
+  st.dataset.s = L.status; $("#stateText").textContent = STATUS[L.status] || L.status;
+  document.body.classList.toggle("paused", L.status.startsWith("pausado") || L.status === "parado");
+  $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
+  $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
+  showStage(L.etapa);
+
+  const h = s.saude;
+  hubNum.textContent = h.decisoes_24h ? pct(h.sem_llm) : "—";
+  const inv = h.invariantes.length;
+  const errRate = h.giros_100 ? h.erros_100 / h.giros_100 : 0;
+  $("#health").innerHTML =
+    meter("Integridade", inv ? inv + " violação(ões)" : "ok", inv ? 0 : 1, null,
+      inv ? esc(h.invariantes.join("; ")) : "Invariantes financeiros intactos.") +
+    meter("Qualidade", pct(h.correcao), h.correcao, h.correcao_limite,
+      `Correções nos lançamentos aceitos sozinhos (${h.amostras} amostras). Acima da marca, a última mudança é revertida.`, true) +
+    meter("Eficiência", pct(h.sem_llm), h.sem_llm, .9, `${h.decisoes_24h} decisões nas últimas 24h; meta: 90% sem LLM.`) +
+    meter("Confiabilidade", h.erros_100 + " erros", errRate, .05, `Nos últimos ${h.giros_100} giros.`, true);
+  const o = s.orcamento;
+  $("#budget").innerHTML = meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
+    o.tokens / o.limite, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Ao esgotar, o círculo pausa e retoma à meia-noite.`);
+
+  $("#waiting").innerHTML = s.aguardando.length ? s.aguardando.map(a =>
+    `<li><span>${esc(a.texto)}</span>${a.acao ? `<button class="mini" data-send="${esc(a.acao)}">Está certo</button>` : ""}</li>`).join("")
+    : `<li class="empty">Nada pendente. O círculo está decidindo sozinho.</li>`;
+  $("#evol").innerHTML = s.evolucoes.length ? s.evolucoes.map(e =>
+    `<li><span>${esc(e.description)}<br><span class="sub">nível ${e.level}</span></span><span class="chip ${esc(e.status)}">${EVOL[e.status] || esc(e.status)}</span></li>`).join("")
+    : `<li class="empty">Nenhuma evolução ainda. Ela aparece quando houver correções suficientes para aprender.</li>`;
+  $("#versions").innerHTML = s.versoes.map(v =>
+    `<li><span>v${v.version} · ${esc(v.reason)}</span><span class="chip ${v.status === "active" ? "applied" : esc(v.status)}">${{active:"ativa",retired:"anterior",shadow:"shadow",rolled_back:"revertida",rejected:"rejeitada"}[v.status] || esc(v.status)}</span></li>`).join("");
+  $("#projects").innerHTML = s.projetos.map(p =>
+    `<div class="proj"><strong>${esc(p.nome)}</strong><span class="sub">${esc(p.linha)} · ${p.lancamentos} lançamentos</span>
+     <div class="bar"><span style="width:${pct(p.progresso)}"></span></div></div>`).join("");
+  $("#replies").innerHTML = s.respostas.map(r => `<li><span>${esc(r.message)}</span><span class="sub">${hora(r.created_at)}</span></li>`).join("");
+}
+async function refresh() {
+  try { render(await (await fetch("/api/estado")).json()); }
+  catch { $("#state").dataset.s = "parado"; $("#stateText").textContent = "Sem conexão com o painel"; }
+}
+async function post(path, body) {
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify(body)});
+  await refresh(); return r.ok;
+}
+$("#pause").onclick = () => post("/api/controle", {acao: S && S.loop.controle.pausado ? "retomar" : "pausar"});
+$("#safe").onclick = () => post("/api/controle", {acao:"modo_seguro", ligado: !(S && S.loop.controle.modo_seguro)});
+$("#ask").onsubmit = e => { e.preventDefault(); const t = $("#askText").value.trim(); if (t) { post("/api/pedido", {texto:t}); $("#askText").value = ""; } };
+document.addEventListener("click", e => { const b = e.target.closest("[data-send]"); if (b) { b.disabled = true; post("/api/pedido", {texto: b.dataset.send}); } });
+
+function connect() {
+  const es = new EventSource("/api/eventos?desde=" + lastId);
+  es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
+  es.addEventListener("etapa", m => showStage(JSON.parse(m.data)));
+  es.onerror = () => { es.close(); setTimeout(connect, 2000); };
+}
+refresh(); setInterval(refresh, 3000);
+fetch("/api/estado").then(r => r.json()).then(s => { lastId = Math.max(0, s.ultima_decisao - 25); connect(); });
+</script>
+</body>
+</html>

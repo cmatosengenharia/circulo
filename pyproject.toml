@@ -19,5 +19,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["circulo"]
 
+[tool.setuptools.package-data]
+circulo = ["painel.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

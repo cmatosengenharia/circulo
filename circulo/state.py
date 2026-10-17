@@ -151,7 +151,7 @@ class Store:
         row = self.one("SELECT value FROM kv WHERE key=?", (key,))
         return json.loads(row["value"]) if row else default
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> None:  # noqa: A003
         self.x("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                (key, json.dumps(value, ensure_ascii=False)))
 
