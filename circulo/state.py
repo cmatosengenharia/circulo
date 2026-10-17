@@ -214,6 +214,24 @@ CREATE TABLE IF NOT EXISTS harness_experiments (
   created_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS prs (
+  number INTEGER PRIMARY KEY,
+  project_id INTEGER,
+  titulo TEXT NOT NULL,
+  branch TEXT,
+  status TEXT NOT NULL,           -- aberto | mergeado | fechado
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trail (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  tick INTEGER NOT NULL,
+  etapa TEXT NOT NULL,
+  project_id INTEGER,
+  em REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,

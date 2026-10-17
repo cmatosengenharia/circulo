@@ -133,6 +133,10 @@ class MergeGate:
 
     def _log(self, v: Verdict) -> None:
         s = self.ctx.store
+        # todo PR de agente que o gate viu aberto entra na contagem (inclusive os que aguardam você)
+        from .projects import kit_project_id
+        s.x("INSERT OR IGNORE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'aberto',?,?)",
+            (v.number, kit_project_id(s, "circulo"), f"PR #{v.number}", None, time.time(), time.time()))
         last = s.one("SELECT reason FROM merges WHERE pr=? AND sha=? ORDER BY id DESC LIMIT 1", (v.number, v.sha))
         if last and last["reason"] == v.reason:
             return  # não repete a mesma avaliação a cada giro
@@ -140,6 +144,10 @@ class MergeGate:
             (v.number, v.sha, int(v.merge), v.reason, json.dumps(v.details, ensure_ascii=False), time.time()))
         if v.merge:
             self.ctx.reply(f"Merge automático do PR #{v.number} ({v.details.get('lines', 0)} linhas).", "merge")
+            from .projects import kit_project_id
+            s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'mergeado',?,?) "
+                "ON CONFLICT(number) DO UPDATE SET status='mergeado', updated_at=excluded.updated_at",
+                (v.number, kit_project_id(s, "circulo"), f"PR #{v.number}", None, time.time(), time.time()))
             dev = s.get("self_dev_aberto") or {}
             if dev.get("pr") == v.number:     # PR do Developer entrou: libera o próximo
                 s.set("self_dev_aberto", {**dev, "fechado": True, "merged": True})

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Círculo — projeto</title>
+<title>Círculo — missão</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
@@ -73,6 +73,14 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .hubnum{fill:var(--ink);font-size:44px;font-weight:800;letter-spacing:-.03em}
 .hublbl{fill:var(--muted);font-size:13px}
 .spark{transition:transform .9s cubic-bezier(.2,.7,.2,1),opacity .9s}
+.comet{transition:opacity .3s}
+.comet .head{fill:var(--jev)}
+.comet .halo{fill:var(--jev);opacity:.18}
+.trail-dot{fill:var(--jev);opacity:.5;transition:opacity 1.6s}
+.node.visited circle{stroke:var(--jev)}
+.hubstate{fill:var(--muted);font-size:13px}
+.hubnum.small{font-size:30px}
+.mission{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--muted);margin-left:6px;white-space:nowrap}
 .paused #ring .arc{stroke:var(--idle)}
 .now{align-self:flex-start;margin:0;font-weight:600}
 .now span{color:var(--muted);font-weight:400}
@@ -138,13 +146,13 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 </head>
 <body>
 <div class="wrap" id="app">
-  <a class="back" href="/">Todos os projetos</a>
+  <a class="back" href="/">Todas as missões</a>
   <header>
-    <h1 id="pname">Projeto</h1>
+    <h1 id="pname">Missão</h1>
     <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
-      <button class="btn primary" id="pause">Pausar o círculo</button>
+      <button class="btn primary" id="pause">Pausar o loop</button>
     </div>
   </header>
 
@@ -161,7 +169,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
     </section>
 
     <section class="panel c5" aria-label="Saúde">
-      <h2>Saúde do círculo</h2>
+      <h2>Saúde do loop</h2>
       <div id="health"></div>
       <div class="budget" id="budget"></div>
     </section>
@@ -174,7 +182,8 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 
     <div class="c5 stack">
       <section class="panel">
-        <h2>Falar com o projeto</h2>
+        <h2 id="askTitle">Falar com a missão</h2>
+        <p class="sub" id="askHelp" style="margin:-6px 0 8px"></p>
         <form class="ask" id="ask">
           <input id="askText" placeholder="38,90 ifood almoço" aria-label="Texto do pedido" autocomplete="off">
           <button class="btn primary" type="submit">Enviar</button>
@@ -210,7 +219,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       <ul class="list" id="pesquisa"></ul>
     </section>
     <section class="panel c7 zero-only" hidden>
-      <h2>Roteiro do círculo</h2>
+      <h2>Roteiro do loop</h2>
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o círculo, mais os erros recorrentes que ele mesmo registrou para corrigir.</p>
       <ul class="list" id="roadmap"></ul>
     </section>
@@ -220,7 +229,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       <ul class="list" id="incidents"></ul>
     </section>
     <section class="panel c7">
-      <h2>Números do projeto</h2>
+      <h2>Números da missão</h2>
       <div id="projects"></div>
     </section>
     <section class="panel c5">
@@ -232,7 +241,8 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 
 <script>
 const $ = s => document.querySelector(s);
-const PID = (location.pathname.match(/\/projeto\/(\d+)/) || [])[1] || "";
+const PID = (location.pathname.match(/\/(?:projeto|missao)\/(\d+)/) || [])[1] || "";
+let ZERO = false;   // tela do Loop (missão zero): vê o loop inteiro, de todas as missões
 const Q = PID ? "projeto=" + PID : "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = x => Math.round(x * 100) + "%";
@@ -247,39 +257,95 @@ const QUEST = {input_type:"Que tipo de mensagem é?", category:"Qual categoria?"
   alert_pattern:"Esse padrão merece alerta?", review_finance:"Revisão financeira", review_code:"Revisão de código", health_rollback:"Precisa de rollback?"};
 
 /* ---------- o círculo ---------- */
-const STAGES = [["orquestrador","Orquestrador"],["pedido","Pedido"],["idle","Evolução natural"],
-  ["meta_learner","Meta-Learner"],["shadow","Shadow"],["saude","Saúde"]];
+const STAGES = [["orquestrador","Orquestrador"],["pedido","Pedido"],["idle","Evolução natural"],["projeto","Construindo missões"],
+  ["developer","Developer"],["meta_learner","Meta-Learner"],["shadow","Shadow"],["saude","Saúde"]];
+const NOW = {orquestrador:"Orquestrador escolhendo o que fazer", pedido:"Atendendo um pedido", idle:"Evolução natural: sem pedido, o loop melhora a si mesmo",
+  projeto:"Construindo e evoluindo uma missão", developer:"Developer corrigindo o próprio código",
+  meta_learner:"Meta-Learner procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
+  descanso:"Entre giros", pausado:"Parado até você retomar ou o orçamento renovar"};
 const R = 190, svg = $("#ring"), NS = "http://www.w3.org/2000/svg";
 const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
 const ang = i => (-90 + i * 360 / STAGES.length) * Math.PI / 180;
+const pos = i => [Math.cos(ang(i)) * R, Math.sin(ang(i)) * R];
 svg.append(el("circle", {class:"track", r:R}));
 const arc = el("circle", {class:"arc", r:R, transform:"rotate(-90)", "stroke-dasharray": 2*Math.PI*R, "stroke-dashoffset": 2*Math.PI*R});
 svg.append(arc);
+const trailG = el("g"); svg.append(trailG);
 const sparks = el("g"); svg.append(sparks);
 svg.append(el("circle", {class:"hub", r:92}));
-const hubNum = el("text", {class:"hubnum", "text-anchor":"middle", y:8}); hubNum.textContent = "—";
-const hubLbl = el("text", {class:"hublbl", "text-anchor":"middle", y:34}); hubLbl.textContent = "decisões sem LLM";
-const hubTick = el("text", {class:"hublbl", "text-anchor":"middle", y:-38});
+const hubTick = el("text", {class:"hublbl", "text-anchor":"middle", y:-30}); hubTick.textContent = "giro";
+const hubNum = el("text", {class:"hubnum", "text-anchor":"middle", y:14}); hubNum.textContent = "—";
+const hubLbl = el("text", {class:"hubstate", "text-anchor":"middle", y:40}); hubLbl.textContent = "";
 svg.append(hubNum, hubLbl, hubTick);
 const nodes = STAGES.map(([id, label], i) => {
-  const a = ang(i), x = Math.cos(a) * R, y = Math.sin(a) * R;
+  const [x, y] = pos(i);
   const g = el("g", {class:"node"}); g.append(el("circle", {cx:x, cy:y, r:11}));
-  const lx = Math.cos(a) * (R + 30), ly = Math.sin(a) * (R + 30) + 4;
-  const t = el("text", {x:lx, y:ly, "text-anchor": Math.abs(lx) < 20 ? "middle" : lx > 0 ? "start" : "end"});
-  t.textContent = label; g.append(t); svg.append(g); return [id, g];
+  const lx = Math.cos(ang(i)) * (R + 30), ly = Math.sin(ang(i)) * (R + 30) + 4;
+  const tx = el("text", {x:lx, y:ly, "text-anchor": Math.abs(lx) < 20 ? "middle" : lx > 0 ? "start" : "end"});
+  tx.textContent = label; g.append(tx); svg.append(g); return [id, g];
 });
+const comet = el("g", {class:"comet"}); comet.append(el("circle", {class:"halo", r:22}), el("circle", {class:"head", r:9}));
+svg.append(comet);
+let cometAt = -1, giroAtual = null, cometAng = ang(0), animId = 0;
+function placeComet(a) { comet.setAttribute("transform", `translate(${Math.cos(a) * R} ${Math.sin(a) * R})`); }
+placeComet(cometAng);
+function moveComet(i) {
+  if (i < 0) { comet.style.opacity = .25; return; }
+  comet.style.opacity = 1;
+  let alvo = ang(i);
+  while (alvo < cometAng - 1e-6) alvo += 2 * Math.PI;          // sempre no sentido do giro
+  if (alvo - cometAng > 2 * Math.PI - 1e-6) alvo -= 2 * Math.PI;
+  if (cometAt >= 0 && cometAt !== i && !reduce) {
+    const [px, py] = pos(cometAt), d = el("circle", {class:"trail-dot", cx:px, cy:py, r:5});
+    trailG.append(d); requestAnimationFrame(() => d.style.opacity = 0); setTimeout(() => d.remove(), 1700);
+  }
+  cometAt = i;
+  const de = cometAng, ate = alvo, t0 = performance.now(), dur = reduce ? 0 : 200, id = ++animId;
+  const passo = now => {
+    if (id !== animId) return;
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 3);
+    cometAng = de + (ate - de) * e; placeComet(cometAng);
+    if (k < 1) requestAnimationFrame(passo); else cometAng = ate % (2 * Math.PI);
+  };
+  requestAnimationFrame(passo);
+}
 function showStage(e) {
   const name = e && e.nome;
   const i = STAGES.findIndex(s => s[0] === name);
-  nodes.forEach(([id, g]) => g.classList.toggle("on", id === name));
+  if (e && e.tick && e.tick !== giroAtual) { giroAtual = e.tick; nodes.forEach(([, g]) => g.classList.remove("visited")); }
+  nodes.forEach(([id, g]) => { g.classList.toggle("on", id === name); if (id === name) g.classList.add("visited"); });
   const C = 2 * Math.PI * R;
   arc.setAttribute("stroke-dashoffset", i < 0 ? C : C - C * (i + 1) / STAGES.length);
-  if (e && e.tick) hubTick.textContent = "giro " + e.tick;
-  const NOW = {orquestrador:"Orquestrador escolhendo o que fazer", pedido:"Atendendo um pedido", idle:"Evolução natural: sem pedido, o círculo melhora a si mesmo",
-    meta_learner:"Meta-Learner procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
-    descanso:"Entre giros", pausado:"Parado até você retomar ou o orçamento renovar"};
-  if (name) $("#now").innerHTML = esc(NOW[name] || name) + (e.tick ? ` <span>· giro ${e.tick}</span>` : "");
+  moveComet(i);
+  if (e && e.tick) hubNum.textContent = Number(e.tick).toLocaleString("pt-BR");
+  const missao = e && e.projeto && S && S.nomes && String(e.projeto) !== PID ? S.nomes[e.projeto] : null;
+  if (name) $("#now").innerHTML = esc(NOW[name] || name) + (missao ? ` <span class="mission">${esc(missao)}</span>` : "") + (e.tick ? ` <span>· giro ${e.tick}</span>` : "");
+  hubLbl.textContent = name === "descanso" ? "" : name === "pausado" ? "parado" : (STAGES[i] || [, ""])[1].toLowerCase();
 }
+// a trilha chega em rajadas (um giro inteiro pode levar milissegundos): toca etapa por etapa
+const fila = [];
+let tocando = false;
+function enfileirar(t) {
+  fila.push({nome: t.etapa, tick: t.tick, projeto: t.project_id});
+  if (fila.length > 40) fila.splice(0, fila.length - 40);
+  if (!tocando) tocar();
+}
+function tocar() {
+  const e = fila.shift();
+  if (!e) { tocando = false; return; }
+  tocando = true; showStage(e);
+  setTimeout(tocar, reduce ? 0 : fila.length > 12 ? 90 : 230);
+}
+// entre giros: contagem regressiva no centro
+setInterval(() => {
+  if (!S || tocando) return;
+  const V = S.loop.vivo || {};
+  if (V.estado === "aguardando" && V.proximo_giro_em) {
+    const s = Math.max(0, Math.round(V.proximo_giro_em - Date.now() / 1000));
+    hubLbl.textContent = s > 0 ? `próximo giro em ${s}s` : "começando…";
+  } else if (V.estado === "desligado") hubLbl.textContent = "loop desligado";
+  else if (V.estado && V.estado.startsWith("pausado")) hubLbl.textContent = "pausado";
+}, 500);
 function spark(d) {
   if (reduce) return;
   const color = d.source === "llm" ? "var(--llm)" : "var(--jev)";
@@ -301,7 +367,7 @@ function addDecision(d) {
   const v = typeof d.value === "number" ? d.value.toFixed(2) : d.value;
   const li = document.createElement("li"); li.className = "new";
   li.innerHTML = `<span class="t">${hora(d.created_at)}</span>
-    <div><div class="q">${esc(QUEST[d.question] || d.question)}</div>
+    <div><div class="q">${esc(QUEST[d.question] || (d.question.startsWith("llm:") ? "Gerar com LLM (" + d.question.slice(4) + ")" : d.question))}${ZERO && d.project_id && S && S.nomes && String(d.project_id) !== PID ? `<span class="mission">${esc(S.nomes[d.project_id])}</span>` : ""}</div>
       <div class="v">${esc(v)} · confiança ${pct(d.confidence)}</div>
       <div class="conf"><span style="width:${pct(d.confidence)}"></span></div></div>
     <span class="src ${esc(d.source)}">${d.source === "llm" ? "LLM" : d.source === "local" ? "local" : "Jev"}</span>`;
@@ -326,15 +392,19 @@ function render(s) {
   const V = L.vivo || {estado: L.status, titulo: STATUS[L.status] || L.status};
   st.dataset.s = V.estado; $("#stateText").textContent = V.titulo;
   document.body.classList.toggle("paused", V.estado.startsWith("pausado") || V.estado === "desligado");
-  $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
+  $("#pause").textContent = L.controle.pausado ? "Retomar o loop" : "Pausar o loop";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
   const P = s.projeto;
   if (P) {
     $("#pname").textContent = P.nome; document.title = "Círculo — " + P.nome;
-    if (P.kit !== "financas") $("#askText").placeholder = "Um detalhe ou orientação para este projeto";
+    const ASK = P.kit === "circulo"
+      ? ["Falar com o loop", "Peça algo ao loop: uma melhoria, uma regra, uma prioridade. Entra no roteiro dele como pedido seu.", "Ex.: priorize pesquisar antes de construir"]
+      : P.kit === "financas" ? ["Registrar ou corrigir", "Gastos, entradas e correções de categoria.", "38,90 ifood almoço"]
+      : ["Falar com a missão", "Uma orientação para os próximos ciclos. Entra como feedback seu e reabre a missão se estiver parada.", "Ex.: use as cores da marca, azul e branco"];
+    $("#askTitle").textContent = ASK[0]; $("#askHelp").textContent = ASK[1]; $("#askText").placeholder = ASK[2];
     $("#about").innerHTML = `<p class="pedido">Pedido: “${esc(P.pedido)}”</p><p>${esc(P.proposito)}</p>` +
       (P.kit === "geral" && !P.motor_pronto ? `<div class="banner" style="margin-top:12px">O motor de construção está parado: falta a chave da LLM (<code>ANTHROPIC_API_KEY</code>) na máquina do loop. O projeto está registrado e classificado; ele começa a pesquisar e construir assim que a chave existir.</div>` : "") +
-      (P.status === "manutencao" ? `<div class="banner" style="margin-top:12px">Em manutenção: os últimos ciclos não trouxeram ganho relevante. Mande uma orientação em “Falar com o projeto” para reabrir.</div>` : "");
+      (P.status === "manutencao" ? `<div class="banner" style="margin-top:12px">Em manutenção: os últimos ciclos não trouxeram ganho relevante. Mande uma orientação em “Falar com a missão” para reabrir.</div>` : "");
   }
   const geral = P && P.kit === "geral" && s.motor;
   document.querySelectorAll(".geral-only").forEach(e => e.hidden = !geral);
@@ -346,7 +416,7 @@ function render(s) {
       ? `<p><strong>Versão ${M.entrega.version}</strong> · nota ${n2(M.entrega.nota)} · critérios ocultos ${n2(M.entrega.nota_oculta)} · <a href="${M.entrega.url}" target="_blank" rel="noopener">abrir em nova aba</a></p>` +
         (M.entrega.formato === "html" ? `<iframe class="preview" sandbox src="${M.entrega.url}" title="Prévia da entrega"></iframe>` : "") +
         `<ul class="list" style="margin-top:10px">${M.versoes.map(v => `<li><span>v${v.version} · nota ${n2(v.nota)} · oculta ${n2(v.nota_oculta)}</span><span class="chip ${esc(v.status)}">${{atual:"atual",anterior:"anterior",descartada:"descartada pela catraca"}[v.status] || esc(v.status)}</span></li>`).join("")}</ul>`
-      : `<p class="empty">${M.regua.length ? "Régua pronta; a primeira versão sai no próximo ciclo deste projeto." : M.pronto ? "Primeiro ciclo: pesquisar o melhor que existe e montar a régua." : "Sem entrega ainda: o motor precisa da chave da LLM."}</p>`;
+      : `<p class="empty">${M.regua.length ? "Régua pronta; a primeira versão sai no próximo ciclo desta missão." : M.pronto ? "Primeiro ciclo: pesquisar o melhor que existe e montar a régua." : "Sem entrega ainda: o motor precisa da chave da LLM."}</p>`;
     }
     $("#regua").innerHTML = M.regua.length ? M.regua.map(c => `<li><span>${esc(c.texto)}<span class="meta">peso ${c.peso}${c.regra ? " · checagem automática" : ""}${c.held_out ? " · oculto do Builder" : ""}</span>${c.nota != null ? `<span class="minibar"><i style="width:${c.nota * 100}%"></i></span>` : ""}</span><span class="chip">${n2(c.nota)}</span></li>`).join("")
       : `<li class="empty">Ainda sem régua.</li>`;
@@ -361,15 +431,15 @@ function render(s) {
   document.querySelectorAll(".zero-only").forEach(e => e.hidden = !zero);
   if (zero) {
     const RS = {feito:"feito", parcial:"parcial", em_andamento:"em andamento", pendente:"pendente"};
-    $("#roadmap").innerHTML = (s.roteiro || []).map(r => `<li><span>${esc(r.titulo)}<span class="meta">${r.origem === "erro" ? "Registrado pelo círculo · " : "Seu pedido · "}${esc(r.detalhe)}${r.evidencia ? " · " + esc(r.evidencia) : ""}</span></span><span class="chip ${esc(r.status)}">${RS[r.status] || esc(r.status)}</span></li>`).join("");
+    $("#roadmap").innerHTML = (s.roteiro || []).map(r => `<li><span>${esc(r.titulo)}<span class="meta">${r.origem === "erro" ? "Registrado pelo loop · " : "Seu pedido · "}${esc(r.detalhe)}${r.evidencia ? " · " + esc(r.evidencia) : ""}</span></span><span class="chip ${esc(r.status)}">${RS[r.status] || esc(r.status)}</span></li>`).join("");
     const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
     $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
       : `<li class="empty">Nenhum erro registrado até agora.</li>`;
   }
-  showStage(L.etapa && (!PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
+  if (!tocando) showStage(L.etapa && (ZERO || !PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
 
   const h = s.saude;
-  hubNum.textContent = h.decisoes_24h ? pct(h.sem_llm) : "—";
+  if (!tocando && L.tick) hubNum.textContent = Number(L.tick).toLocaleString("pt-BR");
   const inv = h.invariantes.length;
   const errRate = h.giros_100 ? h.erros_100 / h.giros_100 : 0;
   $("#health").innerHTML =
@@ -411,13 +481,19 @@ $("#ask").onsubmit = e => { e.preventDefault(); const t = $("#askText").value.tr
 document.addEventListener("click", e => { const b = e.target.closest("[data-send]"); if (b) { b.disabled = true; post("/api/pedido", {texto: b.dataset.send, projeto: PID}); } });
 
 function connect() {
-  const es = new EventSource("/api/eventos?desde=" + lastId + (Q ? "&" + Q : ""));
+  const filtro = ZERO ? "" : Q;
+  const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
-  es.addEventListener("etapa", m => { const e = JSON.parse(m.data); if (!PID || !e || !e.projeto || String(e.projeto) === PID) showStage(e); });
+  es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) enfileirar(e); });
+  es.addEventListener("status", m => { if (S) { S.loop.vivo = JSON.parse(m.data); } });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
 refresh(); setInterval(refresh, 3000);
-fetch("/api/estado?" + Q).then(r => r.json()).then(s => { lastId = Math.max(0, s.ultima_decisao - 25); connect(); });
+fetch("/api/estado?" + Q).then(r => r.json()).then(s => {
+  ZERO = !!(s.projeto && s.projeto.kit === "circulo");
+  if (ZERO) fetch("/api/estado").then(r => r.json()).then(g => { lastId = Math.max(0, g.ultima_decisao - 25); connect(); });
+  else { lastId = Math.max(0, s.ultima_decisao - 25); connect(); }
+});
 </script>
 </body>
 </html>

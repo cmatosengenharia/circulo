@@ -167,6 +167,10 @@ class SelfDeveloper:
                                        f"Correção automática (roteiro #{item['id']}).\n\nArquivos: {', '.join(changed)}\n\n"
                                        "O gate de merge do círculo decide: checks verdes e, se tocar arquivo protegido, label `aprovado-humano`.")
             self.s.set("self_dev_aberto", {"item": item["id"], "branch": branch, "pr": pr, "em": time.time(), "fechado": False})
+            if pr:
+                from .projects import kit_project_id
+                self.s.x("INSERT OR REPLACE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+                         (pr, kit_project_id(self.s, "circulo"), item["titulo"], branch, "aberto", time.time(), time.time()))
             self._set_item(item["id"], "em_andamento", f"PR #{pr}" if pr else f"commit na branch {branch} (sem remoto)")
             self.ctx.reply(f"Developer abriu correção para “{item['titulo']}”" + (f" (PR #{pr})." if pr else "."), "merge")
             return DevResult(item["id"], "proposto", ", ".join(changed), pr)

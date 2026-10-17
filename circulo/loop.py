@@ -97,9 +97,14 @@ class Circle:
         return c
 
     def _stage(self, name: str, extra: dict | None = None) -> None:
-        """Etapa atual do giro, para o painel ao vivo."""
-        self.store.set("etapa", {"nome": name, "tick": self.store.tick, "em": time.time(),
-                                 "projeto": self.ctx.dl.project_id, **(extra or {})})
+        """Etapa atual do giro, para o painel ao vivo. A trilha guarda cada passagem, para o círculo
+        do painel animar etapa por etapa mesmo quando o giro inteiro dura milissegundos."""
+        now = time.time()
+        e = {"nome": name, "tick": self.store.tick, "em": now, "projeto": self.ctx.dl.project_id, **(extra or {})}
+        self.store.set("etapa", e)
+        seq = self.store.x("INSERT INTO trail(tick,etapa,project_id,em) VALUES(?,?,?,?)", (e["tick"], name, e["projeto"], now))
+        if seq % 500 == 0:
+            self.store.x("DELETE FROM trail WHERE seq < ?", (seq - 2000,))   # trilha é efêmera (só para animação)
 
     # ------------------------------------------------------------ entrada
     def submit(self, text: str, at: float | None = None) -> int:
@@ -191,6 +196,16 @@ class Circle:
         ctx = self.ctx
         pid = self.ctx.dl.project_id
         proj = self.store.one("SELECT kit, nome FROM projects WHERE id=?", (pid,)) if pid else None
+        if proj is not None and proj["kit"] == "circulo":
+            # falar com o loop: vira pedido seu no roteiro do próprio loop
+            now = time.time()
+            ordem = (self.store.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
+            self.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                         (payload["text"][:160], payload["text"][:600], "pedido_cassio", "pendente", "pedido pelo painel", ordem, now, now))
+            self.memory.add("feedback", payload["text"], project_id=pid, source="Cássio", trust="confiavel")
+            msg = "Anotado no roteiro do loop como pedido seu."
+            self.ctx.reply(msg)
+            return msg
         if proj is not None and proj["kit"] != "financas":
             # orientação do humano para um projeto: vira feedback confiável na memória e reabre o projeto
             self.memory.add("feedback", payload["text"], tipo=None, project_id=pid, source="Cássio", trust="confiavel")
@@ -327,6 +342,7 @@ class Circle:
         elif pick == "revisar_prs":
             self.gate.run()
         elif pick == "corrigir_codigo":
+            self._stage("developer", {"projeto": kit_project_id(self.store, "circulo")})
             self.self_dev.run_once()
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()

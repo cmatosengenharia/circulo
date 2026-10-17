@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Círculo — projetos</title>
+<title>Círculo — missões</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
@@ -100,10 +100,22 @@ a.card:hover{border-color:var(--ink)}
 .pedido{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pedido::before{content:"“"}.pedido::after{content:"”"}
 .proposito{margin:0;font-size:14px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:auto}
-.stats div{display:flex;flex-direction:column}
-.stats b{font-size:18px;font-weight:700}
+.kpi{display:grid;grid-template-columns:1fr auto;align-items:end;gap:4px 12px;padding:12px 14px;border-radius:14px;background:var(--bg)}
+.kpi .k-lbl{font-size:13px;color:var(--muted);grid-column:1/-1}
+.kpi .k-val{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.kpi .k-val.vazio{font-size:20px;color:var(--muted);font-weight:600}
+.kpi svg{width:120px;height:34px;overflow:visible}
+.kpi svg polyline{fill:none;stroke:var(--jev);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.kpi svg circle{fill:var(--jev)}
+.kpi .k-bar{grid-column:1/-1;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+.kpi .k-bar i{display:block;height:100%;background:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin-top:auto;padding-top:4px}
+.stats div{display:flex;flex-direction:column;min-width:0}
+.stats b{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stats b.err-on{color:var(--bad)}
 .stats span{font-size:12px;color:var(--muted)}
+.ias{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.ias .chip{font-weight:600;background:var(--jev-soft);color:var(--jev)}
 .pulse{display:flex;align-items:flex-end;gap:2px;height:28px}
 .pulse i{flex:1;background:var(--jev);border-radius:2px;min-height:2px;opacity:.85}
 .pulse i.zero{background:var(--line);opacity:1}
@@ -140,7 +152,7 @@ a.card:hover{border-color:var(--ink)}
     <h1>Círculo</h1>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
-      <button class="btn primary" id="pause">Pausar o círculo</button>
+      <button class="btn primary" id="pause">Pausar o loop</button>
     </div>
   </header>
 
@@ -155,21 +167,21 @@ a.card:hover{border-color:var(--ink)}
   </section>
 
   <div class="intro">
-    <h2>Projetos</h2>
-    <p>Cada pedido vira um projeto que o círculo continua evoluindo com o propósito dele. Entre num card para ver o loop trabalhando naquele projeto.</p>
+    <h2>Missões</h2>
+    <p>Cada pedido vira uma missão: o loop pesquisa, constrói e continua evoluindo com o propósito dela. A missão zero é o próprio loop.</p>
   </div>
 
   <div class="cards" id="cards">
     <form class="card novo" id="novo">
-      <h3>Novo pedido</h3>
-      <p>Descreva o que você quer resolver. Pode ser vago: o círculo pesquisa, define a régua e evolui a partir daí.</p>
+      <h3>Nova missão</h3>
+      <p>Descreva o que você quer resolver. Pode ser vago: o loop pesquisa o que há de melhor, define a régua e evolui a partir daí.</p>
       <textarea id="pedido" aria-label="Descreva o pedido" placeholder="Crie uma landing page para captar leads do Instagram"></textarea>
       <div class="ex" aria-label="Exemplos">
         <button type="button">Crie um portal admin para fotógrafos</button>
         <button type="button">Monte um plano para construir a casa no lote</button>
         <button type="button">Compare as opções de carro da empresa para minha família</button>
       </div>
-      <button class="btn primary" type="submit" id="criar">Criar projeto</button>
+      <button class="btn primary" type="submit" id="criar">Criar missão</button>
       <div class="msg" id="msg" role="status"></div>
     </form>
   </div>
@@ -180,12 +192,12 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
   pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
-const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", meta_learner:"no Meta-Learner",
-  shadow:"avaliando shadow", saude:"checando a saúde"};
+const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", projeto:"construindo",
+  developer:"corrigindo o próprio código", meta_learner:"no Meta-Learner", shadow:"avaliando shadow", saude:"checando a saúde"};
 const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado"};
 function ago(ts) {
   const s = Math.max(0, Date.now() / 1000 - ts);
-  if (s < 60) return "há instantes"; if (s < 3600) return `há ${Math.round(s / 60)} min`;
+  if (s < 60) return "agora há pouco"; if (s < 3600) return `há ${Math.round(s / 60)} min`;
   if (s < 86400) return `há ${Math.round(s / 3600)} h`; return `há ${Math.round(s / 86400)} dias`;
 }
 let S = null, known = new Set();
@@ -199,36 +211,67 @@ function cardLive(p) {
   if (p.kit === "geral" && !p.motor_pronto) return `<span class="chip">Parado</span> falta a chave da LLM`;
   if (p.status === "manutencao") return `Em manutenção: sem ganho relevante nos últimos ciclos`;
   if (p.kit === "geral" && !p.regua) return `Próximo ciclo: pesquisar e montar a régua`;
+  if (p.kit === "circulo" && p.roteiro) return `Roteiro: ${p.roteiro.feito} de ${p.roteiro.total} feitos`;
   return "Última atividade " + ago(p.ultima_atividade);
 }
+const NUM = n => n == null ? "—" : Number(n).toLocaleString("pt-BR");
+const PCT = x => x == null ? "—" : Math.round(x * 100) + "%";
+const COMPACT = n => n == null ? "—" : n >= 1e6 ? (n / 1e6).toFixed(1).replace(".", ",") + " mi" : n >= 1e3 ? (n / 1e3).toFixed(1).replace(".", ",") + " mil" : String(n);
+function spark(hist) {
+  if (!hist || hist.length < 2) return "";
+  const w = 120, h = 34, n = hist.length, max = Math.max(...hist, .01), min = Math.min(...hist, 0);
+  const pts = hist.map((v, i) => [i / (n - 1) * w, h - (v - min) / (max - min || 1) * h]);
+  const [lx, ly] = pts[n - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.map(p => p.join(",")).join(" ")}"/><circle cx="${lx}" cy="${ly}" r="3"/></svg>`;
+}
+function kpi(m) {
+  const k = m.principal;
+  if (!k) return "";
+  const vazio = k.valor == null;
+  return `<div class="kpi" title="${esc(k.ajuda)}"><span class="k-lbl">${esc(k.rotulo)}</span>
+    <span class="k-val${vazio ? " vazio" : ""}">${vazio ? "ainda sem dado" : PCT(k.valor)}</span>${spark(k.historico)}
+    ${vazio ? "" : `<span class="k-bar" aria-hidden="true"><i style="width:${Math.min(100, k.valor * 100)}%"></i></span>`}</div>`;
+}
+function stats(p) {
+  const m = p.metricas, s = [];
+  const add = (v, l, cls = "") => s.push(`<div><b class="${cls}" title="${esc(String(v))}">${v}</b><span>${l}</span></div>`);
+  add(esc(m.versao || "—"), "versão");
+  add(NUM(m.ciclos), p.kit === "circulo" ? "giros do loop" : "ciclos");
+  add(NUM(m.evolucoes), "evoluções");
+  add(m.prs.abertos || m.prs.mergeados ? `${m.prs.mergeados} <small style="font-weight:500;color:var(--muted)">+${m.prs.abertos} abertos</small>` : "0", "PRs mergeados");
+  add(PCT(m.sem_llm), "decisões sem LLM");
+  add(NUM(m.erros_abertos), "erros abertos", m.erros_abertos ? "err-on" : "");
+  if (p.kit === "geral") {
+    add(PCT(m.aceitacao), "versões aceitas");
+    add(m.tokens_por_ponto == null ? "—" : COMPACT(m.tokens_por_ponto), "tokens por ponto");
+    add(COMPACT(m.tokens), "tokens gastos");
+  } else if (p.kit === "circulo") {
+    add(NUM(m.missoes), "missões ativas");
+    add(COMPACT(m.decisoes), "decisões");
+    add(COMPACT(m.tokens), "tokens gastos");
+  } else {
+    add(NUM(m.lancamentos), "lançamentos");
+    add(COMPACT(m.decisoes), "decisões");
+    add(m.ultima_evolucao ? ago(m.ultima_evolucao) : "nunca", "última evolução");
+  }
+  return s.join("");
+}
 function card(p) {
+  const m = p.metricas;
   const max = Math.max(1, ...p.atividade_24h);
   const bars = p.atividade_24h.map(v => `<i class="${v ? "" : "zero"}" style="height:${v ? Math.max(12, v / max * 100) : 8}%"></i>`).join("");
-  const semLlm = p.sem_llm == null ? "—" : Math.round(p.sem_llm * 100) + "%";
   const agora = V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id);
-  return `<a class="card${agora ? " agora" : ""}${p.kit === "circulo" ? " zero" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
+  return `<a class="card${agora ? " agora" : ""}${p.kit === "circulo" ? " zero" : ""}" href="/missao/${p.id}" aria-label="Abrir ${esc(p.nome)}">
     <svg class="mini" viewBox="0 0 34 34" aria-hidden="true"><circle class="t" cx="17" cy="17" r="13"/><circle class="a" cx="17" cy="17" r="13"/></svg>
-    <div class="top">${p.kit === "circulo" ? `<span class="chip manutencao">Projeto zero</span>` : `<span class="chip">${esc(p.tipo_rotulo)}</span>`}<span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
+    <div class="top">${p.kit === "circulo" ? `<span class="chip manutencao">Missão zero</span>` : `<span class="chip">${esc(p.tipo_rotulo)}</span>`}<span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
     <h3>${esc(p.nome)}</h3>
     <p class="pedido">${esc(p.pedido)}</p>
     <p class="proposito">${esc(p.proposito)}</p>
-    ${p.kit === "geral" && p.nota != null ? `<div class="zero-box">
-      <div class="zero-row"><span>Nota na régua</span><b>${Math.round(p.nota * 100)}% · v${p.versoes}</b></div>
-      <div class="rbar" aria-hidden="true"><i class="f" style="width:${p.nota * 100}%"></i></div>
-    </div>` : ""}
-    ${p.roteiro ? `<div class="zero-box">
-      <div class="zero-row"><span>Roteiro</span><b>${p.roteiro.feito} de ${p.roteiro.total} feitos${p.roteiro.parcial ? ` · ${p.roteiro.parcial} parciais` : ""}</b></div>
-      <div class="rbar" aria-hidden="true"><i class="f" style="width:${p.roteiro.feito / p.roteiro.total * 100}%"></i><i class="p" style="width:${p.roteiro.parcial / p.roteiro.total * 100}%"></i></div>
-      <div class="zero-row"><span>Erros</span><b class="${p.erros.abertos ? "err-on" : ""}">${p.erros.abertos} abertos${p.erros.isolados ? ` (${p.erros.isolados} isolados)` : ""} · ${p.erros.resolvidos} resolvidos</b></div>
-    </div>` : ""}
-    <div class="stats">
-      <div><b>${p.giros}</b><span>giros</span></div>
-      <div><b>${p.decisoes}</b><span>decisões</span></div>
-      <div><b>${semLlm}</b><span>sem LLM</span></div>
-      <div><b>${p.evolucoes_aplicadas}</b><span>evoluções</span></div>
-    </div>
+    ${kpi(m)}
+    <div class="stats">${stats(p)}</div>
+    <div class="ias"><span>IA:</span>${m.modelos.map(x => `<span class="chip">${esc(x)}</span>`).join("")}</div>
     <div class="pulse" title="Atividade nas últimas 24 horas">${bars}</div>
-    <div class="foot"><span>${cardLive(p)}</span><span>Abrir projeto</span></div>
+    <div class="foot"><span>${cardLive(p)}</span><span>Abrir</span></div>
   </a>`;
 }
 function fmtDur(sec) {
@@ -262,7 +305,7 @@ function facts() {
   if (S) {
     const o = S.orcamento; add("Orçamento hoje", (o.tokens / o.limite * 100).toFixed(1).replace(".", ",") + "% usado");
     add("Decisões sem LLM (24h)", S.saude.decisoes_24h ? Math.round(S.saude.sem_llm * 100) + "%" : "—");
-    if (S.novos_na_fila) add("Projetos sendo criados", S.novos_na_fila);
+    if (S.novos_na_fila) add("Missões sendo criadas", S.novos_na_fila);
     if (S.demo) add("Modo", "demonstração (LLM simulada)");
   }
   $("#facts").innerHTML = f.join("");
@@ -272,12 +315,12 @@ function render(d) {
   S = d;
   const L = d.loop;
   if (!V) live(L.vivo);
-  $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
+  $("#pause").textContent = L.controle.pausado ? "Retomar o loop" : "Pausar o loop";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
   const box = $("#cards"), novo = $("#novo");
   box.querySelectorAll("a.card").forEach(e => e.remove());
   novo.insertAdjacentHTML("afterend", d.projetos.map(card).join(""));
-  if (pending && d.projetos.some(p => !known.has(p.id))) { $("#msg").textContent = "Projeto criado."; pending = false; $("#criar").disabled = false; }
+  if (pending && d.projetos.some(p => !known.has(p.id))) { $("#msg").textContent = "Missão criada."; pending = false; $("#criar").disabled = false; }
   d.projetos.forEach(p => known.add(p.id));
 }
 async function refresh() {
@@ -295,12 +338,12 @@ document.querySelectorAll(".novo .ex button").forEach(b => b.onclick = () => { $
 $("#novo").onsubmit = async e => {
   e.preventDefault();
   const pedido = $("#pedido").value.trim();
-  if (!pedido) { $("#msg").textContent = "Escreva o pedido antes de criar o projeto."; return; }
+  if (!pedido) { $("#msg").textContent = "Escreva o pedido antes de criar a missão."; return; }
   $("#criar").disabled = true; $("#msg").textContent = "Enviado. O Intake está classificando o pedido…";
   const [ok, j] = await post("/api/projeto", {pedido});
   if (!ok) { $("#msg").textContent = j.erro || "Não foi possível enviar o pedido."; $("#criar").disabled = false; return; }
   pending = true; $("#pedido").value = "";
-  if (S && S.loop.controle.pausado) $("#msg").textContent = "Pedido na fila. O círculo está pausado: ele cria o projeto quando você retomar.";
+  if (S && S.loop.controle.pausado) $("#msg").textContent = "Pedido na fila. O loop está pausado: ele cria a missão quando você retomar.";
 };
 function connect() {
   const es = new EventSource("/api/eventos?tipo=status");

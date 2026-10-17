@@ -95,9 +95,10 @@ def test_feed_ao_vivo_sse(circle, painel):
 
 def test_home_e_cards(circle, painel):
     with urllib.request.urlopen(painel + "/", timeout=5) as r:
-        assert "Novo pedido" in r.read().decode()
-    with urllib.request.urlopen(painel + "/projeto/1", timeout=5) as r:
-        assert "Todos os projetos" in r.read().decode()
+        assert "Nova missão" in r.read().decode()
+    for rota in ("/projeto/1", "/missao/1"):
+        with urllib.request.urlopen(painel + rota, timeout=5) as r:
+            assert "Todas as missões" in r.read().decode()
     code, body = post(painel + "/api/projeto", {"pedido": "Crie um portal admin para fotógrafos"}, {"X-Circulo": "1"})
     assert code == 200
     circle.tick()

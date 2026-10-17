@@ -6,6 +6,7 @@ e o círculo passa a atendê-lo quando o kit for criado.
 """
 from __future__ import annotations
 
+import json
 import re
 import time
 
@@ -14,7 +15,7 @@ from .state import Store
 
 # tipo → (rótulo, descrição para o Jev, kit que atende hoje ou None)
 TIPOS: dict[str, tuple[str, str, str | None]] = {
-    "circulo": ("O próprio círculo", "Melhorar o próprio loop: autonomia, autoevolução, guardrails, painel", "circulo"),
+    "circulo": ("Missão zero", "Melhorar o próprio loop: autonomia, autoevolução, guardrails, painel", "circulo"),
     "financas": ("Finanças", "Controle financeiro, gastos, economia, orçamento, patrimônio", "financas"),
     "landing_page": ("Landing page", "Página para captar leads ou vender uma oferta", "geral"),
     "produto_software": ("Produto de software", "Sistema, portal, app ou plataforma com usuários", "geral"),
@@ -86,7 +87,8 @@ def ensure_seed(store: Store) -> None:
                 ("Finanças da família", FINANCAS_PEDIDO, "financas", "financas", "ativo", PROPOSITO["financas"], now, now))
     if not store.one("SELECT 1 FROM projects WHERE kit='circulo'"):
         store.x("INSERT INTO projects(nome,pedido,tipo,kit,status,proposito,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                ("O próprio círculo", CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
+                ("O Loop", CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
+    store.x("UPDATE projects SET nome='O Loop' WHERE kit='circulo' AND nome='O próprio círculo'")
     # projetos criados antes do motor genérico passam a ser atendidos por ele
     store.x("UPDATE projects SET kit='geral', status='ativo' WHERE status='aguardando_kit'")
     if (store.get("roteiro_versao") or 0) < ROTEIRO_VERSAO:
@@ -150,6 +152,79 @@ def novos_na_fila(store: Store) -> int:
     return store.one("SELECT COUNT(*) n FROM events WHERE kind='novo_projeto' AND status IN ('pending','processing')")["n"]
 
 
+def _modelos(store: Store, pid: int, kit: str) -> list[str]:
+    """Quais IAs trabalharam nesta missão (rótulos curtos)."""
+    out = []
+    fontes = {r["source"] for r in store.q("SELECT DISTINCT source FROM decisions WHERE project_id=?", (pid,))}
+    if "jev" in fontes:
+        out.append("Jev")
+    if "local" in fontes:
+        out.append("Jev local")
+    for r in store.q("SELECT DISTINCT value FROM decisions WHERE project_id=? AND question LIKE 'llm:%'", (pid,)):
+        partes = json.loads(r["value"]).replace("claude-", "").split("-")
+        nome = (partes[0].title() + " " + ".".join(partes[1:])).strip()
+        if nome not in out:
+            out.append(nome)
+    if "llm" in fontes and not any(m[0].isupper() and m not in ("Jev", "Jev local") for m in out):
+        out.append("LLM (fallback)")
+    if kit == "circulo" and store.one("SELECT 1 FROM prs"):
+        out.append("Claude Code")
+    return out or ["—"]
+
+
+def metricas(store: Store, p) -> dict:
+    """Indicadores de uma missão. O indicador principal depende do propósito (kit)."""
+    pid, kit = p["id"], p["kit"]
+    dec = store.one("SELECT COUNT(*) n, SUM(source!='llm') sem_llm, COUNT(DISTINCT tick) giros FROM decisions WHERE project_id=?", (pid,))
+    props = store.one("SELECT COUNT(*) n, MAX(updated_at) ult FROM proposals WHERE project_id=? AND status='applied'", (pid,))
+    melhorias = store.one("SELECT COUNT(*) n, MAX(created_at) ult, COALESCE(SUM(CASE WHEN aceita=1 AND ganho>0 THEN ganho END),0) g "
+                          "FROM cycles WHERE project_id=? AND aceita=1 AND fase='melhoria'", (pid,))
+    tent = store.one("SELECT COUNT(*) n, SUM(aceita) ok, COALESCE(SUM(tokens),0) tok FROM cycles WHERE project_id=? AND aceita IS NOT NULL", (pid,))
+    prs = {r["status"]: r["n"] for r in store.q("SELECT status, COUNT(*) n FROM prs WHERE project_id=? GROUP BY status", (pid,))}
+    erros = store.one("SELECT COUNT(*) n FROM incidents WHERE project_id=? AND status!='resolvido'", (pid,))["n"]
+    tokens = store.one("SELECT COALESCE(SUM(tokens),0) t FROM cycles WHERE project_id=?", (pid,))["t"]
+    m = {
+        "ciclos": dec["giros"] or 0,
+        "decisoes": dec["n"] or 0,
+        "sem_llm": (dec["sem_llm"] or 0) / dec["n"] if dec["n"] else None,
+        "evolucoes": (props["n"] or 0) + (melhorias["n"] or 0),
+        "ultima_evolucao": max(props["ult"] or 0, melhorias["ult"] or 0) or None,
+        "prs": {"abertos": prs.get("aberto", 0), "mergeados": prs.get("mergeado", 0)},
+        "modelos": _modelos(store, pid, kit),
+        "erros_abertos": erros,
+        "tokens": tokens,
+        "aceitacao": (tent["ok"] or 0) / tent["n"] if tent["n"] else None,
+        "tokens_por_ponto": round(tent["tok"] / (melhorias["g"] * 100)) if melhorias["g"] else None,
+        "licoes": store.one("SELECT COUNT(*) n FROM memory WHERE kind='licao' AND status='ativa' AND tipo=?", (p["tipo"],))["n"],
+    }
+    if kit == "geral":
+        hist = [r["nota"] for r in store.q("SELECT nota FROM deliverables WHERE project_id=? AND status!='descartada' ORDER BY version", (pid,))]
+        cur = store.one("SELECT version FROM deliverables WHERE project_id=? AND status='atual' ORDER BY version DESC LIMIT 1", (pid,))
+        m["versao"] = f"v{cur['version']}" if cur else "—"
+        m["principal"] = {"rotulo": "Nota na régua", "valor": p["melhor_nota"], "formato": "pct", "historico": hist,
+                          "ajuda": "Quanto a entrega atende a régua montada a partir da pesquisa."}
+    elif kit == "financas":
+        r = store.one("SELECT COUNT(*) n, SUM(auto_accepted=1 AND status!='corrected') ok FROM ledger WHERE kind='despesa'")
+        regras = store.one("SELECT COUNT(*) n FROM proposals WHERE project_id=? AND kind='add_rule' AND status='applied'", (pid,))["n"]
+        m["versao"] = f"regras v{regras + 1}"
+        m["lancamentos"] = store.one("SELECT COUNT(*) n FROM ledger")["n"]
+        m["principal"] = {"rotulo": "Categorizado sozinho", "valor": (r["ok"] or 0) / r["n"] if r["n"] else None, "formato": "pct",
+                          "historico": [], "ajuda": "Despesas que o loop categorizou certo sem você corrigir."}
+    elif kit == "circulo":
+        ver = store.one("SELECT version FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")["version"]
+        rot = {x["status"]: x["n"] for x in store.q("SELECT status, COUNT(*) n FROM roadmap GROUP BY status")}
+        total = sum(rot.values()) or 1
+        m["ciclos"] = store.tick                     # o loop conta todos os giros, de todas as missões
+        m["versao"] = f"política v{ver}"
+        m["evolucoes"] = store.one("SELECT COUNT(*) n FROM policy_versions WHERE reason!='semente'")["n"] + \
+            store.one("SELECT COUNT(*) n FROM harness_experiments WHERE status='promovido'")["n"]
+        m["tokens"] = store.one("SELECT COALESCE(SUM(tokens),0) t FROM budget")["t"]
+        m["missoes"] = store.one("SELECT COUNT(*) n FROM projects WHERE kit!='circulo' AND status!='arquivado'")["n"]
+        m["principal"] = {"rotulo": "Roteiro concluído", "valor": rot.get("feito", 0) / total, "formato": "pct", "historico": [],
+                          "ajuda": "Pedidos seus e correções que o próprio loop registrou, já entregues."}
+    return m
+
+
 def cards(store: Store) -> list[dict]:
     """Resumo de cada projeto para a tela inicial."""
     out = []
@@ -178,7 +253,7 @@ def cards(store: Store) -> list[dict]:
             "giros": dec["giros"] or 0, "ultima_atividade": dec["ultima"] or p["updated_at"],
             "evolucoes_aplicadas": ev.get("applied", 0), "evolucoes_total": sum(ev.values()),
             "atividade_24h": atividade, "agora": etapa.get("projeto") == pid,
-            "criado_em": p["created_at"], "na_fila": fila.get(pid, 0),
+            "criado_em": p["created_at"], "na_fila": fila.get(pid, 0), "metricas": metricas(store, p),
             **(_extras_circulo(store) if p["kit"] == "circulo" else {}),
             **({"nota": p["melhor_nota"], "ciclos_motor": p["ciclos"] or 0, "motor_pronto": bool(store.get("motor_pronto")),
                 "versoes": store.one("SELECT COUNT(*) n FROM deliverables WHERE project_id=? AND status!='descartada'", (pid,))["n"],

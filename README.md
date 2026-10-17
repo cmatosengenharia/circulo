@@ -145,3 +145,14 @@ abre PR (com `GITHUB_TOKEN` + `CIRCULO_REPO`) e deixa o gate de merge decidir. `
 | `GITHUB_TOKEN`, `CIRCULO_REPO` | Gate de merge e PRs do Developer |
 | `CIRCULO_REPO_DIR` | Clone do repo para o Developer trabalhar |
 | `CIRCULO_HUMANO` | Seu login no GitHub (quem pode dar `aprovado-humano`) |
+
+## Nomenclatura do painel
+
+- **Missão**: cada pedido vira uma missão (no código e na API ainda se chama `project`; as URLs aceitam `/missao/<id>` e `/projeto/<id>`).
+- **O Loop (missão zero)**: o próprio círculo. "Falar com o loop" vira pedido seu no roteiro dele.
+- **Giro**: uma volta do loop. **Ciclo**: um giro que trabalhou numa missão. **Evolução**: mudança aplicada que melhorou algo.
+
+Cada card mostra um indicador principal ligado ao propósito (nota na régua, % categorizado sozinho, roteiro
+concluído), versão, ciclos, evoluções, PRs, % de decisões sem LLM, erros abertos, as IAs que trabalharam nela
+e indicadores do tipo (versões aceitas, tokens por ponto de régua, tokens gastos, lançamentos, missões ativas).
+Na tela do Loop, o círculo toca cada etapa de cada giro em tempo real (trilha via SSE), de todas as missões.

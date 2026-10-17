@@ -74,6 +74,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
 
     return {
         "agora": now,
+        "nomes": {r["id"]: r["nome"] for r in s.q("SELECT id, nome FROM projects")},
         "ultima_decisao": s.one(f"SELECT COALESCE(MAX(id),0) m FROM decisions WHERE 1=1{pf}", pa)["m"],
         "loop": {
             "tick": tick, "status": s.get("loop_status", "parado"), "etapa": s.get("etapa"),
@@ -160,10 +161,10 @@ def make_handler(db_path: str):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             projeto = int(q["projeto"][0]) if q.get("projeto", [""])[0].isdigit() else None
-            m = re.fullmatch(r"/projeto/(\d+)/entrega", u.path)
+            m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
                 return self._entrega(int(m.group(1)), q.get("v", [None])[0])
-            if u.path == "/" or u.path.startswith("/projeto/"):
+            if u.path == "/" or u.path.startswith(("/projeto/", "/missao/")):
                 body = _page("home.html" if u.path == "/" else "painel.html")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -210,6 +211,8 @@ def make_handler(db_path: str):
             store = self._store()
             last_stage = None
             last_status, last_sent = None, 0.0
+            # trilha: cada passagem de etapa, para o círculo animar o giro inteiro (mesmo os de milissegundos)
+            seq = store.one("SELECT COALESCE(MAX(seq),0) m FROM trail")["m"]
             try:
                 while True:
                     st = loop_status(store)
@@ -222,6 +225,9 @@ def make_handler(db_path: str):
                         self.wfile.flush()
                         time.sleep(0.5)
                         continue
+                    for t in store.q("SELECT seq, tick, etapa, project_id, em FROM trail WHERE seq > ? ORDER BY seq LIMIT 120", (seq,)):
+                        seq = t["seq"]
+                        self.wfile.write(f"event: trilha\ndata: {json.dumps(dict(t), ensure_ascii=False)}\n\n".encode())
                     for d in novidades(store, desde, projeto):
                         desde = d["id"]
                         self.wfile.write(f"event: decisao\ndata: {json.dumps(d, ensure_ascii=False)}\n\n".encode())
