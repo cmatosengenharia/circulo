@@ -143,6 +143,17 @@ class LocalJev:
             if qid.startswith("rel_") and q.kind == "score":
                 out[qid] = self._score_by_overlap(qid, q, state.get("consulta", ""), q.instructions)
                 continue
+            if qid.startswith("ach_"):
+                txt = q.instructions.split("?", 1)[-1]
+                rel = self._overlap(state.get("pedido", "") + " " + state.get("tipo", "").replace("_", " "), txt)
+                out[qid] = self._noul(qid, 0.35 + rel + (0.2 if len(txt) > 25 else 0))
+                continue
+            if qid.startswith("mens_"):
+                txt = norm(q.instructions.split("?", 1)[-1])
+                vago = re.search(r"\b(bom|boa|bonit\w*|otim\w*|excelente|qualidade|agradavel|interessante|legal)\b", txt)
+                concreto = re.search(r"\d|\b(tem|possui|contem|inclui|mostra|exibe|ate|minimo|maximo|cada|todo|toda)\b", txt)
+                out[qid] = self._noul(qid, (0.6 if concreto else 0.25) if vago else (0.85 if concreto else 0.6))
+                continue
             fn = getattr(self, f"_q_{qid}", None)
             if fn is None:
                 out[qid] = self._unknown(qid, q)
@@ -313,6 +324,12 @@ class LocalJev:
         out = set(re.findall(r"[a-z]{4,}", norm(s.get("output", ""))))
         cover = len(ped & out) / len(ped) if ped else 1.0
         return self._noul("verify_pedido", 0.3 + 0.7 * cover)
+
+    def _q_next_project(self, q, s):
+        def valor(c):
+            return (1 - c["nota"]) * (1 + min(c["parado_giros"], 500) / 100) + 2 * c["feedback_novo"] + (3 if c["sem_regua"] else 0)
+        best = max(s.get("projetos", []), key=valor)
+        return Decision("next_project", "choice", str(best["id"]), 0.7, self.source)
 
     def _q_isolate_stage(self, q, s):
         n = int(s.get("falhas_recentes", 0))

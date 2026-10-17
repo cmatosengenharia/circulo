@@ -17,9 +17,9 @@ def test_projetos_semente_financas_e_o_proprio_circulo(circle):
 
 
 @pytest.mark.parametrize("pedido,tipo,status", [
-    ("Crie uma landing page para captar leads do Instagram", "landing_page", "aguardando_kit"),
-    ("Crie um portal admin para fotógrafos", "produto_software", "aguardando_kit"),
-    ("Monte um plano para a construção da casa no lote", "plano", "aguardando_kit"),
+    ("Crie uma landing page para captar leads do Instagram", "landing_page", "ativo"),
+    ("Crie um portal admin para fotógrafos", "produto_software", "ativo"),
+    ("Monte um plano para a construção da casa no lote", "plano", "ativo"),
 ])
 def test_intake_classifica_com_jev(circle, pedido, tipo, status):
     p = criar(circle, pedido)
@@ -46,12 +46,13 @@ def test_decisoes_e_evolucoes_ficam_no_projeto(circle):
     assert c["evolucoes_aplicadas"] == 1 and c["giros"] >= 6 and sum(c["atividade_24h"]) > 0
 
 
-def test_mensagem_para_projeto_sem_kit_nao_vira_lancamento(circle):
+def test_mensagem_para_projeto_geral_vira_feedback_e_nao_lancamento(circle):
     p = criar(circle, "Crie uma landing page para captar leads do Instagram")
     circle.store.enqueue("mensagem", {"text": "38,90 ifood", "projeto": p["id"]})
     circle.tick()
     assert circle.store.one("SELECT COUNT(*) n FROM ledger")["n"] == 0
-    assert "espera o kit" in circle.store.one("SELECT message FROM alerts WHERE project_id=? ORDER BY id DESC", (p["id"],))["message"]
+    assert "Anotado" in circle.store.one("SELECT message FROM alerts WHERE project_id=? ORDER BY id DESC", (p["id"],))["message"]
+    assert circle.store.one("SELECT kind, trust FROM memory WHERE project_id=?", (p["id"],))["kind"] == "feedback"
 
 
 def test_nome_curto_vem_do_pedido():

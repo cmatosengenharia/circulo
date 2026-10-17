@@ -19,13 +19,15 @@ from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
+from .engine import Engine
 from .incidents import Incidents
+from .memory import Memory
 from .projects import ensure_seed, intake, kit_project_id
 from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
 
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 9000}
 
 
 @dataclass
@@ -62,6 +64,9 @@ class Circle:
         self.shadow = Shadow(self.ctx)
         self.health = HealthMonitor(self.ctx)
         self.gate = gate if gate is not None else build_gate(self.ctx)
+        self.memory = Memory(self.ctx.store, self.ctx.dl)
+        self.engine = Engine(self.ctx, self.memory)
+        self.ctx.store.set("motor_pronto", self.engine.ready)
         self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
         finance.base(store)
         ensure_seed(store)
@@ -112,6 +117,7 @@ class Circle:
         ctx.dl.project_id = circulo_pid          # fora de um pedido, quem trabalha é o próprio círculo
         self._stage("orquestrador")
         self.incidents.resolve_stale()
+        self.engine.reopen_stale()
         finance.age_open_transactions(s)
 
         # 1) pedido (prioridade) ou 2) evolução natural
@@ -177,7 +183,11 @@ class Circle:
         pid = self.ctx.dl.project_id
         proj = self.store.one("SELECT kit, nome FROM projects WHERE id=?", (pid,)) if pid else None
         if proj is not None and proj["kit"] != "financas":
-            msg = f"Anotado em “{proj['nome']}”. Este projeto ainda espera o kit do tipo dele para começar a construir."
+            # orientação do humano para um projeto: vira feedback confiável na memória e reabre o projeto
+            self.memory.add("feedback", payload["text"], tipo=None, project_id=pid, source="Cássio", trust="confiavel")
+            self.engine.reopen(pid, "feedback do humano")
+            msg = (f"Anotado em “{proj['nome']}”. Entra como orientação no próximo ciclo." if self.engine.ready else
+                   f"Anotado em “{proj['nome']}”. O motor de construção precisa da chave da LLM (ANTHROPIC_API_KEY) para usar isso.")
             self.ctx.reply(msg)
             return msg
         p = self.collector.parse(payload["text"])
@@ -256,11 +266,13 @@ class Circle:
         tasks = list(ctx.policy["idle"]["tasks"])
         if ctx.dl.llm is not None and "propor_feature" not in tasks:
             tasks.append("propor_feature")
+        if self.engine.ready and self.engine.candidates() and "evoluir_projeto" not in tasks:
+            tasks.append("evoluir_projeto")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
         if self.controls()["modo_seguro"]:
             # só tarefas de baixo risco: nada de evoluir regras, gerar features ou mergear
-            tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo")]
+            tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")]
         run = ctx.dl.ask("should_run_idle", Question("noul", "Vale rodar uma tarefa de evolução natural agora?"),
                          {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
         if float(run.value) < 0.5:
@@ -271,7 +283,7 @@ class Circle:
         if not tasks:
             return None
         last = s.get("idle_last", {})
-        staleness = {t: s.tick - int(last.get(t, 0)) for t in tasks}
+        staleness = {t: (s.tick - int(last.get(t, 0))) * (2 if t == "evoluir_projeto" else 1) for t in tasks}
         pick = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de evolução natural tem mais valor agora?",
                                                 {t: t.replace("_", " ") for t in tasks}), {"staleness": staleness}).value
         gate = ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST.get(pick, 0), "value_signal": 0.6, "task": pick})
@@ -300,6 +312,11 @@ class Circle:
             self.developer.idle()
         elif pick == "revisar_prs":
             self.gate.run()
+        elif pick == "evoluir_projeto":
+            pid = self.engine.next_project()
+            if pid is not None:
+                self._stage("projeto", {"projeto": pid})
+                self.engine.cycle(pid)
 
     def regression(self) -> dict:
         """Replay da política ativa sobre todo o histórico resolvido; guarda a acurácia como linha de base."""

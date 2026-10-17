@@ -167,6 +167,43 @@ CREATE TABLE IF NOT EXISTS memory (
   updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS rubrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  criteria TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS deliverables (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  formato TEXT NOT NULL,
+  path TEXT NOT NULL,
+  content TEXT NOT NULL,
+  nota REAL,
+  nota_oculta REAL,
+  notas TEXT,
+  status TEXT NOT NULL,           -- atual | anterior | descartada (nada é apagado)
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cycles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  tick INTEGER NOT NULL,
+  fase TEXT NOT NULL,
+  nota_antes REAL,
+  nota_depois REAL,
+  ganho REAL,
+  aceita INTEGER,
+  tokens INTEGER NOT NULL,
+  lessons TEXT,
+  resultado TEXT,
+  created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -191,7 +228,10 @@ class Store:
 
     # colunas adicionadas depois da primeira versão (bancos antigos ganham a coluna sem perder dados)
     MIGRATIONS = (("decisions", "project_id", "INTEGER"), ("proposals", "project_id", "INTEGER"),
-                  ("alerts", "project_id", "INTEGER"), ("metrics", "project_id", "INTEGER"))
+                  ("alerts", "project_id", "INTEGER"), ("metrics", "project_id", "INTEGER"),
+                  ("projects", "melhor_nota", "REAL"), ("projects", "ciclos", "INTEGER"), ("projects", "plateau", "INTEGER"),
+                  ("projects", "ultima_pesquisa_tick", "INTEGER"), ("projects", "ultimo_ciclo_tick", "INTEGER"),
+                  ("projects", "ultimo_ciclo_em", "REAL"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

@@ -117,7 +117,7 @@ def test_estado_filtrado_por_projeto(circle):
     circle.tick()
     lp = circle.store.one("SELECT id FROM projects WHERE tipo='landing_page'")["id"]
     s = estado(circle.store, lp)
-    assert s["projeto"]["status"] == "aguardando_kit" and s["projetos"] == [] and s["aguardando"] == []
+    assert s["projeto"]["status"] == "ativo" and s["projeto"]["kit"] == "geral" and s["projetos"] == [] and s["aguardando"] == []
     assert estado(circle.store, 1)["projeto"]["decisoes"] >= 2
 
 

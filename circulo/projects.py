@@ -16,12 +16,12 @@ from .state import Store
 TIPOS: dict[str, tuple[str, str, str | None]] = {
     "circulo": ("O próprio círculo", "Melhorar o próprio loop: autonomia, autoevolução, guardrails, painel", "circulo"),
     "financas": ("Finanças", "Controle financeiro, gastos, economia, orçamento, patrimônio", "financas"),
-    "landing_page": ("Landing page", "Página para captar leads ou vender uma oferta", None),
-    "produto_software": ("Produto de software", "Sistema, portal, app ou plataforma com usuários", None),
-    "plano": ("Plano", "Plano de ação, cronograma, orçamento ou checklist para um objetivo", None),
-    "pesquisa_decisao": ("Pesquisa e decisão", "Comparar opções e recomendar uma decisão fundamentada", None),
-    "conteudo": ("Conteúdo", "Textos, posts, roteiros ou calendário editorial", None),
-    "outro": ("Outro", "Nenhum dos tipos acima", None),
+    "landing_page": ("Landing page", "Página para captar leads ou vender uma oferta", "geral"),
+    "produto_software": ("Produto de software", "Sistema, portal, app ou plataforma com usuários", "geral"),
+    "plano": ("Plano", "Plano de ação, cronograma, orçamento ou checklist para um objetivo", "geral"),
+    "pesquisa_decisao": ("Pesquisa e decisão", "Comparar opções e recomendar uma decisão fundamentada", "geral"),
+    "conteudo": ("Conteúdo", "Textos, posts, roteiros ou calendário editorial", "geral"),
+    "outro": ("Outro", "Nenhum dos tipos acima", "geral"),
 }
 
 PROPOSITO = {
@@ -82,6 +82,8 @@ def ensure_seed(store: Store) -> None:
     if not store.one("SELECT 1 FROM projects WHERE kit='circulo'"):
         store.x("INSERT INTO projects(nome,pedido,tipo,kit,status,proposito,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 ("O próprio círculo", CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
+    # projetos criados antes do motor genérico passam a ser atendidos por ele
+    store.x("UPDATE projects SET kit='geral', status='ativo' WHERE status='aguardando_kit'")
     if not store.one("SELECT 1 FROM roadmap WHERE origem='pedido_cassio'"):
         for i, (titulo, detalhe, status, evid) in enumerate(ROTEIRO_SEMENTE, 1):
             store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
@@ -111,7 +113,7 @@ def intake(store: Store, dl: DecisionLayer, pedido: str) -> dict:
     tipo = d.value
     kit = TIPOS[tipo][2]
     # Pedido de finanças com o kit já ativo: é o mesmo projeto, não um novo.
-    if kit and (pid := kit_project_id(store, kit)) is not None:
+    if kit in ("financas", "circulo") and (pid := kit_project_id(store, kit)) is not None:
         store.x("UPDATE projects SET updated_at=? WHERE id=?", (time.time(), pid))
         return {"id": pid, "novo": False, "tipo": tipo, "status": "ativo", "confianca": d.confidence}
     status = "ativo" if kit else "aguardando_kit"
@@ -166,6 +168,9 @@ def cards(store: Store) -> list[dict]:
             "atividade_24h": atividade, "agora": etapa.get("projeto") == pid,
             "criado_em": p["created_at"], "na_fila": fila.get(pid, 0),
             **(_extras_circulo(store) if p["kit"] == "circulo" else {}),
+            **({"nota": p["melhor_nota"], "ciclos_motor": p["ciclos"] or 0, "motor_pronto": bool(store.get("motor_pronto")),
+                "versoes": store.one("SELECT COUNT(*) n FROM deliverables WHERE project_id=? AND status!='descartada'", (pid,))["n"],
+                "regua": bool(store.one("SELECT 1 FROM rubrics WHERE project_id=?", (pid,)))} if p["kit"] == "geral" else {}),
         })
     # ativos primeiro; dentro de cada grupo, o que teve atividade mais recente
     out.sort(key=lambda c: (c["kit"] != "circulo", c["status"] != "ativo", -c["ultima_atividade"]))
