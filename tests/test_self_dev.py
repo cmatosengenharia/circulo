@@ -91,9 +91,12 @@ def test_agente_sem_mudanca(circle, repo):
     assert r.status == "sem_mudanca"
 
 
-def test_nao_pega_pedido_grande_sozinho(circle, repo):
+def test_sem_erros_pega_pedido_do_roteiro_mas_nunca_o_que_depende_de_voce(circle, repo):
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), FakeGH(), test_cmd=TEST_CMD)
-    assert dev.run_once().status == "nada"     # roteiro só tem pedidos do humano, nenhum erro
+    item = dev.pick()
+    assert item["origem"] == "pedido_cassio" and "depende de você" not in item["evidencia"]
+    circle.store.x("UPDATE roadmap SET status='feito' WHERE evidencia NOT LIKE '%depende de você%'")
+    assert dev.pick() is None and dev.run_once().status == "nada"
 
 
 def test_item_feito_quando_erro_some(circle, repo):

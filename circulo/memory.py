@@ -43,15 +43,22 @@ class Memory:
 
     # ------------------------------------------------------------ buscar (BM25 + rerank Jev)
     def search(self, query: str, *, kinds: tuple[str, ...] = KINDS, tipo: str | None = None,
-               project_id: int | None = None, k: int = 5, rerank: bool = True, include_quarantine: bool = False) -> list[dict]:
+               project_id: int | None = None, k: int = 5, rerank: bool = True, include_quarantine: bool = False,
+               also: list[int] | None = None) -> list[dict]:
+        """`also`: missões ligadas cuja memória também pode ser consultada (memória compartilhada)."""
         where, args = [f"kind IN ({','.join('?' * len(kinds))})"], list(kinds)
         where.append("status IN ('ativa','quarentena')" if include_quarantine else "status='ativa'")
         if tipo:
-            where.append("(tipo=? OR tipo IS NULL)")
-            args.append(tipo)
+            if also:   # o que veio das missões ligadas vale mesmo sendo de outro tipo
+                where.append(f"(tipo=? OR tipo IS NULL OR project_id IN ({','.join('?' * len(also))}))")
+                args.extend([tipo, *also])
+            else:
+                where.append("(tipo=? OR tipo IS NULL)")
+                args.append(tipo)
         if project_id:
-            where.append("(project_id=? OR project_id IS NULL OR kind='licao')")
-            args.append(project_id)
+            ids = [project_id, *(also or [])]
+            where.append(f"(project_id IN ({','.join('?' * len(ids))}) OR project_id IS NULL OR kind='licao')")
+            args.extend(ids)
         docs = [dict(r) for r in self.s.q(f"SELECT * FROM memory WHERE {' AND '.join(where)}", args)]
         if not docs:
             return []
@@ -83,7 +90,9 @@ class Memory:
                                          "ORDER BY COALESCE(json_extract(meta,'$.usos'),0), id LIMIT ?", (tipo, exploracao))]
         return act + qua
 
-    def lesson_outcome(self, lesson_ids: list[int], gain: float, min_gain: float) -> None:
+    def lesson_outcome(self, lesson_ids: list[int], gain: float, min_gain: float) -> list[int]:
+        """Atualiza as lições usadas no ciclo. Devolve as que acabaram de ser confirmadas (viram ativas)."""
+        ativadas = []
         for lid in lesson_ids:
             row = self.s.one("SELECT status, meta FROM memory WHERE id=?", (lid,))
             if not row:
@@ -95,7 +104,9 @@ class Memory:
             status = row["status"]
             if status == "quarentena" and m.get("confirmacoes", 0) >= 1:
                 status = "ativa"
+                ativadas.append(lid)
             if m["usos"] >= 3 and m.get("confirmacoes", 0) == 0:
                 status = "aposentada"   # nunca apagada: continua consultável no histórico
             self.s.x("UPDATE memory SET status=?, meta=?, updated_at=? WHERE id=?",
                      (status, json.dumps(m, ensure_ascii=False), time.time(), lid))
+        return ativadas

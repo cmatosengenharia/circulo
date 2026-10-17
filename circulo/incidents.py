@@ -111,7 +111,7 @@ class Incidents:
         for iid in fechados:   # o erro parou de acontecer: o item do roteiro que pedia a correção está feito
             self.s.x("UPDATE roadmap SET status='feito', evidencia=evidencia || ' · erro não ocorre há ' || ? || ' giros', updated_at=? "
                      "WHERE origem='erro' AND status!='feito' AND detalhe LIKE ?", (RESOLVE_AFTER_TICKS, time.time(), f"%incidente #{iid},%"))
-        cur = self.s.db.execute(
+        n = self.s.run(
             "UPDATE incidents SET status='resolvido', resolution=COALESCE(resolution,'') || ' | não ocorre há ' || ? || ' giros' "
             "WHERE status IN ('aberto','isolado') AND last_tick < ?", (RESOLVE_AFTER_TICKS, tick - RESOLVE_AFTER_TICKS))
-        return cur.rowcount
+        return n

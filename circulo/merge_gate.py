@@ -4,7 +4,11 @@ O GitHub Free não aplica proteção de branch em repositório privado, então a
 Ordem: regras duras (código, não evoluem) → Reviewer Code (Jev) → merge com SHA travado.
 O Jev só pode deixar o gate MAIS rígido: ele nunca libera o que uma regra dura barrou.
 
-Este arquivo é protegido: o CI exige o label `aprovado-humano` para alterá-lo.
+Nada aqui espera o humano:
+- Constituição (os próprios guardrails, o gate, orçamento, CI): o loop NUNCA altera. PR de agente que
+  toca nesses arquivos é recusado e registrado como "fora do alcance" — a missão segue por outro caminho.
+- Código de dinheiro (finance.py, money.py): entra sozinho, mas só com o check "Evidência reforçada"
+  (propriedades financeiras em milhares de casos aleatórios) verde, além dos testes normais.
 """
 from __future__ import annotations
 
@@ -19,12 +23,14 @@ from typing import Protocol
 from .agents import Ctx, ReviewerCode
 
 # ------------------------------------------------------------------ regras duras (não evoluem)
-REQUIRED_CHECKS = ("Testes (Python 3.11)", "Testes (Python 3.12)", "Testes (Python 3.13)", "Arquivos protegidos")
-PROTECTED_PATHS = (
-    "circulo/finance.py", "circulo/money.py", "circulo/policy.py", "circulo/budget.py",
-    "circulo/merge_gate.py", ".github/",
+REQUIRED_CHECKS = ("Testes (Python 3.11)", "Testes (Python 3.12)", "Testes (Python 3.13)", "Constituição", "Evidência reforçada")
+CONSTITUICAO = (
+    "circulo/merge_gate.py", "circulo/policy.py", "circulo/budget.py", "circulo/guardrails.py",
+    "circulo/self_dev.py", ".github/",
 )
-HUMAN_LABEL = "aprovado-humano"
+DINHEIRO = ("circulo/finance.py", "circulo/money.py")
+PROTECTED_PATHS = CONSTITUICAO + DINHEIRO   # compatibilidade
+HUMAN_LABEL = "aprovado-humano"             # legado: não é mais exigido
 AGENT_BRANCH_PREFIX = "circulo/"     # o gate só mergeia PRs abertos pelos agentes
 MAX_LINES = 800                       # PR maior que isso nunca entra sozinho
 
@@ -46,8 +52,20 @@ class Verdict:
     details: dict = field(default_factory=dict)
 
 
+def _match(files: list[str], paths: tuple[str, ...]) -> list[str]:
+    return [f for f in files if any(f == p or (p.endswith("/") and f.startswith(p)) for p in paths)]
+
+
 def touches_protected(files: list[str]) -> list[str]:
-    return [f for f in files if any(f == p or (p.endswith("/") and f.startswith(p)) for p in PROTECTED_PATHS)]
+    return _match(files, PROTECTED_PATHS)
+
+
+def touches_constitution(files: list[str]) -> list[str]:
+    return _match(files, CONSTITUICAO)
+
+
+def touches_money(files: list[str]) -> list[str]:
+    return _match(files, DINHEIRO)
 
 
 def checks_ok(runs: list[dict]) -> tuple[bool, str]:
@@ -96,25 +114,30 @@ class MergeGate:
         if pr.get("draft"):
             return Verdict(n, sha, False, "rascunho")
         if not pr.get("head_ref", "").startswith(AGENT_BRANCH_PREFIX):
-            return Verdict(n, sha, False, "não é PR de agente (merge é seu)")
+            return Verdict(n, sha, False, "PR humano: o loop não interfere")
+
+        files = self.gh.pr_files(n)
+        names = [f["filename"] for f in files]
+        const = touches_constitution(names)
+        if const:   # recusa definitiva: não espera ninguém, não tenta de novo
+            return Verdict(n, sha, False, f"fora do alcance: PR de agente altera a constituição ({', '.join(const)})",
+                           {"constituicao": const, "fora_do_alcance": True})
 
         ok, why = checks_ok(self.gh.check_runs(sha))
         if not ok:
             return Verdict(n, sha, False, why)
 
-        files = self.gh.pr_files(n)
-        names = [f["filename"] for f in files]
         lines = sum(f.get("additions", 0) + f.get("deletions", 0) for f in files)
-        protected = touches_protected(names)
         if lines > MAX_LINES:
-            return Verdict(n, sha, False, f"PR grande demais ({lines} linhas > {MAX_LINES})", {"lines": lines})
-        if protected and not human_approved(self.gh.label_events(n), self.human):
-            return Verdict(n, sha, False, f"altera arquivo protegido sem '{HUMAN_LABEL}' seu: {', '.join(protected)}",
-                           {"protected": protected})
-
-        # Se tocou em dinheiro, quem revisou o dinheiro foi você (label); o Jev avalia o resto do PR.
+            return Verdict(n, sha, False, f"PR grande demais ({lines} linhas > {MAX_LINES}): o Developer deve quebrar em partes",
+                           {"lines": lines, "fora_do_alcance": True})
+        dinheiro = touches_money(names)
+        # Código de dinheiro: a evidência reforçada (check obrigatório) já rodou; o Jev revisa como código sensível.
         decision = self.reviewer.review(tests_ok=True, lines_changed=lines, touches_money_code=False)
-        details = {"lines": lines, "files": len(names), "protected": protected, "review": decision}
+        if dinheiro and decision == "approve":
+            d2 = self.reviewer.review(tests_ok=True, lines_changed=lines * 2, touches_money_code=False)   # 2ª opinião, mais exigente
+            decision = d2
+        details = {"lines": lines, "files": len(names), "dinheiro": dinheiro, "review": decision}
         if decision != "approve":
             return Verdict(n, sha, False, f"Reviewer Code: {decision}", details)
         return Verdict(n, sha, True, "todos os gates passaram", details)
@@ -151,8 +174,12 @@ class MergeGate:
             dev = s.get("self_dev_aberto") or {}
             if dev.get("pr") == v.number:     # PR do Developer entrou: libera o próximo
                 s.set("self_dev_aberto", {**dev, "fechado": True, "merged": True})
-        elif "protegido" in v.reason or "grande" in v.reason:
-            self.ctx.reply(f"PR #{v.number} aguarda você: {v.reason}.", "merge")
+        elif v.details.get("fora_do_alcance"):
+            self.ctx.reply(f"PR #{v.number} recusado: {v.reason}. A missão segue por outro caminho.", "fora_alcance")
+            s.x("UPDATE prs SET status='fechado', updated_at=? WHERE number=?", (time.time(), v.number))
+            dev = s.get("self_dev_aberto") or {}
+            if dev.get("pr") == v.number:
+                s.set("self_dev_aberto", {**dev, "fechado": True, "merged": False})
 
 
 # ------------------------------------------------------------------ cliente REST real

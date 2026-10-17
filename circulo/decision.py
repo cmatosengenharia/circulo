@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import threading
 import unicodedata
 import urllib.error
 import urllib.request
@@ -148,6 +149,15 @@ class LocalJev:
                 rel = self._overlap(state.get("pedido", "") + " " + state.get("tipo", "").replace("_", " "), txt)
                 out[qid] = self._noul(qid, 0.35 + rel + (0.2 if len(txt) > 25 else 0))
                 continue
+            if qid.startswith("rel_") and q.kind == "choice":
+                out[qid] = self._relacao(qid, q, state)
+                continue
+            if qid.startswith("val_") and q.kind == "score":
+                pid = int(qid[4:])
+                c = next((x for x in state.get("projetos", []) if x["id"] == pid), None)
+                v = self._valor_missao(c) if c else 0
+                out[qid] = Decision(qid, "score", 2.0 if v >= 2.5 else 1.0 if v >= 0.6 else 0.0, 0.6, self.source)
+                continue
             if qid.startswith("mens_"):
                 txt = norm(q.instructions.split("?", 1)[-1])
                 vago = re.search(r"\b(bom|boa|bonit\w*|otim\w*|excelente|qualidade|agradavel|interessante|legal)\b", txt)
@@ -265,7 +275,7 @@ class LocalJev:
 
     _TIPO_HINTS = {
         "financas": r"\b(financ\w*|dinheiro|gasto\w*|econom\w*|orcamento|despesa\w*|investimento\w*)\b",
-        "landing_page": r"\b(landing|pagina de captura|captar leads?|leads?|pagina de vendas)\b",
+        "landing_page": r"\b(landing|pagina de captura|captar leads?|capturar leads?|pagina de vendas)\b",
         "produto_software": r"\b(portal|sistema|aplicativo|app|plataforma|admin|saas|painel)\b",
         "plano": r"\b(plano|planejamento|cronograma|roteiro de|checklist|construcao|obra)\b",
         "pesquisa_decisao": r"\b(compar\w*|escolher|decid\w*|melhor opcao|vale a pena|pesquis\w*)\b",
@@ -325,6 +335,43 @@ class LocalJev:
         cover = len(ped & out) / len(ped) if ped else 1.0
         return self._noul("verify_pedido", 0.3 + 0.7 * cover)
 
+    def _valor_missao(self, c):
+        return (1 - c["nota"]) * (1 + min(c["parado_giros"], 500) / 100) + 2 * c["feedback_novo"] + (3 if c["sem_regua"] else 0)
+
+    def _relacao(self, qid, q, s):
+        me = s.get("missao", {})
+        o = next((x for x in s.get("outras", []) if f"rel_{x['id']}" == qid), {})
+        def pal(p):
+            return {w for w in re.findall(r"[a-z]{4,}", norm(" ".join([p.get("pedido", ""), p.get("proposito", ""), " ".join(p.get("achados", []))])))
+                    if w not in _STOP and w not in ("crie", "criar", "monte", "pedido", "missao")}
+        a, b = pal(me), pal(o)
+        comum = a & b
+        tipos = {me.get("tipo"), o.get("tipo")}
+        if tipos == {"landing_page", "produto_software"} and comum:
+            return Decision(qid, "choice", "complementa", 0.75, self.source)
+        if "financas" in tipos and comum & {"casa", "lote", "dinheiro", "custos", "orcamento", "economizar", "financiamento"}:
+            return Decision(qid, "choice", "compartilha_dados", 0.7, self.source)
+        if len(comum) >= 2:
+            return Decision(qid, "choice", "mesmo_publico", 0.6, self.source)
+        return Decision(qid, "choice", "nenhuma", 0.8, self.source)
+
+    def _q_transfer_lesson(self, q, s):
+        return self._noul("transfer_lesson", 0.65 if s.get("destino", {}).get("relacao") in ("complementa", "mesmo_publico", "consome") else 0.35)
+
+    def _q_should_advance(self, q, s):
+        if not s.get("verificacao_ok"):
+            return self._noul("should_advance", 0.02)
+        g, go = float(s.get("ganho", 0)), float(s.get("ganho_oculto", 0))
+        p = 0.5 + min(0.4, g * 4) + (0.08 if go >= 0 else -0.3) + (0.05 if s.get("integracao_ok", True) else -0.2)
+        return self._noul("should_advance", p)
+
+    def _q_contraprova(self, q, s):
+        """Pergunta invertida (autoconsistência): a nova versão piorou algo importante?"""
+        pioras = int(s.get("criterios_que_pioraram", 0))
+        go = float(s.get("ganho_oculto", 0))
+        p = 0.1 + 0.25 * pioras + (0.5 if go < -0.05 else 0)
+        return self._noul("contraprova", p)
+
     def _q_next_project(self, q, s):
         def valor(c):
             return (1 - c["nota"]) * (1 + min(c["parado_giros"], 500) / 100) + 2 * c["feedback_novo"] + (3 if c["sem_regua"] else 0)
@@ -345,6 +392,16 @@ class LocalJev:
 # ---------------------------------------------------------------- DecisionLayer
 
 class DecisionLayer:
+    @property
+    def project_id(self) -> int | None:
+        return getattr(self._local, "pid", self._default_project)
+
+    @project_id.setter
+    def project_id(self, value: int | None) -> None:
+        if threading.current_thread() is threading.main_thread():
+            self._default_project = value
+        self._local.pid = value
+
     def __init__(self, store: Store, policy: Callable[[], dict], budget: Budget,
                  jev: JevClient | None = None, llm: LLMClient | None = None):
         self.s = store
@@ -353,7 +410,8 @@ class DecisionLayer:
         self.jev = jev or LocalJev()
         self.local = LocalJev()
         self.llm = llm
-        self.project_id: int | None = None   # projeto em atendimento (None = o próprio círculo)
+        self._local = threading.local()        # missão em atendimento, por thread (missões rodam em paralelo)
+        self._default_project: int | None = None
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:

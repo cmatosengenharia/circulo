@@ -21,6 +21,7 @@ from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from . import guardrails
 from .engine import Engine
+from .graph import MissionGraph
 from .harness_lab import HarnessLab
 from .self_dev import SelfDeveloper, build_self_dev
 from .incidents import Incidents
@@ -30,7 +31,7 @@ from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
 
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 9000, "evoluir_harness": 800, "corrigir_codigo": 40000}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 40000}
 
 
 @dataclass
@@ -70,6 +71,9 @@ class Circle:
         self.memory = Memory(self.ctx.store, self.ctx.dl)
         self.lab = HarnessLab(self.ctx)
         self.engine = Engine(self.ctx, self.memory, self.lab)
+        self.graph = MissionGraph(self.ctx, self.memory)
+        self.engine.graph = self.graph
+        self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
         self.self_dev = self_dev if self_dev is not None else build_self_dev(self.ctx)
         self.ctx.policies.before_change = lambda: guardrails.snapshot(self.ctx.store, self.data_dir, "mudanca")
         self.ctx.store.set("motor_pronto", self.engine.ready)
@@ -237,7 +241,7 @@ class Circle:
                 raise ValueError("invariante violado; lançamento desfeito: " + "; ".join(violations))
             if kind == "despesa":
                 self.shadow.record(tx_id, cat["confidence"], cat["category"])
-            check = "" if cat["auto_accept"] else f" — confere? responda 'corrige {tx_id} <categoria> [tag]' ou 'ok {tx_id}'"
+            check = "" if cat["auto_accept"] else " (baixa confiança: o loop reclassifica sozinho quando aprender mais)"
             msg = f"#{tx_id} {fmt_brl(p['amount_cents'])} {p['description']} → {cat['category']}/{cat['tag']}{check}"
         elif kind == "correcao":
             msg = self.correct(p["tx_id"], p.get("args", []))
@@ -255,6 +259,8 @@ class Circle:
     def new_project(self, payload: dict) -> dict:
         res = intake(self.store, self.ctx.dl, payload["pedido"])
         self.ctx.dl.project_id = res["id"]
+        if res["novo"]:
+            self.graph.conectar(res["id"])     # a missão nova já nasce conhecendo as outras
         if not res["novo"]:
             self.ctx.reply("Esse pedido é do projeto que já existe; ele continua evoluindo por lá.")
         elif res["status"] == "aguardando_kit":
@@ -292,6 +298,9 @@ class Circle:
             tasks.append("propor_feature")
         if self.engine.ready and self.engine.candidates() and "evoluir_projeto" not in tasks:
             tasks.append("evoluir_projeto")
+        if self.store.one("SELECT COUNT(*) n FROM projects WHERE kit!='circulo' AND status!='arquivado'")["n"] >= 2 \
+                and "conectar_missoes" not in tasks:
+            tasks.append("conectar_missoes")
         if self.engine.ready and "evoluir_harness" not in tasks:
             tasks.append("evoluir_harness")
         if (self.self_dev is not None and not self.self_dev.busy() and self.self_dev.pick() is not None
@@ -328,11 +337,36 @@ class Circle:
         s.set("idle_last", last)
         return pick
 
+    def reclassificar_pendentes(self, limite: int = 20) -> int:
+        """Autocorreção em finanças, sem perguntar: lançamentos de baixa confiança são reclassificados
+        com as regras atuais (que evoluíram desde então). Só troca quando a confiança nova passa o limiar."""
+        fin = kit_project_id(self.store, "financas")
+        prev = self.ctx.dl.project_id
+        self.ctx.dl.project_id = fin
+        n = 0
+        try:
+            thr = self.ctx.policy["thresholds"]["auto_accept_category"]
+            for r in self.store.q("SELECT id, description, created_at FROM ledger WHERE kind='despesa' AND status='open' "
+                                  "AND auto_accepted=0 ORDER BY id DESC LIMIT ?", (limite,)):
+                hour = datetime.fromtimestamp(r["created_at"], TZ).hour
+                cat = self.categorizer.categorize(r["description"], hour)
+                if cat["confidence"] >= thr and cat["category"] != "outros":
+                    v, _ = self.ctx.policies.active()
+                    self.store.x("UPDATE ledger SET category=?, tag=?, confidence=?, auto_accepted=1, policy_version=? WHERE id=?",
+                                 (cat["category"], cat["tag"], cat["confidence"], v, r["id"]))
+                    n += 1
+        finally:
+            self.ctx.dl.project_id = prev
+        return n
+
     def _run_idle_task(self, pick: str) -> None:
         if pick == "analisar_padroes":
             self.analyst.scan()
         elif pick == "revisar_baixa_confianca":
             self.meta.step()
+            self.reclassificar_pendentes()
+        elif pick == "conectar_missoes":
+            self.graph.conectar_todas()
         elif pick == "rodar_regressao":
             self.regression()
         elif pick == "resumo":
@@ -347,10 +381,8 @@ class Circle:
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "evoluir_projeto":
-            pid = self.engine.next_project()
-            if pid is not None:
-                self._stage("projeto", {"projeto": pid})
-                self.engine.cycle(pid)
+            # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo
+            self.engine.run_parallel(on_stage=lambda nome, pid: self._stage(nome, {"projeto": pid}))
 
     def regression(self) -> dict:
         """Replay da política ativa sobre todo o histórico resolvido; guarda a acurácia como linha de base."""

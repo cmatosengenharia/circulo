@@ -45,24 +45,52 @@ jobs:
           print("50 giros, 0 erros")
           EOF
 
-  arquivos-protegidos:
-    # Cálculos, dinheiro e o guard de proteções só mudam com aprovação humana explícita.
-    name: Arquivos protegidos
-    if: github.event_name == 'pull_request'
+  constituicao:
+    # Os guardrails, o gate, o orçamento e o CI são a constituição: o loop nunca os altera.
+    # Não é uma aprovação pendente: PR de agente que toca neles falha aqui e é recusado na hora.
+    name: Constituição
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Bloqueia mudança em código de dinheiro sem o label aprovado-humano
+      - name: PR de agente não altera a constituição
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/')
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
-          changed=$(git diff --name-only "$BASE" HEAD -- circulo/finance.py circulo/money.py circulo/policy.py circulo/budget.py circulo/merge_gate.py .github/)
-          if [ -z "$changed" ]; then echo "Nenhum arquivo protegido alterado."; exit 0; fi
-          echo "Arquivos protegidos alterados:"; echo "$changed"
-          case ",$LABELS," in
-            *,aprovado-humano,*) echo "Label aprovado-humano presente."; exit 0 ;;
-            *) echo "::error::Este PR altera código de dinheiro/proteções. Precisa do label 'aprovado-humano' para entrar."; exit 1 ;;
-          esac
+          changed=$(git diff --name-only "$BASE" HEAD -- circulo/merge_gate.py circulo/policy.py circulo/budget.py circulo/guardrails.py circulo/self_dev.py .github/)
+          if [ -n "$changed" ]; then echo "::error::Constituição alterada por agente: $changed"; exit 1; fi
+          echo "Constituição intacta."
+      - name: Fora de PR de agente
+        if: "!(github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/'))"
+        run: echo "Mudança feita por você; o loop não decide sobre a constituição."
+
+  evidencia-reforcada:
+    # Código de dinheiro pode mudar sozinho, mas só com propriedades provadas em milhares de casos.
+    name: Evidência reforçada
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Quantos casos rodar
+        id: n
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD -- circulo/finance.py circulo/money.py | grep -q .; then
+            echo "n=5000" >> "$GITHUB_OUTPUT"; echo "Código de dinheiro alterado: evidência reforçada (5000 casos)."
+          else
+            echo "n=300" >> "$GITHUB_OUTPUT"; echo "Sem mudança em dinheiro: rodada normal (300 casos)."
+          fi
+      - name: Propriedades financeiras
+        env:
+          CIRCULO_PROP_N: ${{ steps.n.outputs.n }}
+          CIRCULO_PROP_SEED: ${{ github.run_id }}
+        run: pytest -q tests/test_propriedades_financeiras.py

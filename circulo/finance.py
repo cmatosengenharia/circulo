@@ -96,5 +96,5 @@ def check_invariants(store: Store) -> list[str]:
 def age_open_transactions(store: Store, days: float = 3.0) -> int:
     """Lançamentos sem correção após N dias contam como confirmados (silêncio = ok)."""
     cutoff = time.time() - days * 86400
-    cur = store.db.execute("UPDATE ledger SET status='confirmed' WHERE status='open' AND created_at<?", (cutoff,))
-    return cur.rowcount
+    n = store.run("UPDATE ledger SET status='confirmed' WHERE status='open' AND created_at<?", (cutoff,))
+    return n

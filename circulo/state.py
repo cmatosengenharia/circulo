@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any, Iterable
@@ -232,6 +233,41 @@ CREATE TABLE IF NOT EXISTS trail (
   em REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS links (
+  a INTEGER NOT NULL,
+  b INTEGER NOT NULL,
+  relacao TEXT NOT NULL,
+  forca REAL NOT NULL,
+  evidencia TEXT NOT NULL,
+  origem TEXT NOT NULL,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL,
+  PRIMARY KEY (a, b)
+);
+
+CREATE TABLE IF NOT EXISTS transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lesson_id INTEGER NOT NULL,
+  copia_id INTEGER NOT NULL,
+  de INTEGER NOT NULL,
+  para INTEGER NOT NULL,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS evidence (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  tick INTEGER NOT NULL,
+  fase TEXT NOT NULL,
+  versao INTEGER,
+  antes REAL, depois REAL, oculta_antes REAL, oculta_depois REAL,
+  checks TEXT,
+  jev_avanca REAL, jev_contraprova REAL,
+  decisao TEXT NOT NULL,          -- avancar | descartar | refazer | cumprida | base
+  motivo TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -247,7 +283,10 @@ class Store:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path, isolation_level=None)
+        # Uma conexão compartilhada entre as threads do loop (missões evoluem em paralelo):
+        # toda operação passa pelo mesmo lock, e uma transação segura o lock do começo ao fim.
+        self.lock = threading.RLock()
+        self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
@@ -270,17 +309,25 @@ class Store:
 
     # ---------- utilidades ----------
     def tx(self):
-        return _Tx(self.db)
+        return _Tx(self.db, self.lock)
 
     def q(self, sql: str, args: Iterable[Any] = ()) -> list[sqlite3.Row]:
-        return list(self.db.execute(sql, tuple(args)))
+        with self.lock:
+            return list(self.db.execute(sql, tuple(args)))
 
     def one(self, sql: str, args: Iterable[Any] = ()) -> sqlite3.Row | None:
-        return self.db.execute(sql, tuple(args)).fetchone()
+        with self.lock:
+            return self.db.execute(sql, tuple(args)).fetchone()
 
     def x(self, sql: str, args: Iterable[Any] = ()) -> int:
-        cur = self.db.execute(sql, tuple(args))
-        return cur.lastrowid
+        with self.lock:
+            cur = self.db.execute(sql, tuple(args))
+            return cur.lastrowid
+
+    def run(self, sql: str, args: Iterable[Any] = ()) -> int:
+        """Como x(), mas devolve quantas linhas mudaram."""
+        with self.lock:
+            return self.db.execute(sql, tuple(args)).rowcount
 
     # ---------- kv ----------
     def get(self, key: str, default: Any = None) -> Any:
@@ -331,17 +378,22 @@ class Store:
 
 
 class _Tx:
-    def __init__(self, db: sqlite3.Connection):
+    def __init__(self, db: sqlite3.Connection, lock):
         self.db = db
-        self.nested = db.in_transaction
+        self.lock = lock
+        self.nested = False
 
     def __enter__(self):
+        self.lock.acquire()
+        self.nested = self.db.in_transaction
         if not self.nested:
             self.db.execute("BEGIN IMMEDIATE")
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        if self.nested:
-            return False
-        self.db.execute("ROLLBACK" if exc_type else "COMMIT")
+        try:
+            if not self.nested:
+                self.db.execute("ROLLBACK" if exc_type else "COMMIT")
+        finally:
+            self.lock.release()
         return False

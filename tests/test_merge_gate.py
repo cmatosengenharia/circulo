@@ -72,20 +72,26 @@ def test_nao_mergeia_pr_humano_nem_rascunho(circle):
     assert [v.merge for v in vs] == [False, False] and gh.merged == []
 
 
-def test_arquivo_protegido_exige_label_do_humano(circle):
-    files = {1: [{"filename": "circulo/finance.py", "additions": 3, "deletions": 1}]}
+def test_constituicao_e_recusada_na_hora_sem_esperar_ninguem(circle):
+    files = {1: [{"filename": "circulo/merge_gate.py", "additions": 3, "deletions": 1}]}
     gh = FakeGH([pr()], files=files)
     [v] = gate(circle, gh).run()
-    assert not v.merge and "protegido" in v.reason
-    assert circle.store.one("SELECT 1 FROM alerts WHERE kind='merge' AND message LIKE '%aguarda você%'")
-
-    # label colocado por um bot/agente não vale
-    gh.events = {1: [{"event": "labeled", "label": "aprovado-humano", "actor": "circulo-bot"}]}
+    assert not v.merge and "constituição" in v.reason and gh.merged == []
+    assert circle.store.one("SELECT 1 FROM alerts WHERE kind='fora_alcance'")
+    assert not circle.store.one("SELECT 1 FROM alerts WHERE message LIKE '%aguarda você%'")
+    # nem um label "humano" libera: a constituição é imutável para o loop
+    gh.events = {1: [{"event": "labeled", "label": "aprovado-humano", "actor": "cmatosengenharia"}]}
     assert not gate(circle, gh).run()[0].merge
 
-    # colocado por você vale
-    gh.events = {1: [{"event": "labeled", "label": "aprovado-humano", "actor": "cmatosengenharia"}]}
-    assert gate(circle, gh).run()[0].merge
+
+def test_codigo_de_dinheiro_entra_sozinho_com_evidencia_reforcada(circle):
+    files = {1: [{"filename": "circulo/finance.py", "additions": 10, "deletions": 2}]}
+    gh = FakeGH([pr()], files=files)
+    [v] = gate(circle, gh).run()
+    assert v.merge and v.details["dinheiro"] == ["circulo/finance.py"]
+    sem = [r for r in OK_RUNS if r["name"] != "Evidência reforçada"]
+    gh2 = FakeGH([pr(2, sha="z")], files={2: files[1]}, runs={"z": sem})
+    assert not gate(circle, gh2).run()[0].merge          # sem a evidência reforçada, não entra
 
 
 def test_label_removido_depois_nao_vale():
@@ -94,9 +100,11 @@ def test_label_removido_depois_nao_vale():
     assert not human_approved(ev, "cmatosengenharia")
 
 
-def test_workflow_e_proprio_gate_sao_protegidos():
-    assert touches_protected([".github/workflows/ci.yml", "circulo/merge_gate.py", "circulo/agents.py"]) == [
+def test_workflow_e_proprio_gate_sao_constituicao():
+    from circulo.merge_gate import touches_constitution
+    assert touches_constitution([".github/workflows/ci.yml", "circulo/merge_gate.py", "circulo/agents.py", "circulo/finance.py"]) == [
         ".github/workflows/ci.yml", "circulo/merge_gate.py"]
+    assert touches_protected(["circulo/finance.py"]) == ["circulo/finance.py"]
 
 
 def test_pr_grande_nao_entra_sozinho(circle):

@@ -40,6 +40,7 @@ DEFAULT_POLICY: dict[str, Any] = {
         "alert_pattern": 0.7,
         "rollback": 0.6,
         "verify_output": 0.5,
+        "should_advance": 0.6,
         "remember": 0.6,
     },
     "harness": {
@@ -61,7 +62,8 @@ DEFAULT_POLICY: dict[str, Any] = {
                           "system": "Escreva UMA lição curta e acionável sobre o que fez a nota subir ou cair neste ciclo, para o próximo pedido do mesmo tipo."},
         },
     },
-    "portfolio": {"min_gain": 0.02, "plateau_cycles": 3, "per_project_daily_tokens": 60_000, "reopen_after_ticks": 2000},
+    "portfolio": {"min_gain": 0.02, "plateau_cycles": 3, "per_project_daily_tokens": 60_000, "reopen_after_ticks": 2000,
+                  "parallel": 3, "target_score": 0.85, "est_cycle_tokens": 9000},
     "shadow": {"min_ticks": 20, "min_observations": 10, "min_gain": 0.0},
     "idle": {"tasks": ["analisar_padroes", "revisar_baixa_confianca", "rodar_regressao", "resumo"]},
     "agents": {"developer_enabled": True},
@@ -143,6 +145,10 @@ def guard(new: dict) -> None:
     pf = new.get("portfolio")
     if pf and int(pf.get("per_project_daily_tokens", 0)) > int(new["budget"]["daily_token_limit"]):
         raise PolicyViolation("portfólio: orçamento por projeto maior que o diário")
+    if pf and not (1 <= int(pf.get("parallel", 1)) <= 8):
+        raise PolicyViolation("portfólio: paralelismo deve ficar entre 1 e 8")
+    if pf and not (0.5 <= float(pf.get("target_score", 0.85)) <= 1.0):
+        raise PolicyViolation("portfólio: meta de nota fora de [0.5, 1]")
     if "outros" not in new.get("categories", []):
         raise PolicyViolation("categoria 'outros' é obrigatória")
     cats = set(new["categories"])

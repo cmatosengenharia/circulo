@@ -13,11 +13,18 @@ def test_registro_rapido(circle):
     assert row["amount_cents"] == 3890 and row["auto_accepted"] == 1 and row["policy_version"] == 1
 
 
-def test_desconhecido_pede_ajuda_e_baixa_confianca_pede_revisao(circle):
+def test_baixa_confianca_nao_pergunta_nada_e_se_corrige_sozinha(circle):
     msg, _ = say(circle, "bom dia")
     assert "Não entendi" in msg
     msg, _ = say(circle, "77 loja xyz")
-    assert "corrige" in msg  # caiu em 'outros', não auto-aceita
+    assert "corrige" not in msg and "baixa confiança" in msg          # não espera resposta sua
+    pol = circle.ctx.policies
+    from circulo.policy import PolicyStore
+    pol.add_version(PolicyStore.patched(pol.get(), [{"op": "add_rule", "rule": {"keywords": ["xyz"], "category": "lazer", "tag": "escolha"}}]),
+                    "active", "regra aprendida")
+    assert circle.reclassificar_pendentes() == 1
+    row = circle.store.one("SELECT category, auto_accepted FROM ledger WHERE description LIKE '%xyz%'")
+    assert row["category"] == "lazer" and row["auto_accepted"] == 1
 
 
 def test_correcao_e_confirmacao(circle):

@@ -35,7 +35,11 @@ class FakeGen:
                              "- Ser muito bonita e de qualidade | 1\n- Botão de chamada para ação visível no topo | 2\n"
                              "- Exibe depoimento de cliente | 1\n", 300, model)
         if "Builder" in system:
-            return LLMResult(f"```html\n{self.builds[0]}\n```", 2000, model)
+            html = self.builds[0]
+            if "Pedido:" in prompt and "landing" not in prompt.lower().split("pedido:", 1)[1][:80]:
+                ped = prompt.split("Pedido:", 1)[1].split("\n", 1)[0].strip()
+                html = html.replace("<h1>Landing page para captar leads do Instagram</h1>", f"<h1>{ped}</h1>")
+            return LLMResult(f"```html\n{html}\n```", 2000, model)
         if "Improver" in system:
             pior = "<!doctype html><html><body><h1>Landing page para captar leads do Instagram</h1></body></html>"
             return LLMResult(pior if self.improve_bad else self.builds[1], 2500, model)
