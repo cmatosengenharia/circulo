@@ -1,0 +1,13 @@
+[Unit]
+Description=Circulo autoevolutivo Jev First
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/circulo
+EnvironmentFile=/opt/circulo/.env
+ExecStart=/opt/circulo/.venv/bin/circulo --data /opt/circulo/data run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

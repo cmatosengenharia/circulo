@@ -1,0 +1,47 @@
+# Círculo — loop autoevolutivo Jev First
+
+Loop infinito do Sistema de Controle da Vida. Recebe pedidos, decide tudo primeiro com o Jev,
+entrega, aprende com as correções e evolui as regras de domínio **e** a si mesmo — com shadow mode,
+guard de proteções e rollback automático.
+
+## Rodar
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"            # sem dependências obrigatórias; [llm] adiciona o SDK da Anthropic
+export TYPESAFE_API_KEY=...        # opcional: sem chave usa o decisor local (mesmo contrato)
+export ANTHROPIC_API_KEY=...       # opcional: fallback LLM, só quando o Jev autorizar
+
+circulo add "38,90 ifood almoço"   # enfileira
+circulo run                        # loop infinito (Ctrl+C para; o estado fica salvo)
+circulo respostas                  # o que o círculo respondeu
+circulo status                     # painel + orçamento + versão da política
+circulo resumo                     # resumo diário (também gerado sozinho)
+pytest -q
+```
+
+Mensagens que ele entende: `38,90 ifood almoço` · `+5000 salário` · `corrige 12 mercado impulso` · `ok 12`.
+
+## Um giro (tick)
+
+1. Orçamento esgotado? → pausa (`pausado_orcamento`) e retoma sozinho após a meia-noite (America/Sao_Paulo).
+2. Pedido na fila → Collector (Jev: tipo) → Categorizer (Jev: categoria ‖ tag numa chamada) → LLM só se o Jev estiver inseguro **e** `worth_spending` autorizar → grava em centavos dentro de transação; invariante violado desfaz o lançamento.
+3. Sem pedido → evolução natural: Jev decide se roda (`should_run_idle`), qual tarefa (`idle_task`) e se vale o gasto (`worth_spending`).
+4. Meta-Learner: descobre candidatos por SQL (custo zero) → `should_evolve` → guard → Reviewer Finance (replay do histórico + invariantes + Jev) → nível 1 aplica; nível 2 vai para **shadow**.
+5. Shadow: mesma decisão real avaliada pela versão nova; promove só se a utilidade for maior.
+6. Health Monitor: invariante violado ou taxa de correção subiu após mudança → **rollback automático**.
+7. Métricas por tick; resumo diário em `data/resumos/AAAA-MM-DD.md`.
+
+## O que a auto-evolução NÃO pode mudar (`policy.guard`)
+
+Invariantes ligados · rollback ligado · limite diário de tokens (≤ teto do `CIRCULO_HARD_DAILY_TOKENS`) ·
+limiares em [0,1] · `should_evolve.circle ≥ 0.7` · auto-accept ≥ 0.6 · intervalo ≥ 5s · categoria `outros`.
+`finance.py` (cálculos e invariantes) não é editável pelos agentes.
+
+## 24/7
+
+- macOS: `deploy/com.circulo.loop.plist` → `~/Library/LaunchAgents/` e `launchctl load` (ajuste os caminhos).
+- Linux/VPS: `deploy/circulo.service` (systemd).
+
+Estado em `data/circulo.db` (SQLite/WAL). Matar o processo a qualquer momento é seguro: o evento em
+andamento volta para a fila na próxima partida.

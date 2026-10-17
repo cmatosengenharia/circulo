@@ -1,0 +1,23 @@
+[project]
+name = "circulo"
+version = "0.2.0"
+description = "Círculo autoevolutivo Jev First — controle financeiro da família"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+circulo = "circulo.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["circulo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.circulo.loop</string>
+  <key>WorkingDirectory</key><string>/Users/SEU_USUARIO/Projects/circulo</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/SEU_USUARIO/Projects/circulo/.venv/bin/circulo</string>
+    <string>run</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CIRCULO_DATA</key><string>/Users/SEU_USUARIO/Projects/circulo/data</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/SEU_USUARIO/Projects/circulo/data/loop.log</string>
+  <key>StandardErrorPath</key><string>/Users/SEU_USUARIO/Projects/circulo/data/loop.err</string>
+</dict>
+</plist>
