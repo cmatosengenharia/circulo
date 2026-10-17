@@ -91,3 +91,30 @@ def test_feed_ao_vivo_sse(circle, painel):
     t.start()
     t.join(5)
     assert len(got) >= 2
+
+
+def test_home_e_cards(circle, painel):
+    with urllib.request.urlopen(painel + "/", timeout=5) as r:
+        assert "Novo pedido" in r.read().decode()
+    with urllib.request.urlopen(painel + "/projeto/1", timeout=5) as r:
+        assert "Todos os projetos" in r.read().decode()
+    code, body = post(painel + "/api/projeto", {"pedido": "Crie um portal admin para fotógrafos"}, {"X-Circulo": "1"})
+    assert code == 200
+    circle.tick()
+    with urllib.request.urlopen(painel + "/api/projetos", timeout=5) as r:
+        data = json.loads(r.read())
+    assert {p["tipo"] for p in data["projetos"]} == {"financas", "produto_software"}
+
+
+def test_pedido_curto_demais_e_recusado(painel):
+    assert post(painel + "/api/projeto", {"pedido": "oi"}, {"X-Circulo": "1"})[0] == 400
+
+
+def test_estado_filtrado_por_projeto(circle):
+    say(circle, "38,90 ifood almoço")
+    circle.submit_project("Crie uma landing page para captar leads do Instagram")
+    circle.tick()
+    lp = circle.store.one("SELECT id FROM projects WHERE tipo='landing_page'")["id"]
+    s = estado(circle.store, lp)
+    assert s["projeto"]["status"] == "aguardando_kit" and s["projetos"] == [] and s["aguardando"] == []
+    assert estado(circle.store, 1)["projeto"]["decisoes"] >= 2

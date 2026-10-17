@@ -35,7 +35,8 @@ class Ctx:
         return self.policies.get()
 
     def reply(self, message: str, kind: str = "resposta") -> None:
-        self.store.x("INSERT INTO alerts(kind,message,created_at) VALUES(?,?,?)", (kind, message, time.time()))
+        self.store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
+                     (kind, message, time.time(), self.dl.project_id))
 
 
 def tokens_of(description: str) -> list[str]:

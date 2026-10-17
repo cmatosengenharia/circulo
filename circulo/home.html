@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — projetos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
+  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2;
+  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --idle:#AEB8C2;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
+  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14;
+  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --idle:#4A5765;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--jev);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 56px}
+
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:28px}
+header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
+.state{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}
+.state[data-s="pausado_humano"] .dot,.state[data-s="parado"] .dot{background:var(--idle)}
+.state[data-s="pausado_orcamento"] .dot{background:var(--llm)}
+.state[data-s="modo_seguro"] .dot{background:var(--jev)}
+.state[data-s="rodando"] .dot{animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{50%{opacity:.35}}
+.controls{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.switch{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px 6px 8px;cursor:pointer;font-weight:600}
+.switch i{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background .2s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--surface);transition:transform .2s}
+.switch[aria-checked="true"] i{background:var(--jev)}
+.switch[aria-checked="true"] i::after{transform:translateX(14px)}
+
+.intro{max-width:62ch;margin:0 0 22px}
+.intro h2{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+.intro p{margin:0;color:var(--muted)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.card{position:relative;display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);
+  border-radius:22px;padding:20px;color:inherit;text-decoration:none;min-height:300px;transition:border-color .2s}
+a.card:hover{border-color:var(--ink)}
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--bg);color:var(--muted)}
+.chip.ativo{background:var(--ok-soft);color:var(--ok)}
+.chip.aguardando_kit{background:var(--llm-soft);color:var(--llm)}
+.chip.manutencao{background:var(--jev-soft);color:var(--jev)}
+.card h3{font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.015em;margin:0;padding-right:44px}
+.pedido{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pedido::before{content:"“"}.pedido::after{content:"”"}
+.proposito{margin:0;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:auto}
+.stats div{display:flex;flex-direction:column}
+.stats b{font-size:18px;font-weight:700}
+.stats span{font-size:12px;color:var(--muted)}
+.pulse{display:flex;align-items:flex-end;gap:2px;height:28px}
+.pulse i{flex:1;background:var(--jev);border-radius:2px;min-height:2px;opacity:.85}
+.pulse i.zero{background:var(--line);opacity:1}
+.foot{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+.foot strong{color:var(--ink)}
+
+/* mini círculo: girando quando o loop está neste projeto agora */
+.mini{position:absolute;top:18px;right:18px;width:34px;height:34px}
+.mini circle{fill:none;stroke-width:3}
+.mini .t{stroke:var(--line)}
+.mini .a{stroke:var(--jev);stroke-linecap:round;stroke-dasharray:22 200;transform-origin:center}
+.card.agora .mini .a{animation:spin 1.1s linear infinite}
+.card:not(.agora) .mini .a{stroke:var(--idle)}
+.card.agora{border-color:var(--jev)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* card de novo pedido */
+.novo{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.novo h3{padding-right:0}
+.novo p{margin:0;opacity:.75}
+.novo textarea{width:100%;min-height:96px;resize:vertical;border-radius:14px;border:1px solid transparent;background:color-mix(in srgb,var(--surface) 12%,transparent);color:var(--surface);padding:12px 14px}
+.novo textarea::placeholder{color:color-mix(in srgb,var(--surface) 55%,transparent)}
+.novo .ex{display:flex;flex-wrap:wrap;gap:6px}
+.novo .ex button{border:1px solid color-mix(in srgb,var(--surface) 30%,transparent);background:transparent;color:var(--surface);border-radius:999px;padding:3px 11px;font-size:13px;cursor:pointer}
+.novo .btn.primary{background:var(--surface);color:var(--ink);border-color:var(--surface);align-self:flex-start}
+.msg{font-size:14px;min-height:1.5em}
+.empty{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Círculo</h1>
+    <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
+    <div class="controls">
+      <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
+      <button class="btn primary" id="pause">Pausar o círculo</button>
+    </div>
+  </header>
+
+  <div class="intro">
+    <h2>Projetos</h2>
+    <p>Cada pedido vira um projeto que o círculo continua evoluindo com o propósito dele. Entre num card para ver o loop trabalhando naquele projeto.</p>
+  </div>
+
+  <div class="cards" id="cards">
+    <form class="card novo" id="novo">
+      <h3>Novo pedido</h3>
+      <p>Descreva o que você quer resolver. Pode ser vago: o círculo pesquisa, define a régua e evolui a partir daí.</p>
+      <textarea id="pedido" aria-label="Descreva o pedido" placeholder="Crie uma landing page para captar leads do Instagram"></textarea>
+      <div class="ex" aria-label="Exemplos">
+        <button type="button">Crie um portal admin para fotógrafos</button>
+        <button type="button">Monte um plano para construir a casa no lote</button>
+        <button type="button">Compare as opções de carro da empresa para minha família</button>
+      </div>
+      <button class="btn primary" type="submit" id="criar">Criar projeto</button>
+      <div class="msg" id="msg" role="status"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
+  pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
+const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado"};
+function ago(ts) {
+  const s = Math.max(0, Date.now() / 1000 - ts);
+  if (s < 60) return "há instantes"; if (s < 3600) return `há ${Math.round(s / 60)} min`;
+  if (s < 86400) return `há ${Math.round(s / 3600)} h`; return `há ${Math.round(s / 86400)} dias`;
+}
+let S = null, known = new Set();
+function card(p) {
+  const max = Math.max(1, ...p.atividade_24h);
+  const bars = p.atividade_24h.map(v => `<i class="${v ? "" : "zero"}" style="height:${v ? Math.max(12, v / max * 100) : 8}%"></i>`).join("");
+  const semLlm = p.sem_llm == null ? "—" : Math.round(p.sem_llm * 100) + "%";
+  return `<a class="card${p.agora ? " agora" : ""}" href="/projeto/${p.id}" aria-label="Abrir ${esc(p.nome)}">
+    <svg class="mini" viewBox="0 0 34 34" aria-hidden="true"><circle class="t" cx="17" cy="17" r="13"/><circle class="a" cx="17" cy="17" r="13"/></svg>
+    <div class="top"><span class="chip">${esc(p.tipo_rotulo)}</span><span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
+    <h3>${esc(p.nome)}</h3>
+    <p class="pedido">${esc(p.pedido)}</p>
+    <p class="proposito">${esc(p.proposito)}</p>
+    <div class="stats">
+      <div><b>${p.giros}</b><span>giros</span></div>
+      <div><b>${p.decisoes}</b><span>decisões</span></div>
+      <div><b>${semLlm}</b><span>sem LLM</span></div>
+      <div><b>${p.evolucoes_aplicadas}</b><span>evoluções</span></div>
+    </div>
+    <div class="pulse" title="Atividade nas últimas 24 horas">${bars}</div>
+    <div class="foot"><span>${p.agora ? "<strong>O loop está aqui agora</strong>" : "Última atividade " + ago(p.ultima_atividade)}</span><span>Abrir projeto</span></div>
+  </a>`;
+}
+function render(d) {
+  S = d;
+  const L = d.loop;
+  $("#state").dataset.s = L.status; $("#stateText").textContent = STATUS[L.status] || L.status;
+  $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
+  $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
+  const box = $("#cards"), novo = $("#novo");
+  box.querySelectorAll("a.card").forEach(e => e.remove());
+  novo.insertAdjacentHTML("afterend", d.projetos.map(card).join(""));
+  if (pending && d.projetos.some(p => !known.has(p.id))) { $("#msg").textContent = "Projeto criado."; pending = false; $("#criar").disabled = false; }
+  d.projetos.forEach(p => known.add(p.id));
+}
+async function refresh() {
+  try { render(await (await fetch("/api/projetos")).json()); }
+  catch { $("#state").dataset.s = "parado"; $("#stateText").textContent = "Sem conexão com o painel"; }
+}
+async function post(path, body) {
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({})); await refresh(); return [r.ok, j];
+}
+let pending = false;
+$("#pause").onclick = () => post("/api/controle", {acao: S && S.loop.controle.pausado ? "retomar" : "pausar"});
+$("#safe").onclick = () => post("/api/controle", {acao:"modo_seguro", ligado: !(S && S.loop.controle.modo_seguro)});
+document.querySelectorAll(".novo .ex button").forEach(b => b.onclick = () => { $("#pedido").value = b.textContent; $("#pedido").focus(); });
+$("#novo").onsubmit = async e => {
+  e.preventDefault();
+  const pedido = $("#pedido").value.trim();
+  if (!pedido) { $("#msg").textContent = "Escreva o pedido antes de criar o projeto."; return; }
+  $("#criar").disabled = true; $("#msg").textContent = "Enviado. O Intake está classificando o pedido…";
+  const [ok, j] = await post("/api/projeto", {pedido});
+  if (!ok) { $("#msg").textContent = j.erro || "Não foi possível enviar o pedido."; $("#criar").disabled = false; return; }
+  pending = true; $("#pedido").value = "";
+  if (S && S.loop.controle.pausado) $("#msg").textContent = "Pedido na fila. O círculo está pausado: ele cria o projeto quando você retomar.";
+};
+refresh(); setInterval(refresh, 2500);
+</script>
+</body>
+</html>

@@ -231,6 +231,25 @@ class LocalJev:
             return self._noul("health_rollback", 0.6 + min(0.4, rate - limit))
         return self._noul("health_rollback", 0.1)
 
+    _TIPO_HINTS = {
+        "financas": r"\b(financ\w*|dinheiro|gasto\w*|econom\w*|orcamento|despesa\w*|investimento\w*)\b",
+        "landing_page": r"\b(landing|pagina de captura|captar leads?|leads?|pagina de vendas)\b",
+        "produto_software": r"\b(portal|sistema|aplicativo|app|plataforma|admin|saas|painel)\b",
+        "plano": r"\b(plano|planejamento|cronograma|roteiro de|checklist|construcao|obra)\b",
+        "pesquisa_decisao": r"\b(compar\w*|escolher|decid\w*|melhor opcao|vale a pena|pesquis\w*)\b",
+        "conteudo": r"\b(conteudo|post\w*|instagram|roteiro|texto|artigo|newsletter|video)\b",
+    }
+
+    def _q_project_type(self, q, s):
+        t = norm(s.get("pedido", ""))
+        hits = [k for k, rx in self._TIPO_HINTS.items() if k in q.options() and re.search(rx, t)]
+        if len(hits) == 1:
+            return Decision("project_type", "choice", hits[0], 0.8, self.source)
+        if hits:  # vários sinais: o primeiro na ordem de especificidade, com confiança menor
+            order = ["financas", "landing_page", "produto_software", "plano", "pesquisa_decisao", "conteudo"]
+            return Decision("project_type", "choice", min(hits, key=order.index), 0.55, self.source)
+        return Decision("project_type", "choice", "outro", 0.3, self.source)
+
     def _q_idle_task(self, q, s):
         stale = s.get("staleness", {})
         opts = q.options()
@@ -249,6 +268,7 @@ class DecisionLayer:
         self.jev = jev or LocalJev()
         self.local = LocalJev()
         self.llm = llm
+        self.project_id: int | None = None   # projeto em atendimento (None = o próprio círculo)
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:
@@ -279,8 +299,9 @@ class DecisionLayer:
         return 0.0 <= float(d.value) <= max(0, len(q.criteria or ()) - 1)
 
     def _log(self, d: Decision) -> None:
-        self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at) VALUES(?,?,?,?,?,strftime('%s','now'))",
-                 (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source))
+        self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id) "
+                 "VALUES(?,?,?,?,?,strftime('%s','now'),?)",
+                 (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source, self.project_id))
 
     def _thr(self, path: str, default: float = 0.5) -> float:
         cur: Any = self.policy()["thresholds"]

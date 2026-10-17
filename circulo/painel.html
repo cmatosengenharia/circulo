@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Círculo — painel</title>
+<title>Círculo — projeto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
@@ -26,6 +26,13 @@ button,input{font:inherit;color:inherit}
 
 header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:18px}
 header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
+.back{display:inline-block;color:var(--muted);text-decoration:none;font-weight:600;margin-bottom:6px}
+.back::before{content:"‹ "}
+.back:hover{color:var(--ink)}
+.about{margin:-8px 0 18px;max-width:80ch}
+.about p{margin:0 0 4px}
+.about .pedido{color:var(--muted)}
+.banner{background:var(--llm-soft);color:var(--ink);border-radius:var(--r-sm);padding:12px 16px;margin:0 0 18px}
 .state{display:flex;align-items:center;gap:8px;color:var(--muted)}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}
 .state[data-s="pausado_humano"] .dot,.state[data-s="parado"] .dot{background:var(--idle)}
@@ -84,6 +91,7 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .feed{list-style:none;margin:0;padding:0;max-height:620px;overflow:auto}
 .feed li{display:grid;grid-template-columns:62px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .feed li:first-child{border-top:0}
+.feed li.empty{display:block}
 .feed .t{color:var(--muted);font-size:13px}
 .feed .q{font-weight:600}
 .feed .v{color:var(--muted)}
@@ -115,8 +123,9 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 </head>
 <body>
 <div class="wrap" id="app">
+  <a class="back" href="/">Todos os projetos</a>
   <header>
-    <h1>Círculo</h1>
+    <h1 id="pname">Projeto</h1>
     <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
@@ -124,6 +133,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
     </div>
   </header>
 
+  <div class="about" id="about"></div>
   <div class="grid">
     <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
       <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
@@ -136,7 +146,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
     </section>
 
     <section class="panel c5" aria-label="Saúde">
-      <h2>Saúde</h2>
+      <h2>Saúde do círculo</h2>
       <div id="health"></div>
       <div class="budget" id="budget"></div>
     </section>
@@ -149,7 +159,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 
     <div class="c5 stack">
       <section class="panel">
-        <h2>Novo pedido</h2>
+        <h2>Falar com o projeto</h2>
         <form class="ask" id="ask">
           <input id="askText" placeholder="38,90 ifood almoço" aria-label="Texto do pedido" autocomplete="off">
           <button class="btn primary" type="submit">Enviar</button>
@@ -167,7 +177,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
     </div>
 
     <section class="panel c7">
-      <h2>Projetos</h2>
+      <h2>Números do projeto</h2>
       <div id="projects"></div>
     </section>
     <section class="panel c5">
@@ -179,6 +189,8 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 
 <script>
 const $ = s => document.querySelector(s);
+const PID = (location.pathname.match(/\/projeto\/(\d+)/) || [])[1] || "";
+const Q = PID ? "projeto=" + PID : "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = x => Math.round(x * 100) + "%";
 const hora = ts => new Date(ts * 1000).toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
@@ -272,7 +284,14 @@ function render(s) {
   document.body.classList.toggle("paused", L.status.startsWith("pausado") || L.status === "parado");
   $("#pause").textContent = L.controle.pausado ? "Retomar o círculo" : "Pausar o círculo";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
-  showStage(L.etapa);
+  const P = s.projeto;
+  if (P) {
+    $("#pname").textContent = P.nome; document.title = "Círculo — " + P.nome;
+    if (P.kit !== "financas") $("#askText").placeholder = "Um detalhe ou orientação para este projeto";
+    $("#about").innerHTML = `<p class="pedido">Pedido: “${esc(P.pedido)}”</p><p>${esc(P.proposito)}</p>` +
+      (P.status === "aguardando_kit" ? `<div class="banner" style="margin-top:12px">Este projeto foi registrado como <strong>${esc(P.tipo_rotulo)}</strong>, mas o círculo ainda não tem o kit para construir este tipo de solução. O pedido não se perde: ele passa a ser atendido quando o kit existir. As decisões abaixo são as que o círculo já tomou sobre ele.</div>` : "");
+  }
+  showStage(L.etapa && (!PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
 
   const h = s.saude;
   hubNum.textContent = h.decisoes_24h ? pct(h.sem_llm) : "—";
@@ -283,7 +302,8 @@ function render(s) {
       inv ? esc(h.invariantes.join("; ")) : "Invariantes financeiros intactos.") +
     meter("Qualidade", pct(h.correcao), h.correcao, h.correcao_limite,
       `Correções nos lançamentos aceitos sozinhos (${h.amostras} amostras). Acima da marca, a última mudança é revertida.`, true) +
-    meter("Eficiência", pct(h.sem_llm), h.sem_llm, .9, `${h.decisoes_24h} decisões nas últimas 24h; meta: 90% sem LLM.`) +
+    (h.decisoes_24h ? meter("Eficiência", pct(h.sem_llm), h.sem_llm, .9, `${h.decisoes_24h} decisões nas últimas 24h; meta: 90% sem LLM.`)
+                    : meter("Eficiência", "—", 0, .9, "Nenhuma decisão nas últimas 24h ainda.")) +
     meter("Confiabilidade", h.erros_100 + " erros", errRate, .05, `Nos últimos ${h.giros_100} giros.`, true);
   const o = s.orcamento;
   $("#budget").innerHTML = meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
@@ -297,13 +317,13 @@ function render(s) {
     : `<li class="empty">Nenhuma evolução ainda. Ela aparece quando houver correções suficientes para aprender.</li>`;
   $("#versions").innerHTML = s.versoes.map(v =>
     `<li><span>v${v.version} · ${esc(v.reason)}</span><span class="chip ${v.status === "active" ? "applied" : esc(v.status)}">${{active:"ativa",retired:"anterior",shadow:"shadow",rolled_back:"revertida",rejected:"rejeitada"}[v.status] || esc(v.status)}</span></li>`).join("");
-  $("#projects").innerHTML = s.projetos.map(p =>
+  $("#projects").innerHTML = (P ? `<div class="proj"><span class="sub">${P.giros} giros · ${P.decisoes} decisões · ${P.evolucoes_aplicadas} evoluções aplicadas</span></div>` : "") + s.projetos.map(p =>
     `<div class="proj"><strong>${esc(p.nome)}</strong><span class="sub">${esc(p.linha)} · ${p.lancamentos} lançamentos</span>
      <div class="bar"><span style="width:${pct(p.progresso)}"></span></div></div>`).join("");
   $("#replies").innerHTML = s.respostas.map(r => `<li><span>${esc(r.message)}</span><span class="sub">${hora(r.created_at)}</span></li>`).join("");
 }
 async function refresh() {
-  try { render(await (await fetch("/api/estado")).json()); }
+  try { render(await (await fetch("/api/estado?" + Q)).json()); }
   catch { $("#state").dataset.s = "parado"; $("#stateText").textContent = "Sem conexão com o painel"; }
 }
 async function post(path, body) {
@@ -312,17 +332,17 @@ async function post(path, body) {
 }
 $("#pause").onclick = () => post("/api/controle", {acao: S && S.loop.controle.pausado ? "retomar" : "pausar"});
 $("#safe").onclick = () => post("/api/controle", {acao:"modo_seguro", ligado: !(S && S.loop.controle.modo_seguro)});
-$("#ask").onsubmit = e => { e.preventDefault(); const t = $("#askText").value.trim(); if (t) { post("/api/pedido", {texto:t}); $("#askText").value = ""; } };
-document.addEventListener("click", e => { const b = e.target.closest("[data-send]"); if (b) { b.disabled = true; post("/api/pedido", {texto: b.dataset.send}); } });
+$("#ask").onsubmit = e => { e.preventDefault(); const t = $("#askText").value.trim(); if (t) { post("/api/pedido", {texto:t, projeto: PID}); $("#askText").value = ""; } };
+document.addEventListener("click", e => { const b = e.target.closest("[data-send]"); if (b) { b.disabled = true; post("/api/pedido", {texto: b.dataset.send, projeto: PID}); } });
 
 function connect() {
-  const es = new EventSource("/api/eventos?desde=" + lastId);
+  const es = new EventSource("/api/eventos?desde=" + lastId + (Q ? "&" + Q : ""));
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
-  es.addEventListener("etapa", m => showStage(JSON.parse(m.data)));
+  es.addEventListener("etapa", m => { const e = JSON.parse(m.data); if (!PID || !e || !e.projeto || String(e.projeto) === PID) showStage(e); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
 refresh(); setInterval(refresh, 3000);
-fetch("/api/estado").then(r => r.json()).then(s => { lastId = Math.max(0, s.ultima_decisao - 25); connect(); });
+fetch("/api/estado?" + Q).then(r => r.json()).then(s => { lastId = Math.max(0, s.ultima_decisao - 25); connect(); });
 </script>
 </body>
 </html>

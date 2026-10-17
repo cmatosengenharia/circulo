@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import finance
 from .money import fmt_brl
+from .projects import cards
 from .state import Store
 
 HOST = "127.0.0.1"
@@ -24,7 +25,7 @@ def _rows(rows):
     return [dict(r) for r in rows]
 
 
-def estado(store: Store) -> dict:
+def estado(store: Store, projeto: int | None = None) -> dict:
     s = store
     now = time.time()
     tick = s.tick
@@ -35,8 +36,10 @@ def estado(store: Store) -> dict:
     day = time.strftime("%Y-%m-%d", time.localtime())
     budget = s.one("SELECT * FROM budget ORDER BY day DESC LIMIT 1")
 
-    dec = s.one("""SELECT COUNT(*) n, SUM(source!='llm') sem_llm, SUM(source='jev') jev, SUM(source='local') local
-                   FROM decisions WHERE created_at > ?""", (now - 86400,))
+    pf = " AND project_id=?" if projeto else ""
+    pa = (projeto,) if projeto else ()
+    dec = s.one(f"""SELECT COUNT(*) n, SUM(source!='llm') sem_llm, SUM(source='jev') jev, SUM(source='local') local
+                   FROM decisions WHERE created_at > ?{pf}""", (now - 86400, *pa))
     n = dec["n"] or 0
     last = s.q("SELECT tick, body FROM metrics ORDER BY tick DESC LIMIT 100")
     bodies = [json.loads(r["body"]) for r in last]
@@ -46,7 +49,8 @@ def estado(store: Store) -> dict:
     violations = finance.check_invariants(s)
 
     snap = finance.snapshot(s)
-    projetos = [{
+    kit = s.one("SELECT kit FROM projects WHERE id=?", (projeto,))["kit"] if projeto else "financas"
+    projetos = [] if kit != "financas" else [{
         "nome": "Finanças da família",
         "kit": "financas",
         "linha": (f"Patrimônio {fmt_brl(snap.patrimonio_liquido_cents)} · casa {snap.progresso_bp / 100:.1f}% · "
@@ -56,7 +60,7 @@ def estado(store: Store) -> dict:
     }]
 
     aguardando = []
-    for r in s.q("SELECT id, description, amount_cents, category FROM ledger WHERE status='open' AND auto_accepted=0 ORDER BY id DESC LIMIT 8"):
+    for r in ([] if kit != "financas" else s.q("SELECT id, description, amount_cents, category FROM ledger WHERE status='open' AND auto_accepted=0 ORDER BY id DESC LIMIT 8")):
         aguardando.append({"tipo": "revisao", "texto": f"#{r['id']} {fmt_brl(r['amount_cents'])} {r['description']} → {r['category']}?",
                            "acao": f"ok {r['id']}"})
     for r in s.q("SELECT message FROM alerts WHERE kind IN ('merge','saude') AND delivered=0 ORDER BY id DESC LIMIT 8"):
@@ -68,7 +72,7 @@ def estado(store: Store) -> dict:
 
     return {
         "agora": now,
-        "ultima_decisao": s.one("SELECT COALESCE(MAX(id),0) m FROM decisions")["m"],
+        "ultima_decisao": s.one(f"SELECT COALESCE(MAX(id),0) m FROM decisions WHERE 1=1{pf}", pa)["m"],
         "loop": {
             "tick": tick, "status": s.get("loop_status", "parado"), "etapa": s.get("etapa"),
             "controle": {"pausado": bool(controle.get("pausado")), "modo_seguro": bool(controle.get("modo_seguro"))},
@@ -85,23 +89,26 @@ def estado(store: Store) -> dict:
             "sem_llm": (dec["sem_llm"] or 0) / n if n else 1.0, "decisoes_24h": n,
             "erros_100": errors, "giros_100": len(bodies),
         },
-        "evolucoes": _rows(s.q("SELECT id, level, kind, description, status, notes, updated_at FROM proposals ORDER BY updated_at DESC LIMIT 20")),
+        "evolucoes": _rows(s.q(f"SELECT id, level, kind, description, status, notes, updated_at FROM proposals WHERE 1=1{pf} ORDER BY updated_at DESC LIMIT 20", pa)),
         "versoes": _rows(s.q("SELECT version, status, reason, created_at FROM policy_versions ORDER BY version DESC LIMIT 12")),
         "merges": _rows(s.q("SELECT pr, merged, reason, created_at FROM merges ORDER BY id DESC LIMIT 10")),
         "aguardando": aguardando,
         "projetos": projetos,
         "serie": serie,
-        "respostas": _rows(s.q("SELECT id, message, created_at FROM alerts WHERE kind='resposta' ORDER BY id DESC LIMIT 6")),
+        "respostas": _rows(s.q(f"SELECT id, message, created_at FROM alerts WHERE kind='resposta'{pf} ORDER BY id DESC LIMIT 6", pa)),
+        "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
     }
 
 
-def novidades(store: Store, desde: int) -> list[dict]:
-    rows = store.q("SELECT id, tick, question, value, confidence, source, created_at FROM decisions WHERE id > ? ORDER BY id LIMIT 60", (desde,))
+def novidades(store: Store, desde: int, projeto: int | None = None) -> list[dict]:
+    pf, pa = (" AND project_id=?", (projeto,)) if projeto else ("", ())
+    rows = store.q(f"SELECT id, tick, question, value, confidence, source, created_at, project_id FROM decisions WHERE id > ?{pf} ORDER BY id LIMIT 60",
+                   (desde, *pa))
     return [{**dict(r), "value": json.loads(r["value"])} for r in rows]
 
 
-def _page() -> bytes:
-    return resources.files("circulo").joinpath("painel.html").read_bytes()
+def _page(name: str = "painel.html") -> bytes:
+    return resources.files("circulo").joinpath(name).read_bytes()
 
 
 def make_handler(db_path: str):
@@ -125,21 +132,26 @@ def make_handler(db_path: str):
 
         def do_GET(self):
             u = urlparse(self.path)
-            if u.path == "/":
-                body = _page()
+            q = parse_qs(u.query)
+            projeto = int(q["projeto"][0]) if q.get("projeto", [""])[0].isdigit() else None
+            if u.path == "/" or u.path.startswith("/projeto/"):
+                body = _page("home.html" if u.path == "/" else "painel.html")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
             elif u.path == "/api/estado":
-                self._json(estado(self._store()))
+                self._json(estado(self._store(), projeto))
+            elif u.path == "/api/projetos":
+                st = self._store()
+                self._json({"projetos": cards(st), "loop": estado(st)["loop"]})
             elif u.path == "/api/eventos":
-                self._sse(int(parse_qs(u.query).get("desde", ["0"])[0] or 0))
+                self._sse(int(q.get("desde", ["0"])[0] or 0), projeto)
             else:
                 self._json({"erro": "não encontrado"}, 404)
 
-        def _sse(self, desde: int):
+        def _sse(self, desde: int, projeto: int | None = None):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
@@ -148,7 +160,7 @@ def make_handler(db_path: str):
             last_stage = None
             try:
                 while True:
-                    for d in novidades(store, desde):
+                    for d in novidades(store, desde, projeto):
                         desde = d["id"]
                         self.wfile.write(f"event: decisao\ndata: {json.dumps(d, ensure_ascii=False)}\n\n".encode())
                     etapa = store.get("etapa")
@@ -190,7 +202,16 @@ def make_handler(db_path: str):
                 texto = str(data.get("texto", "")).strip()[:500]
                 if not texto:
                     return self._json({"erro": "pedido vazio"}, 400)
-                eid = store.enqueue("mensagem", {"text": texto, "at": time.time(), "origem": "painel"})
+                payload = {"text": texto, "at": time.time(), "origem": "painel"}
+                if str(data.get("projeto", "")).isdigit():
+                    payload["projeto"] = int(data["projeto"])
+                eid = store.enqueue("mensagem", payload)
+                return self._json({"ok": True, "evento": eid})
+            if u.path == "/api/projeto":
+                pedido = str(data.get("pedido", "")).strip()[:2000]
+                if len(pedido) < 8:
+                    return self._json({"erro": "descreva o pedido em pelo menos uma frase"}, 400)
+                eid = store.enqueue("novo_projeto", {"pedido": pedido, "at": time.time(), "origem": "painel"})
                 return self._json({"ok": True, "evento": eid})
             return self._json({"erro": "não encontrado"}, 404)
 

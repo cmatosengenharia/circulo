@@ -17,6 +17,7 @@ from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev, build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
+from .projects import ensure_seed, intake, kit_project_id
 from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
@@ -59,6 +60,7 @@ class Circle:
         self.health = HealthMonitor(self.ctx)
         self.gate = gate if gate is not None else build_gate(self.ctx)
         finance.base(store)
+        ensure_seed(store)
         recovered = store.recover_interrupted()
         if recovered:
             store.set("last_recovery", {"events": recovered, "at": time.time()})
@@ -108,14 +110,22 @@ class Circle:
         ev = s.claim_next_event()
         if ev:
             r.handled_event = ev["id"]
-            self._stage("pedido", {"evento": ev["id"]})
+            payload = json.loads(ev["payload"])
+            pid = None if ev["kind"] == "novo_projeto" else (payload.get("projeto") or kit_project_id(s, "financas"))
+            self._stage("pedido", {"evento": ev["id"], "projeto": pid})
+            ctx.dl.project_id = pid
             try:
                 with s.tx():
-                    self.handle(json.loads(ev["payload"]), ev["id"])
+                    if ev["kind"] == "novo_projeto":
+                        self.new_project(payload)
+                    else:
+                        self.handle(payload, ev["id"])
                 s.finish_event(ev["id"], True)
             except Exception as exc:  # noqa: BLE001 — o círculo não pode morrer
                 s.finish_event(ev["id"], False, repr(exc))
                 r.errors.append(f"evento {ev['id']}: {exc!r}")
+            finally:
+                ctx.dl.project_id = None
         else:
             try:
                 r.idle_task = self.idle()
@@ -150,6 +160,12 @@ class Circle:
     # ------------------------------------------------------------ pedido
     def handle(self, payload: dict, event_id: int) -> str:
         ctx = self.ctx
+        pid = self.ctx.dl.project_id
+        proj = self.store.one("SELECT kit, nome FROM projects WHERE id=?", (pid,)) if pid else None
+        if proj is not None and proj["kit"] != "financas":
+            msg = f"Anotado em “{proj['nome']}”. Este projeto ainda espera o kit do tipo dele para começar a construir."
+            self.ctx.reply(msg)
+            return msg
         p = self.collector.parse(payload["text"])
         kind = p["type"]
         if kind in ("despesa", "receita") and "amount_cents" not in p:
@@ -184,6 +200,21 @@ class Circle:
             msg = "Não entendi como lançamento. Ex.: '38,90 ifood almoço', '+5000 salário', 'corrige 12 mercado'."
         ctx.reply(msg)
         return msg
+
+    def submit_project(self, pedido: str) -> int:
+        return self.store.enqueue("novo_projeto", {"pedido": pedido, "at": time.time()})
+
+    def new_project(self, payload: dict) -> dict:
+        res = intake(self.store, self.ctx.dl, payload["pedido"])
+        self.ctx.dl.project_id = res["id"]
+        if not res["novo"]:
+            self.ctx.reply("Esse pedido é do projeto que já existe; ele continua evoluindo por lá.")
+        elif res["status"] == "aguardando_kit":
+            self.ctx.reply("Projeto criado e registrado. O círculo ainda não tem o kit para construir este tipo de "
+                           "solução; o pedido fica guardado e passa a ser atendido quando o kit existir.")
+        else:
+            self.ctx.reply("Projeto criado. O círculo começou a trabalhar nele.")
+        return res
 
     def correct(self, tx_id: int, args: list[str]) -> str:
         policy = self.ctx.policy

@@ -19,6 +19,9 @@ MENSAGENS = [
 
 def run_demo(data_dir: str, porta: int = 8765, giro: float = 0.6) -> None:
     c = Circle(data_dir, jev=LocalJev(), llm=None)
+    if c.store.one("SELECT COUNT(*) n FROM projects")["n"] == 1:
+        c.submit_project("Crie uma landing page para captar leads do Instagram")
+        c.submit_project("Crie um portal admin para fotógrafos")
     serve(c.store.path, porta, background=True)
     print(f"demo: painel em http://127.0.0.1:{porta} (dados em {data_dir}). Ctrl+C para parar.")
 

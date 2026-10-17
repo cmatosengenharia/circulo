@@ -72,7 +72,14 @@ Limite honesto: é convenção, não bloqueio do GitHub. Quem tem push direto (v
 ## Painel local
 
 `circulo run --painel` (ou `circulo painel` em outro processo) serve o painel em `http://127.0.0.1:8765`,
-só na sua máquina. Mostra o giro atual no círculo, cada decisão do Jev ao vivo (com confiança e se subiu
+só na sua máquina.
+
+**Tela de projetos** (`/`): cada pedido vira um card (tipo, status, pedido original, propósito, giros,
+decisões, % sem LLM, evoluções, atividade nas últimas 24h; o mini-círculo gira no projeto em que o loop
+está agora). O card "Novo pedido" manda o texto para o Intake, que classifica o tipo com o Jev. Se já existe
+kit para o tipo (hoje: finanças), o projeto nasce ativo; senão fica "aguardando kit", registrado.
+
+**Tela do projeto** (`/projeto/<id>`): Mostra o giro atual no círculo, cada decisão do Jev ao vivo (com confiança e se subiu
 para LLM), saúde contra os limites, orçamento, o que aguarda você, evoluções e versões da política.
 
 Controles que funcionam no loop de verdade:

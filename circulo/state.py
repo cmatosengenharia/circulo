@@ -111,6 +111,19 @@ CREATE TABLE IF NOT EXISTS merges (
   created_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  pedido TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  kit TEXT,
+  status TEXT NOT NULL,          -- ativo | aguardando_kit | manutencao | pausado | arquivado
+  proposito TEXT NOT NULL,
+  tipo_confianca REAL NOT NULL DEFAULT 1,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -131,6 +144,17 @@ class Store:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
+        self._migrate()
+
+    # colunas adicionadas depois da primeira versão (bancos antigos ganham a coluna sem perder dados)
+    MIGRATIONS = (("decisions", "project_id", "INTEGER"), ("proposals", "project_id", "INTEGER"),
+                  ("alerts", "project_id", "INTEGER"), ("metrics", "project_id", "INTEGER"))
+
+    def _migrate(self) -> None:
+        for table, col, typ in self.MIGRATIONS:
+            cols = {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}
+            if col not in cols:
+                self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
     # ---------- utilidades ----------
     def tx(self):

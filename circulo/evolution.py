@@ -108,9 +108,12 @@ class MetaLearner:
             s.x("UPDATE proposals SET status=?, evidence=?, notes=?, updated_at=? WHERE id=?",
                 (status, json.dumps(c.evidence), notes, now, row["id"]))
             return row["id"]
-        return s.x("INSERT INTO proposals(level,kind,fingerprint,description,patch,evidence,status,notes,created_at,updated_at) "
-                   "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                   (level, c.kind, fp, c.description, json.dumps(c.patch, ensure_ascii=False), json.dumps(c.evidence), status, notes, now, now))
+        # regra de domínio pertence ao projeto do kit; mudança do círculo não pertence a projeto nenhum
+        from .projects import kit_project_id
+        pid = kit_project_id(s, "financas") if level == 1 else None
+        return s.x("INSERT INTO proposals(level,kind,fingerprint,description,patch,evidence,status,notes,created_at,updated_at,project_id) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                   (level, c.kind, fp, c.description, json.dumps(c.patch, ensure_ascii=False), json.dumps(c.evidence), status, notes, now, now, pid))
 
     def process(self, c: Candidate) -> str | None:
         s = self.ctx.store
