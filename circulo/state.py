@@ -153,6 +153,20 @@ CREATE TABLE IF NOT EXISTS roadmap (
   updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS memory (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,             -- achado | licao | feedback | entrega
+  text TEXT NOT NULL,
+  tipo TEXT,
+  project_id INTEGER,
+  source TEXT,
+  trust TEXT NOT NULL,            -- confiavel | nao_confiavel
+  status TEXT NOT NULL,           -- ativa | quarentena | aposentada
+  meta TEXT NOT NULL DEFAULT '{}',
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
