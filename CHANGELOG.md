@@ -1,0 +1,41 @@
+# Changelog
+
+## 1.0.0 — 2026-10-17 · primeira versão
+
+O loop autoevolutivo completo, pronto para rodar 24/7 sem depender de interação.
+
+**Núcleo**
+- Loop infinito com estado persistente, batimento, pausa por orçamento e retomada à meia-noite, recuperação após queda.
+- Jev First em todas as etapas: `worth_spending`, `should_evolve`, `route`, `pick_model`, `verify_output`,
+  `meets_bar`, `relevant`, `remember`, `should_advance` + contraprova. Cliente real da API TypeSafe e decisor local
+  com o mesmo contrato.
+- Política versionada com guard, shadow mode, rollback automático, destilação da cascata.
+
+**Missões**
+- Qualquer pedido vira missão (Intake pelo Jev). Motor genérico: pesquisa na web, régua com critérios ocultos,
+  construção, verificação pós-LLM, avaliação composta, catraca, reflexão.
+- Evidência por ciclo e gatilho de avanço com autoconsistência do Jev; missão cumprida com evidência.
+- Portfólio autogerenciado, várias missões em paralelo por giro, orçamento por missão.
+- Grafo de missões: relações pelo Jev, memória (RAG BM25 + rerank do Jev) e contexto compartilhados,
+  integração na régua, lições que viajam entre missões, reabertura quando a missão ligada muda.
+- Kit de finanças da família (registro rápido, categorização, aprendizado de regras, reclassificação automática).
+
+**O Loop (missão zero)**
+- Roteiro com evidência, registro de erros agrupado, quarentena com backoff, Developer que corrige o próprio
+  código por PR (Claude Code headless), harness de prompts evoluindo por A/B.
+
+**Autonomia e guardrails**
+- Zero espera pelo humano: constituição imutável para o loop, evidência reforçada para código de dinheiro,
+  fora do alcance registrado sem fila.
+- Gate de merge no próprio loop; CI com testes, constituição e propriedades financeiras.
+- Snapshots e restauração, orçamento de mudanças, bloqueio de oscilação, alerta de estagnação, modo seguro.
+
+**Painel e operação**
+- Painel local ao vivo: missões em cards com indicadores, o círculo tocando cada etapa, autonomia, evidências,
+  conexões, entregas.
+- Configuração única: `circulo configurar`, `circulo diagnostico`, `circulo instalar` (launchd/systemd).
+
+**Limites conhecidos**
+- Produto de software ainda sai como especificação (Markdown), não como repositório de código.
+- Perguntas do Jev e parâmetros do portfólio ainda não evoluem sozinhos (limiares e prompts evoluem).
+- Calibrado com o decisor local e LLM simulada; o primeiro dia com o Jev e a LLM reais deve ajustar limiares.

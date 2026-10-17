@@ -1,191 +1,90 @@
 # Círculo — loop autoevolutivo Jev First
 
-Loop infinito do Sistema de Controle da Vida. Recebe pedidos, decide tudo primeiro com o Jev,
-entrega, aprende com as correções e evolui as regras de domínio **e** a si mesmo — com shadow mode,
-guard de proteções e rollback automático.
+Um ecossistema que recebe qualquer pedido, transforma em **missão**, pesquisa o que existe de melhor, constrói,
+mede, aprende e continua evoluindo — a missão e a si mesmo — sem esperar ninguém. Toda decisão passa primeiro
+pelo **Jev** (TypeSafe); LLM só entra quando o Jev autoriza.
 
-## Rodar
+## Começar (configuração única)
 
 ```bash
+git clone https://github.com/cmatosengenharia/circulo ~/Projects/circulo
+cd ~/Projects/circulo
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"            # sem dependências obrigatórias; [llm] adiciona o SDK da Anthropic
-export TYPESAFE_API_KEY=...        # opcional: sem chave usa o decisor local (mesmo contrato)
-export ANTHROPIC_API_KEY=...       # opcional: fallback LLM, só quando o Jev autorizar
+pip install -e ".[llm]"
 
-circulo add "38,90 ifood almoço"   # enfileira
-circulo run --painel               # loop infinito + painel em http://127.0.0.1:8765
-circulo demo                       # loop acelerado com pedidos simulados, para ver o painel vivo
-circulo respostas                  # o que o círculo respondeu
-circulo status                     # painel + orçamento + versão da política
-circulo resumo                     # resumo diário (também gerado sozinho)
-pytest -q
+circulo configurar     # cria ~/.config/circulo/env (permissão 600) — preencha as chaves e salve
+circulo diagnostico    # o que está ligado, o que está parado e por quê (--testar chama as APIs)
+circulo instalar       # roda 24/7 (launchd no macOS, systemd no Linux), com painel
 ```
 
-Mensagens que ele entende: `38,90 ifood almoço` · `+5000 salário` · `corrige 12 mercado impulso` · `ok 12`.
+Painel: **http://127.0.0.1:8765**. Depois disso, nada exige você: pedidos novos entram pelo card "Nova missão".
 
-## Um giro (tick)
+| Chave | Liga | Sem ela |
+|---|---|---|
+| `TYPESAFE_API_KEY` | Jev real | decisor local com o mesmo contrato |
+| `ANTHROPIC_API_KEY` | motor das missões, pesquisa na web, evolução do harness | missões ficam registradas, sem construir |
+| `GITHUB_TOKEN` + `CIRCULO_REPO` | gate de merge (PRs de agente entram sozinhos) | sem merge automático |
+| `CIRCULO_REPO_DIR` + Claude Code (`claude`) | Developer: o loop corrige o próprio código por PR | sem autocorreção de código |
 
-1. Orçamento esgotado? → pausa (`pausado_orcamento`) e retoma sozinho após a meia-noite (America/Sao_Paulo).
-2. Pedido na fila → Collector (Jev: tipo) → Categorizer (Jev: categoria ‖ tag numa chamada) → LLM só se o Jev estiver inseguro **e** `worth_spending` autorizar → grava em centavos dentro de transação; invariante violado desfaz o lançamento.
-3. Sem pedido → evolução natural: Jev decide se roda (`should_run_idle`), qual tarefa (`idle_task`) e se vale o gasto (`worth_spending`).
-4. Meta-Learner: descobre candidatos por SQL (custo zero) → `should_evolve` → guard → Reviewer Finance (replay do histórico + invariantes + Jev) → nível 1 aplica; nível 2 vai para **shadow**.
-5. Shadow: mesma decisão real avaliada pela versão nova; promove só se a utilidade for maior.
-6. Health Monitor: invariante violado ou taxa de correção subiu após mudança → **rollback automático**.
-7. Métricas por tick; resumo diário em `data/resumos/AAAA-MM-DD.md`.
+Para ver tudo funcionando sem chave nenhuma: `circulo demo` (LLM simulada, dados separados, rotulado no painel).
 
-## O que a auto-evolução NÃO pode mudar (`policy.guard`)
+## Como funciona
 
-Invariantes ligados · rollback ligado · limite diário de tokens (≤ teto do `CIRCULO_HARD_DAILY_TOKENS`) ·
-limiares em [0,1] · `should_evolve.circle ≥ 0.7` · auto-accept ≥ 0.6 · intervalo ≥ 5s · categoria `outros`.
-`finance.py` (cálculos e invariantes) não é editável pelos agentes.
+**Um giro**: orçamento → pedido na fila (ou evolução natural) → missões evoluindo **em paralelo** → Meta-Learner
+→ shadow → saúde (rollback) → descanso com batimento. Só pausa por orçamento (retoma à meia-noite) ou se você pausar.
 
-## 24/7
+**Cascata de custo (Jev First)**: regra/cache → Jev → LLM pequena → LLM grande. O Jev decide o degrau, o modelo,
+se vale gastar, e confere a saída da LLM (formato, injeção, dados pessoais, aderência) antes de ela seguir.
+Decisões repetidas descem a cascata sozinhas (destilação).
 
-- macOS: `deploy/com.circulo.loop.plist` → `~/Library/LaunchAgents/` e `launchctl load` (ajuste os caminhos).
-- Linux/VPS: `deploy/circulo.service` (systemd).
+**Missão**: pesquisa na web → régua mensurável (com critérios **ocultos** que quem constrói não vê) → construção →
+verificação → avaliação → **catraca** (versão pior é descartada, nada é apagado) → lição em quarentena.
 
-Estado em `data/circulo.db` (SQLite/WAL). Matar o processo a qualquer momento é seguro: o evento em
-andamento volta para a fila na próxima partida.
+**Como o loop sabe que acertou**: cada versão gera uma evidência — nota antes/depois (visível e oculta),
+verificação, integração com missões ligadas e duas perguntas ao Jev em sentidos opostos que precisam concordar.
+Bateu a meta com evidência: **missão cumprida**. Volta sozinha quando a pesquisa, uma missão ligada ou o tempo
+trazem algo novo.
 
-## CI
+**Missões se conhecem**: o Jev decide a relação entre elas; missões ligadas compartilham memória e contexto,
+ganham critério de integração na régua, trocam lições confirmadas e se reabrem quando a outra muda.
 
-`.github/workflows/ci.yml` roda lint, testes (Python 3.11–3.13) e 50 giros do loop em todo push/PR.
-PRs que mexem em `finance.py`, `money.py`, `policy.py`, `budget.py` ou `.github/` só passam com o label
-`aprovado-humano` — é o gate que impede os agentes de alterarem dinheiro e proteções sozinhos.
+**O Loop é a missão zero**: tem roteiro (seus pedidos + erros recorrentes que ele registra), registro de erros,
+quarentena com backoff para etapas que falham, e um Developer que corrige o próprio código por PR.
 
-## Gate de merge (no próprio círculo)
+## Autonomia e guardrails
 
-O GitHub Free não aplica proteção de branch em repositório privado, então o gate mora em `circulo/merge_gate.py`
-e roda como tarefa de evolução natural (`revisar_prs`) quando `GITHUB_TOKEN` e `CIRCULO_REPO` estão definidos.
+Nada espera você. Onde haveria uma aprovação, há evidência, recusa imediata ou nada:
 
-Regras duras (não evoluem; o arquivo é protegido pelo CI):
-1. Só PRs de agente (branch `circulo/…`), sem rascunho.
-2. Os 4 checks obrigatórios verdes na última execução, e nenhum outro check falhando.
-3. Até 800 linhas.
-4. Mexeu em `finance.py`, `money.py`, `policy.py`, `budget.py`, `merge_gate.py` ou `.github/` → precisa do
-   label `aprovado-humano` colocado **por você** (`CIRCULO_HUMANO`), e não removido depois.
-5. Reviewer Code (Jev) aprova — o Jev pode endurecer, nunca liberar o que as regras barraram.
-6. Merge squash com o SHA avaliado travado: commit novo depois da avaliação faz o GitHub recusar.
+- **Constituição** (`merge_gate.py`, `policy.py`, `budget.py`, `guardrails.py`, `self_dev.py`, `.github/`):
+  o loop nunca altera. PR de agente que toca nela é recusado na hora (gate e CI), sem fila.
+- **Código de dinheiro** (`finance.py`, `money.py`): entra sozinho só com o check **Evidência reforçada**
+  (propriedades financeiras em 5.000 casos aleatórios) além dos testes.
+- **Fora do alcance**: gastar dinheiro real, publicar, contatar terceiros. O loop entrega pronto e não executa.
+- Catraca e critérios ocultos contra "trapaça na régua"; snapshots diários e antes de toda mudança de política
+  (`circulo restaurar`); orçamento de mudanças; bloqueio de oscilação; alerta de estagnação; modo seguro.
 
-Limite honesto: é convenção, não bloqueio do GitHub. Quem tem push direto (você, um token) ainda escreve na `main`.
+Merge automático (GitHub Free não protege branch privada, então o gate mora no loop): só PR de agente
+(`circulo/…`), checks obrigatórios verdes (`Testes 3.11–3.13`, `Constituição`, `Evidência reforçada`), até 800
+linhas, revisão do Jev, merge com SHA travado.
 
-## Painel local
+## Painel
 
-`circulo run --painel` (ou `circulo painel` em outro processo) serve o painel em `http://127.0.0.1:8765`,
-só na sua máquina.
+- **Missões** (`/`): estado do loop ao vivo (trabalhando, rodando, pausado, desligado…), e um card por missão com
+  o indicador principal, versão, ciclos, evoluções, PRs, % sem LLM, erros, conexões e IAs usadas.
+- **Missão** (`/missao/<id>`): o círculo tocando cada etapa de cada giro em tempo real, decisões ao vivo,
+  autonomia (intervenções suas: meta zero), evidências, conexões, entrega (HTML isolado), régua, ciclos, pesquisa.
+- **O Loop**: tudo isso para todas as missões, mais roteiro e erros registrados.
 
-**Tela de projetos** (`/`): cada pedido vira um card (tipo, status, pedido original, propósito, giros,
-decisões, % sem LLM, evoluções, atividade nas últimas 24h; o mini-círculo gira no projeto em que o loop
-está agora). O card "Novo pedido" manda o texto para o Intake, que classifica o tipo com o Jev. Se já existe
-kit para o tipo (hoje: finanças), o projeto nasce ativo; senão fica "aguardando kit", registrado.
+Só escuta em 127.0.0.1; comandos exigem cabeçalho próprio e origem local.
 
-**Estado do loop ao vivo** (topo da tela de projetos, via SSE): Trabalhando (em qual projeto e etapa),
-Rodando (entre giros, com contagem até o próximo), Modo seguro, Pausado por você, Pausado por orçamento
-(com contagem até a meia-noite), Desligado (sem batimento há mais de 20s: o processo não está rodando) e
-Sem conexão (o servidor do painel caiu). O loop emite batimento a cada 5s, inclusive descansando, e acorda
-cedo quando chega pedido novo. Cada card mostra também o que o loop está fazendo com aquele projeto.
+## Comandos
 
-**Tela do projeto** (`/projeto/<id>`): Mostra o giro atual no círculo, cada decisão do Jev ao vivo (com confiança e se subiu
-para LLM), saúde contra os limites, orçamento, o que aguarda você, evoluções e versões da política.
+```
+circulo configurar | diagnostico [--testar] | instalar | desinstalar
+circulo run [--painel] | painel | demo
+circulo add "38,90 ifood almoço" | respostas | status | resumo
+circulo snapshot | restaurar <arquivo> | dev [--item N] | tick [-n N]
+```
 
-Controles que funcionam no loop de verdade:
-- **Pausar / Retomar**: o loop para no próximo giro e confere o botão a cada 2s.
-- **Modo seguro**: congela a evolução das regras e do próprio círculo (meta-learner, shadow, merges,
-  features); pedidos continuam sendo atendidos e a saúde continua podendo fazer rollback.
-- **Novo pedido**: entra na mesma fila das mensagens.
-
-Os comandos exigem o cabeçalho `X-Circulo` e origem local, então outro site aberto no navegador não
-consegue mandar comandos para o painel.
-
-## O próprio círculo (projeto zero)
-
-O loop é o primeiro projeto dele mesmo. O card "O próprio círculo" fica fixado no topo e mostra:
-
-- **Roteiro**: os pedidos que criaram o círculo, cada um com estado honesto (feito, parcial, pendente) e
-  evidência (commit ou seção do Prompt Mestre), mais os erros recorrentes que o próprio círculo registrou.
-- **Erros registrados**: todo erro vira incidente, agrupado por impressão digital (mesmo erro com números
-  diferentes conta como um só). Incidente que se repete vira item do roteiro.
-- **Autocorreção**: etapa isolável que falha 3x em 20 giros é colocada em quarentena (o Jev decide antes)
-  por 10 giros, dobrando a cada reincidência (até 640). O resto do círculo segue. `health` e pedidos nunca
-  entram em quarentena. Incidente que não ocorre há 200 giros é marcado como resolvido.
-- Decisões fora de um pedido (evolução natural, meta-learner, shadow, saúde) e evoluções de nível 2
-  pertencem a este projeto.
-
-O `circulo demo` injeta uma falha simulada (rotulada) na análise de padrões para você ver isso acontecendo.
-
-## Motor genérico (qualquer pedido)
-
-Todo pedido que não é finanças nem o próprio círculo é atendido pelo motor genérico (`engine.py`), um ciclo
-por vez, escolhido pelo portfólio (`next_project` do Jev, orçamento por projeto):
-
-1. **Pesquisa** na web (Claude com `web_search`); cada achado passa pelo Jev e entra na memória como não confiável.
-2. **Régua**: critérios mensuráveis (o Jev barra os vagos) + checagens automáticas por tipo + **critérios ocultos**
-   que o Builder nunca vê.
-3. **Construção / melhoria** com o harness do papel (prompt, modelo, limites versionados na política).
-4. **Verificação pós-LLM** (formato, prompt injection, dados pessoais, aderência ao pedido); reprovou → refaz uma vez.
-5. **Avaliação composta** (Score atômico por critério, combinado em código) e **catraca**: versão que piora — inclusive
-   só no oculto — é descartada. Nada é apagado.
-6. **Reflexão**: lição curta em quarentena no playbook do tipo; vira ativa quando ajuda, é aposentada quando não ajuda.
-7. **Retorno decrescente** → manutenção; feedback seu ou o tempo reabrem.
-
-Entregas em `data/projetos/<id>/vN.*`, visíveis na tela do projeto (HTML isolado, sem scripts).
-
-## Developer do projeto zero
-
-Com `CIRCULO_REPO_DIR` (um clone deste repo) e o Claude Code instalado (`claude`), o círculo pega erros
-recorrentes do próprio roteiro, corrige numa branch `circulo/fix-…` com teste de regressão, roda os testes,
-abre PR (com `GITHUB_TOKEN` + `CIRCULO_REPO`) e deixa o gate de merge decidir. `circulo dev [--item N]` dispara na mão.
-
-## Variáveis de ambiente
-
-| Variável | Para quê |
-|---|---|
-| `TYPESAFE_API_KEY` | Jev real (sem ela: decisor local com o mesmo contrato) |
-| `ANTHROPIC_API_KEY` | Motor genérico, pesquisa, harness A/B, fallback (sem ela: projetos ficam registrados, parados) |
-| `GITHUB_TOKEN`, `CIRCULO_REPO` | Gate de merge e PRs do Developer |
-| `CIRCULO_REPO_DIR` | Clone do repo para o Developer trabalhar |
-| `CIRCULO_HUMANO` | Seu login no GitHub (quem pode dar `aprovado-humano`) |
-
-## Nomenclatura do painel
-
-- **Missão**: cada pedido vira uma missão (no código e na API ainda se chama `project`; as URLs aceitam `/missao/<id>` e `/projeto/<id>`).
-- **O Loop (missão zero)**: o próprio círculo. "Falar com o loop" vira pedido seu no roteiro dele.
-- **Giro**: uma volta do loop. **Ciclo**: um giro que trabalhou numa missão. **Evolução**: mudança aplicada que melhorou algo.
-
-Cada card mostra um indicador principal ligado ao propósito (nota na régua, % categorizado sozinho, roteiro
-concluído), versão, ciclos, evoluções, PRs, % de decisões sem LLM, erros abertos, as IAs que trabalharam nela
-e indicadores do tipo (versões aceitas, tokens por ponto de régua, tokens gastos, lançamentos, missões ativas).
-Na tela do Loop, o círculo toca cada etapa de cada giro em tempo real (trilha via SSE), de todas as missões.
-
-## Autonomia (nada espera você)
-
-O loop não pergunta e não aguarda. Onde antes havia uma confirmação humana, agora há uma de três coisas:
-
-| Antes | Agora |
-|---|---|
-| "confere? responda corrige…" em finanças | Baixa confiança fica registrada e é **reclassificada sozinha** quando as regras evoluem |
-| Label `aprovado-humano` para código protegido | **Constituição** (gate, guardrails, política, orçamento, Developer, CI): o loop nunca altera — PR de agente é **recusado na hora** e a missão segue. **Código de dinheiro**: entra sozinho com o check **Evidência reforçada** (propriedades financeiras em 5.000 casos aleatórios) |
-| "Mande uma orientação para reabrir" | Missão parada volta sozinha: pesquisa nova, missão ligada que mudou, ou tempo |
-
-Suas mensagens continuam aceitas (viram feedback ou pedido no roteiro), mas nenhuma é necessária. O painel mostra
-"intervenções suas (7 dias)" — a meta é zero. O único ponto humano é a **configuração única** (chaves e máquina).
-
-### Como o loop sabe que acertou (evidência por ciclo)
-
-Cada versão nova gera um registro em `evidence`: nota antes/depois na régua visível e nos critérios ocultos,
-verificação pós-LLM, integração com as missões ligadas, e duas perguntas ao Jev feitas do jeito oposto —
-"é melhor e segura para seguir?" e "piorou algo importante?". Só avança se a catraca passa **e** as duas
-respostas concordam. Se o Jev se contradiz, a versão é refeita. Bateu a meta (`portfolio.target_score`) e o
-Jev não vê ganho que pague outro ciclo: **missão cumprida**, com o motivo registrado.
-
-### Missões que se conhecem
-
-O Jev decide a relação entre missões (mesmo público, complementa, usa a saída, compartilha dados). Missões
-ligadas consultam a memória umas das outras, recebem o contexto da entrega atual da outra (como dado, nunca
-instrução), ganham critério de integração na régua, trocam lições confirmadas (que chegam em quarentena) e se
-reabrem quando a outra muda.
-
-### Paralelo
-
-`portfolio.parallel` (padrão 3, entre 1 e 8) missões evoluem no mesmo giro. As chamadas de LLM correm em paralelo;
-o banco serializa as escritas; o orçamento é reservado antes de disparar.
+Estado em `data/circulo.db` (SQLite/WAL); entregas em `data/projetos/<id>/vN.*`. Matar o processo é seguro:
+o que estava em andamento volta para a fila.

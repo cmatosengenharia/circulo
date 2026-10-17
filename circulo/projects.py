@@ -41,7 +41,7 @@ CIRCULO_PEDIDO = ("O próprio loop é um projeto: use todos os meus pedidos inic
 
 # Roteiro semente: os pedidos do Cássio que criaram o círculo, com o estado honesto de cada um.
 # (titulo, detalhe, status, evidência)
-ROTEIRO_VERSAO = 3
+ROTEIRO_VERSAO = 4
 ROTEIRO_SEMENTE = [
     ("Loop infinito que só pausa por orçamento", "Estado persistente, retoma de onde parou, recupera após queda.", "feito", "commit 84abb23"),
     ("Jev First antes de qualquer gasto", "worth_spending/should_evolve, perguntas em lote, decisor local com o mesmo contrato.", "feito", "commit 84abb23"),
@@ -64,8 +64,9 @@ ROTEIRO_SEMENTE = [
     ("Missões evoluindo em paralelo", "Várias missões por giro, ranqueadas pelo Jev, com orçamento reservado antes.", "feito", "commit c95b991"),
     ("Missões que se conhecem e se integram", "Grafo decidido pelo Jev; memória e contexto compartilhados; integração vira critério; lições viajam entre missões; missão ligada que muda reabre a outra.", "feito", "commit c95b991"),
     ("Evidência de acerto antes de avançar", "Medição antes/depois (visível e oculta), verificação, Jev a favor + contraprova; contradição = refazer; missão cumprida com evidência.", "feito", "commit c95b991"),
-    ("Ligar as chaves e o Claude Code na máquina do loop", "TYPESAFE_API_KEY, ANTHROPIC_API_KEY, GITHUB_TOKEN, CIRCULO_REPO_DIR e o comando `claude`. Sem isso, o motor e o Developer ficam parados.", "pendente", "depende de você"),
-    ("Rodar 24/7", "Mac com launchd ou VPS com systemd (arquivos em deploy/).", "pendente", "depende de você"),
+    ("Configuração única em um passo", "circulo configurar / diagnostico / instalar; o loop lê as chaves sozinho e o painel mostra o que falta.", "feito", "v1.0.0"),
+    ("Ligar as chaves e o Claude Code na máquina do loop", "`circulo configurar` e preencher TYPESAFE_API_KEY, ANTHROPIC_API_KEY, GITHUB_TOKEN, CIRCULO_REPO, CIRCULO_REPO_DIR; instalar o Claude Code. O diagnóstico fecha este item sozinho.", "pendente", "depende de você"),
+    ("Rodar 24/7", "`circulo instalar` (launchd no macOS, systemd no Linux). O diagnóstico fecha este item sozinho.", "pendente", "depende de você"),
     ("Produto de software vira código", "Hoje o portal sai como especificação; o próximo passo é o Builder gerar um repositório por projeto e usar o mesmo gate.", "pendente", "Prompt Mestre §6"),
     ("Perguntas do Jev e portfólio evoluindo sozinhos", "Estender o shadow para instruções das perguntas e parâmetros do portfólio.", "pendente", "Prompt Mestre §8"),
 ]

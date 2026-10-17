@@ -33,6 +33,14 @@ jobs:
         run: ruff check circulo tests --select E,F,W,B --ignore E501
       - name: Testes
         run: pytest -q
+      - name: Pacote instalável leva o painel
+        run: |
+          pip wheel --no-deps -q -w dist .
+          python -m zipfile -l dist/*.whl | grep -q "circulo/home.html"
+          python -m zipfile -l dist/*.whl | grep -q "circulo/painel.html"
+          echo "wheel ok"
+      - name: Diagnóstico roda sem chaves
+        run: circulo --data "$RUNNER_TEMP/dg" diagnostico
       - name: Fumaça do loop (50 giros sem input)
         run: |
           circulo --data "$RUNNER_TEMP/d" add "38,90 ifood almoço"

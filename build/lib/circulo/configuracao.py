@@ -1,0 +1,263 @@
+"""Configuração única: o único momento em que o loop precisa de você.
+
+- `circulo configurar`  cria o arquivo de configuração (~/.config/circulo/env) com as chaves em branco, permissão 600.
+- `circulo diagnostico` diz, peça por peça, o que está ligado, o que está parado e por quê (sem gastar nada por padrão).
+- `circulo instalar`    registra o loop para rodar 24/7 (launchd no macOS, systemd no Linux) e já sobe o painel.
+
+O loop carrega o arquivo de configuração sozinho ao iniciar, então launchd/systemd não precisam de `export`.
+O estado da configuração vai para o banco, e o painel mostra o que falta — sem você abrir terminal.
+"""
+from __future__ import annotations
+
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+ENV_FILE = Path(os.environ.get("CIRCULO_ENV", Path.home() / ".config" / "circulo" / "env"))
+CHAVES = (
+    ("TYPESAFE_API_KEY", "Jev real (TypeSafe). Sem ela: decisor local com o mesmo contrato."),
+    ("ANTHROPIC_API_KEY", "LLM: motor das missões, pesquisa na web, evolução do harness."),
+    ("GITHUB_TOKEN", "Token fine-grained só do repo circulo (Contents, Pull requests, Checks: leitura e escrita)."),
+    ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
+    ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
+)
+LABEL = "com.circulo.loop"
+
+
+# ------------------------------------------------------------------ arquivo de configuração
+def carregar_env(path: Path = ENV_FILE) -> list[str]:
+    """Carrega KEY=valor sem sobrescrever o ambiente. Devolve as chaves carregadas (nunca os valores)."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    lidas = []
+    for linha in path.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#") or "=" not in linha:
+            continue
+        k, v = linha.split("=", 1)
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and v and k not in os.environ:
+            os.environ[k] = v
+            lidas.append(k)
+    return lidas
+
+
+def configurar(path: Path = ENV_FILE) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existentes = {}
+    if path.exists():
+        for linha in path.read_text(encoding="utf-8").splitlines():
+            if "=" in linha and not linha.lstrip().startswith("#"):
+                k, v = linha.split("=", 1)
+                existentes[k.strip()] = v.strip()
+    linhas = ["# Configuração única do Círculo. Preencha e salve; o loop lê este arquivo sozinho ao iniciar.",
+              "# Nada aqui é enviado para lugar nenhum além das próprias APIs.", ""]
+    for k, ajuda in CHAVES:
+        linhas += [f"# {ajuda}", f"{k}={existentes.get(k, '')}", ""]
+    path.write_text("\n".join(linhas), encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+# ------------------------------------------------------------------ diagnóstico
+@dataclass
+class Peca:
+    nome: str
+    estado: str          # ligado | parado | aviso
+    detalhe: str
+    como_ligar: str = ""
+
+
+def _jev_ok() -> tuple[bool, str]:
+    from .decision import JevHttpClient, Question
+    try:
+        out, _ = JevHttpClient(os.environ["TYPESAFE_API_KEY"], timeout=8).ask_many(
+            {"teste": "diagnóstico do círculo"}, {"ok": Question("noul", "Este é um teste de conexão?")})
+        return True, f"respondeu (noul {float(out['ok'].value):.2f})"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
+
+
+def _llm_ok() -> tuple[bool, str]:
+    try:
+        from .llm import AnthropicLLM
+        r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model="claude-haiku-5-5", max_tokens=5)
+        return True, f"respondeu ({r.tokens} tokens)"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
+
+
+def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
+    """Sem `testar_conexoes`, não gasta nada: só confere o que está configurado."""
+    p: list[Peca] = []
+    v = sys.version_info
+    p.append(Peca("Python", "ligado" if v >= (3, 11) else "parado", f"{v.major}.{v.minor}.{v.micro}",
+                  "Instale Python 3.11 ou mais novo." if v < (3, 11) else ""))
+    p.append(Peca("Arquivo de configuração", "ligado" if ENV_FILE.exists() else "aviso",
+                  str(ENV_FILE) if ENV_FILE.exists() else "ainda não existe",
+                  "" if ENV_FILE.exists() else "Rode `circulo configurar` e preencha as chaves."))
+    if os.environ.get("TYPESAFE_API_KEY"):
+        ok, det = _jev_ok() if testar_conexoes else (True, "chave presente (use --testar para chamar a API)")
+        p.append(Peca("Jev (decisões)", "ligado" if ok else "parado", det, "" if ok else "Confira TYPESAFE_API_KEY."))
+    else:
+        p.append(Peca("Jev (decisões)", "aviso", "sem chave: usando o decisor local (mesmo contrato, menos preciso)",
+                      "Preencha TYPESAFE_API_KEY."))
+    tem_sdk = True
+    try:
+        import anthropic  # noqa: F401
+    except ImportError:
+        tem_sdk = False
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        p.append(Peca("Motor das missões (LLM)", "parado", "sem ANTHROPIC_API_KEY: missões ficam registradas, sem construir",
+                      "Preencha ANTHROPIC_API_KEY."))
+    elif not tem_sdk:
+        p.append(Peca("Motor das missões (LLM)", "parado", "SDK da Anthropic não instalado", 'Rode `pip install -e ".[llm]"`.'))
+    else:
+        ok, det = _llm_ok() if testar_conexoes else (True, "chave e SDK presentes (use --testar para chamar a API)")
+        p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else "Confira ANTHROPIC_API_KEY."))
+    gh = bool(os.environ.get("GITHUB_TOKEN") and os.environ.get("CIRCULO_REPO"))
+    p.append(Peca("Gate de merge", "ligado" if gh else "parado", "PRs de agente avaliados e mergeados sozinhos" if gh
+                  else "sem GITHUB_TOKEN/CIRCULO_REPO", "" if gh else "Preencha GITHUB_TOKEN e CIRCULO_REPO."))
+    repo = os.environ.get("CIRCULO_REPO_DIR")
+    claude = shutil.which(os.environ.get("CIRCULO_CODE_AGENT", "claude"))
+    dev_ok = bool(repo and (Path(repo) / ".git").exists() and claude)
+    falta = [x for x, ok in (("CIRCULO_REPO_DIR (clone do repo)", repo and (Path(repo) / ".git").exists()),
+                              ("Claude Code (comando `claude`)", claude)) if not ok]
+    p.append(Peca("Developer (corrige o próprio código)", "ligado" if dev_ok else "parado",
+                  "pega erros e pedidos do roteiro e abre PR" if dev_ok else "falta: " + ", ".join(falta),
+                  "" if dev_ok else "Clone o repo, aponte CIRCULO_REPO_DIR e instale o Claude Code."))
+    sistema = platform.system()
+    p.append(Peca("Rodando 24/7", "ligado" if servico_instalado() else "aviso",
+                  f"serviço registrado no {'launchd' if sistema == 'Darwin' else 'systemd'}" if servico_instalado()
+                  else "ainda não instalado como serviço", "" if servico_instalado() else "Rode `circulo instalar`."))
+    return p
+
+
+def registrar(store, pecas: list[Peca]) -> None:
+    """Grava o estado real no banco (o painel mostra) e fecha sozinho os itens de configuração do roteiro."""
+    store.set("configuracao", {"em": time.time(), "pecas": [asdict(x) for x in pecas]})
+    estado = {x.nome: x.estado for x in pecas}
+    chaves_ok = estado.get("Motor das missões (LLM)") == "ligado" and estado.get("Jev (decisões)") == "ligado"
+    if chaves_ok and estado.get("Developer (corrige o próprio código)") == "ligado" and estado.get("Gate de merge") == "ligado":
+        store.x("UPDATE roadmap SET status='feito', evidencia='diagnóstico: tudo ligado' WHERE titulo LIKE 'Ligar as chaves%'")
+    elif chaves_ok:
+        store.x("UPDATE roadmap SET status='parcial', evidencia='diagnóstico: Jev e LLM ligados; falta Developer/Gate · depende de você' "
+                "WHERE titulo LIKE 'Ligar as chaves%'")
+    if estado.get("Rodando 24/7") == "ligado":
+        store.x("UPDATE roadmap SET status='feito', evidencia='diagnóstico: serviço instalado' WHERE titulo='Rodar 24/7'")
+
+
+# ------------------------------------------------------------------ 24/7
+def _plist_path() -> Path:
+    return Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
+
+
+def _unit_path() -> Path:
+    return Path.home() / ".config" / "systemd" / "user" / "circulo.service"
+
+
+def servico_instalado() -> bool:
+    return _plist_path().exists() if platform.system() == "Darwin" else _unit_path().exists()
+
+
+def plist(data_dir: Path, porta: int) -> str:
+    data_dir = Path(data_dir).resolve()
+    args = [sys.executable, "-m", "circulo", "--data", str(data_dir), "run", "--painel", "--porta", str(porta)]
+    arr = "\n".join(f"    <string>{a}</string>" for a in args)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{LABEL}</string>
+  <key>WorkingDirectory</key><string>{data_dir.parent}</string>
+  <key>ProgramArguments</key>
+  <array>
+{arr}
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>CIRCULO_ENV</key><string>{ENV_FILE}</string><key>PATH</key><string>{os.environ.get("PATH", "/usr/bin:/bin")}</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>{data_dir}/loop.log</string>
+  <key>StandardErrorPath</key><string>{data_dir}/loop.err</string>
+</dict>
+</plist>
+"""
+
+
+def unit(data_dir: Path, porta: int) -> str:
+    data_dir = Path(data_dir).resolve()
+    return f"""[Unit]
+Description=Circulo autoevolutivo Jev First
+After=network-online.target
+
+[Service]
+WorkingDirectory={data_dir.parent}
+Environment=CIRCULO_ENV={ENV_FILE}
+Environment=PATH={os.environ.get("PATH", "/usr/bin:/bin")}
+ExecStart={sys.executable} -m circulo --data {data_dir} run --painel --porta {porta}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def instalar(data_dir: Path, porta: int = 8765, aplicar: bool = True) -> tuple[Path, list[str]]:
+    """Escreve o serviço e (se `aplicar`) liga. Devolve o arquivo e os comandos executados."""
+    Path(data_dir).mkdir(parents=True, exist_ok=True)
+    if platform.system() == "Darwin":
+        dest, conteudo = _plist_path(), plist(data_dir, porta)
+        cmds = [["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"],
+                ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(dest)]]
+    else:
+        dest, conteudo = _unit_path(), unit(data_dir, porta)
+        cmds = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "circulo.service"]]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(conteudo, encoding="utf-8")
+    feitos = []
+    if aplicar:
+        for c in cmds:
+            subprocess.run(c, capture_output=True, text=True)   # bootout falha se não estava rodando: tudo bem
+            feitos.append(" ".join(c))
+    return dest, feitos
+
+
+def desinstalar(aplicar: bool = True) -> Path | None:
+    if platform.system() == "Darwin":
+        dest = _plist_path()
+        if aplicar:
+            subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"], capture_output=True)
+    else:
+        dest = _unit_path()
+        if aplicar:
+            subprocess.run(["systemctl", "--user", "disable", "--now", "circulo.service"], capture_output=True)
+    if dest.exists():
+        arquivo = dest.with_suffix(dest.suffix + ".desativado")
+        dest.rename(arquivo)   # não apaga: fica guardado ao lado
+        return arquivo
+    return None
+
+
+def imprimir(pecas: list[Peca]) -> str:
+    simb = {"ligado": "●", "parado": "○", "aviso": "◐"}
+    out = []
+    for x in pecas:
+        out.append(f"{simb[x.estado]} {x.nome}: {x.detalhe}")
+        if x.como_ligar:
+            out.append(f"    → {x.como_ligar}")
+    return "\n".join(out)
+
+
+def resumo_json(pecas: list[Peca]) -> str:
+    return json.dumps([asdict(x) for x in pecas], ensure_ascii=False, indent=2)

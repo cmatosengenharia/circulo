@@ -5,7 +5,7 @@ import argparse
 import json
 import os
 
-from .loop import Circle
+from .configuracao import carregar_env
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -27,11 +27,42 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
     sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
+    sub.add_parser("configurar", help="cria o arquivo de configuração única (chaves) com permissão 600")
+    dg = sub.add_parser("diagnostico", help="mostra o que está ligado, o que está parado e por quê")
+    dg.add_argument("--testar", action="store_true", help="chama as APIs de verdade (gasta um pouquinho)")
+    dg.add_argument("--json", action="store_true")
+    ins = sub.add_parser("instalar", help="registra o loop para rodar 24/7 (launchd/systemd) com o painel")
+    ins.add_argument("--porta", type=int, default=8765)
+    ins.add_argument("--so-arquivo", action="store_true", help="só escreve o arquivo do serviço, sem ligar")
+    sub.add_parser("desinstalar", help="desliga o serviço 24/7 (o arquivo fica guardado, não é apagado)")
     dv = sub.add_parser("dev", help="pede ao Developer para corrigir um item do roteiro agora")
     dv.add_argument("--item", type=int, default=None)
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
     args = ap.parse_args(argv)
+    carregar_env()                        # configuração única: o loop lê as chaves sozinho
+    from . import configuracao as cfg
+    from .loop import Circle
+
+    if args.cmd == "configurar":
+        path = cfg.configurar()
+        print(f"Arquivo criado: {path}\nAbra, preencha as chaves e salve. Depois: circulo diagnostico && circulo instalar")
+        return
+    if args.cmd == "diagnostico":
+        pecas = cfg.diagnostico(testar_conexoes=args.testar)
+        print(cfg.resumo_json(pecas) if args.json else cfg.imprimir(pecas))
+        return
+    if args.cmd == "instalar":
+        dest, feitos = cfg.instalar(os.path.abspath(args.data), args.porta, aplicar=not args.so_arquivo)
+        print(f"Serviço: {dest}")
+        for c in feitos:
+            print(f"  $ {c}")
+        print(f"O loop sobe sozinho com o computador e se reinicia se cair. Painel: http://127.0.0.1:{args.porta}")
+        return
+    if args.cmd == "desinstalar":
+        arq = cfg.desinstalar()
+        print(f"Serviço desligado. Arquivo guardado em {arq}" if arq else "Nenhum serviço instalado.")
+        return
 
     if args.cmd == "painel":
         from .painel import serve
@@ -61,6 +92,7 @@ def main(argv: list[str] | None = None) -> None:
         print(snapshot(c.store, c.data_dir, "manual"))
         return
     if args.cmd == "run":
+        cfg.registrar(c.store, cfg.diagnostico())   # o painel mostra o estado real da configuração
         if args.painel:
             from .painel import serve
             serve(c.store.path, args.porta, background=True)

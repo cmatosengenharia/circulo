@@ -14,7 +14,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import finance
+from . import __version__, finance
 from .money import fmt_brl
 from .projects import cards, incidentes, novos_na_fila, roteiro
 from .status import loop_status
@@ -121,7 +121,10 @@ def autonomia(s: Store) -> dict:
         "decisoes_7d": s.one("SELECT COUNT(*) n FROM decisions WHERE created_at>?", (semana,))["n"],
         "evolucoes_7d": s.one("SELECT COUNT(*) n FROM evidence WHERE created_at>? AND decisao IN ('avancar','base','cumprida')", (semana,))["n"],
         "fora_do_alcance": _rows(s.q("SELECT message, created_at FROM alerts WHERE kind='fora_alcance' ORDER BY id DESC LIMIT 6")),
-        "configuracao": _rows(s.q("SELECT titulo, detalhe FROM roadmap WHERE status!='feito' AND evidencia LIKE '%depende de você%' ORDER BY ordem")),
+        "configuracao": ([{"titulo": f"{x['nome']}: parado" if x["estado"] == "parado" else x["nome"], "detalhe": f"{x['detalhe']}. {x['como_ligar']}".strip()}
+                          for x in (s.get("configuracao") or {}).get("pecas", []) if x["estado"] != "ligado"]
+                         if s.get("configuracao") else
+                         _rows(s.q("SELECT titulo, detalhe FROM roadmap WHERE status!='feito' AND evidencia LIKE '%depende de você%' ORDER BY ordem"))),
         "paralelo": int((json.loads(s.one("SELECT body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")["body"])
                          .get("portfolio", {}) or {}).get("parallel", 1)),
     }
@@ -209,7 +212,7 @@ def make_handler(db_path: str):
             elif u.path == "/api/projetos":
                 st = self._store()
                 e = estado(st)
-                self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")),
+                self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")), "versao": __version__,
                             "autonomia": e["autonomia"],
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
             elif u.path == "/api/eventos":
