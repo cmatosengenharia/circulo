@@ -6,6 +6,7 @@ Escritas permitidas: pausar/retomar, modo seguro e enfileirar pedido — nada al
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -99,8 +100,29 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "serie": serie,
         "respostas": _rows(s.q(f"SELECT id, message, created_at FROM alerts WHERE kind='resposta'{pf} ORDER BY id DESC LIMIT 6", pa)),
         "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
+        **({"motor": motor(s, projeto)} if kit == "geral" else {}),
         **({"roteiro": roteiro(s), "incidentes": incidentes(s), "quarentena": {
             k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
+    }
+
+
+def motor(s: Store, pid: int) -> dict:
+    """Tudo o que o motor genérico sabe sobre o projeto: régua, entrega, ciclos, pesquisa e playbook."""
+    tipo = s.one("SELECT tipo FROM projects WHERE id=?", (pid,))["tipo"]
+    rub = s.one("SELECT version, criteria FROM rubrics WHERE project_id=? ORDER BY version DESC LIMIT 1", (pid,))
+    cur = s.one("SELECT version, formato, nota, nota_oculta, notas, created_at FROM deliverables WHERE project_id=? AND status='atual' "
+                "ORDER BY version DESC LIMIT 1", (pid,))
+    notas = json.loads(cur["notas"] or "{}") if cur else {}
+    regua = [{**c, "nota": notas.get(c["id"])} for c in (json.loads(rub["criteria"]) if rub else [])]
+    return {
+        "pronto": bool(s.get("motor_pronto")), "regua_versao": rub["version"] if rub else None, "regua": regua,
+        "entrega": ({k: cur[k] for k in ("version", "formato", "nota", "nota_oculta", "created_at")} | {"url": f"/projeto/{pid}/entrega"}) if cur else None,
+        "versoes": _rows(s.q("SELECT version, nota, nota_oculta, status, created_at FROM deliverables WHERE project_id=? ORDER BY version DESC LIMIT 12", (pid,))),
+        "ciclos": _rows(s.q("SELECT tick, fase, nota_antes, nota_depois, ganho, aceita, tokens, resultado, braco, created_at FROM cycles "
+                             "WHERE project_id=? ORDER BY id DESC LIMIT 15", (pid,))),
+        "achados": _rows(s.q("SELECT text, source, trust, created_at FROM memory WHERE kind='achado' AND project_id=? ORDER BY id DESC LIMIT 12", (pid,))),
+        "licoes": _rows(s.q("SELECT text, status, meta FROM memory WHERE kind='licao' AND tipo=? AND status!='aposentada' ORDER BY id DESC LIMIT 8", (tipo,))),
+        "feedback": _rows(s.q("SELECT text, created_at FROM memory WHERE kind='feedback' AND project_id=? ORDER BY id DESC LIMIT 5", (pid,))),
     }
 
 
@@ -138,6 +160,9 @@ def make_handler(db_path: str):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             projeto = int(q["projeto"][0]) if q.get("projeto", [""])[0].isdigit() else None
+            m = re.fullmatch(r"/projeto/(\d+)/entrega", u.path)
+            if m:
+                return self._entrega(int(m.group(1)), q.get("v", [None])[0])
             if u.path == "/" or u.path.startswith("/projeto/"):
                 body = _page("home.html" if u.path == "/" else "painel.html")
                 self.send_response(200)
@@ -150,12 +175,32 @@ def make_handler(db_path: str):
             elif u.path == "/api/projetos":
                 st = self._store()
                 e = estado(st)
-                self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"],
+                self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")),
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
             elif u.path == "/api/eventos":
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
                 self._json({"erro": "não encontrado"}, 404)
+
+        def _entrega(self, pid: int, v: str | None):
+            st = self._store()
+            if v and v.isdigit():
+                row = st.one("SELECT formato, content FROM deliverables WHERE project_id=? AND version=?", (pid, int(v)))
+            else:
+                row = st.one("SELECT formato, content FROM deliverables WHERE project_id=? AND status='atual' ORDER BY version DESC LIMIT 1", (pid,))
+            if not row:
+                return self._json({"erro": "este projeto ainda não tem entrega"}, 404)
+            body = row["content"].encode()
+            self.send_response(200)
+            if row["formato"] == "html":
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                # entrega gerada por LLM: sem scripts, sem rede, isolada do painel
+                self.send_header("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:")
+            else:
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def _sse(self, desde: int, projeto: int | None = None, so_status: bool = False):
             self.send_response(200)

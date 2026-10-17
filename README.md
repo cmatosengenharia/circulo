@@ -112,3 +112,36 @@ O loop é o primeiro projeto dele mesmo. O card "O próprio círculo" fica fixad
   pertencem a este projeto.
 
 O `circulo demo` injeta uma falha simulada (rotulada) na análise de padrões para você ver isso acontecendo.
+
+## Motor genérico (qualquer pedido)
+
+Todo pedido que não é finanças nem o próprio círculo é atendido pelo motor genérico (`engine.py`), um ciclo
+por vez, escolhido pelo portfólio (`next_project` do Jev, orçamento por projeto):
+
+1. **Pesquisa** na web (Claude com `web_search`); cada achado passa pelo Jev e entra na memória como não confiável.
+2. **Régua**: critérios mensuráveis (o Jev barra os vagos) + checagens automáticas por tipo + **critérios ocultos**
+   que o Builder nunca vê.
+3. **Construção / melhoria** com o harness do papel (prompt, modelo, limites versionados na política).
+4. **Verificação pós-LLM** (formato, prompt injection, dados pessoais, aderência ao pedido); reprovou → refaz uma vez.
+5. **Avaliação composta** (Score atômico por critério, combinado em código) e **catraca**: versão que piora — inclusive
+   só no oculto — é descartada. Nada é apagado.
+6. **Reflexão**: lição curta em quarentena no playbook do tipo; vira ativa quando ajuda, é aposentada quando não ajuda.
+7. **Retorno decrescente** → manutenção; feedback seu ou o tempo reabrem.
+
+Entregas em `data/projetos/<id>/vN.*`, visíveis na tela do projeto (HTML isolado, sem scripts).
+
+## Developer do projeto zero
+
+Com `CIRCULO_REPO_DIR` (um clone deste repo) e o Claude Code instalado (`claude`), o círculo pega erros
+recorrentes do próprio roteiro, corrige numa branch `circulo/fix-…` com teste de regressão, roda os testes,
+abre PR (com `GITHUB_TOKEN` + `CIRCULO_REPO`) e deixa o gate de merge decidir. `circulo dev [--item N]` dispara na mão.
+
+## Variáveis de ambiente
+
+| Variável | Para quê |
+|---|---|
+| `TYPESAFE_API_KEY` | Jev real (sem ela: decisor local com o mesmo contrato) |
+| `ANTHROPIC_API_KEY` | Motor genérico, pesquisa, harness A/B, fallback (sem ela: projetos ficam registrados, parados) |
+| `GITHUB_TOKEN`, `CIRCULO_REPO` | Gate de merge e PRs do Developer |
+| `CIRCULO_REPO_DIR` | Clone do repo para o Developer trabalhar |
+| `CIRCULO_HUMANO` | Seu login no GitHub (quem pode dar `aprovado-humano`) |

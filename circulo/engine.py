@@ -336,7 +336,8 @@ class Engine:
     # ------------------------------------------------------------ retorno decrescente
     def _plateau(self, p: dict, res: CycleResult) -> None:
         # retorno decrescente = melhoria sem ganho OU Jev dizendo que o próximo ciclo não compensa
-        if res.fase not in ("melhoria", "adiado_valor"):
+        # entrega reprovada repetidamente também conta: evita queimar orçamento num ciclo que não sai do lugar
+        if res.fase not in ("melhoria", "adiado_valor") and res.aceita is not False:
             return
         pf = self.ctx.policy["portfolio"]
         if res.ganho >= pf["min_gain"]:

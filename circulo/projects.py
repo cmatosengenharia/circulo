@@ -40,24 +40,29 @@ CIRCULO_PEDIDO = ("O próprio loop é um projeto: use todos os meus pedidos inic
 
 # Roteiro semente: os pedidos do Cássio que criaram o círculo, com o estado honesto de cada um.
 # (titulo, detalhe, status, evidência)
+ROTEIRO_VERSAO = 2
 ROTEIRO_SEMENTE = [
     ("Loop infinito que só pausa por orçamento", "Estado persistente, retoma de onde parou, recupera após queda.", "feito", "commit 84abb23"),
     ("Jev First antes de qualquer gasto", "worth_spending/should_evolve, perguntas em lote, decisor local com o mesmo contrato.", "feito", "commit 84abb23"),
-    ("Jev em todas as etapas antes da LLM (cascata completa)", "Faltam route/pick_model/verify_output/meets_bar e a métrica de destilação.", "parcial", "Prompt Mestre §3–4"),
-    ("Equipe de agentes falando com o Jev", "Núcleo de finanças pronto; Researcher, Rubric Builder e Builders genéricos pendentes.", "parcial", "commit 84abb23"),
+    ("Jev em todas as etapas antes da LLM (cascata completa)", "route, pick_model, verify_output, meets_bar, relevant, remember e destilação.", "feito", "commits 401772d, c714cf4"),
+    ("Equipe de agentes falando com o Jev", "Researcher, Rubric Builder, Builder, Improver, Reflector, Developer e o kit de finanças.", "feito", "commits af9deb7, b163a26"),
     ("Evolução de domínio sem aprovar PR por PR", "Regras aprendidas com correções, replay e invariantes.", "feito", "commit 84abb23"),
-    ("Evolução do próprio círculo em shadow", "Hoje cobre limiares; harness, perguntas e portfólio ainda não.", "parcial", "commit 84abb23"),
+    ("Evolução do próprio círculo em shadow", "Limiares em shadow e prompts por A/B; perguntas do Jev e parâmetros do portfólio ainda não evoluem sozinhos.", "parcial", "commits 84abb23, c714cf4"),
     ("Rollback automático quando a saúde cai", "Health Monitor reverte a última política.", "feito", "commit 84abb23"),
     ("Gate de merge no próprio círculo", "Checks verdes, limite de linhas, label aprovado-humano, SHA travado.", "feito", "commit df0b278"),
-    ("Entregar qualquer solução, não só software", "Projetos e Intake prontos; kits por tipo ainda não existem.", "parcial", "commit 22e1710"),
-    ("Pesquisar o melhor da internet e transformar em régua", "Researcher + Rubric Builder + evals.", "pendente", "Prompt Mestre §7"),
-    ("Autogerenciar o portfólio de projetos", "next_project, retorno decrescente, parar e reabrir projetos.", "pendente", "Prompt Mestre §2"),
-    ("Técnicas modernas onde fizer sentido", "Harness evoluível, skills, RAG com rerank do Jev, evals, destilação.", "pendente", "Prompt Mestre §6"),
-    ("Guardrails contra deleção, degradação e estagnação", "Guard de política e quarentena prontos; catraca, held-out e snapshots pendentes.", "parcial", "Prompt Mestre §11"),
+    ("Entregar qualquer solução, não só software", "Motor genérico atende todos os tipos; produto de software ainda sai como especificação, não como código.", "parcial", "commit af9deb7"),
+    ("Pesquisar o melhor da internet e transformar em régua", "Busca na web, achados filtrados pelo Jev, régua mensurável com critérios ocultos.", "feito", "commit af9deb7"),
+    ("Autogerenciar o portfólio de projetos", "next_project, orçamento por projeto, retorno decrescente, manutenção e reabertura.", "feito", "commit af9deb7"),
+    ("Técnicas modernas onde fizer sentido", "Harness evoluível, playbooks como skills, RAG com rerank do Jev, evals, destilação. Embeddings e fine-tuning ficaram de fora de propósito: sem gatilho ainda.", "feito", "commits 401772d, 13bc1e0, c714cf4"),
+    ("Guardrails contra deleção, degradação e estagnação", "Catraca, critérios ocultos, snapshots, oscilação, orçamento de mudanças, estagnação, quarentena.", "feito", "commits af9deb7, c714cf4"),
     ("Painel local ao vivo", "Feed de decisões, saúde, controles de pausa e modo seguro.", "feito", "commit 8f4895a"),
     ("Projetos em cards", "Cada pedido vira um projeto com propósito.", "feito", "commit 22e1710"),
     ("Estado do loop em tempo real", "Batimento, desligado vs rodando, contagem até o próximo giro.", "feito", "commit 9f740dd"),
-    ("O próprio loop como projeto", "Registra todo erro, aprende com ele e se autocorrige.", "em_andamento", "este card"),
+    ("O próprio loop como projeto", "Registra todo erro, aprende, se isola em execução e corrige o próprio código por PR.", "feito", "commits 17e5ea4, b163a26"),
+    ("Ligar as chaves e o Claude Code na máquina do loop", "TYPESAFE_API_KEY, ANTHROPIC_API_KEY, GITHUB_TOKEN, CIRCULO_REPO_DIR e o comando `claude`. Sem isso, o motor e o Developer ficam parados.", "pendente", "depende de você"),
+    ("Rodar 24/7", "Mac com launchd ou VPS com systemd (arquivos em deploy/).", "pendente", "depende de você"),
+    ("Produto de software vira código", "Hoje o portal sai como especificação; o próximo passo é o Builder gerar um repositório por projeto e usar o mesmo gate.", "pendente", "Prompt Mestre §6"),
+    ("Perguntas do Jev e portfólio evoluindo sozinhos", "Estender o shadow para instruções das perguntas e parâmetros do portfólio.", "pendente", "Prompt Mestre §8"),
 ]
 
 FINANCAS_PEDIDO = "Crie um painel web da minha vida financeira e me ajude a economizar dinheiro"
@@ -84,10 +89,17 @@ def ensure_seed(store: Store) -> None:
                 ("O próprio círculo", CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
     # projetos criados antes do motor genérico passam a ser atendidos por ele
     store.x("UPDATE projects SET kit='geral', status='ativo' WHERE status='aguardando_kit'")
-    if not store.one("SELECT 1 FROM roadmap WHERE origem='pedido_cassio'"):
+    if (store.get("roteiro_versao") or 0) < ROTEIRO_VERSAO:
+        # roteiro semente versionado: atualiza o estado dos pedidos do humano, sem tocar nos itens que o círculo criou
         for i, (titulo, detalhe, status, evid) in enumerate(ROTEIRO_SEMENTE, 1):
-            store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (titulo, detalhe, "pedido_cassio", status, evid, i, now, now))
+            row = store.one("SELECT id FROM roadmap WHERE origem='pedido_cassio' AND titulo=?", (titulo,))
+            if row:
+                store.x("UPDATE roadmap SET detalhe=?, status=?, evidencia=?, ordem=?, updated_at=? WHERE id=?",
+                        (detalhe, status, evid, i, now, row["id"]))
+            else:
+                store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                        (titulo, detalhe, "pedido_cassio", status, evid, i, now, now))
+        store.set("roteiro_versao", ROTEIRO_VERSAO)
 
 
 def roteiro(store: Store) -> list[dict]:

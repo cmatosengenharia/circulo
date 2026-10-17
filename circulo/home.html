@@ -196,7 +196,9 @@ function cardLive(p) {
   if (p.status === "ativo" && e.startsWith("pausado")) return `<span class="chip">Pausado</span> ${p.na_fila ? p.na_fila + " na fila" : ""}`;
   if (V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id)) return `<span class="chip agora">Trabalhando agora</span> ${esc(ETAPA[V.etapa] || V.etapa)}`;
   if (p.na_fila) return `<span class="chip fila">${p.na_fila} na fila</span> o loop chega aqui no próximo giro`;
-  if (p.status === "aguardando_kit") return `Registrado; espera o kit do tipo`;
+  if (p.kit === "geral" && !p.motor_pronto) return `<span class="chip">Parado</span> falta a chave da LLM`;
+  if (p.status === "manutencao") return `Em manutenção: sem ganho relevante nos últimos ciclos`;
+  if (p.kit === "geral" && !p.regua) return `Próximo ciclo: pesquisar e montar a régua`;
   return "Última atividade " + ago(p.ultima_atividade);
 }
 function card(p) {
@@ -210,6 +212,10 @@ function card(p) {
     <h3>${esc(p.nome)}</h3>
     <p class="pedido">${esc(p.pedido)}</p>
     <p class="proposito">${esc(p.proposito)}</p>
+    ${p.kit === "geral" && p.nota != null ? `<div class="zero-box">
+      <div class="zero-row"><span>Nota na régua</span><b>${Math.round(p.nota * 100)}% · v${p.versoes}</b></div>
+      <div class="rbar" aria-hidden="true"><i class="f" style="width:${p.nota * 100}%"></i></div>
+    </div>` : ""}
     ${p.roteiro ? `<div class="zero-box">
       <div class="zero-row"><span>Roteiro</span><b>${p.roteiro.feito} de ${p.roteiro.total} feitos${p.roteiro.parcial ? ` · ${p.roteiro.parcial} parciais` : ""}</b></div>
       <div class="rbar" aria-hidden="true"><i class="f" style="width:${p.roteiro.feito / p.roteiro.total * 100}%"></i><i class="p" style="width:${p.roteiro.parcial / p.roteiro.total * 100}%"></i></div>
@@ -257,6 +263,7 @@ function facts() {
     const o = S.orcamento; add("Orçamento hoje", (o.tokens / o.limite * 100).toFixed(1).replace(".", ",") + "% usado");
     add("Decisões sem LLM (24h)", S.saude.decisoes_24h ? Math.round(S.saude.sem_llm * 100) + "%" : "—");
     if (S.novos_na_fila) add("Projetos sendo criados", S.novos_na_fila);
+    if (S.demo) add("Modo", "demonstração (LLM simulada)");
   }
   $("#facts").innerHTML = f.join("");
 }
