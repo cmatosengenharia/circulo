@@ -15,7 +15,8 @@ from typing import Callable
 from . import finance
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
-from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev, build_llm
+from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
+from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from .incidents import Incidents
