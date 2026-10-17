@@ -140,6 +140,9 @@ class MergeGate:
             (v.number, v.sha, int(v.merge), v.reason, json.dumps(v.details, ensure_ascii=False), time.time()))
         if v.merge:
             self.ctx.reply(f"Merge automático do PR #{v.number} ({v.details.get('lines', 0)} linhas).", "merge")
+            dev = s.get("self_dev_aberto") or {}
+            if dev.get("pr") == v.number:     # PR do Developer entrou: libera o próximo
+                s.set("self_dev_aberto", {**dev, "fechado": True, "merged": True})
         elif "protegido" in v.reason or "grande" in v.reason:
             self.ctx.reply(f"PR #{v.number} aguarda você: {v.reason}.", "merge")
 
@@ -177,6 +180,9 @@ class GitHubREST:
     def label_events(self, number):
         return [{"event": e["event"], "label": (e.get("label") or {}).get("name"), "actor": (e.get("actor") or {}).get("login", "")}
                 for e in self._req("GET", f"/issues/{number}/events?per_page=100") if e["event"] in ("labeled", "unlabeled")]
+
+    def create_pr(self, head: str, base: str, title: str, body: str) -> int:
+        return int(self._req("POST", "/pulls", {"head": head, "base": base, "title": title, "body": body})["number"])
 
     def merge(self, number, sha, title):
         try:

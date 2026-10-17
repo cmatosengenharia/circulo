@@ -106,6 +106,11 @@ class Incidents:
     # ------------------------------------------------------------ fechar o que parou de acontecer
     def resolve_stale(self) -> int:
         tick = self.s.tick
+        fechados = [r["id"] for r in self.s.q("SELECT id FROM incidents WHERE status IN ('aberto','isolado') AND last_tick < ?",
+                                             (tick - RESOLVE_AFTER_TICKS,))]
+        for iid in fechados:   # o erro parou de acontecer: o item do roteiro que pedia a correção está feito
+            self.s.x("UPDATE roadmap SET status='feito', evidencia=evidencia || ' · erro não ocorre há ' || ? || ' giros', updated_at=? "
+                     "WHERE origem='erro' AND status!='feito' AND detalhe LIKE ?", (RESOLVE_AFTER_TICKS, time.time(), f"%incidente #{iid},%"))
         cur = self.s.db.execute(
             "UPDATE incidents SET status='resolvido', resolution=COALESCE(resolution,'') || ' | não ocorre há ' || ? || ' giros' "
             "WHERE status IN ('aberto','isolado') AND last_tick < ?", (RESOLVE_AFTER_TICKS, tick - RESOLVE_AFTER_TICKS))

@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
     sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
+    dv = sub.add_parser("dev", help="pede ao Developer para corrigir um item do roteiro agora")
+    dv.add_argument("--item", type=int, default=None)
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
     args = ap.parse_args(argv)
@@ -48,6 +50,12 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     c = Circle(args.data)
+    if args.cmd == "dev":
+        if c.self_dev is None:
+            print("Developer indisponível: defina CIRCULO_REPO_DIR (clone do repo) e instale o Claude Code (comando `claude`).")
+            return
+        print(c.self_dev.run_once(args.item))
+        return
     if args.cmd == "snapshot":
         from .guardrails import snapshot
         print(snapshot(c.store, c.data_dir, "manual"))
