@@ -151,6 +151,115 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 .proj{display:grid;gap:6px}
 .proj .bar span{background:var(--jev)}
 .budget{margin-top:14px}
+
+/* etapas: uma cor por tipo de trabalho, igual no círculo, na faixa de giros e no "agora" */
+:root{--s-pedido:var(--ok);--s-projeto:var(--jev);--s-developer:var(--llm);--s-idle:#6F8FA6;--s-meta:#9AA6B2;--s-orq:#C5CDD5}
+@media (prefers-color-scheme:dark){:root{--s-idle:#5F8AA8;--s-meta:#5C6A78;--s-orq:#3A4654}}
+
+/* faixa de números */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px}
+.kpi{background:var(--surface);padding:12px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi b{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.kpi small{font-size:12px;color:var(--muted);font-weight:500}
+.kpi a{color:inherit;text-decoration:none}.kpi a:hover b{color:var(--jev)}
+
+/* agora */
+.agora{display:flex;flex-direction:column;gap:12px}
+.agora .tarefa{display:flex;gap:12px;align-items:flex-start}
+.agora .marca{flex:none;width:12px;height:12px;border-radius:50%;margin-top:7px;background:var(--s-orq)}
+.agora .marca.vivo{animation:beat 1.2s ease-in-out infinite}
+.agora h3{margin:0;font-size:19px;font-weight:700;line-height:1.3}
+.agora p{margin:2px 0 0;color:var(--muted)}
+.agora .tempo{font-weight:700;color:var(--ink)}
+.passos{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.passos li{display:grid;grid-template-columns:58px 10px 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:13.5px;border-bottom:1px solid var(--line)}
+.passos li i{width:8px;height:8px;border-radius:50%}
+.passos .t{color:var(--muted);font-size:12.5px}
+.passos .d{color:var(--muted);font-size:12.5px;text-align:right}
+.passos li.new{animation:in .8s ease}
+
+/* faixa de giros: cada barra é um giro, cada pedaço uma etapa, largura = tempo */
+.giros{display:flex;flex-direction:column;gap:5px}
+.giro{display:grid;grid-template-columns:64px 1fr 64px;gap:10px;align-items:center;font-size:12.5px}
+.giro .n{color:var(--muted)}
+.giro .dur{color:var(--muted);text-align:right}
+.giro .barra{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--bg)}
+.giro .barra span{height:100%;min-width:2px;border-right:1px solid var(--surface)}
+.giro.ativo .n{color:var(--ink);font-weight:700}
+.giro.ativo .barra{outline:1.5px solid var(--jev);outline-offset:1px}
+.chaves{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:10px}
+.chaves b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+/* console de decisões */
+.cabeca{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;justify-content:space-between;margin-bottom:10px}
+.cabeca h2{margin:0}
+.resumo-dec{display:flex;gap:16px;align-items:flex-end;color:var(--muted);font-size:12.5px}
+.resumo-dec b{display:block;color:var(--ink);font-size:17px;font-weight:800}
+.spark-svg{width:120px;height:30px;display:block}
+.spark-svg path{fill:none;stroke:var(--jev);stroke-width:1.5}
+.spark-svg .area{fill:var(--jev-soft);stroke:none}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.filtro{border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.filtro[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.filtro.parar{margin-left:auto}
+.console{max-height:560px;overflow:auto;border-top:1px solid var(--line)}
+.dec{display:grid;grid-template-columns:64px minmax(0,1.5fr) minmax(0,1fr) 92px 50px;gap:10px;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.dec .t{color:var(--muted);font-size:12.5px}
+.dec .q{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dec .q .mission{font-weight:600}
+.dec .v{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dec .c{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dec .c i{flex:1;height:5px;border-radius:999px;background:var(--bg);overflow:hidden;position:relative}
+.dec .c i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--jev);border-radius:999px}
+.dec.llm .c i::after{background:var(--llm)}
+.dec.new{animation:in .8s ease}
+.dec-giro{font-size:12px;font-weight:700;color:var(--muted);padding:9px 2px 3px;border-bottom:1px solid var(--line)}
+@media (max-width:640px){.dec{grid-template-columns:52px 1fr 50px}.dec .v,.dec .c{display:none}}
+
+/* linha do tempo da evolução */
+.tl{list-style:none;margin:0;padding:0;position:relative;max-height:620px;overflow:auto}
+.tl li{display:grid;grid-template-columns:14px 1fr;gap:12px;padding:0 0 14px;position:relative}
+.tl li::before{content:"";position:absolute;left:6px;top:14px;bottom:0;width:2px;background:var(--line)}
+.tl li:last-child::before{display:none}
+.tl .p{width:14px;height:14px;border-radius:50%;margin-top:3px;border:3px solid var(--surface);box-shadow:0 0 0 1.5px var(--tc,var(--muted));background:var(--tc,var(--muted))}
+.tl .x{min-width:0}
+.tl .x strong{display:block;font-weight:600;line-height:1.35}
+.tl .x span{display:block;color:var(--muted);font-size:13px}
+.tl .x em{font-style:normal;font-size:12px;font-weight:700;color:var(--tc,var(--muted))}
+.tl li.new .x{animation:in 1.2s ease}
+
+/* modelos */
+.modelos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.modelo{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
+.modelo strong{display:block;font-size:15px}
+.modelo span{display:block;font-size:12.5px;color:var(--muted)}
+details.chamada{border-bottom:1px solid var(--line);padding:7px 0}
+details.chamada summary{display:grid;grid-template-columns:1fr auto;gap:8px;cursor:pointer;list-style:none}
+details.chamada summary::-webkit-details-marker{display:none}
+details.chamada summary b{font-weight:600}
+details.chamada .meta{display:block;color:var(--muted);font-size:12.5px}
+details.chamada pre{white-space:pre-wrap;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border-radius:var(--r-sm);padding:8px 10px;margin:8px 0 0;max-height:200px;overflow:auto}
+
+/* roteiro */
+.rt-prog{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--bg);margin:4px 0 8px}
+.rt-prog span{height:100%}
+.rt-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-bottom:12px}
+.rt-leg b{color:var(--ink)}
+.rt-grupo{margin:14px 0 6px;font-size:14px;font-weight:700;display:flex;gap:8px;align-items:baseline}
+.rt-grupo small{color:var(--muted);font-weight:500}
+.rt{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rt li{border:1px solid var(--line);border-left:4px solid var(--rc,var(--line));border-radius:var(--r-sm);padding:9px 12px;background:var(--surface)}
+.rt li.agora-dev{border-color:var(--llm);box-shadow:0 0 0 3px var(--llm-soft)}
+.rt .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.rt strong{font-weight:600}
+.rt p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.rt .ev{margin-top:4px;font-size:12.5px;color:var(--muted)}
+.rt .ev a{color:var(--jev);font-weight:600}
+.origem{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.origem.erro{background:var(--bad-soft);color:var(--bad)}
+.origem.voce{background:var(--llm-soft);color:var(--llm)}
+details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14px 0 6px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -167,6 +276,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
   </header>
 
   <div class="about" id="about"></div>
+  <div class="kpis" id="kpis" aria-label="Números ao vivo"></div>
   <div class="grid">
     <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
       <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
@@ -179,16 +289,60 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       </div>
     </section>
 
+    <section class="panel c5 agora" aria-label="O que o loop está fazendo agora">
+      <h2>Agora</h2>
+      <div class="tarefa"><span class="marca" id="agoraMarca"></span>
+        <div><h3 id="agoraTitulo">Conectando…</h3><p id="agoraDetalhe"></p></div></div>
+      <ul class="passos" id="passos" aria-live="polite"></ul>
+    </section>
+
+    <section class="panel c12" aria-label="Giros">
+      <div class="cabeca"><div><h2>Giros</h2><p class="sub" style="margin:2px 0 0">Cada linha é um giro; cada pedaço, uma etapa, do tamanho do tempo que levou.</p></div>
+        <p class="sub" id="girosResumo" style="margin:0"></p></div>
+      <div class="giros" id="giros"></div>
+      <div class="chaves" id="chaves"></div>
+    </section>
+
+    <section class="panel c7" aria-label="Decisões ao vivo">
+      <div class="cabeca"><div><h2>Decisões ao vivo</h2><p class="sub" style="margin:2px 0 0">Toda pergunta que o loop faz antes de gastar ou de mudar algo.</p></div>
+        <div class="resumo-dec" id="resumoDec"></div></div>
+      <div class="filtros" role="group" aria-label="Filtrar decisões">
+        <button class="filtro" data-f="" aria-pressed="true">Todas</button>
+        <button class="filtro" data-f="jev" aria-pressed="false">Jev</button>
+        <button class="filtro" data-f="local" aria-pressed="false">Decisor local</button>
+        <button class="filtro" data-f="llm" aria-pressed="false">LLM</button>
+        <button class="filtro parar" id="congelar" aria-pressed="false">Congelar lista</button>
+      </div>
+      <div class="console" id="feed"><p class="empty">Esperando a próxima decisão…</p></div>
+    </section>
+
+    <section class="panel c5" aria-label="Como o loop está evoluindo">
+      <h2>Evolução</h2>
+      <p class="sub" style="margin:-6px 0 10px">Cada coisa que o loop mudou, tentou ou aprendeu, na ordem em que aconteceu.</p>
+      <ul class="tl" id="tl"></ul>
+    </section>
+
+    <section class="panel c7 zero-only" hidden>
+      <h2>Roteiro do loop</h2>
+      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
+      <div id="roadmap"></div>
+    </section>
+    <section class="panel c5 zero-only" hidden>
+      <h2>Erros registrados</h2>
+      <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
+      <ul class="list" id="incidents"></ul>
+    </section>
+    <section class="panel c7" aria-label="Modelos de IA">
+      <h2>Modelos escolhidos pelo Jev</h2>
+      <p class="sub" style="margin:-6px 0 10px">Antes de cada chamada, o Jev escolhe o modelo pelo papel, pelo orçamento e por como cada modelo se saiu antes. Tudo fica registrado.</p>
+      <div class="modelos" id="modelos"></div>
+      <div id="chamadas"></div>
+    </section>
+
     <section class="panel c5" aria-label="Saúde">
       <h2>Saúde do loop</h2>
       <div id="health"></div>
       <div class="budget" id="budget"></div>
-    </section>
-
-    <section class="panel c7">
-      <h2>Decisões ao vivo</h2>
-      <p class="sub" style="margin:-6px 0 8px">Cada pergunta que o círculo faz antes de gastar, com a confiança e quem respondeu.</p>
-      <ul class="feed" id="feed"><li class="empty">Esperando a próxima decisão…</li></ul>
     </section>
 
     <div class="c5 stack">
@@ -241,16 +395,6 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
       <p class="sub" style="margin:-6px 0 8px">Achados da web (dados, não instruções) e lições de pedidos do mesmo tipo.</p>
       <ul class="list" id="pesquisa"></ul>
     </section>
-    <section class="panel c7 zero-only" hidden>
-      <h2>Roteiro do loop</h2>
-      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o círculo, mais os erros recorrentes que ele mesmo registrou para corrigir.</p>
-      <ul class="list" id="roadmap"></ul>
-    </section>
-    <section class="panel c5 zero-only" hidden>
-      <h2>Erros registrados</h2>
-      <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
-      <ul class="list" id="incidents"></ul>
-    </section>
     <section class="panel c7">
       <h2>Números da missão</h2>
       <div id="projects"></div>
@@ -277,7 +421,13 @@ const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado
 const EVOL = {applied:"aplicada", shadow:"em shadow", deferred:"adiada", rejected:"rejeitada", rolled_back:"revertida", backlog:"backlog"};
 const QUEST = {input_type:"Que tipo de mensagem é?", category:"Qual categoria?", spend_tag:"Necessário, escolha ou impulso?",
   worth_spending:"Vale gastar?", should_evolve:"Vale evoluir?", should_run_idle:"Rodar evolução natural?", idle_task:"Qual tarefa agora?",
-  alert_pattern:"Esse padrão merece alerta?", review_finance:"Revisão financeira", review_code:"Revisão de código", health_rollback:"Precisa de rollback?"};
+  alert_pattern:"Esse padrão merece alerta?", review_finance:"Revisão financeira", review_code:"Revisão de código", health_rollback:"Precisa de rollback?",
+  pick_model:"Qual modelo de IA usar?", remember:"Vale guardar esta lição?", contraprova:"Contraprova: a versão nova piorou?", should_advance:"Pode avançar?",
+  route:"Quem resolve: regra, Jev ou LLM?", project_type:"Que tipo de pedido é?", next_project:"Qual missão agora?", isolate_stage:"Isolar a etapa com erro?",
+  transfer_lesson:"Levar a lição para outra missão?", verify_formato:"Saída no formato certo?", verify_injecao:"Saída livre de manipulação?",
+  verify_dados:"Saída sem dados sensíveis?", verify_pedido:"Saída responde ao pedido?", meets_bar:"Quanto atende a régua?"};
+const PREF = [["crit_","Critério da régua"],["rel_","Trecho relevante?"],["ach_","Achado da pesquisa vale?"],["val_","Vale o ganho?"],["mens_","Mensagem entendida?"]];
+const pergunta = q => QUEST[q] || (q.startsWith("llm:") ? "Chamar LLM: " + (PAPEL[q.slice(4)] || q.slice(4)) : (PREF.find(([k]) => q.startsWith(k)) || [, q.replace(/_/g, " ")])[1]);
 
 /* ---------- o círculo ---------- */
 const STAGES = [["orquestrador","Orquestrador"],["pedido","Pedido"],["idle","Evolução natural"],["projeto","Construindo missões"],
@@ -390,23 +540,190 @@ function spark(d) {
   setTimeout(() => c.remove(), 1000);
 }
 
-/* ---------- feed ao vivo ---------- */
-let lastId = 0, feedCount = 0;
-function addDecision(d) {
-  const ul = $("#feed");
-  if (!feedCount) ul.innerHTML = "";
-  feedCount++;
-  const v = typeof d.value === "number" ? d.value.toFixed(2) : d.value;
-  const li = document.createElement("li"); li.className = "new";
-  li.innerHTML = `<span class="t">${hora(d.created_at)}</span>
-    <div><div class="q">${esc(QUEST[d.question] || (d.question.startsWith("llm:") ? "Gerar com LLM (" + d.question.slice(4) + ")" : d.question))}${ZERO && d.project_id && S && S.nomes && String(d.project_id) !== PID ? `<span class="mission">${esc(S.nomes[d.project_id])}</span>` : ""}</div>
-      <div class="v">${esc(v)} · confiança ${pct(d.confidence)}</div>
-      <div class="conf"><span style="width:${pct(d.confidence)}"></span></div></div>
-    <span class="src ${esc(d.source)}">${d.source === "llm" ? "LLM" : d.source === "local" ? "local" : "Jev"}</span>`;
-  ul.prepend(li);
-  while (ul.children.length > 80) ul.lastChild.remove();
-  spark(d);
+/* ---------- cores e nomes das etapas ---------- */
+const COR = {pedido:"var(--s-pedido)", projeto:"var(--s-projeto)", developer:"var(--s-developer)", idle:"var(--s-idle)",
+  meta_learner:"var(--s-meta)", shadow:"var(--s-meta)", saude:"var(--s-meta)", orquestrador:"var(--s-orq)"};
+const NOME = Object.fromEntries(STAGES);
+const dur = s => s < 1 ? Math.round(s * 1000) + " ms" : s < 90 ? s.toFixed(s < 10 ? 1 : 0) + " s" : Math.round(s / 60) + " min";
+const nomeMissao = id => (S && S.nomes && S.nomes[id]) || "";
+
+/* ---------- agora: o passo atual e os últimos passos ---------- */
+const passos = [];          // {em, etapa, detalhe, projeto, tick}
+function addPasso(t, novo = true) {
+  if (t.etapa === "descanso") { if (passos.length) passos[0].fim = t.em; return; }
+  if (passos.length && !passos[0].fim) passos[0].fim = t.em;
+  passos.unshift({em: t.em, etapa: t.etapa, detalhe: t.detalhe, projeto: t.project_id, tick: t.tick, novo});
+  if (passos.length > 14) passos.length = 14;
+  agendar(renderPassos);
 }
+function renderPassos() {
+  $("#passos").innerHTML = passos.map(x => `<li class="${x.novo ? "new" : ""}"><span class="t">${hora(x.em)}</span><i style="background:${COR[x.etapa] || "var(--muted)"}"></i>
+    <span>${esc(x.detalhe || NOME[x.etapa] || x.etapa)}${x.projeto && nomeMissao(x.projeto) && String(x.projeto) !== PID ? ` <span class="mission">${esc(nomeMissao(x.projeto))}</span>` : ""}</span>
+    <span class="d">${x.fim ? dur(x.fim - x.em) : "agora"}</span></li>`).join("") || `<li><span></span><span></span><span class="sub">Os passos aparecem aqui assim que o loop girar.</span><span></span></li>`;
+  passos.forEach(x => x.novo = false);
+}
+function renderAgora() {
+  if (!S) return;
+  const V = S.loop.vivo || {}, A = S.trabalho_agora, m = $("#agoraMarca");
+  let titulo, detalhe, cor = "var(--s-orq)", vivo = false;
+  const agora = Date.now() / 1000;
+  if (V.estado === "desligado") { titulo = "Loop desligado"; detalhe = "O serviço volta sozinho; se não voltar, rode circulo diagnostico."; cor = "var(--bad)"; }
+  else if (V.estado && V.estado.startsWith("pausado")) { titulo = V.titulo || "Pausado"; detalhe = V.detalhe || ""; }
+  else if (V.estado === "aguardando" || !A || A.nome === "descanso") {
+    const s = V.proximo_giro_em ? Math.max(0, Math.round(V.proximo_giro_em - agora)) : null;
+    titulo = s != null ? `Próximo giro em ${s} s` : "Entre giros";
+    detalhe = S.loop.trabalho_pendente === false || (s != null && s > 60) ? "Sem trabalho esperando: descanso longo. Pedido novo ou PR aberto acordam o loop na hora." : "Há trabalho na fila: o próximo giro vem logo.";
+  } else {
+    titulo = A.detalhe || NOW[A.nome] || A.nome; vivo = true; cor = COR[A.nome] || "var(--jev)";
+    const miss = A.projeto && String(A.projeto) !== PID ? nomeMissao(A.projeto) : "";
+    detalhe = `${NOME[A.nome] || A.nome}${miss ? " · " + miss : ""} · giro ${A.tick} · <span class="tempo">há ${dur(Math.max(0, agora - A.em))}</span>`;
+  }
+  m.style.background = cor; m.classList.toggle("vivo", vivo);
+  $("#agoraTitulo").textContent = titulo; $("#agoraDetalhe").innerHTML = vivo ? detalhe : esc(detalhe);
+}
+
+/* ---------- giros ---------- */
+function renderGiros(gs) {
+  const el = $("#giros");
+  if (!gs || !gs.length) { el.innerHTML = `<p class="empty">Nenhum giro registrado ainda.</p>`; return; }
+  const max = Math.max(1, ...gs.map(g => g.dur));
+  el.innerHTML = gs.slice(-14).reverse().map(g => `<div class="giro ${g.ativo ? "ativo" : ""}"><span class="n">giro ${g.tick}</span>
+    <div class="barra" style="width:${Math.max(4, g.dur / max * 100)}%">${g.etapas.map(e => `<span title="${esc((e.detalhe || NOME[e.etapa] || e.etapa) + (e.projeto && nomeMissao(e.projeto) ? " · " + nomeMissao(e.projeto) : "") + " · " + dur(e.dur))}" style="flex:${Math.max(e.dur, max / 400)};background:${COR[e.etapa] || "var(--muted)"}"></span>`).join("")}</div>
+    <span class="dur">${g.ativo ? "rodando" : dur(g.dur)}</span></div>`).join("");
+  const med = gs.filter(g => !g.ativo).map(g => g.dur);
+  $("#girosResumo").textContent = med.length ? `Giro médio: ${dur(med.reduce((a, b) => a + b, 0) / med.length)} de trabalho` : "";
+  if (!$("#chaves").innerHTML) $("#chaves").innerHTML = [["pedido","Pedido"],["projeto","Missões"],["developer","Developer (código)"],["idle","Manutenção"],["meta_learner","Aprender e checar"],["orquestrador","Orquestrar"]]
+    .map(([k, l]) => `<span><b style="background:${COR[k]}"></b>${l}</span>`).join("");
+}
+
+/* ---------- console de decisões ---------- */
+let lastId = 0, filtro = "", congelado = false;
+const DECS = [];
+function addDecision(d) {
+  d._novo = true; DECS.unshift(d);
+  if (DECS.length > 160) DECS.length = 160;
+  spark(d);
+  if (!congelado) agendar(renderDecs);
+}
+function renderDecs() {
+  const ul = $("#feed"), lista = DECS.filter(d => !filtro || d.source === filtro).slice(0, 90);
+  if (!lista.length) { ul.innerHTML = `<p class="empty">${DECS.length ? "Nenhuma decisão com esse filtro ainda." : "Esperando a próxima decisão…"}</p>`; return; }
+  let giro = null, h = "";
+  for (const d of lista) {
+    if (d.tick !== giro) { giro = d.tick; h += `<div class="dec-giro">giro ${d.tick}</div>`; }
+    const v = typeof d.value === "number" ? d.value.toFixed(2) : String(d.value).replace(/^"|"$/g, "").replace(/_/g, " ");
+    const perg = pergunta(d.question);
+    const miss = ZERO && d.project_id && String(d.project_id) !== PID ? nomeMissao(d.project_id) : "";
+    h += `<div class="dec ${esc(d.source)} ${d._novo ? "new" : ""}"><span class="t">${hora(d.created_at)}</span>
+      <span class="q" title="${esc(perg)}">${esc(perg)}${miss ? ` <span class="mission">${esc(miss)}</span>` : ""}</span>
+      <span class="v" title="${esc(v)}">${esc(v)}</span>
+      <span class="c"><i style="--w:${pct(d.confidence)}"></i>${pct(d.confidence)}</span>
+      <span class="src ${esc(d.source)}">${d.source === "llm" ? "LLM" : d.source === "local" ? "local" : "Jev"}</span></div>`;
+  }
+  ul.innerHTML = h; DECS.forEach(d => d._novo = false);
+}
+document.querySelectorAll(".filtro[data-f]").forEach(b => b.onclick = () => {
+  filtro = b.dataset.f; document.querySelectorAll(".filtro[data-f]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderDecs();
+});
+$("#congelar").onclick = e => { congelado = !congelado; e.target.setAttribute("aria-pressed", congelado); e.target.textContent = congelado ? "Continuar ao vivo" : "Congelar lista"; if (!congelado) renderDecs(); };
+function sparkline(serie) {
+  const w = 120, h = 30, max = Math.max(1, ...serie), n = serie.length;
+  const pts = serie.map((v, i) => [i / (n - 1) * w, h - 2 - v / max * (h - 4)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  return `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path class="area" d="${d}L${w} ${h}L0 ${h}Z"/><path d="${d}"/></svg>`;
+}
+function renderRitmo(r) {
+  if (!r) return;
+  const tot = r.serie.reduce((a, b) => a + b, 0), f = r.fontes || {}, n = Object.values(f).reduce((a, b) => a + b, 0) || 1;
+  $("#resumoDec").innerHTML = `<span>${sparkline(r.serie)}${tot} nos últimos ${r.minutos} min</span>
+    <span><b>${pct(((f.jev || 0) + (f.local || 0)) / n)}</b>sem LLM</span>
+    <span><b>${r.confianca_media != null ? pct(r.confianca_media) : "—"}</b>confiança média</span>`;
+}
+
+/* ---------- evolução ---------- */
+const TCOR = {regra:"var(--ok)", politica:"var(--jev)", ciclo:"var(--jev)", evidencia:"var(--ok)", pr:"var(--llm)", merge:"var(--ok)",
+  harness:"var(--jev)", versao:"var(--jev)", roteiro:"var(--s-idle)", erro:"var(--bad)", developer:"var(--llm)"};
+const TNOME = {regra:"regra de domínio", politica:"o próprio loop", ciclo:"ciclo da missão", evidencia:"evidência", pr:"pull request", merge:"gate de merge",
+  harness:"prompt em A/B", versao:"política", roteiro:"roteiro", erro:"erro registrado", developer:"Developer"};
+const ESTADO = {applied:"aplicada", shadow:"em teste (shadow)", deferred:"adiada", rejected:"rejeitada", rolled_back:"revertida", backlog:"na fila",
+  aceita:"aceita", recusada:"recusada pela catraca", aberto:"aberto", mergeado:"mergeado", recusado:"recusado", isolado:"etapa isolada",
+  resolvido:"resolvido", feito:"feito", parcial:"parcial", pendente:"pendente", em_andamento:"em andamento", rodando:"rodando",
+  promovido:"promovido", descartado:"descartado", active:"ativa", retired:"anterior", adiado_valor:"adiado: pouco ganho",
+  adiado_orcamento:"adiado: orçamento", pesquisa:"pesquisa", construcao:"construção", melhoria:"melhoria", bloqueado:"parado",
+  base:"primeira versão", avancar:"avançou", refazer:"refazer", descartar:"descartada", cumprida:"cumprida"};
+let vistos = new Set();
+function renderTimeline(items) {
+  const el = $("#tl");
+  if (!items || !items.length) { el.innerHTML = `<li><span></span><div class="x"><strong>Nada mudou ainda</strong><span>Quando o loop aprender uma regra, testar um prompt, melhorar uma missão ou abrir um PR, aparece aqui com o motivo.</span></div></li>`; return; }
+  const primeira = !vistos.size;
+  el.innerHTML = items.map(i => { const k = i.tipo + i.em + i.titulo, novo = !primeira && !vistos.has(k); vistos.add(k);
+    return `<li class="${novo ? "new" : ""}" style="--tc:${TCOR[i.tipo] || "var(--muted)"}"><span class="p"></span><div class="x">
+      <em>${esc(TNOME[i.tipo] || i.tipo)}${i.estado ? " · " + esc(ESTADO[i.estado] || i.estado) : ""}${i.missao && ZERO ? " · " + esc(i.missao) : ""}</em>
+      <strong>${esc(i.titulo)}</strong>${i.detalhe && !/^\s*[{\[]/.test(i.detalhe) ? `<span>${esc(i.detalhe)}</span>` : ""}<span>${quando(i.em)}</span></div></li>`; }).join("");
+}
+function quando(ts) {
+  const s = Date.now() / 1000 - ts;
+  return s < 60 ? "agora há pouco" : s < 3600 ? `há ${Math.round(s / 60)} min` : s < 86400 ? `há ${Math.round(s / 3600)} h` : new Date(ts * 1000).toLocaleDateString("pt-BR");
+}
+
+/* ---------- modelos ---------- */
+const PAPEL = {researcher:"Pesquisador", rubric:"Régua", builder:"Construtor", improver:"Melhorador", reflector:"Reflexão", developer:"Developer (código)"};
+const curto = m => String(m || "").replace(/^claude-/, "").replace(/-(\d)-(\d)$/, " $1.$2").replace(/^./, c => c.toUpperCase());
+function renderModelos(L) {
+  if (!L) return;
+  $("#modelos").innerHTML = L.resumo.length ? L.resumo.map(m => `<div class="modelo"><strong>${esc(curto(m.modelo))}</strong>
+    <span>${m.chamadas} chamada${m.chamadas > 1 ? "s" : ""} · ${(m.tokens || 0).toLocaleString("pt-BR")} tokens</span>
+    <span>${m.pelo_jev ? pct(m.pelo_jev / m.chamadas) + " escolhido pelo Jev" : "padrão do harness"}${m.avaliadas ? " · " + pct(m.aceitas / m.avaliadas) + " aceitas" : ""}${m.falhas ? " · " + m.falhas + " falhas" : ""}</span></div>`).join("")
+    : `<p class="empty">Nenhuma chamada de LLM ainda. Quando uma missão precisar construir algo, o Jev escolhe o modelo e a chamada aparece aqui.</p>`;
+  const quem = c => c.decidido_por === "jev" ? `escolhido pelo Jev (${pct(c.confianca || 0)})` : c.decidido_por === "local" ? `decisor local (${pct(c.confianca || 0)})`
+    : c.decidido_por === "harness" ? `Jev inseguro (${pct(c.confianca || 0)}): padrão do harness` : "fixo";
+  const abertos = new Set([...document.querySelectorAll("details.chamada[open]")].map(d => d.dataset.id));
+  $("#chamadas").innerHTML = L.recentes.map(c => `<details class="chamada" data-id="${c.id}" ${abertos.has(String(c.id)) ? "open" : ""}><summary>
+      <span><b>${esc(PAPEL[c.papel] || c.papel.replace("fallback:", "Desempate: "))} → ${esc(curto(c.modelo))}</b>
+      <span class="meta">${quem(c)} · ${(c.tokens || 0).toLocaleString("pt-BR")} tokens${c.duracao_ms ? " · " + dur(c.duracao_ms / 1000) : ""} · ${hora(c.created_at)}${ZERO && c.project_id && nomeMissao(c.project_id) ? " · " + esc(nomeMissao(c.project_id)) : ""}</span></span>
+      <span class="chip ${!c.ok ? "isolado" : c.aceita === 1 ? "feito" : c.aceita === 0 ? "descartada" : ""}">${!c.ok ? "falhou" : c.aceita === 1 ? "aceita" : c.aceita === 0 ? "recusada" : "ok"}</span></summary>
+      ${c.erro ? `<pre>${esc(c.erro)}</pre>` : ""}${c.entrada ? `<pre>${esc(c.entrada)}</pre>` : ""}${c.saida ? `<pre>${esc(c.saida)}</pre>` : ""}</details>`).join("");
+}
+
+/* ---------- números ---------- */
+function renderKpis(s) {
+  const L = s.loop, P = s.projeto || {}, M = P.metricas || {}, R = s.repo, r = s.ritmo || {serie: []};
+  const ult5 = r.serie.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const k = [];
+  k.push([Number(ZERO ? L.tick : (P.giros || 0)).toLocaleString("pt-BR"), ZERO ? "giros" : "giros nesta missão"]);
+  if (R) k.push([`<a href="${s.repo_url ? s.repo_url + "/commits/main" : "#"}" target="_blank" rel="noopener"><b>${R.total}</b></a>`, `commits <small>+${R.ultimas_24h} em 24h${R.pelo_developer ? " · " + R.pelo_developer + " do Developer" : ""}</small>`, true]);
+  if (M.prs) k.push([M.prs.mergeados, `PRs mergeados <small>${M.prs.abertos} abertos</small>`]);
+  k.push([M.versao || "—", "versão"]);
+  k.push([(M.evolucoes || 0).toLocaleString("pt-BR"), "evoluções"]);
+  k.push([ult5 >= 10 ? Math.round(ult5) : ult5.toFixed(1), "decisões por minuto"]);
+  k.push([(s.orcamento.llm || 0).toLocaleString("pt-BR"), `chamadas de LLM hoje <small>${s.orcamento.jev} ao Jev</small>`]);
+  $("#kpis").innerHTML = k.map(([v, l, html]) => `<div class="kpi">${html ? v : `<b>${v}</b>`}<span>${l}</span></div>`).join("");
+}
+
+/* ---------- roteiro ---------- */
+const RCOR = {feito:"var(--ok)", parcial:"var(--jev)", em_andamento:"var(--llm)", pendente:"var(--idle)"};
+function comLinks(txt, url) {
+  const e = esc(txt);
+  return url ? e.replace(/\b([0-9a-f]{7,10})\b/g, `<a href="${url}/commit/$1" target="_blank" rel="noopener">$1</a>`) : e;
+}
+function renderRoteiro(s) {
+  const itens = s.roteiro || [], dev = s.developer && !s.developer.fechado ? s.developer.item : null;
+  const n = st => itens.filter(r => r.status === st).length, tot = itens.length || 1;
+  const card = r => `<li style="--rc:${RCOR[r.status]}" class="${r.id === dev ? "agora-dev" : ""}"><div class="top"><strong>${esc(r.titulo)}</strong>
+      <span class="origem ${r.origem === "erro" ? "erro" : /depende de você/.test(r.evidencia) ? "voce" : ""}">${r.origem === "erro" ? "erro que o loop achou" : /depende de você/.test(r.evidencia) ? "depende de você" : r.origem === "pedido_cassio" ? "seu pedido" : "do loop"}</span></div>
+      <p>${esc(r.detalhe)}</p>${r.evidencia && r.evidencia !== "depende de você" ? `<div class="ev">${r.id === dev ? "Developer trabalhando nisto agora · " : ""}${comLinks(r.evidencia, s.repo_url)}</div>` : ""}</li>`;
+  const grupo = (tit, sub, st) => { const l = itens.filter(r => st.includes(r.status)).sort((a, b) => /depende de você/.test(a.evidencia) - /depende de você/.test(b.evidencia)); return l.length ? `<div class="rt-grupo">${tit} <small>${sub} · ${l.length}</small></div><ul class="rt">${l.map(card).join("")}</ul>` : ""; };
+  const feitos = itens.filter(r => r.status === "feito");
+  $("#roadmap").innerHTML = `<div class="rt-prog" role="img" aria-label="${n("feito")} de ${itens.length} itens feitos">${["feito","parcial","em_andamento","pendente"].map(st => `<span style="width:${n(st) / tot * 100}%;background:${RCOR[st]}"></span>`).join("")}</div>
+    <div class="rt-leg"><span><b>${n("feito")}</b> feitos</span><span><b>${n("parcial")}</b> parciais</span><span><b>${n("em_andamento")}</b> em andamento</span><span><b>${n("pendente")}</b> na fila</span></div>` +
+    grupo("Em andamento", "sendo feito agora", ["em_andamento"]) + grupo("Na fila", "o Developer pega na ordem; os que dependem de você ficam de lado", ["pendente"]) +
+    grupo("Parciais", "entregue em parte", ["parcial"]) +
+    (feitos.length ? `<details class="feitos"><summary>Entregues · ${feitos.length}</summary><ul class="rt">${feitos.map(card).join("")}</ul></details>` : "");
+}
+
+/* agrupa renders no próximo quadro: rajadas de eventos não travam a página */
+const pend = new Set();
+function agendar(fn) { if (!pend.size) requestAnimationFrame(() => { const l = [...pend]; pend.clear(); l.forEach(f => f()); }); pend.add(fn); }
 
 /* ---------- estado ---------- */
 let S = null;
@@ -462,11 +779,15 @@ function render(s) {
   const zero = P && P.kit === "circulo";
   document.querySelectorAll(".zero-only").forEach(e => e.hidden = !zero);
   if (zero) {
-    const RS = {feito:"feito", parcial:"parcial", em_andamento:"em andamento", pendente:"pendente"};
-    $("#roadmap").innerHTML = (s.roteiro || []).map(r => `<li><span>${esc(r.titulo)}<span class="meta">${r.origem === "erro" ? "Registrado pelo loop · " : "Seu pedido · "}${esc(r.detalhe)}${r.evidencia ? " · " + esc(r.evidencia) : ""}</span></span><span class="chip ${esc(r.status)}">${RS[r.status] || esc(r.status)}</span></li>`).join("");
+    const rkey = JSON.stringify([s.roteiro, s.developer]);
+    if (rkey !== window._rkey) { window._rkey = rkey; renderRoteiro(s); }
     const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
     $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
       : `<li class="empty">Nenhum erro registrado até agora.</li>`;
+  }
+  renderKpis(s); renderAgora(); renderGiros(s.giros); renderRitmo(s.ritmo); renderTimeline(s.linha_do_tempo); renderModelos(s.llm);
+  if (!passos.length && s.giros && s.giros.length) {           // primeira carga: passos do último giro
+    for (const g of s.giros.slice(-2)) { let em = g.inicio; for (const e of g.etapas) { if (!ZERO && PID && String(e.projeto) !== PID) { em += e.dur; continue; } addPasso({em, etapa: e.etapa, detalhe: e.detalhe, project_id: e.projeto, tick: g.tick}, false); em += e.dur; if (passos[0]) passos[0].fim = em; } }
   }
   if (!tocando) showStage(L.etapa && (ZERO || !PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
 
@@ -533,11 +854,11 @@ function connect() {
   const filtro = ZERO ? "" : Q;
   const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
-  es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) enfileirar(e); });
+  es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { enfileirar(e); if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
   es.addEventListener("status", m => { if (S) { S.loop.vivo = JSON.parse(m.data); } });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
-refresh(); setInterval(refresh, 3000);
+refresh(); setInterval(refresh, 3000); setInterval(renderAgora, 1000);
 fetch("/api/estado?" + Q).then(r => r.json()).then(s => {
   ZERO = !!(s.projeto && s.projeto.kit === "circulo");
   if (ZERO) fetch("/api/estado").then(r => r.json()).then(g => { lastId = Math.max(0, g.ultima_decisao - 25); connect(); });

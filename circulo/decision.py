@@ -490,6 +490,17 @@ class DecisionLayer:
             max_tokens=10,
         )
         self.budget.charge(used, "llm")
+        try:
+            from .registro import registrar as registrar_llm
+            st = getattr(self.budget, "s", None)
+            if st is not None:
+                registrar_llm(st, tick=st.tick, project_id=self.project_id, papel=f"fallback:{name}",
+                              modelo=getattr(self.llm, "default_model", "llm"),
+                              escolha={"decidido_por": "jev", "confianca": round(float(d.confidence), 3),
+                                       "contexto": {"motivo": "Jev inseguro nesta pergunta", "resposta_jev": d.value}},
+                              tokens=used, entrada=q.instructions, saida=text)
+        except Exception:  # noqa: BLE001
+            pass
         pick = norm(text).strip().split()[0] if text.strip() else ""
         if pick in q.options():
             d = Decision(name, "choice", pick, 0.7, "llm")
@@ -510,13 +521,30 @@ def _route(self, task: str, features: Mapping[str, Any]) -> Decision:
                     {"tarefa": task, **features})
 
 
-def _pick_model(self, role: str, features: Mapping[str, Any] | None = None) -> str:
+def _pick_model_detalhe(self, role: str, features: Mapping[str, Any] | None = None) -> dict:
+    """Escolha do modelo pelo Jev, com o histórico de cada nível neste papel como contexto."""
     harness = self.policy().get("harness", {})
+    estado = {"role": role, "budget_left_ratio": round(self.budget.left_ratio(), 3), **(features or {})}
+    store = getattr(self.budget, "s", None) or getattr(self.budget, "store", None)
+    if store is not None:
+        try:
+            from .registro import historico
+            h = historico(store, role)
+            if h:
+                estado["historico_por_nivel"] = h
+        except Exception:  # noqa: BLE001 — histórico é contexto, nunca bloqueia
+            pass
     d = self.ask("pick_model", Question("choice", f"Qual modelo é suficiente para o papel '{role}'?",
-                                        {"pequena": "rápido e barato", "grande": "melhor raciocínio"}),
-                 {"role": role, "budget_left_ratio": round(self.budget.left_ratio(), 3), **(features or {})})
-    tier = d.value if d.confidence >= 0.5 else harness.get("roles", {}).get(role, {}).get("tier", "grande")
-    return harness.get("models", {}).get(tier, "claude-haiku-5-5")
+                                        {"pequena": "rápido e barato", "grande": "melhor raciocínio"}), estado)
+    confiante = d.confidence >= 0.5
+    tier = d.value if confiante else harness.get("roles", {}).get(role, {}).get("tier", "grande")
+    return {"modelo": harness.get("models", {}).get(tier, "claude-haiku-5-5"), "nivel": tier,
+            "decidido_por": d.source if confiante else "harness", "confianca": round(float(d.confidence), 3),
+            "contexto": estado}
+
+
+def _pick_model(self, role: str, features: Mapping[str, Any] | None = None) -> str:
+    return _pick_model_detalhe(self, role, features)["modelo"]
 
 
 def _verify_output(self, output: str, pedido: str, formato: str) -> tuple[bool, dict]:
@@ -576,6 +604,7 @@ def _remember(self, texto: str, ganho: float = 0.0) -> bool:
 
 DecisionLayer.route = _route
 DecisionLayer.pick_model = _pick_model
+DecisionLayer.pick_model_detalhe = _pick_model_detalhe
 DecisionLayer.verify_output = _verify_output
 DecisionLayer.meets_bar = _meets_bar
 DecisionLayer.relevant = _relevant

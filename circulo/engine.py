@@ -20,6 +20,8 @@ from pathlib import Path
 from .agents import Ctx
 from .decision import Question
 from .memory import Memory
+from .registro import marcar_resultado
+from .registro import registrar as registrar_llm
 
 FORMATO = {"landing_page": "html"}
 EXT = {"html": "html", "md": "md"}
@@ -103,9 +105,18 @@ class Engine:
         if self.lab and role in ("builder", "improver"):
             system, arm, exp = self.lab.system_for(role)
             self._tl.arm = (arm, exp)
-        model = self.ctx.dl.pick_model(role, {"tipo": project["tipo"]})
-        out = self.llm.generate(system=system, prompt=prompt, model=model,
-                                max_tokens=int(cfg["max_tokens"]), web_search=int(cfg.get("web_search", 0)))
+        escolha = self.ctx.dl.pick_model_detalhe(role, {"tipo": project["tipo"]})
+        model = escolha["modelo"]
+        t0 = time.time()
+        try:
+            out = self.llm.generate(system=system, prompt=prompt, model=model,
+                                    max_tokens=int(cfg["max_tokens"]), web_search=int(cfg.get("web_search", 0)))
+        except Exception as exc:
+            registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
+                          duracao_ms=int((time.time() - t0) * 1000), ok=False, erro=f"{type(exc).__name__}: {exc}", entrada=prompt)
+            raise
+        registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
+                      tokens=out.tokens, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
         self.ctx.budget.charge(out.tokens, "llm")
         res.tokens += out.tokens
         self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id) VALUES(?,?,?,?,?,?,?)",
@@ -202,6 +213,7 @@ class Engine:
         self._tl.arm = (None, None)
         if self.lab and arm and res.aceita is not None:
             self.lab.record(exp, arm, res.ganho, bool(res.aceita))
+        marcar_resultado(self.s, pid, self.s.tick, res.aceita)
         self.s.x("INSERT INTO cycles(project_id,tick,fase,nota_antes,nota_depois,ganho,aceita,tokens,lessons,resultado,created_at,braco,experimento) "
                  "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                  (pid, self.s.tick, res.fase, res.nota_antes, res.nota_depois, res.ganho,
@@ -225,13 +237,24 @@ class Engine:
         stale = (self.s.tick - (p["ultima_pesquisa_tick"] or 0)) > self.ctx.policy["portfolio"]["reopen_after_ticks"]
         if rub is None or stale:
             res = CycleResult(pid, "pesquisa")
+            self._fase(pid, "Pesquisando o melhor que existe na internet")
             self.research(p, res)
+            self._fase(pid, "Montando a régua de qualidade a partir da pesquisa")
             self.build_rubric(p, res)
             return res
         cur = self.current(pid)
         res = CycleResult(pid, "construcao" if cur is None else "melhoria")
+        self._fase(pid, "Construindo a primeira versão" if cur is None else f"Melhorando a versão {cur['version']} e medindo na régua")
         self.build_or_improve(p, rub, cur, res)
         return res
+
+    def _fase(self, pid: int, detalhe: str) -> None:
+        """Passo dentro do ciclo, para o painel mostrar o que a missão está fazendo agora."""
+        if self.on_stage:
+            try:
+                self.on_stage("projeto", pid, detalhe)
+            except TypeError:          # callback antigo (nome, pid)
+                pass
 
     # ------------------------------------------------------------ pesquisa
     def research(self, p: dict, res: CycleResult) -> int:

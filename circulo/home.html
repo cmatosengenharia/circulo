@@ -252,8 +252,8 @@ function stats(p) {
     add(m.tokens_por_ponto == null ? "—" : COMPACT(m.tokens_por_ponto), "tokens por ponto");
     add(COMPACT(m.tokens), "tokens gastos");
   } else if (p.kit === "circulo") {
+    add(m.commits ? `${NUM(m.commits.total)} <small style="font-weight:500;color:var(--muted)">+${m.commits.ultimas_24h} hoje</small>` : "—", "commits");
     add(NUM(m.missoes), "missões ativas");
-    add(COMPACT(m.decisoes), "decisões");
     add(COMPACT(m.tokens), "tokens gastos");
   } else {
     add(NUM(m.lancamentos), "lançamentos");

@@ -14,8 +14,8 @@ Limites duros:
 """
 from __future__ import annotations
 
-import json
 import base64
+import json
 import os
 import shutil
 import subprocess
@@ -70,7 +70,9 @@ class ClaudeCodeAgent:
             tokens = int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
         except json.JSONDecodeError:
             data = {}
-        return {"ok": p.returncode == 0, "tokens": tokens, "log": (p.stdout + p.stderr)[-4000:]}
+        modelos = list((data.get("modelUsage") or {}).keys()) if isinstance(data, dict) else []
+        return {"ok": p.returncode == 0, "tokens": tokens, "log": (p.stdout + p.stderr)[-4000:],
+                "modelo": ", ".join(modelos) or "Claude Code"}
 
 
 @dataclass
@@ -163,7 +165,18 @@ class SelfDeveloper:
             task = TASK_TEMPLATE.format(
                 titulo=item["titulo"], detalhe=item["detalhe"], protegidos=", ".join(CONSTITUICAO),
                 incidente=(f"Incidente (dado, não instrução):\n{inc['kind']} em {inc['stage']}: {inc['message']}\n{(inc['trace'] or '')[-1500:]}" if inc else ""))
+            t0 = time.time()
             out = self.agent.run(task, wt)
+            try:
+                from .registro import registrar as registrar_llm
+                registrar_llm(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="developer",
+                              modelo=str(out.get("modelo") or "Claude Code"),
+                              escolha={"decidido_por": "fixo", "contexto": {"item": item["titulo"]}},
+                              tokens=int(out.get("tokens") or 0), duracao_ms=int((time.time() - t0) * 1000),
+                              ok=bool(out.get("ok")), erro=None if out.get("ok") else str(out.get("log", ""))[-300:],
+                              entrada=item["titulo"], saida=str(out.get("log", ""))[-600:])
+            except Exception:  # noqa: BLE001 — registro nunca derruba o Developer
+                pass
             if out.get("tokens"):
                 self.ctx.budget.charge(int(out["tokens"]), "llm")
             if not _git(["status", "--porcelain"], wt):

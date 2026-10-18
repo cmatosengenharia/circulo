@@ -165,8 +165,10 @@ def _modelos(store: Store, pid: int, kit: str) -> list[str]:
         out.append("Jev")
     if "local" in fontes:
         out.append("Jev local")
-    for r in store.q("SELECT DISTINCT value FROM decisions WHERE project_id=? AND question LIKE 'llm:%'", (pid,)):
-        partes = json.loads(r["value"]).replace("claude-", "").split("-")
+    usados = [json.loads(r["value"]) for r in store.q("SELECT DISTINCT value FROM decisions WHERE project_id=? AND question LIKE 'llm:%'", (pid,))]
+    usados += [r["modelo"] for r in store.q("SELECT DISTINCT modelo FROM llm_calls WHERE project_id=? AND modelo LIKE 'claude-%'", (pid,))]
+    for valor in dict.fromkeys(usados):
+        partes = valor.replace("claude-", "").split("-")
         nome = (partes[0].title() + " " + ".".join(partes[1:])).strip()
         if nome not in out:
             out.append(nome)
@@ -231,6 +233,8 @@ def metricas(store: Store, p) -> dict:
             store.one("SELECT COUNT(*) n FROM harness_experiments WHERE status='promovido'")["n"]
         m["tokens"] = store.one("SELECT COALESCE(SUM(tokens),0) t FROM budget")["t"]
         m["missoes"] = store.one("SELECT COUNT(*) n FROM projects WHERE kit!='circulo' AND status!='arquivado'")["n"]
+        from .repo_stats import stats as repo_stats
+        m["commits"] = repo_stats()
         m["principal"] = {"rotulo": "Roteiro concluído", "valor": rot.get("feito", 0) / total, "formato": "pct", "historico": [],
                           "ajuda": "Pedidos seus e correções que o próprio loop registrou, já entregues."}
     return m

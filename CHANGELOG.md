@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.0 — 2026-10-18 · o loop trabalhando à vista
+
+**Ritmo**
+- Giro rápido quando há trabalho (missões, código, PRs abertos) e descanso longo só quando não há nada a fazer.
+- Escolha das tarefas pela cascata: regra antes do Jev. Trabalho real tem precedência; a manutenção gira em rodízio e o Jev
+  escolhe entre as três mais esquecidas (antes ele repetia a mesma tarefa e o trabalho real nunca vinha).
+
+**Registro de modelos**
+- Toda chamada de LLM fica guardada (tabela `llm_calls`): papel, modelo, quem escolheu (Jev, decisor local ou padrão do
+  harness), confiança, contexto, tokens, duração, erro, início da entrada e da saída, e se o ciclo foi aceito.
+- O histórico de cada nível de modelo por papel vira contexto da próxima escolha do Jev.
+
+**Painel**
+- Números ao vivo no topo (giros, commits, PRs, versão, evoluções, decisões por minuto, chamadas de LLM).
+- "Agora": o passo atual com o tempo correndo e os últimos passos, com o que cada um fez.
+- Giros: cada giro como uma barra com a duração de cada etapa.
+- Decisões ao vivo em console: agrupadas por giro, filtros Jev/local/LLM, congelar, ritmo dos últimos 30 minutos.
+- Evolução: linha do tempo única de regras, ajustes do próprio loop, ciclos, evidências, PRs, merges, prompts em A/B,
+  versões, roteiro e erros.
+- Modelos escolhidos pelo Jev: resumo por modelo e cada chamada com entrada e saída.
+- Roteiro com progresso, grupos (em andamento, na fila, parciais, entregues), origem de cada item e links para os commits.
+- Commits do repositório no card do Loop.
+
 ## 1.0.5 — 2026-10-17
 
 - Ao subir, o loop testa de verdade as conexões (Jev, Claude e GitHub, só leitura) e registra o resultado no painel: chave errada aparece na hora.

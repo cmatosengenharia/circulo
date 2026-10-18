@@ -187,3 +187,18 @@ def test_reprovacoes_seguidas_param_o_projeto(motor):
     for _ in range(3):
         c.engine.cycle(pid)
     assert c.store.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "manutencao"
+
+
+def test_cada_chamada_de_llm_fica_registrada_com_o_modelo_escolhido_pelo_jev(motor):
+    from circulo.registro import historico, recentes, resumo
+    c, gen, pid = motor
+    c.engine.cycle(pid)          # pesquisa + régua
+    c.engine.cycle(pid)          # primeira versão
+    rows = recentes(c.store, pid)
+    assert rows and {r["papel"] for r in rows} >= {"researcher", "builder"}
+    for r in rows:
+        assert r["modelo"].startswith("claude-") and r["nivel"] in ("pequena", "grande")
+        assert r["decidido_por"] in ("local", "jev", "harness") and r["ok"] == 1 and r["entrada"]
+    assert any(r["aceita"] is not None for r in rows)          # o resultado do ciclo volta para a chamada
+    assert historico(c.store, "builder")                       # vira contexto da próxima escolha do Jev
+    assert resumo(c.store, pid)[0]["chamadas"] >= 2

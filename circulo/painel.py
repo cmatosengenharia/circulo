@@ -6,6 +6,7 @@ Escritas permitidas: pausar/retomar, modo seguro e enfileirar pedido — nada al
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 import time
@@ -15,6 +16,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__, finance
+from . import atividade as atv
+from . import registro, repo_stats
 from .money import fmt_brl
 from .projects import cards, incidentes, novos_na_fila, roteiro
 from .status import loop_status
@@ -72,14 +75,23 @@ def estado(store: Store, projeto: int | None = None) -> dict:
               "pedido": bool(b.get("handled")), "idle": b.get("idle")}
              for t, b in zip(ticks, bodies, strict=True)][::-1]
 
+    zero = kit == "circulo"
     return {
         "agora": now,
+        "trabalho_agora": atv.agora(s),
+        "linha_do_tempo": atv.linha_do_tempo(s, projeto, zero=zero),
+        "giros": atv.giros(s, None if zero else projeto),
+        "ritmo": atv.ritmo(s, None if zero else projeto),
+        "llm": {"recentes": registro.recentes(s, None if zero else projeto, 15), "resumo": registro.resumo(s, None if zero else projeto)},
+        **({"repo": repo_stats.stats()} if zero or projeto is None else {}),
+        "repo_url": f"https://github.com/{os.environ['CIRCULO_REPO']}" if re.fullmatch(r"[\w.-]+/[\w.-]+", os.environ.get("CIRCULO_REPO", "")) else None,
+        "developer": s.get("self_dev_aberto"),
         "nomes": {r["id"]: r["nome"] for r in s.q("SELECT id, nome FROM projects")},
         "ultima_decisao": s.one(f"SELECT COALESCE(MAX(id),0) m FROM decisions WHERE 1=1{pf}", pa)["m"],
         "loop": {
             "tick": tick, "status": s.get("loop_status", "parado"), "etapa": s.get("etapa"),
             "controle": {"pausado": bool(controle.get("pausado")), "modo_seguro": bool(controle.get("modo_seguro"))},
-            "pendentes": s.pending_count(), "politica": pol["version"],
+            "pendentes": s.pending_count(), "politica": pol["version"], "trabalho_pendente": s.get("trabalho_pendente"),
             "shadow": dict(shadow) if shadow else None, "jev_erro": s.get("jev_last_error"),
             "vivo": loop_status(s, now),
         },
@@ -262,7 +274,7 @@ def make_handler(db_path: str):
                         self.wfile.flush()
                         time.sleep(0.5)
                         continue
-                    for t in store.q("SELECT seq, tick, etapa, project_id, em FROM trail WHERE seq > ? ORDER BY seq LIMIT 120", (seq,)):
+                    for t in store.q("SELECT seq, tick, etapa, project_id, em, detalhe FROM trail WHERE seq > ? ORDER BY seq LIMIT 120", (seq,)):
                         seq = t["seq"]
                         self.wfile.write(f"event: trilha\ndata: {json.dumps(dict(t), ensure_ascii=False)}\n\n".encode())
                     for d in novidades(store, desde, projeto):

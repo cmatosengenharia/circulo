@@ -31,6 +31,13 @@ from .money import fmt_brl
 from .policy import PolicyStore
 from .state import Store
 
+# trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
+TRABALHO = ("evoluir_projeto", "corrigir_codigo", "revisar_prs")
+ESPACO = {"corrigir_codigo": 10, "revisar_prs": 2}
+TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
+           "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
+           "revisar_prs": "Revisando PRs abertos no gate", "evoluir_harness": "Testando prompts por A/B", "conectar_missoes": "Ligando missões que se complementam",
+           "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código"}
 IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 40000}
 
 
@@ -106,7 +113,8 @@ class Circle:
         now = time.time()
         e = {"nome": name, "tick": self.store.tick, "em": now, "projeto": self.ctx.dl.project_id, **(extra or {})}
         self.store.set("etapa", e)
-        seq = self.store.x("INSERT INTO trail(tick,etapa,project_id,em) VALUES(?,?,?,?)", (e["tick"], name, e["projeto"], now))
+        seq = self.store.x("INSERT INTO trail(tick,etapa,project_id,em,detalhe) VALUES(?,?,?,?,?)",
+                           (e["tick"], name, e["projeto"], now, e.get("detalhe")))
         if seq % 500 == 0:
             self.store.x("DELETE FROM trail WHERE seq < ?", (seq - 2000,))   # trilha é efêmera (só para animação)
 
@@ -311,31 +319,70 @@ class Circle:
         if self.controls()["modo_seguro"]:
             # só tarefas de baixo risco: nada de evoluir regras, gerar features ou mergear
             tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")]
-        run = ctx.dl.ask("should_run_idle", Question("noul", "Vale rodar uma tarefa de evolução natural agora?"),
-                         {"pending_events": s.pending_count(), "budget_left_ratio": round(ctx.budget.left_ratio(), 3)})
-        if float(run.value) < 0.5:
-            return None
-        componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # (corrigir_codigo tem quarentena própria)   # tarefa que usa uma etapa isolada também fica de fora
+        componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # (corrigir_codigo tem quarentena própria)
         tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}")
                  and not (t in componente and self.incidents.isolated(componente[t]))]
         if not tasks:
             return None
+        # Cascata: regra antes do Jev. Trabalho real (missões, código, PRs) tem precedência e roda a cada giro
+        # enquanto existir; manutenção gira em rodízio (a mais esquecida primeiro). O Jev decide o gasto.
         last = s.get("idle_last", {})
-        staleness = {t: (s.tick - int(last.get(t, 0))) * (2 if t == "evoluir_projeto" else 1) for t in tasks}
-        pick = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de evolução natural tem mais valor agora?",
-                                                {t: t.replace("_", " ") for t in tasks}), {"staleness": staleness}).value
-        gate = ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST.get(pick, 0), "value_signal": 0.6, "task": pick})
-        if not gate.allowed:
-            return None
-        try:
-            self._run_idle_task(pick)
-        except Exception as exc:  # noqa: BLE001
-            self.incidents.record(f"idle:{pick}", exc, ctx.dl.project_id)
-            exc._registrado = True
-            raise
-        last[pick] = s.tick
+        staleness = {t: s.tick - int(last.get(t, -10**6)) for t in tasks}
+        trabalho = [t for t in TRABALHO if t in tasks and staleness[t] >= ESPACO.get(t, 1) and self._tem_trabalho(t)]
+        manut = sorted((t for t in tasks if t not in TRABALHO or t == "revisar_prs"),
+                       key=lambda t: (-staleness[t], tasks.index(t)))
+        manut = [t for t in manut if t not in trabalho]
+        if not trabalho and len(manut) > 1:
+            # a regra estreita para as 3 mais esquecidas; o Jev escolhe entre elas (o rodízio é garantido)
+            top = manut[:3]
+            escolha = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de manutenção tem mais valor agora?",
+                                                       {x: x.replace("_", " ") for x in top}),
+                                 {"staleness": {x: min(staleness[x], 10**4) for x in top}}).value
+            if escolha in top:
+                manut.remove(escolha)
+                manut.insert(0, escolha)
+        ordem = trabalho + manut
+        for pick in ordem:
+            est = IDLE_COST.get(pick, 0)
+            if est > 0:   # só pergunta ao Jev quando há gasto
+                gate = ctx.dl.worth_spending("idle_evolution", {"est_tokens": est, "value_signal": 0.6, "task": pick,
+                                                                 "esquecida_ha_giros": min(staleness[pick], 10**4)})
+                if not gate.allowed:
+                    last[pick] = s.tick           # recusado agora: volta para o fim da fila
+                    continue
+            if pick not in ("corrigir_codigo", "evoluir_projeto"):
+                self._stage("idle", {"detalhe": TAREFAS.get(pick, pick)})
+            try:
+                self._run_idle_task(pick)
+            except Exception as exc:  # noqa: BLE001
+                last[pick] = s.tick
+                s.set("idle_last", last)
+                self.incidents.record(f"idle:{pick}", exc, ctx.dl.project_id)
+                exc._registrado = True
+                raise
+            last[pick] = s.tick
+            s.set("idle_last", last)
+            return pick
         s.set("idle_last", last)
-        return pick
+        return None
+
+    def _tem_trabalho(self, t: str) -> bool:
+        if t == "evoluir_projeto":
+            return bool(self.engine.ready and self.engine.candidates())
+        if t == "corrigir_codigo":
+            return self.self_dev is not None and not self.self_dev.busy() and self.self_dev.pick() is not None
+        if t == "revisar_prs":
+            return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
+        return False
+
+    def trabalho_pendente(self) -> bool:
+        """Há trabalho real esperando? Então o próximo giro vem logo, em vez do descanso longo."""
+        if self.controls()["pausado"]:
+            return False
+        try:
+            return any(self._tem_trabalho(t) for t in TRABALHO)
+        except Exception:  # noqa: BLE001
+            return False
 
     def reclassificar_pendentes(self, limite: int = 20) -> int:
         """Autocorreção em finanças, sem perguntar: lançamentos de baixa confiança são reclassificados
@@ -376,13 +423,15 @@ class Circle:
         elif pick == "revisar_prs":
             self.gate.run()
         elif pick == "corrigir_codigo":
-            self._stage("developer", {"projeto": kit_project_id(self.store, "circulo")})
+            item = self.self_dev.pick()
+            self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
+                                      "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
             self.self_dev.run_once()
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "evoluir_projeto":
             # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo
-            self.engine.run_parallel(on_stage=lambda nome, pid: self._stage(nome, {"projeto": pid}))
+            self.engine.run_parallel(on_stage=lambda nome, pid, detalhe=None: self._stage(nome, {"projeto": pid, "detalhe": detalhe}))
 
     def regression(self) -> dict:
         """Replay da política ativa sobre todo o histórico resolvido; guarda a acurácia como linha de base."""
@@ -496,10 +545,10 @@ class Circle:
                     self._rest(min(self.ctx.budget.seconds_until_reset(), 600), sleep, wake_on_input=False)
                 elif self.store.pending_count() > 0:
                     continue
-                elif r.handled_event:
-                    self._rest(loop["interval_seconds"], sleep)
                 else:
-                    self._rest(loop["idle_interval_seconds"], sleep)
+                    pendente = self.trabalho_pendente()
+                    self.store.set("trabalho_pendente", pendente)
+                    self._rest(loop["interval_seconds"] if (r.handled_event or pendente) else loop["idle_interval_seconds"], sleep)
         finally:
             self.store.set("batimento", None)
         self.store.set("loop_status", "parado")

@@ -92,3 +92,20 @@ def test_metricas_por_tick(circle):
     say(circle, "38,90 ifood almoço")
     body = json.loads(circle.store.one("SELECT body FROM metrics WHERE tick=1")["body"])
     assert body["handled"] == 1 and body["budget"]["chamadas_jev"] == 2  # tipo + (categoria‖tag numa chamada só)
+
+
+def test_giro_rapido_quando_ha_trabalho_e_descanso_longo_quando_nao(circle):
+    loop = circle.ctx.policy["loop"]
+    slept = []
+    circle.run_forever(max_ticks=2, sleep=slept.append)
+    assert sum(slept) == loop["idle_interval_seconds"]                # nada a fazer: descanso longo
+    circle.store.x("INSERT INTO prs(number,titulo,status,created_at,updated_at) VALUES(7,'x','aberto',0,0)")
+    assert circle.trabalho_pendente()
+    slept.clear()
+    circle.run_forever(max_ticks=2, sleep=slept.append)
+    assert sum(slept) == loop["interval_seconds"]                     # trabalho esperando: próximo giro logo
+
+
+def test_manutencao_gira_em_rodizio_sem_repetir(circle):
+    tasks = [circle.tick().idle_task for _ in range(4)]
+    assert len(set(tasks)) == 4

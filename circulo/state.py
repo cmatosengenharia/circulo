@@ -268,6 +268,29 @@ CREATE TABLE IF NOT EXISTS evidence (
   created_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS llm_calls (
+  -- registro estruturado e permanente de cada chamada de LLM: qual modelo, quem escolheu (Jev), por quê,
+  -- quanto custou e se o resultado foi aceito. É contexto para as próximas escolhas do Jev.
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tick INTEGER NOT NULL,
+  project_id INTEGER,
+  papel TEXT NOT NULL,            -- researcher | rubric | builder | improver | reflector | developer | fallback:<pergunta>
+  modelo TEXT NOT NULL,
+  nivel TEXT,                     -- pequena | grande
+  decidido_por TEXT NOT NULL,     -- jev | local | harness (Jev inseguro: vale o padrão do harness) | fixo
+  confianca REAL,
+  contexto TEXT,                  -- o que o Jev viu ao escolher (JSON)
+  tokens INTEGER NOT NULL DEFAULT 0,
+  duracao_ms INTEGER,
+  ok INTEGER NOT NULL,
+  erro TEXT,
+  entrada TEXT,                   -- início do pedido (para lembrar do que se tratava)
+  saida TEXT,                     -- início da resposta
+  aceita INTEGER,                 -- o ciclo que usou esta chamada foi aceito pela catraca?
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS llm_calls_papel ON llm_calls(papel, nivel);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -299,7 +322,8 @@ class Store:
                   ("projects", "melhor_nota", "REAL"), ("projects", "ciclos", "INTEGER"), ("projects", "plateau", "INTEGER"),
                   ("projects", "ultima_pesquisa_tick", "INTEGER"), ("projects", "ultimo_ciclo_tick", "INTEGER"),
                   ("projects", "ultimo_ciclo_em", "REAL"), ("proposals", "rollbacks", "INTEGER"),
-                  ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"))
+                  ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"),
+                  ("trail", "detalhe", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
