@@ -194,6 +194,14 @@ def spans_do_ciclo(store, run_id: str, tick: int, inicio: float, fim: float, err
                     "attributes": {"gen_ai.operation.name": "invoke_agent", **base, "gen_ai.agent.name": a["nome"],
                                    "gen_ai.agent.version": versao, "circulo.project_id": a["projeto"]}})
 
+    # fios de ponta a ponta (rastro.py): o giro aponta, com span links do OTel, para o traço de cada item em que trabalhou
+    try:
+        from .rastro import span_id as fio_span, trace_id as fio_trace
+        itens = [r["de"] for r in store.q("SELECT de FROM elos WHERE para=? AND de LIKE 'item:%'", (f"giro:{run_id}",))]
+    except Exception:  # noqa: BLE001
+        itens = []
+    links = [{"trace_id": fio_trace(n), "span_id": fio_span(n), "attributes": {"circulo.no": n}} for n in itens]
+
     eventos = [{"name": "exception", "time_unix_nano": _ns(e["em"]),
                 "attributes": {"exception.type": e["kind"], "exception.message": e["message"][:300],
                                "circulo.stage": e["stage"], "circulo.incident_id": e["incident_id"]}} for e in errs]
@@ -205,8 +213,9 @@ def spans_do_ciclo(store, run_id: str, tick: int, inicio: float, fim: float, err
                    "attributes": {"gen_ai.operation.name": "invoke_workflow", **base, "gen_ai.agent.name": "circulo",
                                   "gen_ai.agent.version": versao, "circulo.corpo.sha": sha, "gen_ai.usage.total_tokens": tokens,
                                   "circulo.prs": sorted(prs), "circulo.incident_ids": incidentes,
-                                  "circulo.errors": len(erros or []) or len(errs), "circulo.duration_ms": round(1000 * (fim - inicio))},
-                   **({"events": eventos} if eventos else {})})
+                                  "circulo.errors": len(erros or []) or len(errs), "circulo.duration_ms": round(1000 * (fim - inicio)),
+                                  "circulo.itens": itens},
+                   **({"events": eventos} if eventos else {}), **({"links": links} if links else {})})
     return out
 
 

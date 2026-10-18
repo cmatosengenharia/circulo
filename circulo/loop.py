@@ -36,6 +36,7 @@ from .state import Store
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
+RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
@@ -254,6 +255,14 @@ class Circle:
         self._record(r)
         # traço tipado do giro (OTel GenAI) + painel de timeline/grafo; nunca levanta
         telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
+        # observabilidade: traços para o coletor OTLP (se configurado, em segundo plano) e o fio de cada entrega conferido
+        try:
+            from . import observabilidade, rastro
+            observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
+            if r.tick % RASTRO_A_CADA == 0:
+                rastro.verificar(ctx)
+        except Exception as exc:  # noqa: BLE001 — observar nunca derruba o giro
+            r.errors.append(f"rastro: {exc!r}")
         self._stage("descanso")
         s.set("run_id", None)                    # erro fora do giro (ex.: teste da parada) não cai na execução que já fechou
         every = int(ctx.policy["loop"]["summary_every_ticks"])
@@ -272,6 +281,8 @@ class Circle:
             ordem = (self.store.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
             item = self.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                                 (payload["text"][:160], payload["text"][:600], "pedido_cassio", "pendente", "pedido pelo painel", ordem, now, now))
+            from .rastro import elo
+            elo(self.store, f"pedido:{event_id}", f"item:{item}", "virou_item")
             self.memory.add("feedback", payload["text"], project_id=pid, source="Cássio", trust="confiavel")
             na_frente = self.store.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 "
                                        "AND evidencia NOT LIKE '%depende de você%' AND ordem < ?", (ordem,))["n"]

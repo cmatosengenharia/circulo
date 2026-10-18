@@ -421,6 +421,19 @@ CREATE TABLE IF NOT EXISTS run_errors (
 CREATE INDEX IF NOT EXISTS run_errors_run ON run_errors(run_id);
 CREATE INDEX IF NOT EXISTS run_errors_em ON run_errors(em);
 
+-- rastreabilidade de ponta a ponta: elos entre o que o loop faz (pedido → item → giro → PR → merge → versão → evidência)
+CREATE TABLE IF NOT EXISTS elos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  de TEXT NOT NULL,
+  para TEXT NOT NULL,
+  relacao TEXT NOT NULL,
+  detalhe TEXT,
+  em REAL NOT NULL,
+  UNIQUE(de, para, relacao)
+);
+CREATE INDEX IF NOT EXISTS elos_de ON elos(de);
+CREATE INDEX IF NOT EXISTS elos_para ON elos(para);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,

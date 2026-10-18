@@ -226,6 +226,29 @@ def confianca(store: Store, now: float | None = None) -> dict:
         ck.append(_c("developer", "seguranca", "Developer", "info", f"PR #{dev['pr']} aberto",
                      f"gate: {m['reason']}" if m else "esperando o CI", m["created_at"] if m else dev.get("em")))
 
+    # rastreabilidade e SLOs (observabilidade.py): cada entrega tem o fio inteiro? os objetivos de serviço estão de pé?
+    try:
+        from .observabilidade import slos as _slos
+        from .rastro import completude
+        comp = completude(s, now=now)
+        if comp["total"]:
+            ck.append(_c("rastro", "seguranca", "Rastro de ponta a ponta",
+                         "ok" if not comp["incompletos"] else "atencao", f"{comp['completos']} de {comp['total']} entregas",
+                         "cada entrega ligada da origem (pedido, pergunta ou lição) até a evidência no código rodando"
+                         if not comp["incompletos"] else "com lacuna: " + "; ".join(f"#{x['id']} {x['lacunas'][0]}" for x in comp["incompletos"][:3]),
+                         now))
+        lista = [x for x in _slos(s, now) if x["estado"] != "sem_dados"]
+        if lista:
+            ruins = [x for x in lista if x["estado"] == "violado"]
+            risco = [x for x in lista if x["estado"] == "em_risco"]
+            ck.append(_c("slos", "seguranca", "Objetivos de serviço (SLOs)", "atencao" if ruins or risco else "ok",
+                         f"{len(lista) - len(ruins)} de {len(lista)} cumpridos",
+                         "violado: " + ", ".join(x["nome"].lower() for x in ruins) if ruins else
+                         "orçamento de erro acabando: " + ", ".join(x["nome"].lower() for x in risco) if risco else
+                         "todos dentro do alvo, com orçamento de erro sobrando", now))
+    except Exception:  # noqa: BLE001 — a central de confiança nunca cai por causa de um indicador
+        pass
+
     # ---------------------------------------------------------------- PROJETAR: o que vem a seguir
     prox = b.get("proximo_giro_em")
     if prox and st["estado"] not in ("desligado", "pausado_humano"):

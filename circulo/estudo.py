@@ -128,6 +128,8 @@ class Estudo:
     # ------------------------------------------------------------ aplicar o veredito
     def _salvar(self, item: dict, r: dict) -> None:
         agora, iid = time.time(), item["id"]
+        from .rastro import elo
+        elo(self.s, f"item:{iid}", f"estudo:{iid}", "estudou", {"veredito": r.get("veredito"), "fontes": len(r.get("fontes", []))})
         achados = "\n".join(f"- {a.get('ideia', '')} ({a.get('fonte', '')} {a.get('url', '')})".strip() for a in r.get("achados", [])[:8])
         evid = f"\n\nEstudo ({r['veredito']}): {r.get('justificativa', '')}" + (f"\nO melhor das referências:\n{achados}" if achados else "")
         novo = r.get("item") or {}

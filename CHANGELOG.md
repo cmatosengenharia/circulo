@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.17.0 — 2026-10-18
+
+**Rastreabilidade de ponta a ponta e observabilidade**, nos padrões consolidados do mercado (OpenTelemetry,
+W3C Trace Context, sinais de ouro e SLOs do Google SRE, Prometheus).
+
+- **Fio de ponta a ponta** (`rastro.py`, tabela `elos`): cada mudança do loop é ligada da origem até a prova no
+  código rodando: pedido seu, pergunta do conselho ou lição de erro → estudo → sessões do Developer → portões →
+  PR → gate/CI → merge → versão que entrou no código rodando → giros de evidência → concluído.
+  - Elos gravados onde o loop age (pedido, estudo, Developer, PR, corpo). O **corpo liga exatamente** cada PR à
+    versão em que entrou (o gate faz squash com "(#N)" no título; o git diz quais PRs vieram).
+  - O histórico antigo também ganha fio, derivado da branch do PR, dos merges e das verificações do corpo:
+    nos dados reais, 9 de 9 entregas com fio completo.
+  - Cada item tem um **trace_id W3C** estável. O `traceparent` vai para o Claude Code (variável TRACEPARENT), para
+    o commit (trailers `Circulo-Item` e `Circulo-Trace`) e para o corpo do PR. O traço de cada giro aponta para o
+    fio dos itens em que trabalhou (*span links* do OTel).
+  - **Lacuna vira lição**: o neurônio `rastro:cadeia` confere cada entrega mergeada uma vez. Classe trabalho:
+    fica registrada sem travar a evolução.
+- **Observabilidade** (`observabilidade.py`):
+  - sinais de ouro em 24 h e 1 h: tráfego, latência, erros e saturação;
+  - RED por operação (cada verificação e cada papel de LLM);
+  - **5 SLOs com orçamento de erro**, calibrados nos dados reais do loop: giros sem erro ≥ 99%, giro leve no
+    tempo ≥ 95%, LLM sem falha ≥ 90%, painel em tempo real ≥ 99% e entregas com fio completo ≥ 95%. Limite de uso
+    e rede fora do ar contam como saturação, não como erro.
+- **Para ferramentas de mercado**:
+  - `/metrics` no formato do Prometheus: o Grafana raspa direto;
+  - exportação **OTLP/HTTP** dos traços para qualquer coletor (Grafana Tempo, Jaeger, Honeycomb, Datadog…)
+    quando `OTEL_EXPORTER_OTLP_ENDPOINT` estiver cadastrado em Integrações. Roda em segundo plano, e o cursor só
+    avança depois do 2xx: nada se perde se o coletor cair.
+- **Tela Rastros** (`/rastros`, botão na tela inicial e "Rastro do item #N" em cada item do roteiro):
+  - busca por qualquer ponta;
+  - o fio passo a passo, com link para cada giro e PR;
+  - SLOs, sinais de ouro, fios recentes e RED, ao vivo a cada 5 s.
+- Central de confiança: cards "Rastro de ponta a ponta" e "Objetivos de serviço (SLOs)".
+
 ## 1.16.0 — 2026-10-18
 
 Produto, parte 2: **giros em paralelo na mesma missão** e **missões que se conhecem sob o seu controle**.

@@ -878,6 +878,7 @@ function renderRoteiro(s) {
   const card = r => `<li style="--rc:${RCOR[r.status]}" class="${r.id === dev ? "agora-dev" : ""} ${r.desativado ? "off" : ""}"><div class="top"><strong>${esc(r.titulo)}</strong>
       <span class="origem ${r.origem === "erro" ? "erro" : /depende de você/.test(r.evidencia) ? "voce" : ""}">${r.origem === "erro" ? "erro que o loop achou" : /depende de você/.test(r.evidencia) ? "depende de você" : r.origem === "pedido_cassio" ? "seu pedido" : "do loop"}</span></div>
       ${r.detalhe && r.detalhe !== r.titulo ? `<p>${esc(r.detalhe)}</p>` : ""}${r.evidencia && r.evidencia !== "depende de você" ? `<div class="ev">${r.id === dev ? "Developer trabalhando nisto agora · " : ""}${comLinks(r.evidencia, s.repo_url)}</div>` : ""}
+      <div class="ev"><a href="/rastros#item%20${r.id}" title="Da origem até a evidência no código rodando">Rastro do item #${r.id} →</a></div>
       ${r.status === "contestado" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="1" title="O estudo contestou com evidência; você decide seguir mesmo assim">Executar mesmo assim</button></div>`
         : r.status !== "feito" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="${r.desativado ? 1 : 0}" title="${r.desativado ? "Volta para a fila do Developer" : "O loop não vai evoluir este item até você reativar"}">${r.desativado ? "Reativar" : "Desativar"}</button></div>` : ""}</li>`;
   const ativos = itens.filter(r => !r.desativado), off = itens.filter(r => r.desativado);

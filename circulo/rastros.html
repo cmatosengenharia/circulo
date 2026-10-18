@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — rastros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
+  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2;
+  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --bad-soft:#F6DCD8; --idle:#AEB8C2;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
+  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14;
+  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--jev);outline-offset:2px}
+a{color:var(--jev)}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 56px}
+.back{display:inline-block;color:var(--muted);text-decoration:none;font-weight:600;margin-bottom:6px}
+.back::before{content:"‹ "}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:28px 0 10px;font-weight:700}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:76ch}
+.vivo{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.vivo i{width:8px;height:8px;border-radius:50%;background:var(--idle)}
+.vivo.on i{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.vivo.velho i{background:var(--llm)}
+form.busca{display:flex;gap:8px;flex-wrap:wrap}
+form.busca input{flex:1 1 280px;min-width:0;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;cursor:pointer;font-weight:600}
+.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dica{font-size:12.5px;color:var(--muted);margin-top:6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap;display:inline-block}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.falha,.chip.violado{background:var(--bad-soft);color:var(--bad)}
+.chip.pendente,.chip.em_risco,.chip.atencao{background:var(--llm-soft);color:var(--llm)}
+.slo .nome{font-weight:700;font-size:14px}
+.slo .num{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:4px 0 0;font-variant-numeric:tabular-nums}
+.slo .alvo{font-size:12.5px;color:var(--muted)}
+.barra{height:6px;border-radius:999px;background:var(--bg);margin:10px 0 4px;overflow:hidden}
+.barra b{display:block;height:100%;border-radius:999px;background:var(--ok)}
+.barra b.em_risco{background:var(--llm)}.barra b.violado{background:var(--bad)}
+.tile .rot{font-size:12.5px;color:var(--muted);font-weight:600}
+.tile .num{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.tile .mini{font-size:12.5px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-left:8px;vertical-align:middle}
+.seg button{border:0;background:transparent;padding:2px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-weight:600}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+#cadeia:empty{display:none}
+.cab{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.cab h3{margin:0;font-size:18px}
+.ids{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted);overflow-wrap:anywhere;margin-top:4px}
+.lac{background:var(--bad-soft);color:var(--bad);border-radius:12px;padding:8px 12px;margin:10px 0 0;font-size:13.5px}
+ol.fio{list-style:none;margin:14px 0 0;padding:0}
+ol.fio li{position:relative;padding:0 0 14px 26px}
+ol.fio li::before{content:"";position:absolute;left:5px;top:16px;bottom:-2px;width:2px;background:var(--line)}
+ol.fio li:last-child::before{display:none}
+ol.fio li i{position:absolute;left:0;top:5px;width:12px;height:12px;border-radius:50%;background:var(--ok);border:2px solid var(--surface)}
+ol.fio li.falha i{background:var(--bad)}ol.fio li.pendente i{background:var(--surface);border:2px dashed var(--llm)}
+ol.fio .t{font-weight:700}
+ol.fio .q{font-size:12.5px;color:var(--muted)}
+ol.fio .d{font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
+.lista{display:grid;gap:8px}
+.fioRec{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;cursor:pointer;text-align:left;width:100%}
+.fioRec:hover{border-color:var(--ink)}
+.fioRec .n{font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.fioRec .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fioRec .et{font-size:12.5px;color:var(--muted)}
+.pontos{display:flex;gap:3px;margin-top:3px}
+.pontos s{width:16px;height:4px;border-radius:2px;background:var(--line);text-decoration:none}
+.pontos s.on{background:var(--ok)}
+.tabela{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12.5px}
+td.r,th.r{text-align:right}
+td.ruim{color:var(--bad);font-weight:700}
+.duas{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.exp p{margin:4px 0;font-size:13.5px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:6px;overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">Todas as missões</a>
+  <h1>Rastros</h1>
+  <p class="sub">Cada mudança do loop ligada da origem (seu pedido, uma pergunta do conselho ou uma lição de erro) até a prova de que funciona no código rodando. Abaixo, os sinais de ouro e os objetivos de serviço, atualizados ao vivo. <span class="vivo" id="vivo"><i></i><span>conectando…</span></span></p>
+
+  <form class="busca" id="busca" role="search">
+    <input id="q" placeholder="item 36, PR 9, missão 2, run_id, sha ou trace_id" autocomplete="off" aria-label="Buscar um rastro">
+    <button class="btn primary" type="submit">Seguir o fio</button>
+  </form>
+  <div class="dica">Qualquer ponta serve: número do item, do PR ou da missão, o run_id de um giro, o sha de uma versão ou o trace_id W3C.</div>
+
+  <section id="cadeia" class="card" style="margin-top:14px" aria-live="polite"></section>
+
+  <h2>Objetivos de serviço <span style="text-transform:none;letter-spacing:0;font-weight:500">(SLOs, com orçamento de erro)</span></h2>
+  <div class="grid" id="slos"></div>
+
+  <h2>Sinais de ouro <span class="seg" role="group" aria-label="Janela"><button type="button" data-j="24h" aria-pressed="true">24 h</button><button type="button" data-j="1h" aria-pressed="false">1 h</button></span></h2>
+  <div class="grid" id="sinais"></div>
+
+  <h2>Fios recentes <span id="comp" style="text-transform:none;letter-spacing:0;font-weight:500"></span></h2>
+  <div class="lista" id="recentes"></div>
+
+  <h2>Por operação <span style="text-transform:none;letter-spacing:0;font-weight:500">(taxa, erros e duração nas últimas 24 h)</span></h2>
+  <div class="duas">
+    <div class="card tabela"><table id="redV"></table></div>
+    <div class="card tabela"><table id="redL"></table></div>
+  </div>
+
+  <h2>Levar para outras ferramentas</h2>
+  <div class="card exp" id="exp"></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d).replace(".", ",") + "%";
+const ms = x => x == null ? "—" : x < 1000 ? `${x} ms` : x < 60000 ? `${(x / 1000).toFixed(1).replace(".", ",")} s` : `${Math.round(x / 60000)} min`;
+const hora = t => t ? new Date(t * 1000).toLocaleString("pt-BR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) : "";
+const ETAPAS = ["origem", "estudo", "developer", "pr", "gate", "versao", "evidencia", "fim"];
+let janela = "24h", dados = null, atual = null, ultimaOk = 0;
+
+function janelaTxt(s) { return s >= 86400 ? `${Math.round(s / 86400)} d` : `${Math.round(s / 3600)} h`; }
+
+function renderSlos(lista) {
+  $("#slos").innerHTML = lista.map(x => {
+    const rest = x.orcamento_restante, larg = rest == null ? 0 : Math.max(0, Math.min(1, rest)) * 100;
+    const est = {ok: "cumprido", em_risco: "em risco", violado: "violado", sem_dados: "sem dados"}[x.estado];
+    return `<div class="card slo"><div class="cab"><span class="nome">${esc(x.nome)}</span><span class="chip ${x.estado}">${est}</span></div>
+      <div class="num">${x.atual == null ? "—" : pct(x.atual, 2)}</div>
+      <div class="alvo">alvo ${pct(x.alvo, 0)} · ${janelaTxt(x.janela_s)} · ${x.n} medida(s)</div>
+      <div class="barra" title="orçamento de erro restante"><b class="${x.estado}" style="width:${larg}%"></b></div>
+      <div class="alvo">${rest == null ? "sem medidas na janela" : rest < 0 ? "orçamento de erro estourado" : `orçamento de erro: ${pct(rest, 0)} sobrando`} · ${x.ruins} fora</div>
+      <div class="alvo" style="margin-top:4px">${esc(x.como)}</div></div>`;
+  }).join("");
+}
+
+function renderSinais() {
+  const s = janela === "24h" ? dados.sinais : dados.sinais_1h;
+  const t = s.trafego, l = s.latencia, e = s.erros, sa = s.saturacao;
+  const tiles = [
+    ["Tráfego", `${t.giros}`, `giros · ${String(t.giros_por_hora).replace(".", ",")}/h · ${t.pesados} pesados`, `${t.chamadas_llm} chamadas de LLM · ${t.verificacoes} verificações`],
+    ["Latência", ms(l.leve_p95_ms), "p95 do giro leve", `p50 ${ms(l.p50_ms)} · p95 ${ms(l.p95_ms)} · p99 ${ms(l.p99_ms)} (todos)`],
+    ["Erros", e.taxa_giros == null ? "—" : pct(e.taxa_giros, 2), `${e.giros_com_erro} giro(s) com erro`,
+     `${e.llm_falhas} falha(s) de LLM · ${e.verificacoes_reprovadas} verificação(ões) reprovada(s) · ${e.gate_recusas} recusa(s) do gate`],
+    ["Saturação", sa.orcamento_usado == null ? "—" : pct(sa.orcamento_usado, 0), "do limite diário da API",
+     `${sa.fila_pedidos} pedido(s) na fila · ${sa.roteiro_pendente} item(ns) no roteiro`],
+  ];
+  $("#sinais").innerHTML = tiles.map(([r, n, a, b]) => `<div class="card tile"><div class="rot">${r}</div><div class="num">${esc(n)}</div>
+    <div class="mini">${esc(a)}</div><div class="mini">${esc(b)}</div></div>`).join("");
+}
+
+function renderRecentes(lista, comp) {
+  $("#comp").textContent = comp.total ? `· ${comp.completos} de ${comp.total} entregas com o fio completo (${comp.dias} d)` : "";
+  $("#recentes").innerHTML = lista.length ? lista.map(r => {
+    const tem = new Set(r.etapas);
+    return `<button class="card fioRec" type="button" data-q="item ${r.id}"><span class="n">#${r.id}</span>
+      <span style="min-width:0"><div class="tt">${esc(r.titulo)}</div><div class="et">${esc(r.etapa)} · ${esc(r.origem)}${r.em ? " · " + hora(r.em) : ""}</div>
+      <div class="pontos" aria-hidden="true">${ETAPAS.map(e => `<s class="${tem.has(e) ? "on" : ""}"></s>`).join("")}</div></span>
+      <span class="chip ${{lacuna: "falha", completo: "ok", em_curso: "pendente", direto: ""}[r.estado]}">${{lacuna: "lacuna", completo: "completo", em_curso: "em curso", direto: "direto, sem PR"}[r.estado]}</span></button>`;
+  }).join("") : `<div class="card">Nenhum fio ainda.</div>`;
+}
+
+function renderRed(red) {
+  const linhas = (xs, extra) => xs.map(x => `<tr><td>${esc(x.operacao)}</td><td class="r">${x.n}</td>
+    <td class="r ${x.taxa_erro > 0.2 ? "ruim" : ""}">${x.falhas} (${pct(x.taxa_erro, 0)})</td>${extra ? extra(x) : ""}</tr>`).join("");
+  $("#redV").innerHTML = `<tr><th>verificação</th><th class="r">n</th><th class="r">falhas</th></tr>` +
+    (linhas(red.verificacoes) || `<tr><td colspan="3">nenhuma</td></tr>`);
+  $("#redL").innerHTML = `<tr><th>LLM (papel)</th><th class="r">n</th><th class="r">falhas</th><th class="r">p95</th><th class="r">tokens</th></tr>` +
+    (linhas(red.llm, x => `<td class="r">${ms(x.p95_ms)}</td><td class="r">${x.tokens.toLocaleString("pt-BR")}</td>`) || `<tr><td colspan="5">nenhuma</td></tr>`);
+}
+
+function renderExp(x) {
+  const u = x.ultimo || {};
+  $("#exp").innerHTML = `
+    <p><b>Prometheus / Grafana:</b> as métricas ficam em <a href="/metrics"><code>/metrics</code></a> (formato padrão de exposição). O Grafana, ou o Grafana Alloy, raspa direto daqui.</p>
+    <p><b>OpenTelemetry (traços):</b> ${x.otlp_configurado
+      ? `enviando para <code>${esc(x.destino)}</code> · ${u.em ? (u.ok ? `último envio ok às ${hora(u.em)} · ${u.enviados_total || 0} spans no total` : `falhou às ${hora(u.em)}: ${esc(u.erro || "")} (tenta de novo no próximo giro, nada se perde)`) : "esperando o primeiro giro"}`
+      : `desligado. Para mandar os traços a um coletor (Grafana Tempo, Jaeger, Honeycomb, Datadog…), cadastre <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> em <a href="/integracoes">Integrações</a>.`}</p>
+    <p><b>Trilha de cada giro:</b> <a href="/telemetria">linha do tempo e grafo dos agentes</a>.</p>`;
+}
+
+function renderCadeia(c) {
+  atual = c;
+  if (!c) { $("#cadeia").innerHTML = ""; return; }
+  if (c.erro) { $("#cadeia").innerHTML = `<div>${esc(c.erro)}</div>`; return; }
+  const giro = g => g ? ` · <a href="/api/execucao/${esc(g)}">giro ${esc(g)}</a>` : "";
+  $("#cadeia").innerHTML = `<div class="cab"><h3>${esc(c.titulo)}</h3>
+      <span class="chip ${c.lacunas.length ? "falha" : c.completo ? "ok" : "pendente"}">${c.lacunas.length ? "fio com lacuna" : c.completo ? "fio completo" : "em curso"}</span></div>
+    <div class="ids">${esc(c.no)} · trace_id ${esc(c.trace_id)}${c.traceparent ? ` · traceparent ${esc(c.traceparent)}` : ""}${c.duracao_ms != null ? ` · ${ms(c.duracao_ms)}` : ""}</div>
+    ${c.nota ? `<div class="dica">${esc(c.nota)}</div>` : ""}
+    ${c.lacunas.map(l => `<div class="lac">Lacuna: ${esc(l)}</div>`).join("")}
+    <ol class="fio">${c.passos.map(p => `<li class="${p.estado}"><i></i>
+      <div class="t">${esc(p.titulo)}${p.link ? ` <a href="${esc(p.link)}" target="_blank" rel="noopener">abrir ↗</a>` : ""}${p.no && p.no !== c.no && /^(item|pr|missao|versao):/.test(p.no) ? ` <a href="#" data-q="${esc(p.no.replace(":", " "))}">seguir</a>` : ""}</div>
+      <div class="q">${p.em ? hora(p.em) : p.estado === "pendente" ? "ainda não" : "sem horário registrado"}${giro(p.giro)}</div>
+      ${p.detalhe ? `<div class="d">${esc(p.detalhe)}</div>` : ""}</li>`).join("")}</ol>`;
+}
+
+async function seguir(termo, rolar = true) {
+  termo = (termo || "").trim();
+  if (!termo) return;
+  $("#q").value = termo;
+  history.replaceState(null, "", "#" + encodeURIComponent(termo));
+  const r = await fetch("/api/rastro?q=" + encodeURIComponent(termo));
+  renderCadeia(await r.json());
+  if (rolar) $("#cadeia").scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+async function atualizar() {
+  try {
+    const r = await fetch("/api/observabilidade");
+    dados = await r.json();
+    renderSlos(dados.slos); renderSinais(); renderRecentes(dados.rastros, dados.completude); renderRed(dados.red); renderExp(dados.exportacao);
+    ultimaOk = Date.now();
+    if (atual && !atual.erro) {
+      const t = await fetch("/api/rastro?q=" + encodeURIComponent(atual.no.replace(":", " ")));
+      if (t.ok) renderCadeia(await t.json());
+    }
+  } catch (e) { /* o indicador mostra que ficou velho */ }
+  const idade = (Date.now() - ultimaOk) / 1000, v = $("#vivo");
+  v.className = "vivo " + (idade < 12 ? "on" : "velho");
+  v.lastElementChild.textContent = idade < 12 ? "ao vivo (a cada 5 s)" : ultimaOk ? `sem atualizar há ${Math.round(idade)} s` : "sem conexão com o loop";
+}
+
+$("#busca").onsubmit = e => { e.preventDefault(); seguir($("#q").value); };
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-q]");
+  if (a) { e.preventDefault(); seguir(a.dataset.q); }
+  const b = e.target.closest(".seg button");
+  if (b) { janela = b.dataset.j; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); if (dados) renderSinais(); }
+});
+atualizar();
+setInterval(atualizar, 5000);
+if (location.hash.length > 1) seguir(decodeURIComponent(location.hash.slice(1)), false);
+</script>
+</body>
+</html>

@@ -111,10 +111,24 @@ class Corpo:
         self._set(estado="validando", sha=alvo, anterior=anterior, desde_tick=self.s.tick, giros_ok=0, erros=0,
                   patch=str(patch) if patch else None)
         monitorar(self.ctx, "corpo:atualizar", True, sujeito=alvo[:12])
+        self._rastrear(anterior, alvo)
         self.ctx.reply(f"Corpo atualizado: {anterior[:7]} → {alvo[:7]} (validado antes: importação e testes). "
                        f"Reiniciando; os próximos {VALIDAR_GIROS} giros são a prova.", "merge")
         self.reiniciar = f"código atualizado para {alvo[:7]}"
         return {"status": "atualizado", "alvo": alvo, "anterior": anterior, "patch": str(patch) if patch else None}
+
+    def _rastrear(self, anterior: str, alvo: str) -> None:
+        """Elo exato PR → versão: o gate faz squash com o título terminando em (#N), então o git diz quais PRs entraram."""
+        import re
+        from .rastro import elo
+        try:
+            titulos = self._git(["log", "--format=%s", f"{anterior}..{alvo}"], check=False).splitlines()
+        except Exception:  # noqa: BLE001
+            return
+        for t in titulos:
+            m = re.search(r"\(#(\d+)\)\s*$", t)
+            if m:
+                elo(self.s, f"pr:{m.group(1)}", f"versao:{alvo[:12]}", "entrou_em", {"de": anterior[:12]})
 
     # ------------------------------------------------------------ evidência depois: os primeiros giros
     def validar(self, erros: list) -> str | None:
@@ -128,6 +142,8 @@ class Corpo:
             if st["erros"] >= MAX_ERROS_NA_VALIDACAO and self.disponivel and st.get("anterior"):
                 self._git(["reset", "-q", "--hard", st["anterior"]], check=False)
                 self._set(estado="revertido", reprovados=((st.get("reprovados") or []) + [st["sha"]])[-20:])
+                from .rastro import elo
+                elo(self.s, f"versao:{str(st.get('sha', ''))[:12]}", f"versao:{str(st.get('anterior'))[:12]}", "revertida")
                 monitorar(self.ctx, "corpo:evidencia", False, sujeito=str(st.get("sha", ""))[:12],
                           motivo=f"erros nos primeiros giros do código novo: {str(erros)[:800]}", classe="estrutural",
                           assinatura="corpo:regressao_pos_atualizacao")
@@ -140,6 +156,9 @@ class Corpo:
         self._set(giros_ok=st["giros_ok"])
         if st["giros_ok"] >= VALIDAR_GIROS:
             self._set(estado="ok")
+            from .rastro import elo
+            elo(self.s, f"versao:{str(st.get('sha', ''))[:12]}", f"giro:{self.s.get('run_id') or 'fora_do_giro'}", "evidenciada",
+                {"giros_ok": st["giros_ok"]})
             monitorar(self.ctx, "corpo:evidencia", True, sujeito=str(st.get("sha", ""))[:12])
             self.ctx.reply(f"Corpo {str(st.get('sha'))[:7]} evidenciado: {VALIDAR_GIROS} giros sem erro no código novo.", "merge")
             return "ok"

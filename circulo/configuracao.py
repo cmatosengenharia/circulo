@@ -27,6 +27,8 @@ CHAVES = (
     ("GITHUB_TOKEN", "Token fine-grained só do repo circulo (Contents, Pull requests, Checks: leitura e escrita)."),
     ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
     ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
+    ("OTEL_EXPORTER_OTLP_ENDPOINT", "Opcional: coletor OpenTelemetry (ex.: Grafana Cloud, Tempo, Jaeger) que recebe os traços dos giros por OTLP/HTTP."),
+    ("OTEL_EXPORTER_OTLP_HEADERS", "Opcional: cabeçalhos do coletor no formato do OpenTelemetry (ex.: Authorization=Basic%20...)."),
 )
 LABEL = "com.circulo.loop"
 

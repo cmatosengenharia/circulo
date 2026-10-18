@@ -255,8 +255,8 @@ def make_handler(db_path: str):
             m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
                 return self._entrega(int(m.group(1)), q.get("v", [None])[0])
-            if u.path == "/" or u.path == "/integracoes" or u.path.startswith(("/projeto/", "/missao/")):
-                body = _page("home.html" if u.path == "/" else "integracoes.html" if u.path == "/integracoes" else "painel.html")
+            if u.path in ("/", "/integracoes", "/rastros") or u.path.startswith(("/projeto/", "/missao/")):
+                body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -270,6 +270,21 @@ def make_handler(db_path: str):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif u.path == "/metrics":
+                from .observabilidade import prometheus
+                body = prometheus(self._store()).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            elif u.path == "/api/observabilidade":
+                from .observabilidade import visao as obs
+                self._json(obs(self._store()))
+            elif u.path == "/api/rastro":
+                from .rastro import localizar
+                c = localizar(self._store(), q.get("q", [""])[0][:120])
+                self._json(c if c else {"erro": "nada encontrado com esse termo"}, 200 if c else 404)
             elif u.path == "/api/estado":
                 self._json(estado(self._store(), projeto))
             elif u.path == "/api/projetos":

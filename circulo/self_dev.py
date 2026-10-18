@@ -152,6 +152,7 @@ class ClaudeCodeAgent:
         # O Claude Code usa o login da sua conta Claude. A ANTHROPIC_API_KEY do loop (créditos da API) só vai junto
         # se CIRCULO_CODE_AGENT_USA_API=1; senão uma chave sem crédito derrubaria o Developer.
         env = dict(os.environ)
+        env.update(getattr(self, "ambiente_extra", None) or {})   # TRACEPARENT: o fio do item segue no Claude Code
         if os.environ.get("CIRCULO_CODE_AGENT_USA_API") != "1":
             env.pop("ANTHROPIC_API_KEY", None)
             env.pop("ANTHROPIC_WORKSPACE_ID", None)
@@ -325,6 +326,17 @@ class SelfDeveloper:
                 monitorar(self.ctx, f"developer:{nome}", True, sujeito=str(wt.name))
         return True, ""
 
+    def _rastrear(self, item_id: int | None, relacao: str) -> None:
+        """Elo item → giro e o traceparent W3C do fio do item no ambiente do Claude Code."""
+        from .rastro import elo, traceparent
+        if item_id is None:
+            return
+        elo(self.s, f"item:{item_id}", f"giro:{self.s.get('run_id')}", relacao)
+        try:
+            self.agent.ambiente_extra = {"TRACEPARENT": traceparent(f"item:{item_id}")}
+        except Exception:  # noqa: BLE001 — agente sem atributos livres (ex.: dublê de teste): segue sem
+            pass
+
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
         t0 = time.time()
         out = self.agent.run(task, wt)
@@ -397,6 +409,7 @@ class SelfDeveloper:
         branch = wip["branch"] if wip else f"circulo/fix-{item['id']}-{int(time.time())}"
         wt = self.repo.parent / f".circulo-wt-{item['id']}"
         self._set_item(item["id"], "em_andamento", f"branch {branch}")
+        self._rastrear(item["id"], "developer")
         has_remote = bool(_git(["remote"], self.repo, check=False))
         try:
             if has_remote:
@@ -445,7 +458,10 @@ class SelfDeveloper:
                 self.ctx.reply(f"Developer: “{item['titulo']}” foi barrado nos portões antes do PR; nada foi enviado.", "saude")
                 return DevResult(item["id"], "testes_falharam", falha[-800:])
             _git(["add", "-A"], wt)
-            msg = f"{item['titulo']}\n\nCorreção automática do Developer do círculo (roteiro #{item['id']})."
+            from .rastro import trace_id
+            fio = trace_id("item:%d" % item["id"])
+            msg = (f"{item['titulo']}\n\nCorreção automática do Developer do círculo (roteiro #{item['id']}).\n\n"
+                   f"Circulo-Item: {item['id']}\nCirculo-Trace: {fio}")
             _git(["-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}", "commit", "-q", "-m", msg], wt)
             changed = _git(["diff", "--name-only", f"{base}..HEAD"], wt).splitlines()
             pr = None
@@ -454,12 +470,15 @@ class SelfDeveloper:
                 pr = self.gh.create_pr(branch, "main", item["titulo"],
                                        f"Correção automática (roteiro #{item['id']}).\n\nArquivos: {', '.join(changed)}\n\n"
                                        "O gate de merge do círculo decide sozinho: checks verdes, teste novo, Reviewer (Jev). "
-                                       "PR que altera a constituição é recusado na hora.")
+                                       "PR que altera a constituição é recusado na hora.\n\n"
+                                       f"Rastro de ponta a ponta: item #{item['id']} · trace `{fio}`")
             self.s.set("self_dev_aberto", {"item": item["id"], "branch": branch, "pr": pr, "em": time.time(), "fechado": False})
             todos = self.s.get("self_dev_wip") or {}
             if todos.pop(str(item["id"]), None) is not None:
                 self.s.set("self_dev_wip", todos)        # terminou: o parcial virou PR
             if pr:
+                from .rastro import elo
+                elo(self.s, f"item:{item['id']}", f"pr:{pr}", "abriu_pr")
                 from .projects import kit_project_id
                 self.s.x("INSERT OR REPLACE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
                          (pr, kit_project_id(self.s, "circulo"), item["titulo"], branch, "aberto", time.time(), time.time()))
@@ -477,6 +496,7 @@ class SelfDeveloper:
         titulo = r["titulo"] if r else f"item #{item_id}"
         motivo = str(st["conserto"].get("motivo", ""))
         branch = st["branch"]
+        self._rastrear(item_id, "conserto")
         _git(["fetch", "origin", branch, "main"], self.repo)
         atual = _git(["rev-parse", f"origin/{branch}"], self.repo, check=False)
         if atual and st["conserto"].get("sha") and atual != st["conserto"]["sha"]:

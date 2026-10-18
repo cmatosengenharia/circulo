@@ -25,7 +25,7 @@ from pathlib import Path
 
 SERVICO = "circulo"
 NOME_VALIDO = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
-SEGREDO = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|SENHA")
+SEGREDO = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|SENHA|HEADERS")
 
 
 def e_segredo(nome: str) -> bool:
