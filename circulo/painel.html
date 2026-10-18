@@ -299,6 +299,36 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .rt .toggle{border:1px solid var(--line);background:transparent;border-radius:999px;padding:2px 11px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
 .rt .toggle:hover{border-color:var(--bad);color:var(--bad)}
 .rt li.off .toggle:hover{border-color:var(--ok);color:var(--ok)}
+
+/* ---------- central de confiança ---------- */
+.confia{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-weight:600;text-decoration:none;color:var(--ink);font-size:14px}
+.confia i{width:10px;height:10px;border-radius:50%;background:var(--idle)}
+.confia[data-v="confiavel"] i{background:var(--ok)}.confia[data-v="atencao"] i{background:var(--llm)}
+.confia[data-v="falha"] i,.confia[data-v="parado"] i{background:var(--bad)}
+.aovivo{font-size:12.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.aovivo b{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;animation:beat 1.6s ease-in-out infinite}
+.aovivo[data-f="atrasado"] b{background:var(--llm);animation:none}.aovivo[data-f="velho"] b{background:var(--bad);animation:none}
+.aovivo[data-f="velho"]{color:var(--bad);font-weight:600}
+.cf-veredito{display:flex;gap:14px;align-items:flex-start;margin:0 0 14px}
+.cf-veredito .selo{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;font-weight:800;color:#fff;background:var(--idle)}
+.cf-veredito[data-v="confiavel"] .selo{background:var(--ok)}.cf-veredito[data-v="atencao"] .selo{background:var(--llm)}
+.cf-veredito[data-v="falha"] .selo,.cf-veredito[data-v="parado"] .selo{background:var(--bad)}
+.cf-veredito h2{margin:0 0 2px;font-size:20px}.cf-veredito p{margin:0;color:var(--muted)}
+.cf-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.cf-col h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.cf-col ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cf-col li{border:1px solid var(--line);border-left:4px solid var(--idle);border-radius:10px;padding:8px 10px;background:var(--bg)}
+.cf-col li[data-e="ok"]{border-left-color:var(--ok)}.cf-col li[data-e="atencao"]{border-left-color:var(--llm)}
+.cf-col li[data-e="falha"]{border-left-color:var(--bad);background:var(--bad-soft)}.cf-col li[data-e="info"]{border-left-color:var(--jev)}
+.cf-col .t{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
+.cf-col .t .velho{color:var(--bad);font-weight:700}
+.cf-col .v{font-weight:600;overflow-wrap:anywhere}.cf-col .p{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.sinapses{list-style:none;margin:10px 0 0;padding:0;max-height:260px;overflow:auto;font-size:13px}
+.sinapses li{display:grid;grid-template-columns:70px 18px minmax(0,1fr);gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.sinapses .ok{color:var(--ok)}.sinapses .no{color:var(--bad);font-weight:700}
+.sinapses .m{color:var(--muted);overflow-wrap:anywhere}
+.cf-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media (max-width:860px){.cf-cols{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -308,12 +338,26 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
   <header>
     <h1 id="pname">Missão</h1>
     <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
+    <a class="confia" id="confia" href="#confianca" data-v="" title="Posso confiar no loop agora? Clique para ver cada verificação."><i></i><span id="confiaTxt">Conferindo…</span></a>
+    <span class="aovivo" id="aovivo" data-f="velho" aria-live="polite"><b></b><span id="aovivoTxt">conectando…</span></span>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
       <button class="btn primary" id="pause">Pausar o loop</button>
     </div>
   </header>
 
+  <section class="panel zero-only" hidden id="confianca" style="margin:0 0 18px" aria-label="Posso confiar no loop agora?">
+    <div class="cf-veredito" id="cfVeredito" data-v=""><div class="selo" id="cfSelo">…</div>
+      <div><h2 id="cfTitulo">Posso confiar no loop agora?</h2><p id="cfFrase">Conferindo cada verificação…</p></div></div>
+    <div class="cf-cols">
+      <div class="cf-col"><h3>Agora · o que está acontecendo</h3><ul id="cfAgora"></ul></div>
+      <div class="cf-col"><h3>Segurança · está tudo certo?</h3><ul id="cfSeg"></ul></div>
+      <div class="cf-col"><h3>A seguir · o que vem</h3><ul id="cfProx"></ul></div>
+    </div>
+    <div class="cf-barra"><h2 style="margin:0">Sinapses ao vivo <small class="sub">cada verificação de cada neurônio, no momento em que acontece</small></h2>
+      <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
+    <ul class="sinapses" id="sinapses" aria-live="off"></ul>
+  </section>
   <div class="about" id="about"></div>
   <div class="kpis" id="kpis" aria-label="Números ao vivo"></div>
   <div class="grid">
@@ -957,12 +1001,48 @@ document.addEventListener("click", async e => {
 });
 document.addEventListener("click", e => { const b = e.target.closest("[data-send]"); if (b) { b.disabled = true; post("/api/pedido", {texto: b.dataset.send, projeto: PID}); } });
 
+
+/* ---------- central de confiança (empurrada pelo servidor; o frescor de cada dado conta sozinho) ---------- */
+let CF = null, ultimoDado = 0, atrasoMs = null, sinapses = [];
+const VTXT = {confiavel: ["✓", "Pode confiar"], atencao: ["!", "Em observação"], falha: ["×", "Atenção"], parado: ["■", "Loop parado"]};
+function ha(ts) { if (!ts) return "—"; const s = Math.max(0, Date.now() / 1000 - ts); return s < 60 ? `há ${s.toFixed(0)} s` : s < 3600 ? `há ${(s / 60).toFixed(0)} min` : `há ${(s / 3600).toFixed(1)} h`; }
+function renderConfianca() {
+  if (!CF) return;
+  const [selo, curto] = VTXT[CF.veredito] || ["?", CF.veredito];
+  $("#confia").dataset.v = CF.veredito; $("#confiaTxt").textContent = curto;
+  if (!ZERO && CF.circulo_id) $("#confia").href = "/missao/" + CF.circulo_id + "#confianca";
+  $("#cfVeredito").dataset.v = CF.veredito; $("#cfSelo").textContent = selo; $("#cfTitulo").textContent = curto; $("#cfFrase").textContent = CF.frase;
+  const item = c => { const velho = c.fresco_s && c.dado_em && Date.now() / 1000 - c.dado_em > c.fresco_s;
+    return `<li data-e="${c.estado}"><div class="t"><span>${esc(c.titulo)}</span><span class="${velho ? "velho" : ""}" title="quando a fonte produziu este dado">${velho ? "dado velho · " : ""}${ha(c.dado_em)}</span></div>
+      <div class="v">${esc(String(c.valor))}</div>${c.porque ? `<div class="p">${esc(c.porque)}</div>` : ""}</li>`; };
+  const grupo = g => CF.checks.filter(c => c.grupo === g).map(item).join("") || `<li data-e="info"><div class="p">Nada aqui agora.</div></li>`;
+  $("#cfAgora").innerHTML = grupo("agora"); $("#cfSeg").innerHTML = grupo("seguranca"); $("#cfProx").innerHTML = grupo("proximo");
+}
+function renderSinapses() {
+  const so = $("#soFalhas").checked, l = sinapses.filter(v => !so || !v.ok).slice(0, 40);
+  $("#sinapses").innerHTML = l.map(v => `<li><span class="sub">${new Date(v.created_at * 1000).toLocaleTimeString("pt-BR")}</span>
+    <span class="${v.ok ? "ok" : "no"}" title="${v.ok ? "passou" : "barrado"}">${v.ok ? "✓" : "×"}</span>
+    <span><b>${esc(v.ponto)}</b>${v.sujeito ? ` · ${esc(v.sujeito)}` : ""}${!v.ok && v.motivo ? `<span class="m"> — ${esc(v.motivo.split("\n")[0].slice(0, 160))}</span>` : ""}</span></li>`).join("")
+    || `<li><span></span><span></span><span class="sub">${so ? "Nada barrado desde que você abriu o painel." : "Nenhuma verificação ainda."}</span></li>`;
+}
+$("#soFalhas").addEventListener("change", renderSinapses);
+function renderAoVivo() {
+  const s = ultimoDado ? (Date.now() - ultimoDado) / 1000 : Infinity, el = $("#aovivo");
+  el.dataset.f = s <= 3 ? "aovivo" : s <= 10 ? "atrasado" : "velho";
+  $("#aovivoTxt").textContent = !ultimoDado ? "conectando…" : s <= 3 ? `ao vivo · dado de ${s.toFixed(1)} s atrás`
+    : s <= 10 ? `atrasado · último dado há ${s.toFixed(0)} s` : `sem conexão há ${s.toFixed(0)} s: os números podem estar velhos`;
+  renderConfianca();
+}
+setInterval(renderAoVivo, 1000);
+setInterval(() => { if (atrasoMs != null) post("/api/frescor", {atraso_ms: Math.round(atrasoMs)}).catch(() => {}); }, 60000);
 function connect() {
   const filtro = ZERO ? "" : Q;
   const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
   es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { enfileirar(e); if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
-  es.addEventListener("status", m => { if (S) { S.loop.vivo = JSON.parse(m.data); } });
+  es.addEventListener("status", m => { ultimoDado = Date.now(); if (S) { S.loop.vivo = JSON.parse(m.data); } });
+  es.addEventListener("confianca", m => { CF = JSON.parse(m.data); ultimoDado = Date.now(); atrasoMs = Math.max(0, Date.now() - CF.gerado_em * 1000); renderAoVivo(); });
+  es.addEventListener("sinapse", m => { sinapses.unshift(JSON.parse(m.data)); sinapses = sinapses.slice(0, 200); ultimoDado = Date.now(); agendar(renderSinapses); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
 refresh(); setInterval(refresh, 3000); setInterval(renderAgora, 1000);

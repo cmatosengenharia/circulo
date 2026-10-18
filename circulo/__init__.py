@@ -1,2 +1,2 @@
 """Círculo autoevolutivo Jev First — Sistema de Controle da Vida."""
-__version__ = "1.9.3"
+__version__ = "1.10.0"

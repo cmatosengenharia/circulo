@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.10.0 — 2026-10-18
+
+Central de confiança: o painel responde primeiro "posso confiar no loop agora?", em tempo real e em tudo.
+
+Estudo (pedido do Cássio, seguindo o princípio do loop de buscar as práticas consolidadas):
+- consciência situacional (Endsley): três níveis, **perceber** o que acontece, **entender** se está seguro e
+  **projetar** o que vem a seguir ([Perceptual Edge](https://www.perceptualedge.com/blog/?p=45),
+  [Endsley/DTIC](https://apps.dtic.mil/sti/tr/pdf/ADA616862.pdf));
+- **frescor do dado**: "dado de quando" pela fonte e não pela tela; "ao vivo" só quando é de verdade; alertar quando o
+  dado para de avançar ([Basedash](https://www.basedash.com/blog/data-freshness-how-current-your-dashboard-data-really-is));
+- **supervisão humana de agentes**: trilha da decisão (quem decidiu e com que confiança), ações em tempo real, parada
+  verificável ([Airia](https://www.airia.com/blog/human-oversight-for-ai-agents-what-it-means-and-how-to-implement-it-in-the-enterprise/));
+- **sinais de ouro / RED** e menos carga cognitiva: cada painel responde a uma pergunta, cores consistentes, exceções à
+  vista ([AWS Grafana](https://docs.aws.amazon.com/grafana/latest/userguide/v10-dash-bestpractices.html));
+- **calibrar a confiança**: mais informação quando a confiança está baixa, sem afogar o humano
+  ([arXiv 2004.07176](https://arxiv.org/pdf/2004.07176)).
+
+O que mudou:
+- Topo da tela do loop: veredito (Pode confiar · Em observação · Atenção · Loop parado), com a frase do porquê, e três
+  colunas:
+  - **Agora**: processo vivo (batimento), etapa e há quanto tempo, última decisão (pela regra, pelo Jev ou pela LLM,
+    com a confiança) e quem decide nas últimas 24 h;
+  - **Segurança**: código rodando (validado e evidenciado), CI da main, reincidências, erros de estrutura abertos,
+    portões, erros nos últimos giros, etapas isoladas, orçamento, invariantes do dinheiro e Developer;
+  - **A seguir**: próximo giro, próximo trabalho do Developer, pedidos esperando estudo, planejador e próxima checagem
+    do código.
+- Cada item mostra **de quando é o dado** (relógio da fonte), contando ao vivo, e acusa "dado velho" quando passa do
+  limite. A pausa é **verificável**: mostra o horário do último giro.
+- Indicador **ao vivo** no cabeçalho: "dado de 0,4 s atrás", "atrasado" depois de 3 s e "sem conexão" depois de 10 s.
+- Selo de confiança em todas as telas.
+- Tudo **empurrado** pelo servidor (SSE): a confiança a cada mudança e no mínimo a cada 2 s, e as **sinapses ao
+  vivo**, isto é, cada verificação de cada neurônio no momento em que acontece, com o filtro "só o que foi barrado".
+- **O painel também é um neurônio** (`painel:frescor`): ele mede o próprio atraso entre o dado e a tela e manda para o
+  loop (no máximo 1 vez por minuto). Acima de 3 s vira lição de estrutura.
+- **O painel evolui sozinho daqui para frente**: novo item no roteiro, "Painel de confiança em tempo real, evoluindo por
+  evidência". Ele passa pelo estudo (fontes confiáveis) e depois pelo Developer.
+- Semente do roteiro: nunca desfaz o que o loop já entregou (item feito por PR continua feito).
+
 ## 1.9.3 — 2026-10-18
 
 O gate mergeou o PR #4 com CI verde, mas o CI tinha rodado sobre a main antiga, antes da 1.9.1, e a main ficou

@@ -41,7 +41,7 @@ CIRCULO_PEDIDO = ("O próprio loop é um projeto: use todos os meus pedidos inic
 
 # Roteiro semente: os pedidos do Cássio que criaram o círculo, com o estado honesto de cada um.
 # (titulo, detalhe, status, evidência)
-ROTEIRO_VERSAO = 4
+ROTEIRO_VERSAO = 5
 ROTEIRO_SEMENTE = [
     ("Loop infinito que só pausa por orçamento", "Estado persistente, retoma de onde parou, recupera após queda.", "feito", "commit 84abb23"),
     ("Jev First antes de qualquer gasto", "worth_spending/should_evolve, perguntas em lote, decisor local com o mesmo contrato.", "feito", "commit 84abb23"),
@@ -69,6 +69,12 @@ ROTEIRO_SEMENTE = [
     ("Rodar 24/7", "`circulo instalar` (launchd no macOS, systemd no Linux). O diagnóstico fecha este item sozinho.", "pendente", "depende de você"),
     ("Produto de software vira código", "Hoje o portal sai como especificação; o próximo passo é o Builder gerar um repositório por projeto e usar o mesmo gate.", "pendente", "Prompt Mestre §6"),
     ("Perguntas do Jev e portfólio evoluindo sozinhos", "Estender o shadow para instruções das perguntas e parâmetros do portfólio.", "pendente", "Prompt Mestre §8"),
+    ("Painel de confiança em tempo real, evoluindo por evidência",
+     "O humano precisa sentir segurança em absolutamente tudo o que o loop faz, em tempo real. Estudar as práticas "
+     "consolidadas (consciência situacional de Endsley: perceber, entender, projetar; frescor do dado; supervisão humana "
+     "de agentes: trilha da decisão, parada verificável; sinais de ouro de SRE) e evoluir a Central de confiança do painel. "
+     "Sucesso: neurônio painel:frescor sempre abaixo de 3 s e nenhuma ação do loop sem aparecer no painel na hora.",
+     "pendente", "pedido do Cássio (18/10, 11:06)"),
 ]
 
 FINANCAS_PEDIDO = "Crie um painel web da minha vida financeira e me ajude a economizar dinheiro"
@@ -101,6 +107,10 @@ def ensure_seed(store: Store) -> None:
         for i, (titulo, detalhe, status, evid) in enumerate(ROTEIRO_SEMENTE, 1):
             row = store.one("SELECT id FROM roadmap WHERE origem='pedido_cassio' AND titulo=?", (titulo,))
             if row:
+                # o que o loop já entregou nunca volta atrás por causa da semente (ex.: item feito por PR do Developer)
+                atual = store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (row["id"],))
+                if atual["status"] in ("feito", "observacao", "contestado") and status != "feito":
+                    status, evid = atual["status"], atual["evidencia"]
                 store.x("UPDATE roadmap SET detalhe=?, status=?, evidencia=?, ordem=?, updated_at=? WHERE id=?",
                         (detalhe, status, evid, i, now, row["id"]))
             else:

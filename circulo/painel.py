@@ -262,6 +262,9 @@ def make_handler(db_path: str):
                 self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")), "versao": __version__,
                             "autonomia": e["autonomia"],
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
+            elif u.path == "/api/confianca":
+                from .confianca import confianca
+                self._json(confianca(self._store()))
             elif u.path == "/api/eventos":
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
@@ -297,6 +300,10 @@ def make_handler(db_path: str):
             last_status, last_sent = None, 0.0
             # trilha: cada passagem de etapa, para o círculo animar o giro inteiro (mesmo os de milissegundos)
             seq = store.one("SELECT COALESCE(MAX(seq),0) m FROM trail")["m"]
+            # sinapses: cada verificação de cada neurônio, ao vivo (as 30 últimas na conexão, depois só as novas)
+            from .confianca import confianca
+            sin = max(0, (store.one("SELECT COALESCE(MAX(id),0) m FROM verificacoes")["m"] or 0) - 30)
+            last_conf, last_conf_em = None, 0.0
             try:
                 while True:
                     st = loop_status(store)
@@ -309,6 +316,19 @@ def make_handler(db_path: str):
                         self.wfile.flush()
                         time.sleep(0.5)
                         continue
+                    # central de confiança: empurrada quando muda e, no mínimo, a cada 2 s (o frescor é visível)
+                    if time.time() - last_conf_em >= 1.0:
+                        conf = confianca(store)
+                        chave = json.dumps([conf["veredito"], [(c["id"], c["estado"], c["valor"], c["porque"]) for c in conf["checks"]]],
+                                           ensure_ascii=False)
+                        if chave != last_conf or time.time() - last_conf_em >= 2.0:
+                            last_conf = chave
+                            self.wfile.write(f"event: confianca\ndata: {json.dumps(conf, ensure_ascii=False)}\n\n".encode())
+                        last_conf_em = time.time()
+                    for v in store.q("SELECT id, tick, ponto, sujeito, ok, assinatura, substr(motivo,1,240) motivo, created_at "
+                                     "FROM verificacoes WHERE id > ? ORDER BY id LIMIT 100", (sin,)):
+                        sin = v["id"]
+                        self.wfile.write(f"event: sinapse\ndata: {json.dumps(dict(v), ensure_ascii=False)}\n\n".encode())
                     for t in store.q("SELECT seq, tick, etapa, project_id, em, detalhe FROM trail WHERE seq > ? ORDER BY seq LIMIT 120", (seq,)):
                         seq = t["seq"]
                         self.wfile.write(f"event: trilha\ndata: {json.dumps(dict(t), ensure_ascii=False)}\n\n".encode())
@@ -350,6 +370,14 @@ def make_handler(db_path: str):
                     return self._json({"erro": "ação desconhecida"}, 400)
                 store.set("controle", {"pausado": bool(c.get("pausado")), "modo_seguro": bool(c.get("modo_seguro"))})
                 return self._json({"ok": True, "controle": store.get("controle")})
+            if u.path == "/api/frescor":
+                # o painel mede o próprio atraso (dado → tela) e o loop monitora como qualquer neurônio
+                from .confianca import registrar_frescor
+                try:
+                    atraso = float(data.get("atraso_ms"))
+                except (TypeError, ValueError):
+                    return self._json({"erro": "atraso_ms inválido"}, 400)
+                return self._json({"ok": True, "registrado": registrar_frescor(store, atraso)})
             if u.path == "/api/pedido":
                 texto = str(data.get("texto", "")).strip()[:500]
                 if not texto:
