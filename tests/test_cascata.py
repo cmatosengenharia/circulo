@@ -13,6 +13,32 @@ def test_route_e_pick_model(circle):
     assert dl.pick_model("builder") == "claude-haiku-5-5"        # orçamento apertado → modelo menor
 
 
+def test_pick_model_segue_a_complexidade_da_tarefa(circle):
+    dl = circle.ctx.dl
+    # mesmo papel, tarefas diferentes: o Jev escolhe pela complexidade, não só pelo papel
+    simples = dl.pick_model_detalhe("rubric", {"tarefa": "Liste 3 critérios para um post curto."})
+    dificil = dl.pick_model_detalhe("reflector", {"tarefa": "Analise o ciclo. " + "contexto detalhado " * 700})
+    assert simples["nivel"] == "pequena" and simples["contexto"]["complexity"] == "baixa"
+    assert dificil["nivel"] == "grande" and dificil["contexto"]["complexity"] == "alta"
+    assert len(dificil["contexto"]["tarefa"]) <= 1500
+    assert dl.pick_model("builder", {"complexity": "baixa"}) == "claude-haiku-5-5"
+
+
+def test_engine_passa_a_tarefa_para_a_escolha_do_modelo(circle, monkeypatch):
+    from circulo.engine import CycleResult
+    vistos = []
+    real = circle.ctx.dl.pick_model_detalhe
+    monkeypatch.setattr(circle.ctx.dl, "pick_model_detalhe", lambda role, f=None: vistos.append(f) or real(role, f))
+    eng = circle.engine
+    pid = circle.ctx.store.x("INSERT INTO projects(nome,pedido,tipo,status,proposito,created_at,updated_at) "
+                             "VALUES('t','um pedido','conteudo','ativo','p',0,0)")
+    try:
+        eng._gen("reflector", "Resultado do ciclo: 0.5", CycleResult(pid, "reflexao"), eng.project(pid))
+    except Exception:  # noqa: BLE001 — só importa o que chegou à escolha do modelo
+        pass
+    assert vistos and vistos[0]["tarefa"] == "Resultado do ciclo: 0.5"
+
+
 def test_verify_output_barra_injecao_dados_e_formato(circle):
     dl = circle.ctx.dl
     ok, _ = dl.verify_output("<!doctype html><html><body><h1>Landing page para captar leads</h1><form></form></body></html>",
