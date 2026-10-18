@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-10-18
+
+- Teste de conexões mostra o erro inteiro (com o corpo da resposta) e em qual passo falhou; teste do Claude usa o modelo pequeno da política; permissão certa do token do GitHub (Checks em leitura).
+
 ## 1.2.0 — 2026-10-18
 
 - Roteiro: você pode desativar qualquer item que ainda não foi entregue. O Developer nunca pega item desativado; reativar

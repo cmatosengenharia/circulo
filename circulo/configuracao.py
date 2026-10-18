@@ -76,6 +76,20 @@ class Peca:
     como_ligar: str = ""
 
 
+def _erro(exc: Exception) -> str:
+    """Mensagem de erro inteira o bastante para saber o que fazer (inclui o corpo da resposta HTTP)."""
+    msg = f"{type(exc).__name__}: {exc}"
+    corpo = getattr(exc, "body", None)
+    if corpo is None and hasattr(exc, "read"):
+        try:
+            corpo = exc.read().decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            corpo = None
+    if corpo and str(corpo)[:60] not in msg:
+        msg += f" · {corpo}"
+    return msg[:600]
+
+
 def _jev_ok() -> tuple[bool, str]:
     from .decision import JevHttpClient, Question
     try:
@@ -89,22 +103,27 @@ def _jev_ok() -> tuple[bool, str]:
 def _llm_ok() -> tuple[bool, str]:
     try:
         from .llm import AnthropicLLM
-        r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model="claude-haiku-5-5", max_tokens=5)
-        return True, f"respondeu ({r.tokens} tokens)"
+        from .policy import DEFAULT_POLICY
+        modelo = DEFAULT_POLICY["harness"]["models"]["pequena"]
+        r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model=modelo, max_tokens=5)
+        return True, f"respondeu ({modelo}, {r.tokens} tokens)"
     except Exception as exc:  # noqa: BLE001
-        return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
+        return False, f"falhou: {_erro(exc)}"
 
 
 def _github_ok() -> tuple[bool, str]:
     """Só leitura: lista PRs e lê os checks da main. Não cria nada."""
+    etapa = "conectar"
     try:
         from .merge_gate import GitHubREST
         gh = GitHubREST(os.environ["CIRCULO_REPO"], os.environ["GITHUB_TOKEN"])
+        etapa = "listar PRs (permissão Pull requests)"
         prs = gh.open_prs()
+        etapa = "ler os checks da main (permissão Checks, leitura)"
         checks = gh.check_runs("main")
         return True, f"acesso ao repo ok ({len(prs)} PR abertos, {len(checks)} checks na main)"
     except Exception as exc:  # noqa: BLE001
-        return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
+        return False, f"falhou ao {etapa}: {_erro(exc)}"
 
 
 def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
@@ -141,7 +160,7 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
     else:
         ok, det = _github_ok() if testar_conexoes else (True, "PRs de agente avaliados e mergeados sozinhos (use --testar para chamar a API)")
         p.append(Peca("Gate de merge", "ligado" if ok else "parado", det,
-                      "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita, Actions e Commit statuses em leitura."))
+                      "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita, Checks em leitura."))
     repo = os.environ.get("CIRCULO_REPO_DIR")
     claude = shutil.which(os.environ.get("CIRCULO_CODE_AGENT", "claude"))
     dev_ok = bool(repo and (Path(repo) / ".git").exists() and claude)
