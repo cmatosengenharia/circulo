@@ -321,8 +321,7 @@ class Circle:
             tasks.append("conectar_missoes")
         if self.engine.ready and "evoluir_harness" not in tasks:
             tasks.append("evoluir_harness")
-        if (self.self_dev is not None and not self.self_dev.busy() and self.self_dev.pick() is not None
-                and "corrigir_codigo" not in tasks):
+        if self.self_dev is not None and self.self_dev.tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
@@ -358,7 +357,7 @@ class Circle:
                 contexto = {"est_tokens": est, "value_signal": VALOR.get(pick, 0.6), "task": pick,
                             "esquecida_ha_giros": min(staleness[pick], 10**4)}
                 if pick == "corrigir_codigo" and self.self_dev is not None:
-                    item = self.self_dev.pick()
+                    item = self.self_dev.alvo()
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
                         contexto.update({"item": item["titulo"], "origem": item["origem"]})
                 gate = ctx.dl.worth_spending("idle_evolution", contexto)
@@ -385,7 +384,7 @@ class Circle:
         if t == "evoluir_projeto":
             return bool(self.engine.ready and self.engine.candidates())
         if t == "corrigir_codigo":
-            return self.self_dev is not None and not self.self_dev.busy() and self.self_dev.pick() is not None
+            return self.self_dev is not None and self.self_dev.tem_trabalho()
         if t == "revisar_prs":
             return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
         return False
@@ -438,11 +437,11 @@ class Circle:
         elif pick == "revisar_prs":
             self.gate.run()
         elif pick == "corrigir_codigo":
-            item = self.self_dev.pick()
+            item = self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
             res = self.self_dev.run_once()
-            if item and res.status != "proposto":
+            if item and res.status not in ("proposto", "consertado"):
                 # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")
         elif pick == "evoluir_harness":

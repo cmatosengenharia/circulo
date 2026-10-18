@@ -9,6 +9,8 @@ Nada aqui espera o humano:
   toca nesses arquivos é recusado e registrado como "fora do alcance" — a missão segue por outro caminho.
 - Código de dinheiro (finance.py, money.py): entra sozinho, mas só com o check "Evidência reforçada"
   (propriedades financeiras em milhares de casos aleatórios) verde, além dos testes normais.
+- PR do Developer reprovado pelo CI, ou sem teste novo, não fica parado esperando: volta para o próprio Developer
+  consertar na mesma branch, com o log do CI (`self_dev_aberto.conserto`).
 """
 from __future__ import annotations
 
@@ -34,6 +36,11 @@ PROTECTED_PATHS = CONSTITUICAO + DINHEIRO   # compatibilidade
 HUMAN_LABEL = "aprovado-humano"             # legado: não é mais exigido
 AGENT_BRANCH_PREFIX = "circulo/"     # o gate só mergeia PRs abertos pelos agentes
 MAX_LINES = 800                       # PR maior que isso nunca entra sozinho
+DEVELOPER_BRANCH_PREFIX = "circulo/fix-"   # PRs do Developer precisam trazer teste novo
+
+
+def tem_teste(files: list[str]) -> bool:
+    return any(f.startswith("tests/") or f.split("/")[-1].startswith("test_") for f in files)
 
 
 class GitHub(Protocol):
@@ -126,7 +133,11 @@ class MergeGate:
 
         ok, why = checks_ok(self.gh.check_runs(sha))
         if not ok:
-            return Verdict(n, sha, False, why)
+            reprovado = why.startswith("checks falhando") or why.startswith("check obrigatório")
+            return Verdict(n, sha, False, why, {"conserto": True} if reprovado else {})
+        if pr.get("head_ref", "").startswith(DEVELOPER_BRANCH_PREFIX) and not tem_teste(names):
+            return Verdict(n, sha, False, "PR do Developer sem teste novo: precisa de um teste de regressão em tests/",
+                           {"conserto": True, "sem_teste": True})
 
         lines = sum(f.get("additions", 0) + f.get("deletions", 0) for f in files)
         if lines > MAX_LINES:
@@ -161,6 +172,19 @@ class MergeGate:
         from .projects import kit_project_id
         s.x("INSERT OR IGNORE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'aberto',?,?)",
             (v.number, kit_project_id(s, "circulo"), f"PR #{v.number}", None, time.time(), time.time()))
+        dev = s.get("self_dev_aberto") or {}
+        if v.details.get("conserto") and dev.get("pr") == v.number and not dev.get("fechado") \
+                and (dev.get("conserto") or {}).get("sha") != v.sha and dev.get("conserto_sha") != v.sha:
+            # devolve ao Developer uma vez por versão do PR, com o que o CI disse
+            log = ""
+            if not v.details.get("sem_teste") and hasattr(self.gh, "falhas_ci"):
+                try:
+                    log = self.gh.falhas_ci(v.sha)
+                except Exception:  # noqa: BLE001 — sem o log o Developer ainda reproduz localmente
+                    log = ""
+            s.set("self_dev_aberto", {**dev, "conserto": {"sha": v.sha, "motivo": v.reason, "log": log[-4000:]},
+                                      "conserto_sha": v.sha})
+            self.ctx.reply(f"PR #{v.number} não passou no gate ({v.reason}); o Developer vai consertar na mesma branch.", "saude")
         last = s.one("SELECT reason FROM merges WHERE pr=? AND sha=? ORDER BY id DESC LIMIT 1", (v.number, v.sha))
         if last and last["reason"] == v.reason:
             return  # não repete a mesma avaliação a cada giro
@@ -226,6 +250,39 @@ class GitHubREST:
             for j in self._req("GET", f"/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]:
                 jobs.append({"id": j["id"], "name": j["name"], "status": j["status"], "conclusion": j.get("conclusion")})
         return jobs
+
+    def falhas_ci(self, sha: str, linhas: int = 60) -> str:
+        """Final do log dos jobs que falharam (o GitHub redireciona para um armazenamento que recusa o token)."""
+        class _SemRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+        corridas = self._req("GET", f"/actions/runs?head_sha={sha}&per_page=20")["workflow_runs"]
+        partes = []
+        for run in corridas:
+            for j in self._req("GET", f"/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]:
+                if j.get("conclusion") != "failure" or len(partes) >= 1:   # um job basta: os outros costumam repetir
+                    continue
+                req = urllib.request.Request(f"{self.API}/repos/{self.repo}/actions/jobs/{j['id']}/logs",
+                                             headers={"Authorization": f"Bearer {self.token}", "User-Agent": "circulo"})
+                try:
+                    with urllib.request.build_opener(_SemRedirect).open(req, timeout=self.timeout) as r:
+                        texto = r.read().decode("utf-8", "replace")
+                except urllib.error.HTTPError as e:
+                    if e.code not in (301, 302, 303, 307, 308) or not e.headers.get("Location"):
+                        raise
+                    with urllib.request.urlopen(e.headers["Location"], timeout=self.timeout) as r:
+                        texto = r.read().decode("utf-8", "replace")
+                limpas = [re.sub(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ", "", x) for x in texto.splitlines()]
+                limpas = [x for x in limpas if x.strip() and not x.startswith(("##[group]", "##[endgroup]"))]
+                fim = next((i for i, x in enumerate(limpas) if x.startswith("##[error]")), len(limpas))
+                partes.append(f"[{j['name']}]\n" + "\n".join(limpas[max(0, fim - linhas):fim + 1]))
+        return "\n".join(partes)
+
+    def close_pr(self, number: int, comentario: str = "") -> None:
+        """Fecha (não apaga): o PR e a branch continuam no GitHub e podem ser reabertos."""
+        if comentario:
+            self._req("POST", f"/issues/{number}/comments", {"body": comentario})
+        self._req("PATCH", f"/pulls/{number}", {"state": "closed"})
 
     def label_events(self, number):
         return [{"event": e["event"], "label": (e.get("label") or {}).get("name"), "actor": (e.get("actor") or {}).get("login", "")}

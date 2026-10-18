@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0 — 2026-10-18
+
+Incidente: o loop girou mais de 1.400 vezes sem evoluir. O PR #1 do Developer (item #26) falhou no CI por lint
+(`zip()` sem `strict=`). Como só existe um PR do Developer por vez, ele ficou "ocupado" para sempre, e o gate repetia
+"checks falhando" sem devolver o trabalho para ninguém.
+
+- PR do Developer reprovado no CI, ou sem teste novo, volta para o próprio Developer consertar na mesma branch, com o
+  final do log do CI (lido pela API do Actions). Depois de 2 consertos sem passar, o PR é fechado (pode ser reaberto,
+  a branch fica) e o item volta para a fila. Nada fica parado esperando você.
+- Verificação local igual ao CI: antes de enviar, o Developer roda o mesmo `ruff check` do CI, além dos testes. Se o
+  ruff faltar na máquina do loop, ele é instalado uma vez via pip.
+- Claude Code que termina com erro (`is_error`: limite da conta, máximo de passos) não conta mais como sucesso. Antes,
+  a saída 0 com trabalho pela metade virava PR. Agora o trabalho parcial é descartado. No limite da conta, o Developer
+  espera o horário de reset ("resets 4:30am") em vez de tentar de novo a cada giro.
+- `ruff` entra nas dependências `dev`.
+
 ## 1.3.3 — 2026-10-18
 
 - Gate de merge: se o token não tiver a permissão Checks, lê os mesmos jobs do CI pela API do Actions.
