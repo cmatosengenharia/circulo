@@ -481,7 +481,8 @@ class Circle:
         elif pick == "estudar_pedido":
             self.estudo.run()
         elif pick == "atualizar_corpo":
-            self.corpo.run()
+            from .corpo_caminho import atualizar_corpo
+            atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
             item = self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
