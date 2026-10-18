@@ -413,6 +413,12 @@ class LocalJev:
         n = int(s.get("falhas_recentes", 0))
         return self._noul("isolate_stage", 0.0 if n < 3 else min(1.0, 0.55 + 0.1 * n))
 
+    def _q_pergunta_evolucao(self, q, s):
+        # regra: a de maior prioridade (relevância × placar da persona × diversidade ÷ custo)
+        cands = s.get("candidatas", {})
+        best = max(q.options(), key=lambda o: float((cands.get(o) or {}).get("score", 0)))
+        return Decision("pergunta_evolucao", "choice", best, 0.7, self.source)
+
     def _q_idle_task(self, q, s):
         stale = s.get("staleness", {})
         opts = q.options()

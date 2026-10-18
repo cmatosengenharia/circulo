@@ -176,6 +176,21 @@ CREATE TABLE IF NOT EXISTS portoes (
   UNIQUE(neuronio, tipo, spec)
 );
 
+-- conselho de perguntas: toda autoevolução parte de uma pergunta feita por uma perspectiva (persona)
+CREATE TABLE IF NOT EXISTS perguntas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL,
+  persona TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  relevancia REAL,
+  score REAL,
+  evidencia TEXT,
+  status TEXT NOT NULL,          -- feita | virou_item | entregue | contestada | repetida | descartada
+  item_id INTEGER,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS incidents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fingerprint TEXT NOT NULL UNIQUE,

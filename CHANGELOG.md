@@ -2,6 +2,37 @@
 
 ## 1.12.0 — 2026-10-18
 
+A autoevolução parte de **perguntas**, feitas por um **conselho de perspectivas**, com economia primeiro.
+
+Exemplo de pergunta (pedido do Cássio): "Como usuário, qual componente devo melhorar para facilitar a visualização das
+métricas no painel?". Quem faz esse tipo de pergunta no loop é o conselho (`perguntas.py`):
+
+| Persona | Olhar |
+|---|---|
+| usuário | entender rápido, confiar, não precisar perguntar |
+| economista | menos tokens e menos LLM por resultado entregue |
+| operador (SRE) | não travar, não ficar cego, se recuperar sozinho |
+| cientista | toda mudança prova que melhorou algo |
+| arquiteto | menos retrabalho onde o código mais quebra |
+| auditor | guardrail que nunca barrou nada pode estar quebrado |
+| cético | indicador que diz "tudo bem" e pode estar mentindo |
+| financeiro | o cérebro financeiro só aprende com dados reais |
+
+- **Gerar e priorizar perguntas não gasta LLM.** Cada pergunta tem um sinal calculado por SQL nos dados do loop
+  (quanto dói agora) e a evidência que a sustenta; pergunta sem dor não entra.
+  Prioridade = relevância × placar da persona × diversidade ÷ custo. Persona usada nas últimas 3 perguntas pesa 0,35,
+  para o conselho não ficar preso num olhar só. A regra estreita para as 3 melhores e o Jev escolhe.
+- **Só a pergunta escolhida vai para a LLM** (planejador), que responde com UM item, ou com `sem_item` quando a
+  resposta já existe ou exige mexer na constituição. Isso corrige o caso do #35, que propôs algo já feito. Pergunta em
+  andamento não é refeita.
+- **As perguntas evoluem**: cada persona tem um placar (Beta). Item entregue soma; contestado, repetido ou sem item
+  subtrai. Quem pergunta melhor pergunta mais.
+- Rastro completo: tabela `perguntas`, item do roteiro com "pergunta do conselho: <persona>", alerta "Conselho
+  (persona) perguntou: … → item #n", painel ("Última pergunta do conselho") e `/api/conselho` (placar, últimas
+  perguntas e as próximas candidatas).
+
+## 1.12.0 — 2026-10-18
+
 Central de confiança em três níveis (Endsley), sinais de ouro, trilha write-ahead e parada testada (item #32).
 
 - **Trilha write-ahead** (`circulo/intencoes.py`): cada pedido e cada tarefa do loop gravam a intenção antes de rodar.

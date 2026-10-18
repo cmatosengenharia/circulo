@@ -242,6 +242,12 @@ def confianca(store: Store, now: float | None = None) -> dict:
     if estudar:
         ck.append(_c("estudo", "proximo", "Esperando estudo", "info", f"{estudar} pedido(s)",
                      "antes de executar, o loop pesquisa em fontes confiáveis e decide adotar, adaptar ou contestar", now))
+    ultima = s.one("SELECT persona, texto, status, item_id, created_at FROM perguntas ORDER BY id DESC LIMIT 1")
+    if ultima:
+        st_p = {"feita": "sendo respondida", "virou_item": f"virou o item #{ultima['item_id']}", "entregue": "entregue",
+                "contestada": "contestada pelo estudo", "repetida": "já existia", "descartada": "sem item novo"}.get(ultima["status"], ultima["status"])
+        ck.append(_c("conselho", "proximo", f"Última pergunta do conselho ({ultima['persona']})", "info", ultima["texto"][:140],
+                     f"{st_p}; a evolução parte de perguntas, escolhidas por dor medida e custo, sem LLM", ultima["created_at"]))
     plan = s.get("planejador") or {}
     if plan.get("em") and not alvo and not estudar:
         ck.append(_c("planejador", "proximo", "Planejador", "info", f"próxima tentativa {_hora(float(plan['em']) + 1800)}",

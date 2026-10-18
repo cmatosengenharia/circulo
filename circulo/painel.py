@@ -270,6 +270,15 @@ def make_handler(db_path: str):
                 self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")), "versao": __version__,
                             "autonomia": e["autonomia"],
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
+            elif u.path == "/api/conselho":
+                from .perguntas import Conselho
+                from .agents import Ctx  # noqa: F401 — o conselho só lê o store aqui
+
+                class _C:
+                    pass
+                c = _C()
+                c.store = self._store()
+                self._json(Conselho(c).resumo())
             elif u.path == "/api/confianca":
                 from .confianca import confianca
                 self._json(confianca(self._store()))
