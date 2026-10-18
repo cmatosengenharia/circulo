@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.9.0 — 2026-10-18
+
+O loop passa a rodar o código que ele mesmo evoluiu. Antes, um PR mergeado pelo gate (ex.: #3, feito sozinho em
+7 minutos: planejar → estudar → Developer → portões → PR → CI → merge) só existia no GitHub, e a máquina do loop
+seguia no código antigo até alguém atualizar à mão.
+
+- **Neurônio `corpo:atualizar`** (`corpo.py`): quando a main anda (logo depois de um merge, e a cada 60 giros):
+  - portões ANTES de trocar: num worktree separado com o código novo, importa os módulos do serviço e roda a suíte
+    de testes. Se reprovar, o corpo não muda, a lição `corpo:validacao_falhou` (estrutural) é registrada e aquele
+    código não é tentado de novo;
+  - troca: a mudança local é guardada em patch na pasta de dados (arquivo não rastreado nunca é apagado). O código
+    vai para a main e o loop reinicia limpo;
+  - **evidência depois**: os 5 primeiros giros precisam rodar sem erro. Com 2 giros com erro, o loop volta para o
+    código anterior, reinicia e registra `corpo:regressao_pos_atualizacao`.
+- `corpo.py` entra na constituição: agente nenhum afrouxa a troca do próprio corpo.
+
 ## 1.8.0 — 2026-10-18
 
 O pedido é uma hipótese, não uma ordem gravada em pedra. O loop só executa depois de estudar em fontes confiáveis,

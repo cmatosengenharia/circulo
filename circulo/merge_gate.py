@@ -29,7 +29,7 @@ from .agents import Ctx, ReviewerCode
 REQUIRED_CHECKS = ("Testes (Python 3.11)", "Testes (Python 3.12)", "Testes (Python 3.13)", "Constituição", "Evidência reforçada")
 CONSTITUICAO = (
     "circulo/merge_gate.py", "circulo/policy.py", "circulo/budget.py", "circulo/guardrails.py",
-    "circulo/self_dev.py", ".github/",
+    "circulo/self_dev.py", "circulo/corpo.py", ".github/",
 )
 DINHEIRO = ("circulo/finance.py", "circulo/money.py")
 PROTECTED_PATHS = CONSTITUICAO + DINHEIRO   # compatibilidade
