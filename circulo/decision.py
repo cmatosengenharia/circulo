@@ -421,10 +421,17 @@ class DecisionLayer:
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError, OSError) as exc:
             out, _ = self.local.ask_many(state, questions)
             self.s.set("jev_last_error", str(exc)[:300])
+        incerto = self._thr("jev_incerto", 0.25)
         for qid, q in questions.items():
             d = out.get(qid)
             if d is None or not self._valid(q, d):
                 out[qid] = self.local.ask_many(state, {qid: q})[0][qid]
+            elif d.source == "jev" and d.confidence < incerto and not qid.startswith(("crit_", "rel_")):
+                # Cascata: o Jev respondeu "não sei" (perto de 50%, confiança baixa). A resposta dele fica registrada,
+                # e a decisão passa para a regra determinística, em vez de um meio-termo que trava tudo.
+                self._log(d)
+                regra = self.local.ask_many(state, {qid: q})[0][qid]
+                out[qid] = Decision(regra.name, regra.kind, regra.value, regra.confidence, "local", regra.probabilities)
             self._log(out[qid])
         return out
 

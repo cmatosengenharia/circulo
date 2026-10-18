@@ -78,3 +78,23 @@ def test_jev_fora_do_ar_nao_para_o_circulo(circle):
     circle.submit("38,90 ifood almoço")
     r = circle.tick()
     assert not r.errors and circle.store.get("jev_last_error") == "timeout"
+
+
+def test_jev_em_duvida_passa_para_a_regra_e_fica_registrado(tmp_path):
+    from circulo.decision import Decision
+    from circulo.loop import Circle
+
+    class JevIndeciso:
+        source = "jev"
+
+        def ask_many(self, state, questions):
+            return {k: Decision(k, q.kind, (q.options()[0] if q.kind == "choice" else 0.48 if q.kind == "noul" else 0.0),
+                                0.04, "jev") for k, q in questions.items()}, 1
+
+    c = Circle(tmp_path, jev=JevIndeciso())
+    c.submit("38,90 ifood almoço")
+    c.tick()
+    fontes = [r["source"] for r in c.store.q("SELECT source FROM decisions WHERE question='input_type'")]
+    assert fontes == ["jev", "local"]                    # a dúvida do Jev aparece, e a regra decide
+    row = c.store.one("SELECT category FROM ledger")
+    assert row["category"] == "delivery"                 # sem a regra, o "não sei" do Jev travaria o lançamento

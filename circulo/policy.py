@@ -37,6 +37,7 @@ DEFAULT_POLICY: dict[str, Any] = {
         "should_evolve": {"domain": 0.6, "circle": 0.8},
         "auto_accept_category": 0.75,
         "llm_fallback_below": 0.5,
+        "jev_incerto": 0.25,          # abaixo desta confiança, a regra decide (a resposta do Jev fica registrada)
         "alert_pattern": 0.7,
         "rollback": 0.6,
         "verify_output": 0.5,
