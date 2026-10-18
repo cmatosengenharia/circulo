@@ -15,6 +15,7 @@ Limites duros:
 from __future__ import annotations
 
 import json
+import base64
 import os
 import shutil
 import subprocess
@@ -80,8 +81,21 @@ class DevResult:
     pr: int | None = None
 
 
+def _git_env() -> dict:
+    """Nunca pede senha (o loop não tem ninguém para digitar). Com GITHUB_TOKEN, fetch/push no GitHub usam o
+    token por variável de ambiente do git (fora da linha de comando, não aparece no `ps`)."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        cred = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        n = int(env.get("GIT_CONFIG_COUNT", "0") or 0)
+        env.update({"GIT_CONFIG_COUNT": str(n + 1), f"GIT_CONFIG_KEY_{n}": "http.https://github.com/.extraheader",
+                    f"GIT_CONFIG_VALUE_{n}": f"AUTHORIZATION: basic {cred}"})
+    return env
+
+
 def _git(args: list[str], cwd: Path, check: bool = True) -> str:
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=_git_env())
     if check and p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)}: {p.stderr.strip()[-300:]}")
     return p.stdout.strip()

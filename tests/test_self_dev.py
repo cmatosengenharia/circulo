@@ -131,3 +131,19 @@ def test_merge_do_pr_libera_o_developer(circle, repo):
 
     MergeGate(circle.ctx, GH(), "cmatosengenharia").run()
     assert not dev.busy()
+
+
+def test_git_usa_token_sem_expor_na_linha_de_comando_e_nunca_pede_senha(monkeypatch):
+    import base64
+    from circulo.self_dev import _git_env
+    monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
+    monkeypatch.setenv("GITHUB_TOKEN", "tok123")
+    env = _git_env()
+    assert env["GIT_TERMINAL_PROMPT"] == "0" and env["GIT_CONFIG_COUNT"] == "1"
+    assert env["GIT_CONFIG_KEY_0"] == "http.https://github.com/.extraheader"
+    assert base64.b64encode(b"x-access-token:tok123").decode() in env["GIT_CONFIG_VALUE_0"]
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")             # config de git que já existia é preservada
+    env = _git_env()
+    assert env["GIT_CONFIG_COUNT"] == "2" and env["GIT_CONFIG_KEY_1"] == "http.https://github.com/.extraheader"
+    monkeypatch.delenv("GITHUB_TOKEN")
+    assert _git_env()["GIT_CONFIG_COUNT"] == "1"

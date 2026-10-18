@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 — 2026-10-17
+
+- Developer autentica fetch/push no GitHub com o `GITHUB_TOKEN` (por variável de ambiente do git, fora da linha de comando) e nunca fica esperando senha.
+
 ## 1.0.2 — 2026-10-17
 
 - Serviço 24/7 roda dentro da pasta de dados e usa o executável `circulo` do ambiente. Antes, no macOS, o clone `~/Projects/circulo` escondia o pacote instalado e o loop caía ao subir.
