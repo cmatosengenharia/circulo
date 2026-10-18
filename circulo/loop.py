@@ -7,6 +7,7 @@ import signal
 import threading
 import time
 import traceback
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -59,6 +60,7 @@ class TickResult:
     health: dict = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     inicio: float = field(default_factory=time.time)
+    run_id: str | None = None
 
 
 class Circle:
@@ -134,10 +136,11 @@ class Circle:
         """Etapa atual do giro, para o painel ao vivo. A trilha guarda cada passagem, para o círculo
         do painel animar etapa por etapa mesmo quando o giro inteiro dura milissegundos."""
         now = time.time()
-        e = {"nome": name, "tick": self.store.tick, "em": now, "projeto": self.ctx.dl.project_id, **(extra or {})}
+        e = {"nome": name, "tick": self.store.tick, "em": now, "projeto": self.ctx.dl.project_id,
+             "run_id": self.store.get("run_id"), **(extra or {})}
         self.store.set("etapa", e)
-        seq = self.store.x("INSERT INTO trail(tick,etapa,project_id,em,detalhe) VALUES(?,?,?,?,?)",
-                           (e["tick"], name, e["projeto"], now, e.get("detalhe")))
+        seq = self.store.x("INSERT INTO trail(tick,etapa,project_id,em,detalhe,run_id,tarefa) VALUES(?,?,?,?,?,?,?)",
+                           (e["tick"], name, e["projeto"], now, e.get("detalhe"), e["run_id"], e.get("tarefa")))
         if seq % 500 == 0:
             self.store.x("DELETE FROM trail WHERE seq < ?", (seq - 2000,))   # trilha é efêmera (só para animação)
 
@@ -149,6 +152,8 @@ class Circle:
     def tick(self) -> TickResult:
         s, ctx = self.store, self.ctx
         ctl = self.controls()
+        if ctl["pausado"] or ctx.budget.exhausted():
+            s.set("run_id", None)                # giro que não roda não é execução: nada a rastrear
         if ctl["pausado"]:
             s.set("loop_status", "pausado_humano")
             self._stage("pausado")
@@ -160,6 +165,9 @@ class Circle:
             return TickResult(s.tick, paused=True, pause_reason="orcamento")
         s.set("loop_status", "modo_seguro" if ctl["modo_seguro"] else "rodando")
         r = TickResult(s.next_tick())
+        # um ID por execução, gravado em cada etapa, erro e métrica: o painel localiza qualquer falha por ele
+        r.run_id = uuid.uuid4().hex[:12]
+        s.set("run_id", r.run_id)
         havia_trabalho = self.trabalho_pendente(ignorar_estagnacao=True)
         antes = self._progresso()
         circulo_pid = kit_project_id(s, "circulo")
@@ -245,6 +253,7 @@ class Circle:
                 r.errors.append(f"corpo: {exc!r}")
         self._record(r)
         self._stage("descanso")
+        s.set("run_id", None)                    # erro fora do giro (ex.: teste da parada) não cai na execução que já fechou
         every = int(ctx.policy["loop"]["summary_every_ticks"])
         if r.tick % every == 0:
             self.write_summary()
@@ -424,7 +433,7 @@ class Circle:
                     s.set("progresso", pg)
                     continue
             if pick not in ("corrigir_codigo", "evoluir_projeto"):
-                self._stage("idle", {"detalhe": TAREFAS.get(pick, pick)})
+                self._stage("idle", {"detalhe": TAREFAS.get(pick, pick), "tarefa": pick})
             try:
                 # write-ahead: intenção (motivo, regra que decidiu, entradas) gravada antes; só então a tarefa roda
                 intencoes.executar(s, pick, lambda pick=pick: self._run_idle_task(pick), motivo=TAREFAS.get(pick, pick),
@@ -560,7 +569,7 @@ class Circle:
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
             item = self.self_dev.alvo()
-            self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
+            self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"), "tarefa": "corrigir_codigo",
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
             res = self.self_dev.run_once(autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
@@ -570,7 +579,8 @@ class Circle:
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "evoluir_projeto":
             # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo
-            self.engine.run_parallel(on_stage=lambda nome, pid, detalhe=None: self._stage(nome, {"projeto": pid, "detalhe": detalhe}))
+            self.engine.run_parallel(on_stage=lambda nome, pid, detalhe=None: self._stage(nome, {"projeto": pid, "detalhe": detalhe,
+                                                                                               "tarefa": "evoluir_projeto"}))
 
     def regression(self) -> dict:
         """Replay da política ativa sobre todo o histórico resolvido; guarda a acurácia como linha de base."""
@@ -589,7 +599,7 @@ class Circle:
 
     # ------------------------------------------------------------ métricas e resumo
     def _record(self, r: TickResult) -> None:
-        body = {"handled": r.handled_event, "idle": r.idle_task, "evolutions": r.evolutions, "shadow": r.shadow,
+        body = {"run_id": r.run_id, "handled": r.handled_event, "idle": r.idle_task, "evolutions": r.evolutions, "shadow": r.shadow,
                 "health": r.health, "errors": r.errors, "budget": self.ctx.budget.snapshot(),
                 "duracao_ms": round(1000 * (time.time() - r.inicio))}   # sinal de ouro: latência do giro
         self.store.x("INSERT OR REPLACE INTO metrics(tick,body,created_at) VALUES(?,?,?)",

@@ -268,6 +268,13 @@ def make_handler(db_path: str):
             elif u.path == "/api/parada":
                 from . import parada
                 self._json(parada.estado(self._store()))
+            elif u.path == "/api/loop":
+                from .camadas import visao
+                self._json(visao(self._store()))
+            elif u.path.startswith("/api/execucao/"):
+                from .camadas import execucao
+                ex = execucao(self._store(), u.path.rsplit("/", 1)[1])
+                self._json(ex if ex else {"erro": "execução não encontrada"}, 200 if ex else 404)
             elif u.path == "/api/eventos":
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:

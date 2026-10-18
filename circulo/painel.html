@@ -191,6 +191,31 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 .chaves{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:10px}
 .chaves b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 
+/* dash em camadas: semáforo no topo, etapas do ciclo, detalhe de uma execução pelo run_id */
+.camadas{margin:0 0 18px;display:flex;flex-direction:column;gap:14px}
+.semaforo{display:flex;gap:12px;align-items:center}
+.semaforo .luz{flex:none;width:18px;height:18px;border-radius:50%;background:var(--idle)}
+.semaforo[data-c="verde"] .luz{background:var(--ok)}
+.semaforo[data-c="amarelo"] .luz{background:var(--llm)}
+.semaforo[data-c="vermelho"] .luz{background:var(--bad)}
+.semaforo p{margin:0;font-size:17px;font-weight:700}
+.sinais{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.sinais div{background:var(--bg);border-radius:var(--r-sm);padding:8px 12px;min-width:0}
+.sinais span{display:block;font-size:12px;color:var(--muted)}
+.sinais b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etapas{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.etapa{flex:1 0 96px;text-align:left;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-top:4px solid var(--idle);border-radius:var(--r-sm);padding:6px 8px;cursor:pointer}
+.etapa[disabled]{cursor:default;opacity:.55}
+.etapa[data-s="ok"]{border-top-color:var(--ok)}
+.etapa[data-s="rodando"]{border-top-color:var(--jev)}
+.etapa[data-s="falhou"]{border-top-color:var(--bad);background:var(--bad-soft)}
+.etapa b{display:block;font-size:12.5px}
+.etapa span{display:block;font-size:11.5px;color:var(--muted)}
+.execs{width:100%;height:70px;display:block}
+.execs rect{cursor:pointer}
+.exec-det{border-top:1px solid var(--line);padding-top:10px}
+.exec-det pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border-radius:var(--r-sm);padding:8px;max-height:220px;overflow:auto}
+
 /* console de decisões */
 .cabeca{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;justify-content:space-between;margin-bottom:10px}
 .cabeca h2{margin:0}
@@ -347,6 +372,17 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <button class="btn primary" id="pause">Pausar o loop</button>
     </div>
   </header>
+
+  <section class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
+    <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
+    <div class="sinais" id="sinais"></div>
+    <div><h2 style="margin:0 0 6px">Etapas do ciclo <small class="sub">clique numa etapa para abrir a última execução dela</small></h2>
+      <div class="etapas" id="etapas" role="list"></div></div>
+    <div><h2 style="margin:0 0 6px">Execuções <small class="sub">altura = duração · vermelho = falhou · linha verde = PR mergeado · linha vermelha = incidente</small></h2>
+      <svg class="execs" id="execs" viewBox="0 0 600 70" preserveAspectRatio="none" role="img" aria-label="Duração das últimas execuções"></svg></div>
+    <div class="exec-det" id="execDet" hidden></div>
+    <details><summary class="sub">Saturação (fila de pedidos, tempo ocioso)</summary><div class="sinais" id="saturacao" style="margin-top:8px"></div></details>
+  </section>
 
   <section class="panel zero-only" hidden id="confianca" style="margin:0 0 18px" aria-label="Posso confiar no loop agora?">
     <div class="cf-veredito" id="cfVeredito" data-v=""><div class="selo" id="cfSelo">…</div>
@@ -1069,9 +1105,60 @@ function connect() {
   es.addEventListener("sinapse", m => { sinapses.unshift(JSON.parse(m.data)); sinapses = sinapses.slice(0, 200); ultimoDado = Date.now(); agendar(renderSinapses); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
+/* ---------- dash em camadas: saúde → etapas → execução (run_id) ---------- */
+const ST_ETAPA = {ok:"ok", rodando:"rodando agora", falhou:"falhou", sem_execucao:"não rodou nas últimas execuções"};
+async function abrirExecucao(rid, chave) {
+  const det = $("#execDet");
+  const r = await fetch("/api/execucao/" + encodeURIComponent(rid));
+  if (!r.ok) { det.hidden = false; det.innerHTML = `<p class="sub">Execução ${esc(rid)} não encontrada (a trilha guarda só as mais recentes).</p>`; return; }
+  const x = await r.json();
+  const erros = x.erros.filter(e => !chave || e.chave === chave);
+  det.hidden = false;
+  det.innerHTML = `<h2 style="margin:0 0 6px">Execução <code>${esc(x.run_id)}</code> · giro ${x.tick}${x.ativo ? " · em curso" : ""}${x.duracao_ms != null ? " · " + dur(x.duracao_ms / 1000) : ""}</h2>
+    ${erros.length ? erros.map(e => `<p><strong>${esc(e.nome)}: ${esc(e.kind)}</strong> ${esc(e.message)} <span class="sub">${hora(e.em)}${e.incident_id ? " · incidente #" + e.incident_id : ""}</span></p><pre>${esc(e.trace)}</pre>`).join("")
+      : `<p class="sub">Nenhum erro ${chave ? "nesta etapa " : ""}nesta execução.</p>`}
+    ${x.erros_do_giro.length && !chave ? `<pre>${esc(x.erros_do_giro.join("\n"))}</pre>` : ""}
+    <ul class="passos">${x.etapas.map(e => `<li${chave && e.chave === chave ? ' style="font-weight:700"' : ""}><span class="t">${hora(e.em)}</span><i style="background:var(--s-orq)"></i><span>${esc(e.nome)}${e.detalhe ? " · " + esc(e.detalhe) : ""}</span><span class="d">${dur(e.dur)}</span></li>`).join("")}</ul>
+    ${x.decisoes.length ? `<details><summary class="sub">${x.decisoes.length} decisões neste giro</summary><ul class="list">${x.decisoes.map(d => `<li><span>${esc(QUEST[d.question] || d.question)} → ${esc(JSON.stringify(d.value))}</span><span class="chip">${esc(d.source)}</span></li>`).join("")}</ul></details>` : ""}`;
+}
+function renderCamadas(v) {
+  const H = v.saude, a = H.etapa_atual, pr = H.ultimo_pr;
+  $("#semaforo").dataset.c = H.cor; $("#semFrase").textContent = H.frase;
+  $("#sinais").innerHTML = [
+    ["Loop", H.titulo],
+    ["Etapa atual", a ? `${a.nome} · ${dur(a.ha)}` : "entre giros"],
+    ["Último PR", pr ? `#${pr.number} ${pr.status} · ${pr.titulo}` : "nenhum ainda"],
+    ["Erros em 24 h", String(H.erros_24h) + (H.dur_falha != null ? ` · falha leva ${dur(H.dur_falha)}` : "")],
+    ["Giro típico", H.dur_ok != null ? dur(H.dur_ok) : "—"],
+  ].map(([k, val]) => `<div><span>${k}</span><b title="${esc(val)}">${esc(val)}</b></div>`).join("");
+  $("#etapas").innerHTML = v.etapas.map(e =>
+    `<button class="etapa" role="listitem" data-s="${e.status}" data-run="${esc(e.run_id || "")}" data-chave="${e.chave}" ${e.run_id ? "" : "disabled"}
+       title="${esc(e.nome)}: ${ST_ETAPA[e.status]}${e.run_id ? " · execução " + esc(e.run_id) : ""}">
+       <b>${esc(e.nome)}</b><span>${ST_ETAPA[e.status]}</span><span>${e.dur != null ? dur(e.dur) : "—"}${e.erros_24h ? ` · ${e.erros_24h} erro${e.erros_24h > 1 ? "s" : ""}` : ""}</span></button>`).join("");
+  const X = v.execucoes, W = 600, Hh = 70;
+  if (X.length) {
+    const t0 = X[0].inicio, t1 = Math.max(v.agora, t0 + 1), xs = t => (t - t0) / (t1 - t0) * (W - 8);
+    const maxd = Math.max(...X.map(r => r.dur), 0.001), bw = Math.max(3, (W - 8) / X.length * 0.7);
+    $("#execs").innerHTML = X.map(r => `<rect data-run="${esc(r.run_id)}" x="${xs(r.inicio)}" y="${Hh - Math.max(2, r.dur / maxd * (Hh - 4))}" width="${bw}" height="${Math.max(2, r.dur / maxd * (Hh - 4))}"
+        fill="${r.erros ? "var(--bad)" : r.ativo ? "var(--jev)" : "var(--idle)"}"><title>giro ${r.tick} · ${dur(r.dur)}${r.erros ? " · " + r.erros + " erro(s)" : ""} · ${esc(r.run_id)}</title></rect>`).join("")
+      + v.marcos.filter(m => m.em >= t0).map(m => `<line x1="${xs(m.em)}" x2="${xs(m.em)}" y1="0" y2="${Hh}" stroke="${m.tipo === "merge" ? "var(--ok)" : "var(--bad)"}" stroke-width="1.5" stroke-dasharray="3 2"><title>${esc(m.titulo)} · ${hora(m.em)}</title></line>`).join("");
+  } else $("#execs").innerHTML = "";
+  const Z = v.saturacao;
+  $("#saturacao").innerHTML = [["Pedidos na fila", String(Z.fila)], ["Tempo ocioso (1 h)", Z.ocioso != null ? pct(Z.ocioso) : "—"], ["Giros na última hora", String(Z.giros_1h)]]
+    .map(([k, val]) => `<div><span>${k}</span><b>${esc(val)}</b></div>`).join("");
+}
+$("#etapas").addEventListener("click", ev => { const b = ev.target.closest(".etapa"); if (b && b.dataset.run) abrirExecucao(b.dataset.run, b.dataset.chave); });
+$("#execs").addEventListener("click", ev => { const r = ev.target.closest("rect"); if (r) abrirExecucao(r.dataset.run); });
+async function refreshCamadas() {
+  if (!ZERO) return;
+  try { renderCamadas(await (await fetch("/api/loop")).json()); } catch { $("#semaforo").dataset.c = ""; $("#semFrase").textContent = "Sem conexão com o painel"; }
+}
+setInterval(refreshCamadas, 5000);   // etapas no dash com atraso de até 5 s (meta: ≤ 15 s)
+
 refresh(); setInterval(refresh, 3000); setInterval(renderAgora, 1000);
 fetch("/api/estado?" + Q).then(r => r.json()).then(s => {
   ZERO = !!(s.projeto && s.projeto.kit === "circulo");
+  refreshCamadas();
   if (ZERO) fetch("/api/estado").then(r => r.json()).then(g => { lastId = Math.max(0, g.ultima_decisao - 25); connect(); });
   else { lastId = Math.max(0, s.ultima_decisao - 25); connect(); }
 });
