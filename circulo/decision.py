@@ -327,6 +327,10 @@ class LocalJev:
     def _q_pick_model(self, q, s):
         if float(s.get("budget_left_ratio", 1)) < 0.2:
             return Decision("pick_model", "choice", "pequena", 0.85, self.source)
+        # a complexidade da tarefa manda; o papel só desempata quando ela é média ou desconhecida
+        cx = s.get("complexity")
+        if cx in ("alta", "baixa"):
+            return Decision("pick_model", "choice", "grande" if cx == "alta" else "pequena", 0.75, self.source)
         heavy = s.get("role") in ("builder", "improver", "researcher", "rubric", "developer")
         return Decision("pick_model", "choice", "grande" if heavy else "pequena", 0.7, self.source)
 
@@ -549,10 +553,24 @@ def _route(self, task: str, features: Mapping[str, Any]) -> Decision:
                     {"tarefa": task, **features})
 
 
+def complexidade_tarefa(tarefa: str, max_tokens: int = 0) -> str:
+    """Sinal barato da complexidade da tarefa (tamanho do pedido + tamanho esperado da saída): baixa | media | alta."""
+    pontos = len(tarefa.split()) / 400 + max_tokens / 3000
+    if "foi reprovada" in tarefa:   # consertar uma versão reprovada pede mais raciocínio
+        pontos += 1
+    return "alta" if pontos >= 2.5 else "baixa" if pontos < 0.6 else "media"
+
+
 def _pick_model_detalhe(self, role: str, features: Mapping[str, Any] | None = None) -> dict:
-    """Escolha do modelo pelo Jev, com o histórico de cada nível neste papel como contexto."""
+    """Escolha do modelo pelo Jev pela complexidade da tarefa, com o histórico de cada nível neste papel como contexto."""
     harness = self.policy().get("harness", {})
     estado = {"role": role, "budget_left_ratio": round(self.budget.left_ratio(), 3), **(features or {})}
+    if "tarefa" in estado:
+        tarefa = str(estado["tarefa"])
+        if "complexity" not in estado:
+            max_tokens = int(harness.get("roles", {}).get(role, {}).get("max_tokens", 0))
+            estado["complexity"] = complexidade_tarefa(tarefa, max_tokens)
+        estado["tarefa"] = tarefa[:1500]
     store = getattr(self.budget, "s", None) or getattr(self.budget, "store", None)
     if store is not None:
         try:
@@ -562,7 +580,7 @@ def _pick_model_detalhe(self, role: str, features: Mapping[str, Any] | None = No
                 estado["historico_por_nivel"] = h
         except Exception:  # noqa: BLE001 — histórico é contexto, nunca bloqueia
             pass
-    d = self.ask("pick_model", Question("choice", f"Qual modelo é suficiente para o papel '{role}'?",
+    d = self.ask("pick_model", Question("choice", f"Dada a complexidade desta tarefa, qual modelo é suficiente para o papel '{role}'?",
                                         {"pequena": "rápido e barato", "grande": "melhor raciocínio"}), estado)
     confiante = d.confidence >= 0.5
     tier = d.value if confiante else harness.get("roles", {}).get(role, {}).get("tier", "grande")

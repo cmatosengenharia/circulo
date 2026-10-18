@@ -105,7 +105,8 @@ class Engine:
         if self.lab and role in ("builder", "improver"):
             system, arm, exp = self.lab.system_for(role)
             self._tl.arm = (arm, exp)
-        escolha = self.ctx.dl.pick_model_detalhe(role, {"tipo": project["tipo"]})
+        escolha = self.ctx.dl.pick_model_detalhe(role, {"tipo": project["tipo"], "pedido": project["pedido"][:300],
+                                                         "tarefa": prompt})
         model = escolha["modelo"]
         t0 = time.time()
         try:
