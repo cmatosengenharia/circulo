@@ -351,12 +351,18 @@ class SelfDeveloper:
         r = self.s.one("SELECT * FROM roadmap WHERE id=?", (item_id,))
         titulo = r["titulo"] if r else f"item #{item_id}"
         motivo = str(st["conserto"].get("motivo", ""))
+        branch = st["branch"]
+        _git(["fetch", "origin", branch, "main"], self.repo)
+        atual = _git(["rev-parse", f"origin/{branch}"], self.repo, check=False)
+        if atual and st["conserto"].get("sha") and atual != st["conserto"]["sha"]:
+            # o PR mudou depois da reprovação (outro commit, main atualizada): o CI vai rodar de novo; espera o gate
+            st["conserto"] = None
+            self.s.set("self_dev_aberto", st)
+            return DevResult(item_id, "aguardando_ci", f"o PR #{pr} mudou desde a reprovação; o gate avalia de novo", pr)
         if int(st.get("consertos", 0)) >= MAX_CONSERTOS:
             return self._abandonar(st, titulo, motivo)
         wt = self.repo.parent / f".circulo-wt-{item_id}"
-        branch = st["branch"]
         try:
-            _git(["fetch", "origin", branch, "main"], self.repo)
             if wt.exists():
                 _git(["worktree", "remove", "--force", str(wt)], self.repo, check=False)
             _git(["worktree", "add", "-B", branch, str(wt), f"origin/{branch}"], self.repo)

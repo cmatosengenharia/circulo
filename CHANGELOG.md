@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.2 — 2026-10-18
+
+- Conserto só vale para a versão do PR que foi reprovada: se a branch mudou depois (commit novo, main atualizada no PR),
+  o Developer não conserta nem fecha o PR, e espera o gate avaliar a versão nova.
+
 ## 1.4.1 — 2026-10-18
 
 - CI, job Constituição: compara o merge do PR com a main atual (`HEAD^1`), não com a main de quando o PR abriu.

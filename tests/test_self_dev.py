@@ -322,8 +322,21 @@ def test_depois_de_max_consertos_o_pr_e_fechado_e_o_item_volta(circle, repo):
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
     dev.run_once()
     st = circle.store.get("self_dev_aberto")
-    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": "x", "motivo": "checks falhando"}})
+    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": gh._sha(), "motivo": "checks falhando"}})
     r = dev.run_once()
     assert r.status == "abandonado" and gh.closed and gh.closed[0][0] == 42
     assert not dev.busy()
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
+
+
+def test_pr_que_mudou_depois_da_reprovacao_nao_e_consertado_nem_fechado(circle, repo):
+    from circulo.self_dev import MAX_CONSERTOS
+    erro_recorrente(circle)
+    gh = GateGH(repo.parent / "origin.git")
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
+    dev.run_once()
+    st = circle.store.get("self_dev_aberto")
+    # reprovado num sha antigo; depois disso a branch andou (ex.: main atualizada no PR)
+    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": "0" * 40, "motivo": "checks falhando"}})
+    r = dev.run_once()
+    assert r.status == "aguardando_ci" and gh.closed == [] and dev.busy() and not dev.tem_trabalho()
