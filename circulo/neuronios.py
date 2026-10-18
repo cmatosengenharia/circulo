@@ -143,16 +143,18 @@ def diff_do_worktree(wt: Path, base: str, git) -> tuple[list[dict], dict[str, li
     return arquivos, adicionadas
 
 
-def portoes_natos_pr(arquivos: list[dict]) -> list[Resultado]:
+def portoes_natos_pr(arquivos: list[dict], adicionadas: dict[str, list[str]] | None = None) -> list[Resultado]:
     """O mesmo que o gate do merge exige, checado ANTES de o PR existir."""
     from .merge_gate import MAX_LINES, tem_teste, touches_constitution
     nomes = [a["filename"] for a in arquivos]
+    marcas = sorted({f for f, ls in (adicionadas or {}).items() if any(re.match(r"^(<{7}|>{7})( |$)|^={7}$", x) for x in ls)})
     const = touches_constitution(nomes)
     linhas = sum(a["additions"] + a["deletions"] for a in arquivos)
     return [
         Resultado("constituição intacta", not const, f"altera a constituição: {', '.join(const)}" if const else ""),
         Resultado("tamanho", linhas <= MAX_LINES, f"{linhas} linhas > {MAX_LINES}: quebre em partes" if linhas > MAX_LINES else ""),
         Resultado("teste novo", tem_teste(nomes), "" if tem_teste(nomes) else "nenhum teste novo em tests/"),
+        Resultado("sem marcador de conflito", not marcas, f"marcadores de conflito em: {', '.join(marcas)}" if marcas else ""),
     ]
 
 

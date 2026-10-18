@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.2 — 2026-10-18
+
+Dois jeitos de o Developer ficar parado para sempre esperando um PR, achados enquanto ele resolvia a lição #1 sozinho
+(PR #4, que acabou superado pela correção da 1.9.1):
+
+- **PR em conflito com a main** volta para o Developer: o gate lê `mergeable` e devolve com "conflito com a main".
+  No conserto, a main é trazida para a branch e o agente resolve os conflitos. Novo portão nato antes do PR:
+  **sem marcador de conflito** nas linhas novas.
+- **PR fechado ou mergeado fora do gate** (por você, no GitHub): o Developer é liberado. Se o PR foi fechado sem
+  merge, o item volta para a fila; se foi mergeado, o item vira feito.
+- O conserto que só traz a main (sem mudança do agente) também é enviado.
+
 ## 1.9.1 — 2026-10-18
 
 Primeira lição real da máquina do loop (#1, estrutural), registrada sozinha minutos depois da 1.9.0. A troca de corpo

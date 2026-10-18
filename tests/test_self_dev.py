@@ -370,3 +370,33 @@ def test_correcao_que_exige_a_constituicao_vai_para_voce(circle, repo):
     r = SelfDeveloper(circle.ctx, repo, MexeNoGate(), gh, test_cmd=TEST_CMD).run_once()
     assert r.status == "fora_do_alcance" and gh.prs == []
     assert "depende de você" in circle.store.one("SELECT evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"]
+
+
+def test_pr_em_conflito_volta_para_o_developer_trazer_a_main(circle, repo):
+    from circulo.merge_gate import MergeGate
+    erro_recorrente(circle)
+    gh = GateGH(repo.parent / "origin.git")
+    gh.pr_state = lambda n: {"state": "open", "merged": False, "mergeable": False}
+    dev = SelfDeveloper(circle.ctx, repo, ConsertaAgent(), gh, test_cmd=TEST_CMD)
+    dev.run_once()
+    # a main andou no mesmo arquivo de teste
+    (repo / "test_app.py").write_text("def test_outro():\n    assert True\n")
+    git(repo, "add", "-A")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "main andou")
+    git(repo, "push", "-q", "origin", "main")
+    [v] = MergeGate(circle.ctx, gh, "cmatosengenharia").run()
+    assert not v.merge and "conflito" in v.reason and dev.tem_trabalho()
+
+
+def test_pr_fechado_fora_do_gate_libera_o_developer(circle, repo):
+    from circulo.merge_gate import MergeGate
+    item = erro_recorrente(circle)
+    gh = GateGH(repo.parent / "origin.git")
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
+    dev.run_once()
+    assert dev.busy()
+    gh.closed.append((42, "fechado por você"))                 # some da lista de abertos
+    gh.pr_state = lambda n: {"state": "closed", "merged": False, "mergeable": None}
+    MergeGate(circle.ctx, gh, "cmatosengenharia").run()
+    assert not dev.busy()
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"

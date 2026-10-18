@@ -131,6 +131,15 @@ class MergeGate:
             return Verdict(n, sha, False, f"fora do alcance: PR de agente altera a constituição ({', '.join(const)})",
                            {"constituicao": const, "fora_do_alcance": True})
 
+        estado = getattr(self.gh, "pr_state", None)
+        if estado is not None and pr.get("head_ref", "").startswith(DEVELOPER_BRANCH_PREFIX):
+            try:
+                if estado(n).get("mergeable") is False:
+                    # PR que não entra na main por conflito não fica parado: volta para o Developer resolver
+                    return Verdict(n, sha, False, "conflito com a main: o Developer precisa trazer a main para a branch",
+                                   {"conserto": True, "conflito": True})
+            except Exception:  # noqa: BLE001 — sem a informação, segue para os checks
+                pass
         ok, why = checks_ok(self.gh.check_runs(sha))
         if not ok:
             reprovado = why.startswith("checks falhando") or why.startswith("check obrigatório")
@@ -156,7 +165,9 @@ class MergeGate:
 
     def run(self) -> list[Verdict]:
         out = []
-        for pr in self.gh.open_prs():
+        abertos = self.gh.open_prs()
+        self._pr_do_developer_sumiu({p["number"] for p in abertos})
+        for pr in abertos:
             v = self.evaluate(pr)
             if v.merge:
                 merged, msg = self.gh.merge(v.number, v.sha, pr.get("title", f"PR #{v.number}"))
@@ -165,6 +176,31 @@ class MergeGate:
             self._log(v)
             out.append(v)
         return out
+
+    def _pr_do_developer_sumiu(self, abertos: set[int]) -> None:
+        """PR do Developer fechado ou mergeado fora do gate (por você, no GitHub): o Developer não fica esperando
+        para sempre um PR que não existe mais."""
+        s = self.ctx.store
+        dev = s.get("self_dev_aberto") or {}
+        if not dev.get("pr") or dev.get("fechado") or dev["pr"] in abertos:
+            return
+        estado = getattr(self.gh, "pr_state", None)
+        info = {}
+        if estado is not None:
+            try:
+                info = estado(dev["pr"])
+            except Exception:  # noqa: BLE001
+                return
+        merged = bool(info.get("merged"))
+        s.set("self_dev_aberto", {**dev, "fechado": True, "merged": merged})
+        s.x("UPDATE prs SET status=?, updated_at=? WHERE number=?", ("mergeado" if merged else "fechado", time.time(), dev["pr"]))
+        if merged:
+            from .self_dev import concluir_mergeados
+            concluir_mergeados(s)
+        else:
+            s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE id=? AND status='em_andamento'",
+                (f"PR #{dev['pr']} fechado sem merge fora do gate", time.time(), dev.get("item")))
+            self.ctx.reply(f"PR #{dev['pr']} foi fechado sem merge fora do gate; o item volta para a fila e o Developer segue.", "merge")
 
     def _log(self, v: Verdict) -> None:
         s = self.ctx.store
@@ -287,6 +323,10 @@ class GitHubREST:
                 fim = next((i for i, x in enumerate(limpas) if x.startswith("##[error]")), len(limpas))
                 partes.append(f"[{j['name']}]\n" + "\n".join(limpas[max(0, fim - linhas):fim + 1]))
         return "\n".join(partes)
+
+    def pr_state(self, number: int) -> dict:
+        p = self._req("GET", f"/pulls/{number}")
+        return {"state": p.get("state"), "merged": bool(p.get("merged")), "mergeable": p.get("mergeable")}
 
     def close_pr(self, number: int, comentario: str = "") -> None:
         """Fecha (não apaga): o PR e a branch continuam no GitHub e podem ser reabertos."""
