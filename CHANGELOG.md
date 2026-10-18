@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4 — 2026-10-17
+
+- Salvar a configuração acorda o loop do descanso na hora (antes esperava o próximo giro, até alguns minutos).
+
 ## 1.0.3 — 2026-10-17
 
 - Developer autentica fetch/push no GitHub com o `GITHUB_TOKEN` (por variável de ambiente do git, fora da linha de comando) e nunca fica esperando senha.

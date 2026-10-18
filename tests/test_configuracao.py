@@ -85,6 +85,7 @@ def test_loop_reinicia_sozinho_quando_a_configuracao_muda(circle, casa, monkeypa
 
     circle.run_forever(max_ticks=50, sleep=sleep)
     assert circle.store.tick < 50 and circle.store.get("ultimo_reinicio")["motivo"] == "configuração alterada"
+    assert len(passos) == 2          # acorda do descanso no mesmo instante, não espera o próximo giro
 
 
 def test_servico_roda_na_pasta_de_dados_e_nao_e_escondido_pelo_clone(tmp_path):

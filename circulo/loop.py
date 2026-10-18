@@ -459,6 +459,15 @@ class Circle:
             self.heartbeat(time.time() + remaining)
             if wake_on_input and self.store.pending_count() > 0 and not self.controls()["pausado"]:
                 return
+            if self._config_mudou():          # você salvou as chaves: não espera o fim do descanso
+                return
+
+    def _config_mudou(self) -> bool:
+        from .configuracao import ENV_FILE
+        if getattr(self, "_env_mtime", "nunca") == "nunca":
+            return False
+        atual = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
+        return atual != self._env_mtime and self.store.get("reiniciar_ao_mudar_config", True)
 
     def run_forever(self, max_ticks: int | None = None, sleep: Callable[[float], None] | None = None) -> None:
         sleep = sleep or (lambda sec: self._stop.wait(sec))
@@ -467,13 +476,12 @@ class Circle:
             signal.signal(signal.SIGINT, self.stop)
         self.store.set("loop_iniciado_em", time.time())
         from .configuracao import ENV_FILE
-        env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
+        self._env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
         n = 0
         try:
             while not self._stop.is_set():
                 # configuração mudou (você salvou as chaves): sai limpo; o serviço 24/7 sobe de novo já com elas
-                atual = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
-                if atual != env_mtime and self.store.get("reiniciar_ao_mudar_config", True):
+                if self._config_mudou():
                     self.store.set("ultimo_reinicio", {"em": time.time(), "motivo": "configuração alterada"})
                     break
                 self.heartbeat()
