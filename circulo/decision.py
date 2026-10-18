@@ -443,6 +443,7 @@ class DecisionLayer:
         self.llm = llm
         self._local = threading.local()        # missão em atendimento, por thread (missões rodam em paralelo)
         self._default_project: int | None = None
+        self._aprendiz_lock = threading.Lock()
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:
@@ -457,14 +458,58 @@ class DecisionLayer:
             d = out.get(qid)
             if d is None or not self._valid(q, d):
                 out[qid] = self.local.ask_many(state, {qid: q})[0][qid]
+            elif d.source == "jev" and d.confidence < incerto and qid == "worth_spending" and \
+                    (aprendido := self._worth_aprendido(state, d, incerto)) is not None:
+                out[qid] = aprendido         # a dúvida do Jev, ajustada pelo que ele já aprendeu imitando a regra
             elif d.source == "jev" and d.confidence < incerto and not qid.startswith(("crit_", "rel_")):
                 # Cascata: o Jev respondeu "não sei" (perto de 50%, confiança baixa). A resposta dele fica registrada,
                 # e a decisão passa para a regra determinística, em vez de um meio-termo que trava tudo.
                 self._log(d)
                 regra = self.local.ask_many(state, {qid: q})[0][qid]
                 out[qid] = Decision(regra.name, regra.kind, regra.value, regra.confidence, "local", regra.probabilities)
+                if qid == "worth_spending":
+                    self._worth_rotular(state, regra)
             self._log(out[qid])
         return out
+
+    # --- Jev aprende o worth_spending imitando a regra quando está em dúvida
+    # Cada vez que a regra decide no lugar do Jev, o exemplo (features, decisão da regra, desfecho) vira rótulo.
+    # Os pesos são contagens por balde de entradas similares; com rótulos consistentes a confiança sobe e,
+    # na próxima rodada, a resposta em dúvida do Jev é ajustada por eles em vez de cair de novo na regra.
+    WORTH_KEY = "jev_aprendiz.worth_spending"
+
+    def _worth_limiar(self, state: Mapping[str, Any]) -> float:
+        return self._thr(f"worth_spending.{state.get('action', '')}", self._thr("worth_spending.default"))
+
+    @staticmethod
+    def _worth_balde(state: Mapping[str, Any]) -> str:
+        tokens = int(state.get("est_tokens", 0))
+        return "|".join((str(state.get("action", "")), f"v{float(state.get('value_signal', 0.5)):.1f}",
+                         f"b{round(float(state.get('budget_left_ratio', 1.0)) * 5) / 5:.1f}",
+                         f"t{int(math.log2(tokens)) if tokens > 0 else 0}"))
+
+    def _worth_rotular(self, state: Mapping[str, Any], regra: Decision) -> None:
+        thr = self._worth_limiar(state)
+        permitido = float(regra.value) >= thr
+        with self._aprendiz_lock:
+            m = self.s.get(self.WORTH_KEY) or {"pesos": {}, "exemplos": []}
+            pos, n = m["pesos"].get(self._worth_balde(state), [0, 0])
+            m["pesos"][self._worth_balde(state)] = [pos + permitido, n + 1]
+            m["exemplos"] = (m["exemplos"] + [{
+                "features": {k: state.get(k) for k in ("action", "est_tokens", "value_signal", "budget_left_ratio")},
+                "regra": round(float(regra.value), 4), "limiar": thr,
+                "desfecho": "permitido" if permitido else "negado"}])[-200:]
+            self.s.set(self.WORTH_KEY, m)
+
+    def _worth_aprendido(self, state: Mapping[str, Any], d: Decision, incerto: float) -> Decision | None:
+        pos, n = (self.s.get(self.WORTH_KEY) or {}).get("pesos", {}).get(self._worth_balde(state), [0, 0])
+        if n == 0 or 2 * pos == n:
+            return None
+        p = (pos + 1) / (n + 2)                        # Laplace: poucos exemplos, pouca confiança
+        if abs(2 * p - 1) < incerto or (p >= self._worth_limiar(state)) != (2 * pos > n):
+            return None                                # ainda não aprendeu o bastante para decidir como a regra
+        return Decision(d.name, "noul", p, abs(2 * p - 1), "jev",
+                        {"jev_bruto": float(d.value), "exemplos": float(n)})
 
     def ask(self, name: str, q: Question, state: Mapping[str, Any]) -> Decision:
         return self.ask_many(state, {name: q})[name]

@@ -98,3 +98,47 @@ def test_jev_em_duvida_passa_para_a_regra_e_fica_registrado(tmp_path):
     assert fontes == ["jev", "local"]                    # a dúvida do Jev aparece, e a regra decide
     row = c.store.one("SELECT category FROM ledger")
     assert row["category"] == "delivery"                 # sem a regra, o "não sei" do Jev travaria o lançamento
+
+
+class _JevEmDuvidaNoWorth:
+    """Jev real que responde 'não sei' (perto de 50%) em todo worth_spending."""
+    source = "jev"
+
+    def ask_many(self, state, questions):
+        return {k: Decision(k, "noul", 0.52, 0.04, "jev") for k in questions}, 1
+
+
+def test_jev_aprende_worth_spending_imitando_a_regra_quando_em_duvida(tmp_path):
+    c = Circle(tmp_path, jev=_JevEmDuvidaNoWorth())
+    dl = c.ctx.dl
+    primeira = dl.worth_spending("developer_feature", {"est_tokens": 1500, "value_signal": 0.55})
+    assert primeira.decision.source == "local" and primeira.decision.confidence < 0.25   # a regra decide pela dúvida
+    exemplo = c.store.get(dl.WORTH_KEY)["exemplos"][-1]
+    assert exemplo["desfecho"] == "negado" and exemplo["features"]["action"] == "developer_feature"
+    st = {"action": "developer_feature", "est_tokens": 1500, "value_signal": 0.55, "budget_left_ratio": 1.0}
+    for _ in range(5):                                     # N exemplos rotulados consistentes
+        dl._worth_rotular(st, primeira.decision)
+    g = dl.worth_spending("developer_feature", {"est_tokens": 1600, "value_signal": 0.56})   # entrada similar
+    assert g.decision.source == "jev" and g.decision.confidence > 0.25
+    assert g.allowed == primeira.allowed                   # decide como a regra decidiria
+    assert g.decision.probabilities["jev_bruto"] == 0.52
+
+    sim = dl.worth_spending("idle_evolution", {"est_tokens": 0, "value_signal": 0.6})
+    assert sim.allowed and sim.decision.source == "local"  # outro balde: ainda não aprendeu, a regra decide
+    sim = dl.worth_spending("idle_evolution", {"est_tokens": 0, "value_signal": 0.6})
+    assert sim.allowed and sim.decision.source == "jev" and sim.decision.confidence > 0.25
+    assert dl.worth_spending("developer_feature", {"est_tokens": 1500, "value_signal": 0.55}).decision.source == "jev"
+
+    jev = [r["confidence"] for r in c.store.q(
+        "SELECT confidence FROM decisions WHERE question='worth_spending' AND source='jev'")]
+    assert sum(conf < 0.25 for conf in jev) / len(jev) < 0.5   # a fração de dúvida do Jev cai
+
+
+def test_worth_spending_com_rotulos_divergentes_continua_na_regra(tmp_path):
+    c = Circle(tmp_path, jev=_JevEmDuvidaNoWorth())
+    dl = c.ctx.dl
+    st = {"action": "developer_feature", "est_tokens": 1500, "value_signal": 0.55, "budget_left_ratio": 1.0}
+    for v in (0.9, 0.1, 0.9, 0.1):
+        dl._worth_rotular(st, Decision("worth_spending", "noul", v, abs(2 * v - 1), "local"))
+    g = dl.worth_spending("developer_feature", {"est_tokens": 1500, "value_signal": 0.55})
+    assert g.decision.source == "local"                    # sem consenso, não inventa confiança
