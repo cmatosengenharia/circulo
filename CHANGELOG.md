@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.18.0 — 2026-10-18
+
+**Pausar missão por missão**, sem parar o loop nem as outras missões.
+
+- Botão **"Pausar esta missão" / "Retomar esta missão"** no painel de cada missão. Quando pausada, aparece uma
+  faixa explicando o estado, e a tela inicial mostra o selo "pausada" no card.
+- Pausada, a missão:
+  - sai da escolha do motor: nenhum ciclo novo começa e não há gasto de tokens;
+  - guarda os pedidos para ela na fila, enquanto os das outras missões e as missões novas seguem; ao retomar,
+    os guardados são atendidos na ordem.
+- **Pausa verificável**, como a parada do loop: se um ciclo da missão já estava rodando, o estado fica "parando"
+  até ele terminar. O resultado desse ciclo **não é aplicado** (fica registrado como descartado) e a entrega atual
+  não muda. Ciclo interrompido pela pausa não conta como platô.
+- Cada pausa e retomada vira alerta e entra no rastro da missão (`/rastros`, "missão N").
+- Central de confiança: card "Missões pausadas por você".
+- O próprio loop não se pausa por missão: para ele continua o botão "Pausar o loop".
+- API: `POST /api/missao/pausa {id, acao: pausar|retomar}`, com o mesmo cabeçalho de proteção do painel.
+
 ## 1.17.0 — 2026-10-18
 
 **Rastreabilidade de ponta a ponta e observabilidade**, nos padrões consolidados do mercado (OpenTelemetry,

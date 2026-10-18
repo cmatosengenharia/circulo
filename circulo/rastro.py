@@ -281,6 +281,10 @@ def cadeia_missao(store: Store, pid: int, limite: int = 15) -> dict | None:
         ganho = f" {c['ganho'] * 100:+.0f} pts" if c["ganho"] else ""
         passos.append(_passo("ciclo", f"Ciclo: {c['fase']}{ganho}", {1: "ok", 0: "falha"}.get(c["aceita"], "ok"), c["created_at"],
                              f"{c['resultado'] or ''} · {c['tokens']} tokens", giro_do_tick(store, c["tick"])))
+    for e in elos_de(store, no):
+        if e["relacao"] in ("pausada", "retomada"):
+            passos.append(_passo("pausa", "Pausada por você" if e["relacao"] == "pausada" else "Retomada por você",
+                                 "pendente" if e["relacao"] == "pausada" else "ok", e["em"], e["detalhe"] or ""))
     total = store.one("SELECT COUNT(*) n FROM cycles WHERE project_id=?", (pid,))["n"]
     lig = store.q("SELECT a, b, relacao, origem FROM links WHERE a=? OR b=?", (pid, pid))
     if lig:

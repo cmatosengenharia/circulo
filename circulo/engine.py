@@ -151,7 +151,7 @@ class Engine:
     def candidates(self) -> list[dict]:
         pf = self.ctx.policy["portfolio"]
         out = []
-        for p in self.s.q("SELECT * FROM projects WHERE kit='geral' AND status='ativo'"):
+        for p in self.s.q("SELECT * FROM projects WHERE kit='geral' AND status='ativo' AND COALESCE(pausada,0)=0"):
             if self.tokens_today(p["id"]) >= pf["per_project_daily_tokens"]:
                 continue
             fb = self.s.one("SELECT COUNT(*) n FROM memory WHERE kind='feedback' AND project_id=? AND created_at>?",
@@ -219,13 +219,18 @@ class Engine:
 
     # ------------------------------------------------------------ um ciclo
     def cycle(self, pid: int) -> CycleResult:
+        from . import pausa
+        if pausa.pausada(self.s, pid):          # pausada entre a escolha e o começo: nem começa
+            return CycleResult(pid, "pausada", nota="missão pausada por você")
         p = self.project(pid)
         prev_dl = self.ctx.dl.project_id
         self.ctx.dl.project_id = pid
+        pausa.ciclo_comecou(self.s, pid)
         try:
             res = self._cycle(p)
         finally:
             self.ctx.dl.project_id = prev_dl
+            pausa.ciclo_terminou(self.s, pid)
         now = time.time()
         arm, exp = getattr(self._tl, "arm", (None, None))
         self._tl.arm = (None, None)
@@ -238,7 +243,8 @@ class Engine:
                   None if res.aceita is None else int(res.aceita), res.tokens, json.dumps(res.lessons), res.nota, now, arm, exp))
         self.s.x("UPDATE projects SET ultimo_ciclo_tick=?, ultimo_ciclo_em=?, ciclos=COALESCE(ciclos,0)+1, updated_at=? WHERE id=?",
                  (self.s.tick, now, now, pid))
-        self._plateau(p, res)
+        if not pausa.pausada(self.s, pid):     # ciclo interrompido pela pausa não conta como platô
+            self._plateau(p, res)
         return res
 
     def _cycle(self, p: dict) -> CycleResult:
@@ -464,6 +470,11 @@ class Engine:
         if decisao in ("refazer", "descartar") and aceita:
             aceita = False
             res.nota = motivo
+        from .pausa import pausada
+        if pausada(self.s, p["id"]):
+            # você pausou no meio do ciclo: a versão fica registrada, mas nada muda na missão
+            res.nota = motivo = "missão pausada no meio do ciclo: resultado guardado como descartado, a entrega atual não mudou"
+            aceita, decisao = False, "descartar"
         pq = getattr(self._tl, "pergunta", None)
         if pq:          # placar da perspectiva por tipo de missão: a pergunta rendeu versão melhor?
             self.s.x("UPDATE perguntas SET status=?, updated_at=? WHERE id=?", ("entregue" if aceita else "descartada", time.time(), pq[0]))

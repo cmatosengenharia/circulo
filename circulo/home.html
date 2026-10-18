@@ -98,6 +98,7 @@ a.card:hover{border-color:var(--ink)}
 .chip.aguardando_kit{background:var(--llm-soft);color:var(--llm)}
 .chip.manutencao{background:var(--jev-soft);color:var(--jev)}
 .chip.cumprida{background:var(--ok);color:var(--surface)}
+.chip.pausada{background:var(--llm-soft);color:var(--llm)}
 .links{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
 .links b{color:var(--ink);font-weight:600}
 .card h3{font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.015em;margin:0;padding-right:44px}
@@ -211,6 +212,7 @@ let S = null, known = new Set();
 let V = null;   // estado vivo do loop (SSE)
 function cardLive(p) {
   const e = V ? V.estado : "";
+  if (p.pausa && p.pausa.pausada) return `<span class="chip pausada">${p.pausa.estado === "parando" ? "Parando…" : "Pausada por você"}</span> ${p.pausa.pedidos_guardados ? p.pausa.pedidos_guardados + " pedido(s) guardado(s)" : "o loop segue nas outras"}`;
   if (p.status === "ativo" && e === "desligado") return `<span class="chip parado">Loop desligado</span> ${p.na_fila ? p.na_fila + " na fila" : ""}`;
   if (p.status === "ativo" && e.startsWith("pausado")) return `<span class="chip">Pausado</span> ${p.na_fila ? p.na_fila + " na fila" : ""}`;
   if (V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id)) return `<span class="chip agora">Trabalhando agora</span> ${esc(ETAPA[V.etapa] || V.etapa)}`;
@@ -271,7 +273,7 @@ function card(p) {
   const agora = V && V.estado === "trabalhando" && String(V.projeto_id) === String(p.id);
   return `<a class="card${agora ? " agora" : ""}${p.kit === "circulo" ? " zero" : ""}" href="/missao/${p.id}" aria-label="Abrir ${esc(p.nome)}">
     <svg class="mini" viewBox="0 0 34 34" aria-hidden="true"><circle class="t" cx="17" cy="17" r="13"/><circle class="a" cx="17" cy="17" r="13"/></svg>
-    <div class="top">${p.kit === "circulo" ? `<span class="chip manutencao">Missão zero</span>` : `<span class="chip">${esc(p.tipo_rotulo)}</span>`}<span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span></div>
+    <div class="top">${p.kit === "circulo" ? `<span class="chip manutencao">Missão zero</span>` : `<span class="chip">${esc(p.tipo_rotulo)}</span>`}<span class="chip ${esc(p.status)}">${PSTATUS[p.status] || esc(p.status)}</span>${p.pausa && p.pausa.pausada ? `<span class="chip pausada">pausada</span>` : ""}</div>
     <h3>${esc(p.nome)}</h3>
     <p class="pedido">${esc(p.pedido)}</p>
     <p class="proposito">${esc(p.proposito)}</p>
