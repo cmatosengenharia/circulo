@@ -23,6 +23,35 @@ def tirar_assinatura_do_orcamento(store: Store) -> int:
     return total
 
 
+LIMITE_MIN = 10_000
+
+
+def limite_diario(store: Store, padrao: int) -> int:
+    """Limite diário da API: o que você escolheu no painel (kv `orcamento_limite`) ou o da política.
+    Nunca passa do teto duro (CIRCULO_HARD_DAILY_TOKENS) nem fica abaixo de LIMITE_MIN."""
+    from .policy import HARD_DAILY_TOKEN_CAP
+    escolhido = (store.get("orcamento_limite") or {}).get("limite")
+    if not escolhido:
+        return int(padrao)
+    return max(LIMITE_MIN, min(int(escolhido), HARD_DAILY_TOKEN_CAP))
+
+
+def definir_limite(store: Store, limite: int | None, padrao: int) -> dict:
+    """Você muda o limite pelo painel. None volta para o da política. Fica registrado (alerta + histórico)."""
+    from .policy import HARD_DAILY_TOKEN_CAP
+    import time
+    antes = limite_diario(store, padrao)
+    if limite is None:
+        store.set("orcamento_limite", None)
+    else:
+        if not isinstance(limite, int) or not (LIMITE_MIN <= limite <= HARD_DAILY_TOKEN_CAP):
+            raise ValueError(f"o limite precisa ser um número entre {LIMITE_MIN:,} e {HARD_DAILY_TOKEN_CAP:,} tokens".replace(",", "."))
+        hist = ((store.get("orcamento_limite") or {}).get("historico") or [])[-19:]
+        store.set("orcamento_limite", {"limite": limite, "em": time.time(), "historico": hist + [[time.time(), antes, limite]]})
+    depois = limite_diario(store, padrao)
+    return {"antes": antes, "depois": depois, "padrao": int(padrao), "customizado": limite is not None}
+
+
 class BudgetExhausted(Exception):
     pass
 
@@ -43,7 +72,7 @@ class Budget:
 
     @property
     def limit(self) -> int:
-        return int(self.policy()["budget"]["daily_token_limit"])
+        return limite_diario(self.s, int(self.policy()["budget"]["daily_token_limit"]))
 
     @property
     def reserve(self) -> int:

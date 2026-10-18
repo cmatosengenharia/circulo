@@ -96,7 +96,8 @@ def estado(store: Store, projeto: int | None = None) -> dict:
             "vivo": loop_status(s, now),
         },
         "orcamento": {"dia": budget["day"] if budget else day, "tokens": budget["tokens"] if budget else 0,
-                      "limite": policy["budget"]["daily_token_limit"],
+                      "limite": _limite(s, policy), "limite_padrao": policy["budget"]["daily_token_limit"],
+                      "customizado": bool((s.get("orcamento_limite") or {}).get("limite")),
                       "jev": budget["jev_calls"] if budget else 0, "llm": budget["llm_calls"] if budget else 0},
         "saude": {
             "invariantes": violations,
@@ -138,6 +139,11 @@ def _cerebros(s: Store) -> list[dict]:
         return cerebros(s)
     except Exception:  # noqa: BLE001
         return []
+
+
+def _limite(s: Store, policy: dict) -> int:
+    from .budget import limite_diario
+    return limite_diario(s, int(policy["budget"]["daily_token_limit"]))
 
 
 def conversa(s: Store, projeto: int | None, limite: int = 25) -> list[dict]:
@@ -401,6 +407,22 @@ def make_handler(db_path: str):
                     return self._json({"erro": "ação desconhecida"}, 400)
                 store.set("controle", {"pausado": bool(c.get("pausado")), "modo_seguro": bool(c.get("modo_seguro"))})
                 return self._json({"ok": True, "controle": store.get("controle")})
+            if u.path == "/api/orcamento":
+                # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
+                from .budget import definir_limite
+                pol = store.one("SELECT body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")
+                padrao = int(json.loads(pol["body"])["budget"]["daily_token_limit"])
+                bruto = data.get("limite")
+                try:
+                    r = definir_limite(store, None if bruto in (None, "", "padrao") else int(bruto), padrao)
+                except (ValueError, TypeError) as exc:
+                    return self._json({"erro": str(exc)}, 400)
+                def fmt(n):
+                    return f"{n:,}".replace(",", ".")
+                store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
+                        ("controle", f"Você mudou o limite diário da API: {fmt(r['antes'])} → {fmt(r['depois'])} tokens"
+                         + ("" if r["customizado"] else " (padrão da política)"), time.time(), kit_project_id(store, "circulo")))
+                return self._json({"ok": True, **r})
             if u.path == "/api/frescor":
                 # o painel mede o próprio atraso (dado → tela) e o loop monitora como qualquer neurônio
                 from .confianca import registrar_frescor

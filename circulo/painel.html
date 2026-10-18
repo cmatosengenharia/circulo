@@ -325,6 +325,10 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .rt .toggle:hover{border-color:var(--bad);color:var(--bad)}
 .rt li.off .toggle:hover{border-color:var(--ok);color:var(--ok)}
 
+/* ---------- limite da API ---------- */
+.orc-btn{all:unset;cursor:pointer;font-size:inherit}.orc-btn b{font-size:22px}
+.orc-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:-6px 0 18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.orc-form input{width:160px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 /* ---------- central de confiança ---------- */
 .confia{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-weight:600;text-decoration:none;color:var(--ink);font-size:14px}
 .confia i{width:10px;height:10px;border-radius:50%;background:var(--idle)}
@@ -398,6 +402,13 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
   </section>
   <div class="about" id="about"></div>
   <div class="kpis" id="kpis" aria-label="Números ao vivo"></div>
+  <form class="orc-form" id="orcForm" hidden>
+    <label>Limite diário da API (tokens) <input type="number" id="orcLimite" min="10000" step="10000" required></label>
+    <button class="btn primary" type="submit">Salvar</button>
+    <button class="btn" type="button" id="orcPadrao">Voltar ao padrão</button>
+    <button class="btn" type="button" id="orcFechar">Cancelar</button>
+    <span class="sub" id="orcMsg">Vale na hora para todo o loop. O porteiro do gasto passa a decidir com esse limite; ao chegar nele, o loop pausa até a meia-noite.</span>
+  </form>
   <div class="grid">
     <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
       <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
@@ -834,6 +845,9 @@ function renderKpis(s) {
   k.push([(M.evolucoes || 0).toLocaleString("pt-BR"), "evoluções"]);
   k.push([ult5 >= 10 ? Math.round(ult5) : ult5.toFixed(1), "decisões por minuto"]);
   k.push([(s.orcamento.llm || 0).toLocaleString("pt-BR"), `chamadas de LLM hoje <small>${s.orcamento.jev} ao Jev</small>`]);
+  const O = s.orcamento, pct = O.limite ? Math.round(100 * O.tokens / O.limite) : 0;
+  k.push([`<button class="orc-btn" id="orcBtn" title="Mudar o limite diário da API"><b>${pct}%</b> ✎</button>`,
+    `da API hoje <small>${(O.tokens / 1000).toFixed(0)} mil de ${(O.limite / 1000).toFixed(0)} mil tokens${O.customizado ? " · limite seu" : ""}</small>`, true]);
   $("#kpis").innerHTML = k.map(([v, l, html]) => `<div class="kpi">${html ? v : `<b>${v}</b>`}<span>${l}</span></div>`).join("");
 }
 
@@ -1095,6 +1109,18 @@ function medirAtraso() { if (CF) piorAtraso = Math.max(piorAtraso || 0, atrasoMs
 setInterval(medirAtraso, 1000);
 setInterval(() => { if (piorAtraso != null) { const a = Math.round(piorAtraso); piorAtraso = null;
   fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a})}).catch(() => {}); } }, 10000);
+document.addEventListener("click", e => {
+  if (e.target.closest("#orcBtn")) { $("#orcForm").hidden = false; $("#orcLimite").value = S && S.orcamento ? S.orcamento.limite : ""; $("#orcLimite").focus(); }
+});
+$("#orcFechar").onclick = () => { $("#orcForm").hidden = true; };
+async function salvarLimite(limite) {
+  const r = await fetch("/api/orcamento", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({limite})});
+  const j = await r.json();
+  $("#orcMsg").textContent = r.ok ? `Limite agora: ${j.depois.toLocaleString("pt-BR")} tokens por dia${j.customizado ? "" : " (padrão)"}.` : (j.erro || "não foi possível salvar");
+  if (r.ok) { setTimeout(() => { $("#orcForm").hidden = true; }, 1500); refresh(); }
+}
+$("#orcForm").onsubmit = e => { e.preventDefault(); salvarLimite(Number($("#orcLimite").value)); };
+$("#orcPadrao").onclick = () => salvarLimite(null);
 function connect() {
   const filtro = ZERO ? "" : Q;
   const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));

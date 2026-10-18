@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.0 — 2026-10-18
+
+- **Limite diário da API customizável pelo painel**: no número "% da API hoje" (✎), você escolhe o limite em tokens ou
+  volta ao padrão da política. Vale na hora para todo o loop: porteiro do gasto, pausa por orçamento, Central de
+  confiança e painel. Piso de 10 mil e teto duro em `CIRCULO_HARD_DAILY_TOKENS` (padrão 2 milhões), inclusive se o
+  valor for adulterado direto no banco. Cada mudança vira alerta ("Você mudou o limite diário da API: 200.000 →
+  400.000") e fica no histórico (kv `orcamento_limite`).
+
 ## 1.13.0 — 2026-10-18
 
 As perguntas deixam de ser só fixas. Elas vêm de uma **LLM especializada nesse tipo de evolução** (pedido do Cássio),
