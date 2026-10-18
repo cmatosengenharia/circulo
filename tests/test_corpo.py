@@ -84,6 +84,42 @@ def test_erros_nos_primeiros_giros_voltam_para_o_codigo_anterior(circle, repos, 
     assert circle.store.one("SELECT 1 FROM licoes WHERE assinatura='corpo:regressao_pos_atualizacao'")
 
 
+def test_licao_1_arquivo_nao_rastreado_que_a_main_traz_nao_trava_a_troca(circle, repos, tmp_path):
+    """Lição #1: `git checkout -B main <alvo>` abortava com "untracked working tree files would be overwritten
+    by checkout" quando o arquivo copiado à mão para o corpo vivo chegava à main por merge."""
+    from circulo.corpo_caminho import atualizar_corpo
+    _, vivo, dev = repos
+    (dev / "igual.py").write_text("X = 1\n")
+    (dev / "diferente.py").write_text("Y = 2\n")
+    git(dev, "add", "-A")
+    novo = evoluir(dev)
+    (vivo / "igual.py").write_text("X = 1\n")                         # cópia manual, idêntica à main
+    (vivo / "diferente.py").write_text("Y = 'local'\n")               # cópia manual que divergiu
+    with pytest.raises(RuntimeError):                                  # o erro do incidente, sem o caminho livre
+        Corpo(circle.ctx, vivo, tmp_path, validacao=OK).run()
+    assert git(vivo, "rev-parse", "HEAD") != novo                      # o checkout abortado não mudou nada
+    r = atualizar_corpo(Corpo(circle.ctx, vivo, tmp_path, validacao=OK))
+    assert r["status"] == "atualizado" and git(vivo, "rev-parse", "HEAD") == novo
+    assert (vivo / "diferente.py").read_text() == "Y = 2\n" and (vivo / "igual.py").read_text() == "X = 1\n"
+    assert r["liberado"]["removidos"] == ["igual.py"] and r["liberado"]["guardados"] == ["diferente.py"]
+    guardado = tmp_path / r["liberado"]["pasta"] / "diferente.py"
+    assert guardado.read_text() == "Y = 'local'\n"                     # nada diferente se perde
+
+
+def test_licao_1_sem_colisao_o_erro_continua_visivel(circle, repos, tmp_path, monkeypatch):
+    """Lição #1: só a colisão com não rastreados é tratada; outra falha do git não é engolida."""
+    from circulo.corpo_caminho import atualizar_corpo
+    _, vivo, dev = repos
+    evoluir(dev)
+    c = Corpo(circle.ctx, vivo, tmp_path, validacao=OK)
+
+    def falha():
+        raise RuntimeError("git fetch: rede fora")
+    monkeypatch.setattr(c, "run", falha)
+    with pytest.raises(RuntimeError, match="rede fora"):
+        atualizar_corpo(c)
+
+
 def test_em_testes_nunca_ha_corpo_de_verdade(circle):
     from circulo.corpo import build_corpo
     assert build_corpo(circle.ctx, circle.data_dir) is None and circle.corpo is None
