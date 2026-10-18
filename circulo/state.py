@@ -342,6 +342,34 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 CREATE INDEX IF NOT EXISTS llm_calls_papel ON llm_calls(papel, nivel);
 
+-- trilha write-ahead (circulo/intencoes.py): a intenção entra antes da ação; só de acréscimo, encadeada por hash
+CREATE TABLE IF NOT EXISTS intencoes (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL,             -- intencao (antes de executar) | resultado (depois, com ref)
+  ref INTEGER,
+  tick INTEGER,
+  ator TEXT NOT NULL,             -- loop | humano | teste
+  acao TEXT NOT NULL,
+  motivo TEXT,
+  regra TEXT,                     -- quem decidiu: regra, jev ou llm (e com que confiança)
+  entradas TEXT,
+  em REAL NOT NULL,
+  prev TEXT NOT NULL,
+  hash TEXT NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS intencoes_ref ON intencoes(ref);
+CREATE TRIGGER IF NOT EXISTS intencoes_sem_update BEFORE UPDATE ON intencoes
+  BEGIN SELECT RAISE(ABORT, 'trilha de intenções é só de acréscimo'); END;
+CREATE TRIGGER IF NOT EXISTS intencoes_sem_delete BEFORE DELETE ON intencoes
+  BEGIN SELECT RAISE(ABORT, 'trilha de intenções é só de acréscimo'); END;
+
+CREATE TABLE IF NOT EXISTS frescor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  atraso_ms REAL NOT NULL,        -- atraso dado → tela medido pelo próprio painel (SLO: p99 ≤ 3 s em 24 h)
+  em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,

@@ -265,6 +265,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/confianca":
                 from .confianca import confianca
                 self._json(confianca(self._store()))
+            elif u.path == "/api/parada":
+                from . import parada
+                self._json(parada.estado(self._store()))
             elif u.path == "/api/eventos":
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
@@ -357,14 +360,18 @@ def make_handler(db_path: str):
                 return self._json({"erro": "json inválido"}, 400)
             store = self._store()
             u = urlparse(self.path)
-            if u.path == "/api/controle":
+            if u.path in ("/api/controle", "/api/parada"):
+                from . import parada
                 c = store.get("controle", {}) or {}
                 acao = data.get("acao")
-                if acao == "pausar":
-                    c["pausado"] = True
-                elif acao == "retomar":
-                    c["pausado"] = False
-                elif acao == "modo_seguro":
+                if acao in ("pausar", "parar"):
+                    # parada verificável: a intenção entra na trilha, a pausa liga e o loop confirma no próximo giro
+                    parada.pedir(store)
+                    return self._json({"ok": True, "controle": store.get("controle"), "parada": parada.estado(store)})
+                if acao == "retomar":
+                    parada.retomar(store)
+                    return self._json({"ok": True, "controle": store.get("controle"), "parada": parada.estado(store)})
+                if acao == "modo_seguro" and u.path == "/api/controle":
                     c["modo_seguro"] = bool(data.get("ligado"))
                 else:
                     return self._json({"erro": "ação desconhecida"}, 400)
