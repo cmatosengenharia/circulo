@@ -1,6 +1,11 @@
+import pathlib
+import subprocess
+import sys
+
 import pytest
 
 from circulo.agents import ReviewerCode
+from circulo.evolution import CUSTO_CICLO, valor_portfolio
 from circulo.policy import DEFAULT_POLICY, PolicyStore, PolicyViolation, guard
 from conftest import say
 
@@ -98,3 +103,32 @@ def test_reviewer_code_nunca_auto_aprova_codigo_de_dinheiro(circle):
     assert rc.review(tests_ok=False, lines_changed=10, touches_money_code=False) == "reject"
     assert rc.review(tests_ok=True, lines_changed=10, touches_money_code=True) == "changes"
     assert rc.review(tests_ok=True, lines_changed=10, touches_money_code=False) == "approve"
+
+
+def _ciclo(pid, tick, ganho, aceita=1, fase="melhoria", tokens=9000):
+    return {"project_id": pid, "tick": tick, "fase": fase, "ganho": ganho, "aceita": aceita, "tokens": tokens}
+
+
+def test_valor_portfolio_um_valor_por_par_de_ciclos_por_projeto():
+    cycles = [_ciclo(1, 1, 0.5), _ciclo(2, 2, 0.5), _ciclo(1, 3, 0.1), _ciclo(1, 4, 0.2), _ciclo(2, 5, 0.3)]
+    pf = {"min_gain": 0.0, "plateau_cycles": 3}
+    # projeto 1 tem 3 ciclos (2 pares), projeto 2 tem 2 (1 par); ciclo único não gera valor
+    assert valor_portfolio(cycles, pf, 9000) == pytest.approx([0.1 - CUSTO_CICLO, 0.2 - CUSTO_CICLO, 0.3 - CUSTO_CICLO])
+    assert valor_portfolio([_ciclo(1, 1, 0.5)], pf, 9000) == []
+
+
+def test_valor_portfolio_para_no_plateau_e_mantem_tamanho_entre_politicas():
+    cycles = [_ciclo(1, t, 0.0) for t in range(1, 7)]
+    atual = valor_portfolio(cycles, {"min_gain": 0.01, "plateau_cycles": 3}, 9000)
+    menor = valor_portfolio(cycles, {"min_gain": 0.01, "plateau_cycles": 2}, 9000)
+    assert len(atual) == len(menor) == 5        # portfolio_candidates compara posição a posição (zip strict)
+    assert sum(menor) > sum(atual)              # parar antes queima menos ciclos sem ganho
+
+
+def test_codigo_passa_no_lint_do_ci():
+    """Mesmo comando do CI: zip sem strict (B905) derrubou o PR antes."""
+    pytest.importorskip("ruff")
+    raiz = pathlib.Path(__file__).resolve().parent.parent
+    r = subprocess.run([sys.executable, "-m", "ruff", "check", "circulo", "tests", "--select", "E,F,W,B", "--ignore", "E501"],
+                       cwd=raiz, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr

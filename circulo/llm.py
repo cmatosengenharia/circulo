@@ -28,7 +28,7 @@ class AnthropicLLM:
     WEB_SEARCH_TOOL = "web_search_20250305"
 
     def __init__(self, default_model: str | None = None):
-        import anthropic  # noqa: import tardio
+        import anthropic  # import tardio: só exige o pacote quando a LLM é usada
         # chave da organização (sem workspace) exige dizer o workspace em cada chamada
         ws = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
         self.client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)

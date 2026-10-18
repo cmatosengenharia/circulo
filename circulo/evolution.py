@@ -5,6 +5,7 @@ import json
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 from . import finance
 from .agents import Categorizer, Ctx, ReviewerFinance, tokens_of
@@ -41,7 +42,7 @@ def valor_portfolio(cycles: list, pf: dict, est_tokens: int, desde: int = 0) -> 
     out = []
     for seq in por_projeto.values():
         streak = 0
-        for prev, nxt in zip(seq, seq[1:]):
+        for prev, nxt in pairwise(seq):
             if prev["fase"] in ("melhoria", "adiado_valor") or prev["aceita"] == 0:   # mesmo critério do motor
                 streak = 0 if (prev["ganho"] or 0) >= pf["min_gain"] else streak + 1
             parou = streak >= pf["plateau_cycles"]
@@ -175,7 +176,7 @@ class MetaLearner:
         est = int(pf.get("est_cycle_tokens", 9000))
         alt = {**pf, "plateau_cycles": n - 1}
         atual, menor = valor_portfolio(cycles, pf, est), valor_portfolio(cycles, alt, est)
-        diff = [(a, b) for a, b in zip(atual, menor) if a != b]
+        diff = [(a, b) for a, b in zip(atual, menor, strict=True) if a != b]   # mesmos ciclos: um valor por ciclo nos dois
         if len(diff) < 3 or sum(menor) <= sum(atual):
             return []
         melhor = sum(b > a for a, b in diff) / len(diff)
