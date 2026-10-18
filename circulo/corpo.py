@@ -19,7 +19,8 @@ import sys
 import time
 from pathlib import Path
 
-CHECAR_A_CADA = 60          # giros entre checagens da main (além de logo depois de um merge)
+CHECAR_A_CADA_S = 600       # segundos entre checagens da main (além de logo depois de um merge); em giros, o descanso
+                            # longo (300 s) faria a checagem levar horas
 VALIDAR_GIROS = 5           # giros sem erro depois de trocar o corpo = atualização evidenciada
 MAX_ERROS_NA_VALIDACAO = 2
 SMOKE = "import circulo.cli, circulo.loop, circulo.painel, circulo.self_dev, circulo.merge_gate"
@@ -55,10 +56,10 @@ class Corpo:
             return False
         st = self.estado()
         ultimo_merge = (self.s.one("SELECT MAX(id) m FROM merges WHERE merged=1") or {"m": None})["m"] or 0
-        devido = ultimo_merge > int(st.get("merge_visto", 0)) or self.s.tick - int(st.get("checado_tick", -10**9)) >= CHECAR_A_CADA
+        devido = ultimo_merge > int(st.get("merge_visto", 0)) or time.time() - float(st.get("checado_em", 0)) >= CHECAR_A_CADA_S
         if devido:
             remoto = self._git(["ls-remote", "origin", "refs/heads/main"], check=False).split("\t")[0].strip()
-            self._set(checado_tick=self.s.tick, merge_visto=ultimo_merge, remoto=remoto)
+            self._set(checado_tick=self.s.tick, checado_em=time.time(), merge_visto=ultimo_merge, remoto=remoto)
         st = self.estado()
         remoto = st.get("remoto")
         local = self._git(["rev-parse", "HEAD"], check=False)
