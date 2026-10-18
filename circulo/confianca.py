@@ -226,6 +226,18 @@ def confianca(store: Store, now: float | None = None) -> dict:
         ck.append(_c("developer", "seguranca", "Developer", "info", f"PR #{dev['pr']} aberto",
                      f"gate: {m['reason']}" if m else "esperando o CI", m["created_at"] if m else dev.get("em")))
 
+    # missões pausadas por você: o loop segue, elas não
+    try:
+        paradas = s.q("SELECT id, nome, pausada_em FROM projects WHERE COALESCE(pausada,0)=1 ORDER BY pausada_em")
+    except Exception:  # noqa: BLE001
+        paradas = []
+    if paradas:
+        from .pausa import em_ciclo
+        parando = [p["nome"] for p in paradas if em_ciclo(s, p["id"])]
+        ck.append(_c("missoes_pausadas", "agora", "Missões pausadas por você", "info", f"{len(paradas)} missão(ões)",
+                     ", ".join(p["nome"] for p in paradas)[:200] + (f"; terminando o ciclo em curso: {', '.join(parando)}" if parando else
+                                                                    "; nenhum ciclo delas rodando"), now))
+
     # rastreabilidade e SLOs (observabilidade.py): cada entrega tem o fio inteiro? os objetivos de serviço estão de pé?
     try:
         from .observabilidade import slos as _slos

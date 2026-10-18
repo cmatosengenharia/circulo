@@ -250,6 +250,11 @@ def metricas(store: Store, p) -> dict:
     return m
 
 
+def _pausa_estado(store: Store, pid: int) -> dict:
+    from .pausa import estado
+    return estado(store, pid)
+
+
 def cards(store: Store) -> list[dict]:
     """Resumo de cada projeto para a tela inicial."""
     out = []
@@ -274,6 +279,7 @@ def cards(store: Store) -> list[dict]:
         out.append({
             "id": pid, "nome": p["nome"], "pedido": p["pedido"], "tipo": p["tipo"], "tipo_rotulo": TIPOS.get(p["tipo"], ("?",))[0],
             "paralelo": int(p["paralelo"] or 1) if "paralelo" in p.keys() else 1,
+            "pausa": None if p["kit"] == "circulo" else _pausa_estado(store, pid),
             "kit": p["kit"], "status": p["status"], "proposito": p["proposito"],
             "decisoes": dec["n"] or 0, "sem_llm": (dec["sem_llm"] or 0) / dec["n"] if dec["n"] else None,
             "giros": dec["giros"] or 0, "ultima_atividade": dec["ultima"] or p["updated_at"],
@@ -286,5 +292,6 @@ def cards(store: Store) -> list[dict]:
                 "regua": bool(store.one("SELECT 1 FROM rubrics WHERE project_id=?", (pid,)))} if p["kit"] == "geral" else {}),
         })
     # ativos primeiro; dentro de cada grupo, o que teve atividade mais recente
-    out.sort(key=lambda c: (c["kit"] != "circulo", c["status"] != "ativo", -c["ultima_atividade"]))
+    out.sort(key=lambda c: (c["kit"] != "circulo", bool(c.get("pausa") and c["pausa"]["pausada"]), c["status"] != "ativo",
+                            -c["ultima_atividade"]))
     return out

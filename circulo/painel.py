@@ -449,6 +449,21 @@ def make_handler(db_path: str):
                                                                  data.get("valor"), str(data.get("ajuda", "")))})
                 except (ValueError, RuntimeError) as exc:
                     return self._json({"erro": str(exc)}, 400)
+            if u.path == "/api/missao/pausa":
+                # pausar/retomar só esta missão: o loop e as outras seguem
+                from . import pausa
+                try:
+                    pid = int(data.get("id"))
+                except (TypeError, ValueError):
+                    return self._json({"erro": "id é obrigatório"}, 400)
+                acao = data.get("acao")
+                if acao not in ("pausar", "retomar"):
+                    return self._json({"erro": "acao: pausar ou retomar"}, 400)
+                try:
+                    st = pausa.pausar(store, pid, str(data.get("motivo") or "")) if acao == "pausar" else pausa.retomar(store, pid)
+                except ValueError as exc:
+                    return self._json({"erro": str(exc)}, 400)
+                return self._json({"ok": True, **st})
             if u.path == "/api/missao/paralelo":
                 # giros em paralelo nesta missão: variantes que disputam um torneio a cada ciclo
                 from .engine import MAX_PARALELO

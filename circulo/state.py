@@ -469,7 +469,8 @@ class Store:
                   ("trail", "detalhe", "TEXT"), ("roadmap", "desativado", "INTEGER"), ("alerts", "evento", "INTEGER"),
                   ("shadow_obs", "tag_ativa", "TEXT"), ("shadow_obs", "tag_shadow", "TEXT"),
                   ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"),
-                  ("perguntas", "cerebro", "TEXT"), ("projects", "paralelo", "INTEGER"))
+                  ("perguntas", "cerebro", "TEXT"), ("projects", "paralelo", "INTEGER"),
+                  ("projects", "pausada", "INTEGER"), ("projects", "pausada_em", "REAL"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
@@ -525,8 +526,14 @@ class Store:
                       (kind, json.dumps(payload, ensure_ascii=False), time.time()))
 
     def claim_next_event(self) -> sqlite3.Row | None:
+        from .pausa import evento_em_espera, pausadas
+        paradas = pausadas(self)        # pedido de missão pausada fica guardado na fila até você retomar
         with self.tx():
-            row = self.one("SELECT * FROM events WHERE status='pending' ORDER BY id LIMIT 1")
+            row = None
+            for r in self.q("SELECT * FROM events WHERE status='pending' ORDER BY id LIMIT 500"):
+                if not evento_em_espera(self, r["kind"], r["payload"], paradas):
+                    row = r
+                    break
             if row:
                 self.x("UPDATE events SET status='processing', attempts=attempts+1 WHERE id=?", (row["id"],))
         return row
@@ -545,7 +552,12 @@ class Store:
         return cur.rowcount
 
     def pending_count(self) -> int:
-        return self.one("SELECT COUNT(*) c FROM events WHERE status='pending'")["c"]
+        from .pausa import evento_em_espera, pausadas
+        paradas = pausadas(self)
+        if not paradas:
+            return self.one("SELECT COUNT(*) c FROM events WHERE status='pending'")["c"]
+        return sum(1 for r in self.q("SELECT kind, payload FROM events WHERE status='pending'")
+                   if not evento_em_espera(self, r["kind"], r["payload"], paradas))
 
 
 class _Tx:

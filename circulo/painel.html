@@ -325,6 +325,10 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .rt .toggle:hover{border-color:var(--bad);color:var(--bad)}
 .rt li.off .toggle:hover{border-color:var(--ok);color:var(--ok)}
 
+/* ---------- pausa por missão ---------- */
+.pausa-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:var(--llm-soft);color:var(--ink);border:1px solid var(--llm);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:14px}
+.pausa-banner b{color:var(--llm)}
+.pausa-banner .sub{flex:1 1 260px}
 /* ---------- conexões e paralelo ---------- */
 .ligar,.paralelo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
 .ligar select,.paralelo select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);max-width:100%}
@@ -377,9 +381,11 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     <span class="aovivo" id="aovivo" data-f="velho" aria-live="polite"><b></b><span id="aovivoTxt">conectando…</span></span>
     <div class="controls">
       <button class="switch" id="safe" role="switch" aria-checked="false" title="Congela a evolução das regras e do próprio círculo; os pedidos continuam sendo atendidos."><i></i>Modo seguro</button>
+      <button class="btn" id="pausaMissao" hidden title="Para só esta missão; o loop e as outras missões continuam">Pausar esta missão</button>
       <button class="btn primary" id="pause">Pausar o loop</button>
     </div>
   </header>
+  <div class="pausa-banner" id="pausaBanner" hidden role="status" aria-live="polite"></div>
 
   <section class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
     <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
@@ -1007,6 +1013,7 @@ function render(s) {
     (A.fora_do_alcance.length ? `<li class="grupo">Fora do alcance (recusado, sem espera)</li>` + A.fora_do_alcance.map(a => `<li><span>${esc(a.message)}</span><span class="sub">${hora(a.created_at)}</span></li>`).join("") : "") +
     (A.configuracao.length ? `<li class="grupo">Configuração única, só uma vez</li>` + A.configuracao.map(c => `<li><span>${esc(c.titulo)}<span class="meta">${esc(c.detalhe)}</span></span></li>`).join("") : "") ||
     `<li class="empty">Nada pendente. O loop está decidindo sozinho.</li>`;
+  renderPausaMissao(P);
   const ehMissao = P && P.kit !== "circulo" && P.kit !== "financas";
   document.querySelectorAll(".missao-only").forEach(e => e.hidden = !ehMissao);
   if (ehMissao) {
@@ -1051,6 +1058,28 @@ $("#pause").onclick = async () => {
     body: JSON.stringify({acao: S && S.loop.controle.pausado ? "retomar" : "parar"})});
   if (r.ok) renderParada((await r.json()).parada);
   await refresh();
+};
+/* ---------- pausa por missão ---------- */
+function renderPausaMissao(P) {
+  const b = $("#pausaMissao"), ban = $("#pausaBanner");
+  const pode = !!(P && P.kit !== "circulo" && P.pausa);
+  b.hidden = !pode;
+  if (!pode) { ban.hidden = true; return; }
+  const e = P.pausa.estado;
+  b.textContent = e === "rodando" ? "Pausar esta missão" : "Retomar esta missão";
+  b.dataset.acao = e === "rodando" ? "pausar" : "retomar";
+  b.classList.toggle("primary", e !== "rodando");
+  ban.hidden = e === "rodando";
+  if (e !== "rodando") {
+    const desde = P.pausa.desde ? new Date(P.pausa.desde * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"}) : "";
+    ban.innerHTML = `<b>${e === "parando" ? "Parando esta missão…" : "Missão pausada por você"}</b>` +
+      `<span class="sub">${esc(P.pausa.explicacao)}${desde ? ` · desde ${desde}` : ""}${P.pausa.pedidos_guardados ? ` · ${P.pausa.pedidos_guardados} pedido(s) guardado(s) para quando retomar` : ""}. O loop e as outras missões seguem normalmente.</span>`;
+  }
+}
+$("#pausaMissao").onclick = async () => {
+  const b = $("#pausaMissao"); b.disabled = true;
+  await post("/api/missao/pausa", {id: Number(PID), acao: b.dataset.acao});
+  b.disabled = false;
 };
 $("#safe").onclick = () => post("/api/controle", {acao:"modo_seguro", ligado: !(S && S.loop.controle.modo_seguro)});
 /* ---------- conversa ---------- */
