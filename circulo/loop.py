@@ -47,7 +47,8 @@ TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_
            "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código",
            "planejar_roteiro": "Planejando o próximo item do roteiro a partir da evidência",
            "estudar_pedido": "Estudando o pedido em fontes confiáveis antes de executar",
-           "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu"}
+           "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu",
+           "curar_licoes": "Reexecutando no main os testes das lições abertas"}
 IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
@@ -396,6 +397,8 @@ class Circle:
             tasks.append("corrigir_codigo")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
             tasks.append("atualizar_corpo")
+        if self._curar_precisa() and "curar_licoes" not in tasks:
+            tasks.append("curar_licoes")
         if self.self_dev is not None and self.estudo.precisa() and "estudar_pedido" not in tasks:
             tasks.append("estudar_pedido")
         if self.planejador.precisa() and "planejar_roteiro" not in tasks:
@@ -475,6 +478,20 @@ class Circle:
         try:
             return self.corpo.precisa()
         except Exception:  # noqa: BLE001 — rede fora: tenta de novo na próxima checagem
+            return False
+
+    def _curador(self):
+        from .licoes import CuradorGit
+        return CuradorGit(self.corpo.repo, self.data_dir)
+
+    def _curar_precisa(self) -> bool:
+        """Há lição de teste para reexecutar no main (sem fetch: o corpo já busca o main periodicamente)."""
+        try:
+            if self.corpo is None or not self.corpo.disponivel:
+                return False
+            sha = self._curador().sha_main(fetch=False)
+            return bool(sha and self.licoes.pendentes(sha))
+        except Exception:  # noqa: BLE001
             return False
 
     def _tem_trabalho(self, t: str) -> bool:
@@ -588,6 +605,10 @@ class Circle:
         elif pick == "atualizar_corpo":
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
+        elif pick == "curar_licoes":
+            # worktree descartável do main, nunca checkout no clone principal (lição #1)
+            for linha in self.licoes.curar(self._curador()):
+                self.ctx.reply(f"Curador: {linha}", "licao")
         elif pick == "corrigir_codigo":
             item = self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"), "tarefa": "corrigir_codigo",
