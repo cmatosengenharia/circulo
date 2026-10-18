@@ -58,7 +58,7 @@ def linha_do_tempo(s: Store, projeto: int | None = None, zero: bool = False, lim
                      "OR evidencia LIKE 'diagnóstico%' OR evidencia='pedido pelo painel' OR status='em_andamento' OR desativado IS NOT NULL "
                      "ORDER BY updated_at DESC LIMIT 10"):
             add(r["updated_at"], "roteiro", f"Roteiro: {r['titulo']}", r["evidencia"], "desativado" if r["off"] else r["status"])
-        for r in s.q("SELECT message, created_at FROM alerts WHERE kind='saude' AND message LIKE 'Developer%' ORDER BY id DESC LIMIT 8"):
+        for r in s.q("SELECT message, created_at FROM alerts WHERE kind IN ('saude','merge') AND message LIKE 'Developer%' ORDER BY id DESC LIMIT 8"):
             add(r["created_at"], "developer", r["message"][:160], "", "")
     for r in s.q(f"SELECT stage, kind, message, count, status, first_seen, last_seen, project_id FROM incidents WHERE 1=1{pf} "
                  "ORDER BY last_seen DESC LIMIT 8", pa):

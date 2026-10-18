@@ -109,3 +109,9 @@ def test_giro_rapido_quando_ha_trabalho_e_descanso_longo_quando_nao(circle):
 def test_manutencao_gira_em_rodizio_sem_repetir(circle):
     tasks = [circle.tick().idle_task for _ in range(4)]
     assert len(set(tasks)) == 4
+
+
+def test_tarefa_do_roteiro_passa_no_porteiro_do_gasto_mesmo_sendo_cara(circle):
+    from circulo.loop import IDLE_COST, VALOR
+    g = circle.ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST["corrigir_codigo"], "value_signal": VALOR["corrigir_codigo"]})
+    assert g.allowed            # antes: valor 0,6 dava 0,39 contra limiar 0,4 e o Developer nunca rodava

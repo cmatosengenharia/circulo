@@ -34,6 +34,8 @@ from .state import Store
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
 TRABALHO = ("evoluir_projeto", "corrigir_codigo", "revisar_prs")
 ESPACO = {"corrigir_codigo": 10, "revisar_prs": 2}
+# valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
+VALOR = {"corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
            "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
            "revisar_prs": "Revisando PRs abertos no gate", "evoluir_harness": "Testando prompts por A/B", "conectar_missoes": "Ligando missões que se complementam",
@@ -351,8 +353,13 @@ class Circle:
         for pick in ordem:
             est = IDLE_COST.get(pick, 0)
             if est > 0:   # só pergunta ao Jev quando há gasto
-                gate = ctx.dl.worth_spending("idle_evolution", {"est_tokens": est, "value_signal": 0.6, "task": pick,
-                                                                 "esquecida_ha_giros": min(staleness[pick], 10**4)})
+                contexto = {"est_tokens": est, "value_signal": VALOR.get(pick, 0.6), "task": pick,
+                            "esquecida_ha_giros": min(staleness[pick], 10**4)}
+                if pick == "corrigir_codigo" and self.self_dev is not None:
+                    item = self.self_dev.pick()
+                    if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
+                        contexto.update({"item": item["titulo"], "origem": item["origem"]})
+                gate = ctx.dl.worth_spending("idle_evolution", contexto)
                 if not gate.allowed:
                     last[pick] = s.tick           # recusado agora: volta para o fim da fila
                     continue
@@ -432,7 +439,10 @@ class Circle:
             item = self.self_dev.pick()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
-            self.self_dev.run_once()
+            res = self.self_dev.run_once()
+            if item and res.status != "proposto":
+                # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
+                self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "evoluir_projeto":
