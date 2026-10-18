@@ -19,7 +19,7 @@ from . import __version__, finance
 from . import atividade as atv
 from . import registro, repo_stats
 from .money import fmt_brl
-from .projects import cards, incidentes, novos_na_fila, roteiro
+from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
 
@@ -116,11 +116,30 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "projetos": projetos,
         "serie": serie,
         "respostas": _rows(s.q(f"SELECT id, message, created_at FROM alerts WHERE kind='resposta'{pf} ORDER BY id DESC LIMIT 6", pa)),
+        "conversa": conversa(s, projeto),
         "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
         **({"motor": motor(s, projeto)} if kit == "geral" else {}),
         **({"roteiro": roteiro(s), "incidentes": incidentes(s), "quarentena": {
             k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
     }
+
+
+def conversa(s: Store, projeto: int | None, limite: int = 25) -> list[dict]:
+    """Suas mensagens para esta missão (ou para o loop) e o que o loop respondeu a cada uma, em ordem."""
+    fin = kit_project_id(s, "financas")
+    alvo = projeto or fin
+    if alvo == fin:
+        cond, args = "(json_extract(payload,'$.projeto') IS NULL OR json_extract(payload,'$.projeto')=?)", (alvo,)
+    else:
+        cond, args = "json_extract(payload,'$.projeto')=?", (alvo,)
+    msgs = s.q(f"SELECT id, payload, status, error, created_at, processed_at FROM events WHERE kind='mensagem' AND {cond} "
+               "AND COALESCE(json_extract(payload,'$.origem'),'') != 'demo' ORDER BY id DESC LIMIT ?", (*args, limite))
+    out = []
+    for m in reversed(msgs):
+        resp = [dict(r) for r in s.q("SELECT message, created_at FROM alerts WHERE evento=? ORDER BY id", (m["id"],))]
+        out.append({"id": m["id"], "texto": json.loads(m["payload"]).get("text", ""), "status": m["status"],
+                    "erro": m["error"], "em": m["created_at"], "respondido_em": m["processed_at"], "respostas": resp})
+    return out
 
 
 def autonomia(s: Store) -> dict:
@@ -324,6 +343,18 @@ def make_handler(db_path: str):
                     payload["projeto"] = int(data["projeto"])
                 eid = store.enqueue("mensagem", payload)
                 return self._json({"ok": True, "evento": eid})
+            if u.path == "/api/roteiro":
+                # você decide o que o loop NÃO deve evoluir: item desativado sai da fila do Developer (e volta quando reativar)
+                item = data.get("id")
+                if not isinstance(item, int) or not store.one("SELECT 1 FROM roadmap WHERE id=?", (item,)):
+                    return self._json({"erro": "item não encontrado"}, 404)
+                ativo = bool(data.get("ativo"))
+                store.x("UPDATE roadmap SET desativado=?, updated_at=? WHERE id=?", (0 if ativo else 1, time.time(), item))
+                titulo = store.one("SELECT titulo FROM roadmap WHERE id=?", (item,))["titulo"]
+                store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
+                        ("controle", f"Você {'reativou' if ativo else 'desativou'} o item #{item} do roteiro: {titulo}", time.time(),
+                         kit_project_id(store, "circulo")))
+                return self._json({"ok": True, "id": item, "ativo": ativo})
             if u.path == "/api/projeto":
                 pedido = str(data.get("pedido", "")).strip()[:2000]
                 if len(pedido) < 8:

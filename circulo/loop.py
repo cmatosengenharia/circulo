@@ -154,6 +154,7 @@ class Circle:
             pid = None if ev["kind"] == "novo_projeto" else (payload.get("projeto") or kit_project_id(s, "financas"))
             self._stage("pedido", {"evento": ev["id"], "projeto": pid})
             ctx.dl.project_id = pid
+            ctx.evento = ev["id"]
             try:
                 with s.tx():
                     if ev["kind"] == "novo_projeto":
@@ -167,6 +168,7 @@ class Circle:
                 self.incidents.record(f"pedido:{ev['kind']}", exc, pid)
             finally:
                 ctx.dl.project_id = circulo_pid
+                ctx.evento = None
         else:
             try:
                 r.idle_task = self.idle()
@@ -212,10 +214,14 @@ class Circle:
             # falar com o loop: vira pedido seu no roteiro do próprio loop
             now = time.time()
             ordem = (self.store.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
-            self.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                         (payload["text"][:160], payload["text"][:600], "pedido_cassio", "pendente", "pedido pelo painel", ordem, now, now))
+            item = self.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                                (payload["text"][:160], payload["text"][:600], "pedido_cassio", "pendente", "pedido pelo painel", ordem, now, now))
             self.memory.add("feedback", payload["text"], project_id=pid, source="Cássio", trust="confiavel")
-            msg = "Anotado no roteiro do loop como pedido seu."
+            na_frente = self.store.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 "
+                                       "AND evidencia NOT LIKE '%depende de você%' AND ordem < ?", (ordem,))["n"]
+            msg = (f"Anotado no roteiro como item #{item}. O Developer pega na ordem"
+                   + (f"; há {na_frente} na frente." if na_frente else ": é o próximo.")
+                   + " Se não quiser que ele mexa nisso, desative o item no roteiro.")
             self.ctx.reply(msg)
             return msg
         if proj is not None and proj["kit"] != "financas":

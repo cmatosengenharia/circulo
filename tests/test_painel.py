@@ -6,6 +6,7 @@ import urllib.request
 import pytest
 
 from circulo.painel import estado, serve
+from circulo.projects import kit_project_id
 from conftest import say
 
 
@@ -130,3 +131,27 @@ def test_painel_sobe_antes_do_loop_e_mostra_desligado(tmp_path):
         assert data["loop"]["vivo"]["estado"] == "desligado" and data["projetos"][0]["kit"] == "circulo"
     finally:
         srv.shutdown()
+
+
+def test_desativar_item_do_roteiro_tira_da_fila_do_developer(circle, painel):
+    from circulo.self_dev import SelfDeveloper
+    dev = SelfDeveloper(circle.ctx, circle.data_dir, agent=None, github=None)
+    primeiro = dev.pick()
+    assert primeiro is not None
+    code, _ = post(painel + "/api/roteiro", {"id": primeiro["id"], "ativo": False}, {"X-Circulo": "1"})
+    assert code == 200
+    assert dev.pick()["id"] != primeiro["id"]                       # o Developer pula o item desativado
+    item = next(r for r in estado(circle.store, kit_project_id(circle.store, "circulo"))["roteiro"] if r["id"] == primeiro["id"])
+    assert item["desativado"] == 1
+    assert post(painel + "/api/roteiro", {"id": primeiro["id"], "ativo": True}, {"X-Circulo": "1"})[0] == 200
+    assert dev.pick()["id"] == primeiro["id"]                       # reativado: volta ao lugar dele
+    assert post(painel + "/api/roteiro", {"id": primeiro["id"], "ativo": False})[0] == 403    # sem o cabeçalho do painel
+
+
+def test_conversa_liga_cada_resposta_a_sua_mensagem(circle, painel):
+    zero = kit_project_id(circle.store, "circulo")
+    post(painel + "/api/pedido", {"texto": "Priorize corrigir erros", "projeto": str(zero)}, {"X-Circulo": "1"})
+    circle.tick()
+    c = estado(circle.store, zero)["conversa"]
+    assert c[-1]["texto"] == "Priorize corrigir erros" and c[-1]["status"] == "done"
+    assert "item #" in c[-1]["respostas"][0]["message"]

@@ -110,7 +110,7 @@ def ensure_seed(store: Store) -> None:
 
 
 def roteiro(store: Store) -> list[dict]:
-    return [dict(r) for r in store.q("SELECT id, titulo, detalhe, origem, status, evidencia FROM roadmap ORDER BY "
+    return [dict(r) for r in store.q("SELECT id, titulo, detalhe, origem, status, evidencia, COALESCE(desativado,0) desativado, updated_at FROM roadmap ORDER BY "
                                      "CASE status WHEN 'em_andamento' THEN 0 WHEN 'pendente' THEN 1 WHEN 'parcial' THEN 2 ELSE 3 END, ordem")]
 
 
@@ -225,7 +225,7 @@ def metricas(store: Store, p) -> dict:
                           "historico": [], "ajuda": "Despesas que o loop categorizou certo sem você corrigir."}
     elif kit == "circulo":
         ver = store.one("SELECT version FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")["version"]
-        rot = {x["status"]: x["n"] for x in store.q("SELECT status, COUNT(*) n FROM roadmap GROUP BY status")}
+        rot = {x["status"]: x["n"] for x in store.q("SELECT status, COUNT(*) n FROM roadmap WHERE COALESCE(desativado,0)=0 GROUP BY status")}
         total = sum(rot.values()) or 1
         m["ciclos"] = store.tick                     # o loop conta todos os giros, de todas as missões
         m["versao"] = f"política v{ver}"

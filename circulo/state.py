@@ -323,7 +323,7 @@ class Store:
                   ("projects", "ultima_pesquisa_tick", "INTEGER"), ("projects", "ultimo_ciclo_tick", "INTEGER"),
                   ("projects", "ultimo_ciclo_em", "REAL"), ("proposals", "rollbacks", "INTEGER"),
                   ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"),
-                  ("trail", "detalhe", "TEXT"))
+                  ("trail", "detalhe", "TEXT"), ("roadmap", "desativado", "INTEGER"), ("alerts", "evento", "INTEGER"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

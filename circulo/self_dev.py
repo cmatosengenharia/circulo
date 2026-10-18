@@ -120,8 +120,9 @@ class SelfDeveloper:
             r = self.s.one("SELECT * FROM roadmap WHERE id=?", (item_id,))
         else:
             # primeiro erros recorrentes; depois pedidos do roteiro que não dependem de algo fora do código
-            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' ORDER BY ordem LIMIT 1")
-                 or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' "
+            # item desativado por você no painel nunca é pego
+            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0 ORDER BY ordem LIMIT 1")
+                 or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
                                "AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1"))
         return dict(r) if r else None
 

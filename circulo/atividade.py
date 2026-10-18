@@ -54,9 +54,10 @@ def linha_do_tempo(s: Store, projeto: int | None = None, zero: bool = False, lim
             add(r["created_at"], "harness", f"Prompt do {r['role']} em A/B: {r['variante'][:90]}", r["notes"] or "", r["status"])
         for r in s.q("SELECT version, status, reason, created_at FROM policy_versions WHERE reason!='semente' ORDER BY version DESC LIMIT 8"):
             add(r["created_at"], "versao", f"Política v{r['version']}: {r['reason']}", "", r["status"])
-        for r in s.q("SELECT titulo, status, evidencia, origem, updated_at FROM roadmap WHERE origem!='pedido_cassio' "
-                     "OR evidencia LIKE 'diagnóstico%' OR status='em_andamento' ORDER BY updated_at DESC LIMIT 10"):
-            add(r["updated_at"], "roteiro", f"Roteiro: {r['titulo']}", r["evidencia"], r["status"])
+        for r in s.q("SELECT titulo, status, evidencia, origem, updated_at, COALESCE(desativado,0) off FROM roadmap WHERE origem!='pedido_cassio' "
+                     "OR evidencia LIKE 'diagnóstico%' OR evidencia='pedido pelo painel' OR status='em_andamento' OR desativado IS NOT NULL "
+                     "ORDER BY updated_at DESC LIMIT 10"):
+            add(r["updated_at"], "roteiro", f"Roteiro: {r['titulo']}", r["evidencia"], "desativado" if r["off"] else r["status"])
         for r in s.q("SELECT message, created_at FROM alerts WHERE kind='saude' AND message LIKE 'Developer%' ORDER BY id DESC LIMIT 8"):
             add(r["created_at"], "developer", r["message"][:160], "", "")
     for r in s.q(f"SELECT stage, kind, message, count, status, first_seen, last_seen, project_id FROM incidents WHERE 1=1{pf} "

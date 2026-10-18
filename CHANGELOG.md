@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — 2026-10-18
+
+- Roteiro: você pode desativar qualquer item que ainda não foi entregue. O Developer nunca pega item desativado; reativar
+  devolve o item ao lugar dele na fila. A mudança aparece na linha do tempo da evolução e o progresso ignora os desativados.
+- Falar com o loop virou conversa: suas mensagens e as respostas do loop ligadas a cada uma, estado (na fila, lido e em
+  quanto tempo, falhou), sugestões, Enter para enviar. Pedido ao loop responde com o número do item no roteiro e quantos
+  estão na frente.
+
 ## 1.1.0 — 2026-10-18 · o loop trabalhando à vista
 
 **Ritmo**

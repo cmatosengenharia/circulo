@@ -29,14 +29,15 @@ class Ctx:
     dl: DecisionLayer
     data_dir: Path
     now: Callable[[], datetime]
+    evento: int | None = None          # pedido em atendimento: a resposta fica ligada a ele (conversa no painel)
 
     @property
     def policy(self) -> dict:
         return self.policies.get()
 
     def reply(self, message: str, kind: str = "resposta") -> None:
-        self.store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
-                     (kind, message, time.time(), self.dl.project_id))
+        self.store.x("INSERT INTO alerts(kind,message,created_at,project_id,evento) VALUES(?,?,?,?,?)",
+                     (kind, message, time.time(), self.dl.project_id, self.evento))
 
 
 def tokens_of(description: str) -> list[str]:
