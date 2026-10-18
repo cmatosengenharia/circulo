@@ -147,3 +147,23 @@ def test_git_usa_token_sem_expor_na_linha_de_comando_e_nunca_pede_senha(monkeypa
     assert env["GIT_CONFIG_COUNT"] == "2" and env["GIT_CONFIG_KEY_1"] == "http.https://github.com/.extraheader"
     monkeypatch.delenv("GITHUB_TOKEN")
     assert _git_env()["GIT_CONFIG_COUNT"] == "1"
+
+
+def test_testes_do_developer_rodam_isolados_e_nunca_acordam_outro_developer(monkeypatch):
+    import os
+    from circulo.self_dev import ambiente_isolado, build_self_dev
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "y")
+    monkeypatch.setenv("CIRCULO_REPO_DIR", "/tmp")
+    env = ambiente_isolado()
+    assert "GITHUB_TOKEN" not in env and "ANTHROPIC_API_KEY" not in env and "CIRCULO_REPO_DIR" not in env
+    assert env["CIRCULO_SEM_DEVELOPER"] == "1" and env["CIRCULO_ENV"] == os.devnull
+    assert build_self_dev(None) is None                     # dentro de testes, nunca um Developer de verdade
+
+
+def test_item_preso_em_andamento_volta_para_a_fila(circle, tmp_path):
+    from circulo.self_dev import SelfDeveloper
+    circle.store.x("UPDATE roadmap SET status='em_andamento', evidencia='branch circulo/fix-26-1' WHERE id=(SELECT MIN(id) FROM roadmap WHERE status='pendente')")
+    dev = SelfDeveloper(circle.ctx, tmp_path, agent=None, github=None)
+    assert dev.recuperar() == 1
+    assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE status='em_andamento'")["n"] == 0

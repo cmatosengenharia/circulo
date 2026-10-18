@@ -229,6 +229,8 @@ class GitHubREST:
 
 
 def build_gate(ctx: Ctx) -> MergeGate | None:
+    if os.environ.get("CIRCULO_SEM_DEVELOPER") == "1" or os.environ.get("PYTEST_CURRENT_TEST"):
+        return None              # testes nunca falam com o GitHub de verdade
     repo, token = os.environ.get("CIRCULO_REPO"), os.environ.get("GITHUB_TOKEN")
     if not repo or not token:
         return None

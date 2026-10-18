@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2 — 2026-10-18
+
+- Testes herméticos: os testes que o Developer roda antes de abrir PR não herdam chaves nem o repositório, e nenhum
+  Developer ou gate de verdade nasce dentro de testes. Antes, rodando na máquina do loop, um teste acordava outro
+  Developer (Claude Code dentro de Claude Code).
+- Item do roteiro preso em "em andamento" por execução interrompida volta sozinho para a fila ao reiniciar.
+
 ## 1.3.1 — 2026-10-18
 
 - Valor esperado por tarefa no porteiro do gasto: o item do roteiro (seu pedido ou erro recorrente) vale mais que manutenção; antes o Developer era recusado por 0,39 contra 0,40. O Jev vê qual item seria feito.

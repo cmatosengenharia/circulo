@@ -133,6 +133,15 @@ class SelfDeveloper:
                                "AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1"))
         return dict(r) if r else None
 
+    def recuperar(self) -> int:
+        """Execução interrompida (loop reiniciado no meio do trabalho): o item volta para a fila em vez de ficar
+        preso em "em andamento" sem PR."""
+        st = self.s.get("self_dev_aberto") or {}
+        aberto = st.get("item") if st.get("pr") and not st.get("fechado") else None
+        return self.s.run("UPDATE roadmap SET status='pendente', evidencia='retomado: a execução anterior foi interrompida', "
+                          "updated_at=? WHERE status='em_andamento' AND evidencia LIKE 'branch %' AND id IS NOT ?",
+                          (time.time(), aberto))
+
     def busy(self) -> bool:
         st = self.s.get("self_dev_aberto")
         return bool(st and st.get("pr") and not st.get("fechado"))
@@ -190,7 +199,7 @@ class SelfDeveloper:
             if not _git(["status", "--porcelain"], wt):
                 self._set_item(item["id"], "pendente", "agente não produziu mudança")
                 return DevResult(item["id"], "sem_mudanca", out.get("log", "")[-300:])
-            tests = subprocess.run(self.test_cmd, cwd=wt, capture_output=True, text=True, timeout=1800)
+            tests = subprocess.run(self.test_cmd, cwd=wt, capture_output=True, text=True, timeout=900, env=ambiente_isolado())
             if tests.returncode != 0:
                 self._set_item(item["id"], "pendente", "correção reprovada nos testes locais")
                 self.ctx.reply(f"Developer: a correção de “{item['titulo']}” não passou nos testes locais; nada foi enviado.", "saude")
@@ -227,7 +236,21 @@ class SelfDeveloper:
             self.s.set("self_dev_aberto", st)
 
 
+SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",
+            "CIRCULO_REPO", "CIRCULO_REPO_DIR")
+
+
+def ambiente_isolado() -> dict:
+    """Ambiente dos testes do Developer: sem chaves, sem repositório e com o Developer desligado.
+    Sem isso, um teste que cria um loop acordaria outro Developer de verdade (Claude Code dentro de Claude Code)."""
+    env = {k: v for k, v in os.environ.items() if k not in SEGREDOS}
+    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0"})
+    return env
+
+
 def build_self_dev(ctx: Ctx) -> SelfDeveloper | None:
+    if os.environ.get("CIRCULO_SEM_DEVELOPER") == "1" or os.environ.get("PYTEST_CURRENT_TEST"):
+        return None              # nunca um Developer de verdade dentro de testes
     repo = os.environ.get("CIRCULO_REPO_DIR")
     if not repo or not (Path(repo) / ".git").exists():
         return None

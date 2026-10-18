@@ -84,6 +84,8 @@ class Circle:
         self.engine.graph = self.graph
         self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
         self.self_dev = self_dev if self_dev is not None else build_self_dev(self.ctx)
+        if self.self_dev is not None:
+            self.self_dev.recuperar()
         self.ctx.policies.before_change = lambda: guardrails.snapshot(self.ctx.store, self.data_dir, "mudanca")
         self.ctx.store.set("motor_pronto", self.engine.ready)
         self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
