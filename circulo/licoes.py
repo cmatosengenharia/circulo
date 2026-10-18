@@ -44,6 +44,11 @@ def normalizar(texto: str, n: int = 70) -> str:
 def assinatura_de(ponto: str, motivo: str) -> str:
     """Mesma causa → mesma assinatura, mesmo com números, hashes e PRs diferentes."""
     m = motivo or ""
+    # causas de ambiente com assinatura estável (o log bruto do agente muda a cada vez)
+    if re.search(r'"api_error_status":\s*429|hit your [a-z ]{0,20}limit|session limit|usage limit|rate[ _-]?limit', m, re.I):
+        return f"{ponto}:limite_de_uso"
+    if re.search(r"timed? ?out|timeout", m, re.I):
+        return f"{ponto}:timeout"
     codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", m)))
     if codigos and re.search(r"ruff|lint|\.py:\d+:\d+", m, re.I):
         return f"{ponto}:lint:{','.join(codigos[:3])}"

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.1 — 2026-10-18
+
+Achado na validação das 12:57: o Developer trabalhou 6 min (56 passos) no item #32, bateu no limite de uso da
+assinatura do Claude Code e todo o trabalho foi descartado. Depois do reset, ele recomeçaria do zero, com risco de bater
+no limite de novo, sem fim.
+
+- **Trabalho parcial é retomado, não refeito**: sessão interrompida (limite da conta, máximo de passos) vira um commit
+  local na branch, sem push e sem PR. A próxima sessão continua de onde parou ("CONTINUAÇÃO: … não recomece").
+  Neurônio `developer:retomada`: depois de 4 sessões sem terminar, registra a lição "item grande demais".
+- Assinatura estável para erro de ambiente: `…:limite_de_uso` e `…:timeout`. Antes, o log bruto do agente gerava uma
+  assinatura nova a cada vez (lição #3), e repetições não eram reconhecidas.
+
 ## 1.11.0 — 2026-10-18
 
 Incidente: das 11:20 às 12:13 o loop girou a cada 15 s sem avançar. Os dois pedidos do Cássio (#33 e #34) ficaram sem

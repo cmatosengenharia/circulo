@@ -402,3 +402,41 @@ def test_pr_fechado_fora_do_gate_libera_o_developer(circle, repo):
     MergeGate(circle.ctx, gh, "cmatosengenharia").run()
     assert not dev.busy()
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
+
+
+def test_sessao_interrompida_guarda_o_parcial_e_a_proxima_continua(circle, repo):
+    """Limite da conta no meio da tarefa: o trabalho não é jogado fora; a próxima sessão continua do commit parcial."""
+    erro_recorrente(circle)
+
+    class Parcial:
+        def __init__(self):
+            self.tasks = []
+
+        def run(self, task, workdir):
+            self.tasks.append(task)
+            w = Path(workdir)
+            if len(self.tasks) == 1:                      # 1ª sessão: metade do trabalho e o limite da conta
+                (w / "app.py").write_text("def soma(a, b):\n    return a + b\n")
+                return {"ok": False, "tokens": 10, "log": LOG_LIMITE}
+            assert (w / "app.py").read_text().endswith("a + b\n")      # o parcial está lá
+            import re
+            m = re.search(r"lição #(\d+)", task)
+            (w / "test_app.py").write_text(f"from app import soma\n\ndef test_soma():\n    # lição #{m.group(1) if m else 0}\n"
+                                           "    assert soma(2, 2) == 4\n")
+            return {"ok": True, "tokens": 10, "log": "ok"}
+    agente, gh = Parcial(), FakeGH()
+    dev = SelfDeveloper(circle.ctx, repo, agente, gh, test_cmd=TEST_CMD)
+    assert dev.run_once().status == "limite"
+    assert circle.store.get("self_dev_wip")
+    circle.store.set("self_dev_espera", None)
+    r = dev.run_once()
+    assert r.status == "proposto" and "CONTINUAÇÃO" in agente.tasks[1]
+    assert not circle.store.get("self_dev_wip")
+    assert "return a + b" in git(repo.parent / "origin.git", "show", f"{gh.prs[0][0]}:app.py")
+
+
+def test_assinatura_do_limite_e_estavel():
+    from circulo.licoes import assinatura_de
+    a = assinatura_de("developer:agente", '{"disabled_reason":"x","api_error_status":429,"result":"hit your session limit"}')
+    b = assinatura_de("developer:agente", '{"subagent_stats":{},"api_error_status":429}')
+    assert a == b == "developer:agente:limite_de_uso"
