@@ -609,6 +609,25 @@ class Circle:
 
     HEARTBEAT_EVERY = 5.0   # segundos; o painel considera o loop desligado sem batimento por 3x isso
 
+    def _tick_com_pulso(self) -> "TickResult":
+        """O batimento continua DURANTE o giro. Antes ele só era escrito entre giros: uma etapa longa (o Developer
+        trabalhando 8 min) deixava o painel mostrando "Desligado" com o loop trabalhando."""
+        parar = threading.Event()
+
+        def pulso():
+            while not parar.wait(self.HEARTBEAT_EVERY):
+                try:
+                    self.heartbeat()
+                except Exception:  # noqa: BLE001 — o pulso nunca derruba o giro
+                    pass
+        t = threading.Thread(target=pulso, name="pulso", daemon=True)
+        t.start()
+        try:
+            return self.tick()
+        finally:
+            parar.set()
+            t.join(timeout=2)
+
     def heartbeat(self, proximo_giro: float | None = None) -> None:
         self.store.set("batimento", {"em": time.time(), "pid": os.getpid(), "proximo_giro_em": proximo_giro})
 
@@ -649,7 +668,7 @@ class Circle:
                     self.store.set("ultimo_reinicio", {"em": time.time(), "motivo": "configuração alterada"})
                     break
                 self.heartbeat()
-                r = self.tick()
+                r = self._tick_com_pulso()
                 n += 1
                 if self.corpo is not None and self.corpo.reiniciar:
                     # código novo (ou rollback): sai limpo; o serviço 24/7 sobe de novo já nele

@@ -115,3 +115,23 @@ def test_tarefa_do_roteiro_passa_no_porteiro_do_gasto_mesmo_sendo_cara(circle):
     from circulo.loop import IDLE_COST, VALOR
     g = circle.ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST["corrigir_codigo"], "value_signal": VALOR["corrigir_codigo"]})
     assert g.allowed            # antes: valor 0,6 dava 0,39 contra limiar 0,4 e o Developer nunca rodava
+
+
+def test_batimento_continua_durante_giro_longo(circle, monkeypatch):
+    """Etapa longa (Developer por minutos) não pode fazer o painel achar que o loop desligou."""
+    import time
+    from circulo.status import loop_status
+    circle.HEARTBEAT_EVERY = 0.05
+    vistos = []
+    original = circle.tick
+
+    def tick_longo():
+        circle._stage("developer", {"detalhe": "Claude Code trabalhando"})
+        inicio = circle.store.get("batimento")["em"]
+        time.sleep(0.3)
+        vistos.append((circle.store.get("batimento")["em"] > inicio, loop_status(circle.store)["estado"]))
+        return original()
+    circle.tick = tick_longo
+    circle.heartbeat()
+    circle._tick_com_pulso()
+    assert vistos == [(True, "trabalhando")]
