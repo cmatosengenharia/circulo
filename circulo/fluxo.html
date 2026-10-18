@@ -342,7 +342,11 @@ function renderJev(j) {
       <div class="par"><span>Variante (EN)</span><span class="barra"><b style="width:${Math.round(l.conf_en * 100)}%"></b></span><span>${Math.round(l.conf_en * 100)}%</span></div>
       <div class="nota">${l.n} pares na mesma chamada · ganho ${l.ganho >= 0 ? "+" : ""}${Math.round(l.ganho * 100)} pts · concordância ${Math.round(l.concordancia * 100)}%</div>` : ""}</div>`;
   }).join("");
-  $("#jevLab").innerHTML = `<b>Laboratório: melhores formas de perguntar</b>
+  const cob = j.cobertura;
+  const cobHtml = cob ? `<div class="nota" style="margin-bottom:10px"><b>Cobertura da API do Jev no código:</b> ${cob.total} perguntas ·
+      critérios descritos ${Math.round(cob.por_regra.criterios * 100)}% · em inglês ${Math.round(cob.por_regra.ingles * 100)}% ·
+      citam campos do estado ${Math.round(cob.por_regra.referencia_estado * 100)}%${cob.faltam.filter(f => f.falta.includes("criterios")).length ? ` · sem critérios: ${cob.faltam.filter(f => f.falta.includes("criterios")).map(f => esc(f.onde)).join(", ")}` : ""}</div>` : "";
+  $("#jevLab").innerHTML = cobHtml + `<b>Laboratório: melhores formas de perguntar</b>
     <div class="nota">A doc do Jev recomenda inglês e a condição explícita. Cada pergunta abaixo vai em dobro na mesma chamada (custo quase zero): a atual e a variante. Com ${j.min_n} pares e ganho de ${Math.round(j.ganho_min * 100)} pontos de confiança, a variante vira a oficial sozinha; se o ganho sumir, volta.</div>${labs}`;
 }
 

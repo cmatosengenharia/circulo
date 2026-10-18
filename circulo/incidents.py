@@ -15,7 +15,7 @@ import re
 import time
 import traceback
 
-from .decision import Question
+from .decision import Question, SN
 from .state import Store
 
 NEVER_ISOLATE_PREFIXES = ("health", "pedido")
@@ -101,7 +101,9 @@ class Incidents:
         if cur and cur["ate_tick"] > tick:
             return
         d = self.dl.ask("isolate_stage", Question(
-            "noul", "Esta etapa está falhando de forma repetida e deve ser isolada temporariamente para o resto do círculo seguir?"),
+            "noul", "Esta etapa está falhando de forma repetida e deve ser isolada temporariamente para o resto do círculo seguir?",
+            SN("`falhas_recentes` se acumulam na janela e já houve `reincidencias`: a etapa derruba giro atrás de giro",
+               "foi uma falha isolada ou já parou; isolar tiraria trabalho útil do loop sem necessidade")),
             {"stage": stage, "falhas_recentes": recent, "janela_giros": WINDOW_TICKS, "reincidencias": (cur or {}).get("nivel", 0)})
         if float(d.value) < 0.6:
             return

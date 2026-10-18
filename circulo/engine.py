@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .agents import Ctx
-from .decision import Question
+from .decision import Question, SN
 from .memory import Memory
 from .registro import marcar_resultado
 from .registro import registrar as registrar_llm
@@ -168,7 +168,9 @@ class Engine:
             one = self.next_project()
             return [one] if one is not None else []
         qs = {f"val_{c['id']}": Question("score", f"Valor do próximo ciclo para “{c['nome']}” (nota atual {c['nota']:.2f})",
-                                         ("baixo", "médio", "alto")) for c in cands}
+                                         ("a missão já está com nota alta, sem feedback novo e teve ciclo há pouco: um ciclo agora mudaria pouco",
+                                          "há algo a ganhar: nota mediana, ou parada há alguns giros, ou ainda sem régua",
+                                          "um ciclo agora rende muito: nota baixa, feedback novo seu esperando, ou parada há muitos giros")) for c in cands}
         res = self.ctx.dl.ask_many({"projetos": cands}, qs)
         ranked = sorted(cands, key=lambda c: -float(res[f"val_{c['id']}"].value))
         return [c["id"] for c in ranked[:k]]
@@ -214,7 +216,9 @@ class Engine:
             return cands[0]["id"]
         d = self.ctx.dl.ask("next_project", Question(
             "choice", "Qual projeto ganha mais com o próximo ciclo (maior melhoria esperada por custo)?",
-            {str(c["id"]): f"{c['nome']} (nota {c['nota']:.2f})" for c in cands}), {"projetos": cands})
+            {str(c["id"]): f"{c['nome']}: nota {c['nota']:.2f}, parada há {c['parado_giros']} giros, "
+                           f"{c['feedback_novo']} feedback(s) novo(s){', ainda sem régua' if c['sem_regua'] else ''}" for c in cands}),
+            {"projetos": cands})
         return int(d.value)
 
     # ------------------------------------------------------------ um ciclo
@@ -302,7 +306,9 @@ class Engine:
         achados = _lines(text)
         if not achados:
             return 0
-        qs = {f"ach_{i}": Question("noul", f"Este achado é relevante para o pedido e verificável? {a}") for i, (a, _) in enumerate(achados)}
+        qs = {f"ach_{i}": Question("noul", f"Este achado é relevante para o pedido e verificável? {a}",
+                                   SN("o achado fala diretamente do que `pedido` quer (para o `tipo` desta missão) e afirma algo concreto que dá para conferir numa fonte",
+                                      "é genérico, não tem relação com o pedido, ou é opinião sem como verificar")) for i, (a, _) in enumerate(achados)}
         dec = self.ctx.dl.ask_many({"pedido": p["pedido"], "tipo": p["tipo"]}, qs)
         n = 0
         for i, (a, fonte) in enumerate(achados):
@@ -338,7 +344,9 @@ class Engine:
                   "\n\nEscreva de 5 a 9 critérios mensuráveis.")
         text, _ = self._gen("rubric", prompt, res, p)
         cands = _lines(text)
-        qs = {f"mens_{i}": Question("noul", f"Este critério é mensurável na entrega (não é vago)? {c}") for i, (c, _) in enumerate(cands)}
+        qs = {f"mens_{i}": Question("noul", f"Este critério é mensurável na entrega (não é vago)? {c}",
+                                    SN("dá para olhar a entrega e dizer objetivamente se o critério está cumprido (tem, mostra, inclui, quantidade, limite)",
+                                       "é um adjetivo (bom, bonito, de qualidade) ou depende do gosto de quem avalia")) for i, (c, _) in enumerate(cands)}
         dec = self.ctx.dl.ask_many({"tipo": p["tipo"]}, qs) if qs else {}
         crit = []
         for i, (c, peso) in enumerate(cands):
@@ -529,8 +537,12 @@ class Engine:
                   "verificacao_ok": True, "checks": checks, "criterios_que_pioraram": len(pioraram), "integracao_ok": integ_ok,
                   "catraca_ok": catraca_ok}
         r = self.ctx.dl.ask_many(estado, {
-            "should_advance": Question("noul", "A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução?"),
-            "contraprova": Question("noul", "A nova versão piorou algo importante em relação à anterior?"),
+            "should_advance": Question("noul", "A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução?",
+                                       SN("`ganho` e `ganho_oculto` positivos ou nulos, `verificacao_ok`, `catraca_ok`, nenhum critério piorou",
+                                          "algum ganho negativo, `criterios_que_pioraram` > 0, verificação ou catraca reprovadas, ou integração quebrada")),
+            "contraprova": Question("noul", "A nova versão piorou algo importante em relação à anterior?",
+                                    SN("`ganho_oculto` negativo, `criterios_que_pioraram` > 0 ou `integracao_ok` falso",
+                                       "nada piorou: todos os ganhos ≥ 0 e os checks passaram")),
         })
         p_av, p_cp = round(float(r["should_advance"].value), 3), round(float(r["contraprova"].value), 3)
         thr = float(self.ctx.policy["thresholds"].get("should_advance", 0.6))

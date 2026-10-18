@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.21.0 — 2026-10-18
+
+**O Jev explorado ao máximo, com o loop conferindo isso sozinho.**
+
+A auditoria (`jev_cobertura.py`, a partir da documentação da TypeSafe) mostrou que o loop usava pouco da API:
+35 perguntas, só 37% com critérios, nenhum Noul com a situação do sim e do não, dois Scores com graus
+("baixo/médio/alto", anti-padrão da doc), e `probabilities`/`legend` da resposta jogados fora.
+
+- **Critérios em todas as 35 perguntas** (97% → o teste `test_jev_cobertura.py` não deixa entrar pergunta nova
+  sem critérios):
+  - Noul agora manda `criteria` com `true`/`false` descrevendo a situação de cada lado, citando os campos do
+    estado entre crases (helper `SN`);
+  - Choice com descrição por opção (ex.: "qual tarefa" diz o que cada tarefa faz e há quantos giros está esquecida;
+    "qual modelo" descreve o tipo de tarefa de cada nível);
+  - Score com níveis que descrevem situações: régua das entregas, relevância de trechos e valor do próximo ciclo.
+- **A distribuição não é mais jogada fora**: `probabilities` e `legend` ficam na decisão (coluna
+  `decisions.probabilidades`), e `ultima_decisao` expõe a distribuição a quem decide:
+  - empate técnico no Jev (< 10 pontos entre as duas primeiras tarefas) → a regra desempata pela mais esquecida;
+  - **roteamento por confiança** no gate de merge: aprovação automática só com o Jev seguro; em dúvida, "precisa de
+    ajustes" (padrão da doc: agir com confiança alta, revisar na média).
+- **Jev como verificador** (caso de uso da doc): o dado que o planejador cita como evidência é conferido pelo
+  Jev contra a evidência real; se não está lá, o item vira "chutado" e é descartado.
+- **Laboratório** cobre 8 perguntas (antes 3): `review_code`, `should_advance`, `contraprova`, `pick_model` e
+  `remember` também vão em dobro, em inglês e com critérios, e a melhor forma vence com evidência.
+- **Cobertura ao vivo** na aba Decisões e Jev: quantas perguntas têm critérios, estão em inglês e citam o estado.
+
 ## 1.20.0 — 2026-10-18
 
 **As práticas da Lauren Tan (poteto: React Compiler, Grok Bot) para entregar rápido e seguro com agentes.**

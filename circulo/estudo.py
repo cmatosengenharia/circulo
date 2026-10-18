@@ -19,7 +19,7 @@ import re
 import time
 
 from .agents import Ctx
-from .decision import Question
+from .decision import Question, SN
 
 MIN_FONTES = 2
 EST_TOKENS = 9000
@@ -126,7 +126,9 @@ class Estudo:
         # Jev: a evidência sustenta o veredito? (só pode deixar mais conservador)
         if r["veredito"] != "adotar":
             d = self.ctx.dl.ask("evidencia_sustenta", Question(
-                "noul", f"A evidência encontrada sustenta {r['veredito']} o pedido em vez de executá-lo como está?"),
+                "noul", f"A evidência encontrada sustenta {r['veredito']} o pedido em vez de executá-lo como está?",
+                SN("há `n_fontes` ≥ 2 e `n_citacoes` reais, e `justificativa` aponta um fato concreto das fontes que contradiz ou melhora o pedido",
+                   "as fontes são poucas ou a justificativa é opinião, genérica ou não decorre das fontes")),
                 {"veredito": r["veredito"], "n_fontes": len(r["fontes"]), "n_achados": len(r["achados"]),
                  "n_citacoes": len(out.citations or []), "justificativa": r["justificativa"][:300]})
             if float(d.value) < 0.5:

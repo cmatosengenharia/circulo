@@ -15,7 +15,7 @@ import re
 import time
 
 from .agents import Ctx
-from .decision import Question, norm
+from .decision import Question, norm, SN
 from .memory import Memory
 
 RELACOES = {
@@ -142,7 +142,9 @@ class MissionGraph:
             if lg["tipo"] == lic["tipo"]:
                 continue   # mesmo tipo já enxerga a lição pelo playbook
             ok = self.ctx.dl.ask("transfer_lesson", Question(
-                "noul", f"A lição “{lic['text'][:200]}” provavelmente ajuda também a missão “{lg['nome']}”?"),
+                "noul", f"A lição “{lic['text'][:200]}” provavelmente ajuda também a missão “{lg['nome']}”?",
+                SN("a lição fala de algo que a missão `destino` também faz (mesmo público, mesmo tipo de entrega ou mesma etapa)",
+                   "a lição é específica do tipo de origem e não se aplica ao que `destino` entrega")),
                 {"licao": lic["text"], "origem_tipo": lic["tipo"], "destino": lg})
             if float(ok.value) < 0.5:
                 continue

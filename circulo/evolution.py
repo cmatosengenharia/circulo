@@ -9,7 +9,7 @@ from itertools import pairwise
 
 from . import finance
 from .agents import Categorizer, Ctx, ReviewerFinance, tokens_of
-from .decision import TAG_EXEMPLOS, LocalJev, Question, exemplos_de_tag
+from .decision import TAG_EXEMPLOS, LocalJev, Question, exemplos_de_tag, SN
 from .policy import PolicyStore, PolicyViolation, changed_top_keys, fingerprint, level_of_change
 
 RESOLVED = "('confirmed','corrected')"
@@ -375,7 +375,9 @@ class HealthMonitor:
             self.ctx.reply("Invariante financeiro violado: " + "; ".join(violations), "saude")
         recent_change = parent is not None and since <= policy["rollback"]["watch_ticks"]
         if recent_change and (violations or n >= 5):
-            d = self.ctx.dl.ask("health_rollback", Question("noul", "A última mudança de política piorou a saúde do sistema e deve ser desfeita?"),
+            d = self.ctx.dl.ask("health_rollback", Question("noul", "A última mudança de política piorou a saúde do sistema e deve ser desfeita?",
+                                                           SN("`correction_rate` subiu em relação a `correction_rate_before` e passa de `max_correction_rate`, poucos giros depois da mudança",
+                                                              "a taxa de correção está igual ou menor que antes, ou dentro do limite")),
                                 {**m, "max_correction_rate": policy["rollback"]["max_correction_rate"]})
             if violations or float(d.value) >= policy["thresholds"]["rollback"]:
                 restored = self.ctx.policies.rollback(f"saúde: viol={len(violations)} correção={rate:.0%} antes={rate_before:.0%}")

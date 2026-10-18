@@ -429,9 +429,13 @@ class Circle:
             # a regra estreita para as 3 mais esquecidas; o Jev escolhe entre elas (o rodízio é garantido)
             top = manut[:3]
             escolha = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de manutenção tem mais valor agora?",
-                                                       {x: x.replace("_", " ") for x in top}),
+                                                       {x: f"{TAREFAS.get(x, x.replace('_', ' '))} (esquecida há {min(staleness[x], 10**4)} giros)" for x in top}),
                                  {"staleness": {x: min(staleness[x], 10**4) for x in top}}).value
             if escolha in top:
+                probs = getattr(d_idle, "probabilities", {}) if (d_idle := getattr(ctx.dl, "ultima_decisao", None)) else {}
+                ordenadas = sorted(((float(probs.get(x, 0)), x) for x in top), reverse=True)
+                if len(ordenadas) > 1 and ordenadas[0][0] - ordenadas[1][0] < 0.10 and probs:
+                    escolha = max(top, key=lambda x: staleness[x])   # empate técnico no Jev: a mais esquecida (regra)
                 manut.remove(escolha)
                 manut.insert(0, escolha)
         ordem = trabalho + manut

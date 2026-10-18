@@ -94,10 +94,11 @@ def _erro(exc: Exception) -> str:
 
 
 def _jev_ok() -> tuple[bool, str]:
-    from .decision import JevHttpClient, Question
+    from .decision import SN, JevHttpClient, Question
     try:
         out, _ = JevHttpClient(os.environ["TYPESAFE_API_KEY"], timeout=8).ask_many(
-            {"teste": "diagnóstico do círculo"}, {"ok": Question("noul", "Este é um teste de conexão?")})
+            {"teste": "diagnóstico do círculo"}, {"ok": Question("noul", "Este é um teste de conexão?",
+                                                                  SN("`teste` diz que é um diagnóstico ou teste", "é um pedido real de trabalho"))})
         return True, f"respondeu (noul {float(out['ok'].value):.2f})"
     except Exception as exc:  # noqa: BLE001
         return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"

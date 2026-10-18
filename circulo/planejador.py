@@ -19,7 +19,7 @@ import re
 import time
 
 from .agents import Ctx
-from .decision import norm
+from .decision import Question, norm
 
 MAX_POR_DIA = 6
 INTERVALO = 1800
@@ -162,6 +162,17 @@ class Planejador:
         if not item:
             conselho.marcar(pid, "descartada")
             return None
+        if item.get("dado") and item.get("base") in ("medido", "inferido"):
+            # verificação pelo Jev (caso de uso da doc: conferir afirmações de IA contra a fonte): o dado existe na evidência?
+            from .decision import SN
+            v = self.ctx.dl.ask("dado_na_evidencia", Question(
+                "noul", "O dado citado pelo planejador aparece de fato na evidência do loop?",
+                SN("`dado` corresponde a um número ou fato presente em `evidencia` (mesmo arredondado)",
+                   "`dado` não está na evidência, ou contradiz o que ela mostra")),
+                {"dado": item["dado"], "evidencia": json.dumps({"pergunta": pergunta.evidencia, "geral": ev}, ensure_ascii=False, default=str)[:6000]})
+            if float(v.value) < 0.5 and v.source == "jev":
+                item["base"] = "chutado"
+                item["detalhe"] += f" (o Jev não achou o dado “{item['dado'][:80]}” na evidência)"
         if item.get("base") == "chutado":
             # evidência marcada (pstack): o que não foi medido nem inferido da evidência não vira trabalho
             conselho.marcar(pid, "descartada")

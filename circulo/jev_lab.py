@@ -35,24 +35,63 @@ def _worth(q, state: Mapping[str, Any]):
     from .decision import Question
     return Question("noul", "The autonomous loop wants to run `action` now, costing about `est_tokens` tokens. `value_signal` is the "
                             "expected value of this task (0 to 1) and `budget_left_ratio` is the share of today's token budget still "
-                            "available. Is running it now worth it? Answer yes when the task has clear value and the budget left "
-                            "comfortably covers it; answer no when the value is low or the budget is tight.")
+                            "available. Is running it now worth it?",
+                    {"true": "the task has clear value (`value_signal` high) and the remaining budget comfortably covers its cost",
+                     "false": "the expected value is low, or the remaining budget is tight for what the task costs"})
 
 
 def _idle(q, state: Mapping[str, Any]):
     from .decision import Question
     return Question("choice", "Which maintenance task gives the loop the most value right now? Prefer the task neglected for the "
                               "most turns in `staleness`, unless another one clearly matters more.",
-                    {k: TAREFA_EN.get(k, k.replace("_", " ")) for k in q.options()})
+                    {k: f"{TAREFA_EN.get(k, k.replace('_', ' '))} (neglected for {state.get('staleness', {}).get(k, '?')} turns)" for k in q.options()})
 
 
 def _evolve(q, state: Mapping[str, Any]):
     from .decision import Question
-    return Question("noul", "Does the evidence justify applying this `evolution_type` change now? Answer yes only if the same problem "
-                            "was observed several times (`occurrences`) and consistently (`consistency` close to 1).")
+    return Question("noul", "Does the evidence justify applying this `evolution_type` change now?",
+                    {"true": "the same problem was observed several times (`occurrences`) and consistently (`consistency` close to 1)",
+                     "false": "few occurrences, inconsistent evidence, or the change is larger than the evidence supports"})
 
 
-VARIANTES: dict[str, Callable] = {"worth_spending": _worth, "idle_task": _idle, "should_evolve": _evolve}
+def _review(q, state):
+    from .decision import Question
+    return Question("choice", "Can this pull request be merged automatically?",
+                    {"approve": "`tests_ok` is true, `lines_changed` is small and `touches_money_code` is false: safe to merge without a human",
+                     "changes": "tests pass but the change is large or touches money code: needs adjustments or a human look first",
+                     "reject": "`tests_ok` is false: discard"})
+
+
+def _advance(q, state):
+    from .decision import Question
+    return Question("noul", "Does the evidence show the new version is better and safe to advance?",
+                    {"true": "`ganho` and `ganho_oculto` are ≥ 0, `verificacao_ok` and `catraca_ok` are true, and no criterion got worse",
+                     "false": "some gain is negative, `criterios_que_pioraram` > 0, a check failed, or `integracao_ok` is false"})
+
+
+def _contraprova(q, state):
+    from .decision import Question
+    return Question("noul", "Did the new version make something important worse than the previous one?",
+                    {"true": "`ganho_oculto` is negative, `criterios_que_pioraram` > 0 or `integracao_ok` is false",
+                     "false": "nothing got worse: all gains ≥ 0 and the checks passed"})
+
+
+def _pick(q, state):
+    from .decision import Question
+    return Question("choice", "Which model tier is enough for this task?",
+                    {"pequena": "short task with a fixed output format and no multi-step reasoning: classify, summarize, rewrite, extract",
+                     "grande": "long or open-ended task that requires planning, comparing alternatives, writing code or multi-step reasoning"})
+
+
+def _remember(q, state):
+    from .decision import Question
+    return Question("noul", "Is this lesson worth keeping in the loop's memory?",
+                    {"true": "`texto` is a specific, reusable rule that would change a future decision (or `ganho` was relevant)",
+                     "false": "it is vague, obvious, only applies to this one case, or repeats what is already known"})
+
+
+VARIANTES: dict[str, Callable] = {"worth_spending": _worth, "idle_task": _idle, "should_evolve": _evolve, "review_code": _review,
+                                  "should_advance": _advance, "contraprova": _contraprova, "pick_model": _pick, "remember": _remember}
 
 
 def ativas(store) -> dict:
@@ -160,7 +199,12 @@ def resumo(store, now: float | None = None) -> dict:
         except Exception:  # noqa: BLE001
             p = {"n": 0}
         lab.append({"pergunta": qid, "ativa": bool(at.get(qid)), **p})
+    try:
+        from .jev_cobertura import cobertura
+        cob = cobertura()
+    except Exception:  # noqa: BLE001
+        cob = None
     tot = sum(x["n"] for x in perguntas) or 0
     return {"modelo": store.get("jev_modelo"), "modelo_pedido": store.get("jev_modelo_pedido"), "ultimo_erro": store.get("jev_last_error"),
             "decisoes_24h": tot, "sem_llm_24h": round(sum((x["jev"] or 0) + (x["regra"] or 0) for x in perguntas) / tot, 3) if tot else None,
-            "perguntas": perguntas, "laboratorio": lab, "min_n": MIN_N, "ganho_min": GANHO_MIN}
+            "perguntas": perguntas, "laboratorio": lab, "min_n": MIN_N, "ganho_min": GANHO_MIN, "cobertura": cob}

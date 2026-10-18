@@ -11,7 +11,7 @@ from typing import Callable
 
 from . import finance
 from .budget import Budget
-from .decision import DecisionLayer, LocalJev, Question, norm
+from .decision import DecisionLayer, LocalJev, Question, norm, SN
 from .money import find_amount, fmt_brl
 from .policy import PolicyStore, fingerprint
 from .state import Store
@@ -124,7 +124,9 @@ class Analyst:
         f = self.features()
         if f["total_30d_cents"] == 0:
             return None
-        d = self.ctx.dl.ask("alert_pattern", Question("noul", "Este padrão de gasto merece um alerta para a família (impacta a meta da casa)?"), f)
+        d = self.ctx.dl.ask("alert_pattern", Question("noul", "Este padrão de gasto merece um alerta para a família (impacta a meta da casa)?",
+                                                     SN("`share_impulso` alto ou `delivery_count_30d` frequente, com valor que pesa em `total_30d_cents`: afasta a meta da casa",
+                                                        "gastos dentro do padrão, impulso baixo, nada que mude o caminho até a casa")), f)
         if float(d.value) < self.ctx.policy["thresholds"]["alert_pattern"]:
             return None
         msg = (f"Últimos 30 dias: {fmt_brl(f['total_30d_cents'])} em despesas; "
@@ -228,4 +230,7 @@ class ReviewerCode:
             return "reject"
         if touches_money_code and d.value == "approve":
             return "changes"  # código de dinheiro nunca entra sem revisão humana no resumo
+        # roteamento por confiança (doc do Jev): aprovação automática só com o Jev seguro; em dúvida, pede ajustes
+        if d.value == "approve" and d.source == "jev" and d.confidence < self.ctx.policy["thresholds"].get("review_code_confianca", 0.5):
+            return "changes"
         return d.value
