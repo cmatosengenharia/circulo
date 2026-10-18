@@ -12,6 +12,7 @@ import math
 import os
 import re
 import threading
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -100,10 +101,15 @@ class JevHttpClient:
     source = "jev"
     URL = "https://api.typesafe.ai/v1/systemone"
 
-    def __init__(self, api_key: str, model: str = "jev-latest", timeout: float = 5.0):
+    RETRY = (429, 529, 500, 502, 503, 504)
+
+    def __init__(self, api_key: str, model: str | None = None, timeout: float = 5.0, tentativas: int = 3):
         self.api_key = api_key
-        self.model = model
+        # versão fixa (ex.: jev-1.13.0) recomendada quando os limiares estão calibrados; padrão: o alias estável
+        self.model = model or os.environ.get("JEV_MODEL", "jev-latest")
         self.timeout = timeout
+        self.tentativas = tentativas
+        self.ultimo_modelo: str | None = None
 
     def ask_many(self, state, questions):
         body = {"state": state, "model": self.model, "questions": {}}
@@ -120,8 +126,18 @@ class JevHttpClient:
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-            data = json.loads(resp.read())
+        data = None
+        for i in range(self.tentativas):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read())
+                break
+            except urllib.error.HTTPError as e:
+                # a doc da TypeSafe: 429 (limite) e 529 (sobrecarga) se repetem com espera exponencial
+                if e.code not in self.RETRY or i == self.tentativas - 1:
+                    raise
+                time.sleep(0.4 * 2 ** i)
+        self.ultimo_modelo = data.get("model")
         out: dict[str, Decision] = {}
         for qid, a in data["answers"].items():
             t = a["type"]
@@ -614,10 +630,15 @@ class DecisionLayer:
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:
+        from . import jev_lab
         jev_fora = False
         try:
-            out, tokens = self.jev.ask_many(state, questions)
+            enviar, mapa = jev_lab.preparar(self.s, self.jev, state, questions)
+            out, tokens = self.jev.ask_many(state, enviar)
             self.budget.charge_jev(max(1, tokens // 1000))  # Jev ~1000x mais barato que LLM
+            modelo = getattr(self.jev, "ultimo_modelo", None)
+            out = jev_lab.colher(self.s, dict(out), mapa, modelo)
+            self._registrar_modelo(modelo)
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError, OSError) as exc:
             out, _ = self.local.ask_many(state, questions)
             self.s.set("jev_last_error", str(exc)[:300])
@@ -717,6 +738,20 @@ class DecisionLayer:
     def ask(self, name: str, q: Question, state: Mapping[str, Any]) -> Decision:
         return self.ask_many(state, {name: q})[name]
 
+    def _registrar_modelo(self, modelo: str | None) -> None:
+        """A resposta diz a versão exata do Jev. Se ela mudar (alias apontou para outra), os limiares calibrados podem
+        não valer mais: fica registrado e vira alerta."""
+        if not modelo:
+            return
+        antes = self.s.get("jev_modelo")
+        if antes != modelo:
+            self.s.set("jev_modelo", modelo)
+            self.s.set("jev_modelo_pedido", getattr(self.jev, "model", None))
+            if antes:
+                self.s.x("INSERT INTO alerts(kind,message,created_at) VALUES('saude',?,strftime('%s','now'))",
+                         (f"O Jev mudou de versão: {antes} → {modelo}. Os limiares foram calibrados na anterior; "
+                          "o laboratório e a regressão vão mostrar se algo mudou.",))
+
     @staticmethod
     def _valid(q: Question, d: Decision) -> bool:
         if d.kind != q.kind or not 0.0 <= d.confidence <= 1.0:
@@ -729,8 +764,8 @@ class DecisionLayer:
 
     def _log(self, d: Decision) -> None:
         self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id) "
-                 "VALUES(?,?,?,?,?,strftime('%s','now'),?)",
-                 (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source, self.project_id))
+                 "VALUES(?,?,?,?,?,?,?)",
+                 (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source, time.time(), self.project_id))
 
     def _thr(self, path: str, default: float = 0.5) -> float:
         cur: Any = self.policy()["thresholds"]

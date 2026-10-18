@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — fluxo ao vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
+  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2; --gh:#2B3440;
+  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --bad-soft:#F6DCD8; --idle:#AEB8C2; --node:#FFFFFF;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
+  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14; --gh:#C9D3DD;
+  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765; --node:#1F2A36;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
+a{color:var(--jev)}
+:focus-visible{outline:2px solid var(--jev);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 56px}
+.back{display:inline-block;color:var(--muted);text-decoration:none;font-weight:600;margin-bottom:6px}
+.back::before{content:"‹ "}
+.cab{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px;font-weight:700}
+.sub{color:var(--muted);font-size:14px;margin:4px 0 16px;max-width:80ch}
+.estado{display:inline-flex;align-items:center;gap:8px;font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 14px}
+.estado i{width:10px;height:10px;border-radius:50%;background:var(--idle)}
+.estado[data-s=trabalhando] i,.estado[data-s=rodando] i{background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
+.estado[data-s=desligado] i{background:var(--bad)}
+.links a{margin-left:12px;font-weight:600}
+.palco{display:grid;gap:14px;grid-template-columns:minmax(0,1.55fr) minmax(280px,1fr)}
+@media (max-width:900px){.palco{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px}
+.cena{position:relative;padding:6px}
+.cena svg{display:block;width:100%;height:auto}
+.anel{fill:none;stroke:var(--line);stroke-width:2}
+.raio{stroke:var(--line);stroke-width:1;stroke-dasharray:3 6}
+.no circle.c{fill:var(--node);stroke:var(--line);stroke-width:2;transition:stroke .3s,fill .3s}
+.no text{font-size:12.5px;font-weight:600;fill:var(--muted);text-anchor:middle;pointer-events:none}
+.no text.ic{font-size:13px;font-weight:800;fill:var(--ink)}
+.no{cursor:pointer}
+.no.ativo circle.c{stroke:var(--ok);stroke-width:3;fill:var(--ok-soft)}
+.no.ativo text{fill:var(--ink)}
+.no.novo circle.c{stroke-dasharray:4 3;stroke:var(--jev)}
+.no.falhou circle.c{stroke:var(--bad);fill:var(--bad-soft)}
+.no.ext.jev circle.c{fill:var(--jev-soft);stroke:var(--jev)}
+.no.ext.jev text{fill:var(--jev)}
+.no.ext.llm circle.c{fill:var(--llm-soft);stroke:var(--llm)}
+.no.ext.llm text{fill:var(--llm)}
+.no.ext.github circle.c{stroke:var(--gh)}
+.pulso{fill:none;stroke:var(--ok);stroke-width:2;opacity:0}
+.pulso.on{animation:pulso .8s ease-out}
+.pulso.bad{stroke:var(--bad)}
+@keyframes pulso{from{opacity:.9;r:24}to{opacity:0;r:46}}
+.bola{filter:drop-shadow(0 0 6px currentColor)}
+.balao{position:absolute;transform:translate(-50%,-100%);max-width:min(300px,70%);background:var(--ink);color:var(--surface);font-size:12.5px;
+  line-height:1.35;padding:6px 10px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity .25s;z-index:2}
+.balao.on{opacity:.96}
+.balao b{display:block;font-size:11.5px;opacity:.75;font-weight:600}
+.lado{display:flex;flex-direction:column;gap:14px;min-width:0}
+.agora{padding:14px 16px}
+.agora .quem{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.agora .oque{color:var(--muted);font-size:14px}
+.agora .meta{font-size:12.5px;color:var(--muted);margin-top:6px}
+.log{padding:6px 0;max-height:430px;overflow:auto}
+.log ol{list-style:none;margin:0;padding:0}
+.log li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:7px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.log li:last-child{border-bottom:0}
+.log .h{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;padding-top:2px}
+.log .a{font-weight:700}
+.log li.decisao .a::after{content:" → Jev";color:var(--jev);font-weight:600}
+.log li.llm .a::after{content:" → LLM";color:var(--llm);font-weight:600}
+.log li.erro .t,.log li.falha .t{color:var(--bad)}
+.legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);padding:2px 12px 10px}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.vel{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);padding:10px 14px 0}
+.vel button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--ink);font:inherit;font-size:12px;font-weight:600}
+.vel button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+.agentes{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.ag{padding:12px 14px;scroll-margin-top:16px}
+.ag.foco{outline:2px solid var(--jev)}
+.ag .t{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
+.ag p{margin:4px 0 8px;color:var(--muted);font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.jev{background:var(--jev-soft);color:var(--jev)}.chip.warn{background:var(--llm-soft);color:var(--llm)}
+.ag .ult{font-size:12.5px;color:var(--muted);margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.jevbox{padding:14px 16px}
+.duas{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.barra{height:8px;border-radius:999px;background:var(--bg);overflow:hidden;position:relative}
+.barra b{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--jev)}
+.barra b.pt{background:var(--idle)}
+.lin{display:grid;grid-template-columns:minmax(0,1fr) 120px 48px;gap:8px;align-items:center;font-size:13.5px;padding:5px 0}
+.lin .n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.lab{padding:8px 0;border-bottom:1px solid var(--line)}
+.lab:last-child{border-bottom:0}
+.lab .t{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px}
+.lab .par{display:grid;grid-template-columns:110px 1fr 44px;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:4px}
+.nota{font-size:12.5px;color:var(--muted);margin-top:8px}
+.embed .back,.embed .cab{display:none}
+.embed .wrap{padding-top:4px}
+@media (max-width:600px){.no text.rot{display:none}.no.ativo text.rot{display:block;font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">Todas as missões</a>
+  <div class="cab">
+    <h1>Fluxo ao vivo</h1>
+    <div><span class="estado" id="estado" data-s=""><i></i><span id="estadoTxt">conectando…</span></span><span class="links"><a href="/missao/2" id="linkLoop">Painel do loop</a><a href="/rastros">Rastros</a></span></div>
+  </div>
+  <p class="sub">Cada giro passa de agente em agente. A bolinha mostra a requisição indo para o próximo; quando um agente pergunta ao Jev ou chama a LLM, ela vai e volta. Clique num agente para ver o que ele faz e como está indo.</p>
+
+  <div class="palco">
+    <div class="card cena" id="cena">
+      <svg id="svg" viewBox="0 0 800 660" role="img" aria-label="Agentes do loop em círculo, com o Jev no centro"></svg>
+      <div class="legenda" aria-hidden="true">
+        <span><i style="background:var(--ok)"></i>passagem entre agentes</span>
+        <span><i style="background:var(--jev)"></i>pergunta ao Jev</span>
+        <span><i style="background:var(--idle)"></i>Jev em dúvida → a regra decidiu</span>
+        <span><i style="background:var(--llm)"></i>LLM</span>
+        <span><i style="background:var(--bad)"></i>falha</span>
+        <span><i style="border:2px dashed var(--jev);width:12px;height:12px"></i>agente novo</span>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="card agora" aria-live="polite">
+        <div class="oque" id="agoraRot">Agora</div>
+        <div class="quem" id="agoraQuem">—</div>
+        <div class="oque" id="agoraOque"></div>
+        <div class="meta" id="agoraMeta"></div>
+      </div>
+      <div class="card">
+        <div class="vel" role="group" aria-label="Velocidade da animação">Animação
+          <button type="button" data-v="1" aria-pressed="true">tempo real</button>
+          <button type="button" data-v="3" aria-pressed="false">3×</button>
+          <button type="button" data-v="0" aria-pressed="false">pausar</button></div>
+        <div class="log"><ol id="log" aria-live="polite"></ol></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Agentes <span style="text-transform:none;letter-spacing:0;font-weight:500">(o que cada um faz e como está indo nas últimas 24 h)</span></h2>
+  <div class="agentes" id="agentes"></div>
+
+  <h2>Jev <span style="text-transform:none;letter-spacing:0;font-weight:500">(o decisor que vem antes de qualquer LLM)</span></h2>
+  <div class="duas">
+    <div class="card jevbox" id="jevPerguntas"></div>
+    <div class="card jevbox" id="jevLab"></div>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const NS = "http://www.w3.org/2000/svg";
+const C = {x: 400, y: 318, r: 262};
+const EXT_POS = {jev: [400, 300], llm: [300, 430], github: [500, 430]};
+const ORDEM = ["orquestrador", "pedido", "decisao", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
+               "revisar_prs", "evoluir_projeto", "conectar_missoes", "analisar_padroes", "revisar_baixa_confianca", "rodar_regressao",
+               "resumo", "propor_feature", "evoluir_harness", "meta_learner", "shadow", "licoes", "saude"];
+const ICONE = {orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
+  corrigir_codigo: "</>", revisar_prs: "✓", evoluir_projeto: "★", conectar_missoes: "⇄", analisar_padroes: "≋", revisar_baixa_confianca: "↺",
+  rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
+  jev: "Jev", llm: "LLM", github: "Git"};
+const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let AG = {}, pos = {}, atual = null, fila = [], velocidade = 1, rodando = false, catalogo = [];
+
+function el(tag, attrs, pai) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (pai) pai.appendChild(e); return e; }
+function nome(k) { return (AG[k] && AG[k].nome) || ({descanso: "Descanso", pausado: "Pausado"}[k]) || k.replace(/_/g, " "); }
+
+function desenhar() {
+  const svg = $("#svg"); svg.innerHTML = "";
+  const internos = [...ORDEM.filter(k => AG[k]), ...Object.keys(AG).filter(k => !ORDEM.includes(k) && !AG[k].externo)];
+  pos = {};
+  internos.forEach((k, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / internos.length; pos[k] = [C.x + C.r * Math.cos(a), C.y + C.r * Math.sin(a)]; });
+  Object.assign(pos, EXT_POS);
+  pos.descanso = pos.orquestrador; pos.pausado = pos.orquestrador;
+  el("circle", {cx: C.x, cy: C.y, r: C.r, class: "anel"}, svg);
+  internos.forEach(k => el("line", {x1: pos[k][0], y1: pos[k][1], x2: pos.jev[0], y2: pos.jev[1], class: "raio"}, svg));
+  for (const k of [...internos, "jev", "llm", "github"]) {
+    const ext = ["jev", "llm", "github"].includes(k), [x, y] = pos[k], r = k === "jev" ? 46 : ext ? 30 : 24;
+    const g = el("g", {class: `no ${ext ? "ext " + k : ""} ${AG[k] && AG[k].novo ? "novo" : ""}`, id: "no-" + k, tabindex: 0, role: "button",
+      "aria-label": `${nome(k)}: ${(AG[k] && AG[k].faz) || ""}`}, svg);
+    el("circle", {cx: x, cy: y, r, class: "c"}, g);
+    el("circle", {cx: x, cy: y, r, class: "pulso"}, g);
+    const ic = el("text", {x, y: y + 5, class: "ic"}, g); ic.textContent = ICONE[k] || nome(k).slice(0, 2);
+    if (!ext) {
+      const below = y > C.y - 20, t = el("text", {x, y: below ? y + r + 16 : y - r - 8, class: "rot"}, g); t.textContent = nome(k);
+    }
+    g.addEventListener("click", () => focar(k));
+    g.addEventListener("keydown", e => { if (e.key === "Enter") focar(k); });
+  }
+  if (atual) ativar(atual, false);
+}
+
+function focar(k) {
+  const c = document.getElementById("ag-" + k); if (!c) return;
+  document.querySelectorAll(".ag.foco").forEach(x => x.classList.remove("foco"));
+  c.classList.add("foco"); c.scrollIntoView({behavior: reduz ? "auto" : "smooth", block: "center"});
+}
+
+function ativar(k, pulsar = true, ruim = false) {
+  document.querySelectorAll(".no.ativo").forEach(n => n.classList.remove("ativo"));
+  const n = document.getElementById("no-" + (k === "descanso" || k === "pausado" ? "orquestrador" : k));
+  if (!n) return;
+  if (k !== "descanso" && k !== "pausado") n.classList.add("ativo");
+  if (pulsar && !reduz) { const p = n.querySelector(".pulso"); p.classList.remove("on", "bad"); void p.getBBox(); if (ruim) p.classList.add("bad"); p.classList.add("on"); }
+}
+
+function balao(k, titulo, texto, ms) {
+  const p = pos[k] || pos.orquestrador, b = document.createElement("div");
+  b.className = "balao"; b.innerHTML = `<b>${esc(titulo)}</b>${esc(texto)}`;
+  b.style.left = (p[0] / 800 * 100) + "%"; b.style.top = ((p[1] - 30) / 660 * 100) + "%";
+  $("#cena").appendChild(b); requestAnimationFrame(() => b.classList.add("on"));
+  setTimeout(() => { b.classList.remove("on"); setTimeout(() => b.remove(), 300); }, ms);
+}
+
+function voar(de, para, cor, ms) {
+  return new Promise(res => {
+    const a = pos[de], b = pos[para];
+    if (!a || !b || de === para || reduz || !velocidade) return res();
+    const bola = el("circle", {r: 8, class: "bola", fill: cor, style: `color:${cor}`}, $("#svg"));
+    const t0 = performance.now(), dur = ms / velocidade;
+    // arco leve, para a bolinha não cortar o centro em linha reta
+    const mx = (a[0] + b[0]) / 2 + (C.y - (a[1] + b[1]) / 2) * 0.12, my = (a[1] + b[1]) / 2 - (C.x - (a[0] + b[0]) / 2) * 0.12;
+    (function passo(t) {
+      const u = Math.min(1, (t - t0) / dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      const x = (1 - e) ** 2 * a[0] + 2 * (1 - e) * e * mx + e * e * b[0], y = (1 - e) ** 2 * a[1] + 2 * (1 - e) * e * my + e * e * b[1];
+      bola.setAttribute("cx", x); bola.setAttribute("cy", y);
+      if (u < 1) requestAnimationFrame(passo); else { bola.remove(); res(); }
+    })(t0);
+  });
+}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const espera = ms => new Promise(r => setTimeout(r, velocidade ? ms / velocidade : 0));
+
+function registrar(e) {
+  const li = document.createElement("li");
+  li.className = e.tipo + (e.ok === false ? " falha" : "");
+  const h = new Date(e.em * 1000).toLocaleTimeString("pt-BR");
+  li.innerHTML = `<span class="h">${h}</span><span><span class="a">${esc(nome(e.agente))}</span> <span class="t">${esc(e.texto)}</span></span>`;
+  const log = $("#log"); log.prepend(li);
+  while (log.children.length > 80) log.lastChild.remove();
+}
+
+async function tocar(e) {
+  if (!AG[e.agente] && !["descanso", "pausado"].includes(e.agente)) {    // agente novo nascido da autoevolução: entra no círculo
+    AG[e.agente] = {id: e.agente, nome: e.agente.replace(/_/g, " "), faz: e.texto, novo: true}; desenhar();
+  }
+  registrar(e);
+  if (e.tipo === "etapa") {
+    const de = e.de && pos[e.de] ? e.de : (atual || "orquestrador");
+    await voar(de, e.agente, css("--ok"), 520);
+    atual = e.agente; ativar(e.agente);
+    if (e.agente !== "descanso") balao(e.agente, nome(e.agente), e.texto, 1600 / Math.max(velocidade, 1));
+    mostrarAgora(e);
+    await espera(220);
+  } else if (e.tipo === "decisao") {
+    const de = atual && pos[atual] ? atual : e.agente;
+    await voar(de, "jev", css("--jev"), 380);
+    ativar("jev"); balao("jev", nome(de) + " perguntou", e.texto, 1500 / Math.max(velocidade, 1));
+    await espera(160);
+    await voar("jev", de, e.decidiu === "jev" ? css("--jev") : e.decidiu === "llm" ? css("--llm") : css("--idle"), 380);
+    ativar(de, false);
+  } else if (e.tipo === "llm") {
+    const de = e.agente && pos[e.agente] ? e.agente : atual;
+    await voar(de, "llm", css("--llm"), 420); ativar("llm", true, e.ok === false);
+    balao("llm", nome(de), e.texto, 1400 / Math.max(velocidade, 1));
+    await voar("llm", de, e.ok === false ? css("--bad") : css("--llm"), 420); ativar(de, false);
+  } else if (e.tipo === "verificacao") {
+    const k = pos[e.agente] ? e.agente : atual;
+    if (e.para === "github") { await voar(k, "github", css("--gh"), 360); await voar("github", k, e.ok ? css("--ok") : css("--bad"), 360); }
+    ativar(k, true, !e.ok); balao(k, (e.ok ? "✓ " : "✗ ") + nome(k), e.texto, 1300 / Math.max(velocidade, 1));
+    await espera(160);
+  } else if (e.tipo === "erro") {
+    const k = pos[e.agente] ? e.agente : atual;
+    const n = document.getElementById("no-" + k); if (n) { n.classList.add("falhou"); setTimeout(() => n.classList.remove("falhou"), 2500); }
+    ativar(k, true, true); balao(k, "erro", e.texto, 2200 / Math.max(velocidade, 1)); await espera(300);
+  }
+}
+
+async function tocador() {
+  if (rodando) return; rodando = true;
+  while (fila.length) {
+    if (!velocidade) { await new Promise(r => setTimeout(r, 300)); continue; }
+    if (fila.length > 160) {                       // atrasou demais (aba escondida): pula para o fim sem perder o registro
+      const pulados = fila.splice(0, fila.length - 40); pulados.forEach(registrar);
+      const ult = [...pulados].reverse().find(x => x.tipo === "etapa"); if (ult) { atual = ult.agente; ativar(atual, false); }
+    }
+    const extra = fila.length > 25 ? 3 : fila.length > 10 ? 1.8 : 1, v0 = velocidade;
+    velocidade = v0 * extra; await tocar(fila.shift()); velocidade = v0;
+  }
+  rodando = false;
+}
+
+function mostrarAgora(e) {
+  $("#agoraQuem").textContent = nome(e.agente);
+  $("#agoraOque").textContent = e.agente === "descanso" ? "Esperando o próximo giro" : (AG[e.agente] && AG[e.agente].faz) || e.texto;
+  $("#agoraMeta").textContent = `${e.texto}${e.tick ? " · giro " + e.tick : ""}`;
+}
+
+function fmtMs(ms) { return ms == null ? "—" : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : `${Math.round(ms / 60000)} min`; }
+function ha(t) { const s = Date.now() / 1000 - t; return s < 60 ? "agora há pouco" : s < 3600 ? `há ${Math.round(s / 60)} min` : `há ${Math.round(s / 3600)} h`; }
+
+function renderAgentes(lista) {
+  $("#agentes").innerHTML = lista.filter(a => !a.externo).map(a => {
+    const tend = a.tendencia == null ? "" : a.tendencia <= -0.05 ? `<span class="chip ok">↓ ${Math.round(-a.tendencia * 100)}% mais rápido</span>`
+      : a.tendencia >= 0.1 ? `<span class="chip warn">↑ ${Math.round(a.tendencia * 100)}% mais lento</span>` : `<span class="chip">ritmo estável</span>`;
+    return `<div class="card ag" id="ag-${esc(a.id)}"><div class="t"><span>${esc(ICONE[a.id] || "•")} ${esc(a.nome)}</span>${a.novo ? `<span class="chip jev">novo</span>` : ""}</div>
+      <p>${esc(a.faz)}</p>
+      <div class="chips"><span class="chip">${a.execucoes_24h} execução(ões)</span><span class="chip">p50 ${fmtMs(a.p50_ms)}</span>${tend}
+        ${a.falhas_24h ? `<span class="chip bad">${a.falhas_24h} falha(s)</span>` : ""}${a.tokens_24h ? `<span class="chip warn">${a.tokens_24h.toLocaleString("pt-BR")} tokens</span>` : ""}</div>
+      ${a.ultimo ? `<div class="ult">Último: ${esc(a.ultimo.texto || "trabalhou")} · ${ha(a.ultimo.em)}</div>` : `<div class="ult">Não trabalhou nas últimas 48 h.</div>`}</div>`;
+  }).join("");
+}
+
+function renderJev(j) {
+  const PERG = {worth_spending: "Vale gastar agora?", idle_task: "Qual tarefa agora?", should_evolve: "A evidência justifica evoluir?",
+    pick_model: "Qual modelo basta?", review_code: "O PR pode entrar?", should_run_idle: "Vale rodar a manutenção?", evidencia_sustenta: "A evidência sustenta?"};
+  const linhas = (j.perguntas || []).map(p => `<div class="lin"><span title="${esc(p.pergunta)}">${esc(PERG[p.pergunta] || p.pergunta.replace(/_/g, " "))}
+      <span style="color:var(--muted);font-size:12px">· Jev ${p.jev || 0} · regra ${p.regra || 0}${p.llm ? " · LLM " + p.llm : ""}</span></span>
+      <span class="barra" title="confiança média do Jev"><b style="width:${Math.round((p.conf_jev || 0) * 100)}%"></b></span>
+      <span class="n">${p.conf_jev == null ? "—" : Math.round(p.conf_jev * 100) + "%"}</span></div>`).join("");
+  $("#jevPerguntas").innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Perguntas nas últimas 24 h</b>
+      <span class="chip jev">${esc(j.modelo || "versão ainda não registrada")}</span></div>
+    <div class="nota">${j.decisoes_24h || 0} decisões; ${j.sem_llm_24h == null ? "—" : Math.round(j.sem_llm_24h * 100) + "%"} sem LLM. A barra é a confiança média do Jev: abaixo de 25% ele está em dúvida e a regra decide no lugar.</div>
+    ${linhas || `<div class="nota">Nenhuma decisão nas últimas 24 h.</div>`}
+    ${j.ultimo_erro ? `<div class="nota">Último erro de conexão com o Jev: ${esc(j.ultimo_erro)}</div>` : ""}`;
+  const labs = (j.laboratorio || []).map(l => {
+    const st = l.ativa ? `<span class="chip ok">adotada</span>` : !l.n ? `<span class="chip">esperando o Jev real</span>`
+      : l.n < j.min_n ? `<span class="chip">testando ${l.n}/${j.min_n}</span>` : l.ganho >= j.ganho_min ? `<span class="chip ok">vai adotar</span>` : `<span class="chip warn">sem ganho</span>`;
+    return `<div class="lab"><div class="t"><span>${esc(PERG[l.pergunta] || l.pergunta)}</span>${st}</div>
+      ${l.n ? `<div class="par"><span>Como era (PT)</span><span class="barra"><b class="pt" style="width:${Math.round(l.conf_pt * 100)}%"></b></span><span>${Math.round(l.conf_pt * 100)}%</span></div>
+      <div class="par"><span>Variante (EN)</span><span class="barra"><b style="width:${Math.round(l.conf_en * 100)}%"></b></span><span>${Math.round(l.conf_en * 100)}%</span></div>
+      <div class="nota">${l.n} pares na mesma chamada · ganho ${l.ganho >= 0 ? "+" : ""}${Math.round(l.ganho * 100)} pts · concordância ${Math.round(l.concordancia * 100)}%</div>` : ""}</div>`;
+  }).join("");
+  $("#jevLab").innerHTML = `<b>Laboratório: melhores formas de perguntar</b>
+    <div class="nota">A doc do Jev recomenda inglês e a condição explícita. Cada pergunta abaixo vai em dobro na mesma chamada (custo quase zero): a atual e a variante. Com ${j.min_n} pares e ganho de ${Math.round(j.ganho_min * 100)} pontos de confiança, a variante vira a oficial sozinha; se o ganho sumir, volta.</div>${labs}`;
+}
+
+async function carregar() {
+  try {
+    const r = await fetch("/api/fluxo"), j = await r.json();
+    const novo = JSON.stringify(j.agentes.map(a => a.id + (a.novo ? "*" : "")));
+    j.agentes.forEach(a => AG[a.id] = a);
+    if (novo !== window._ags) { window._ags = novo; desenhar(); }
+    renderAgentes(j.agentes); renderJev(j.jev); estado(j.agora);
+  } catch (e) { /* tenta de novo */ }
+}
+
+function estado(a) {
+  if (!a) return;
+  $("#estado").dataset.s = a.estado; $("#estadoTxt").textContent = a.titulo || a.estado;
+  if (!fila.length && a.agente && a.agente !== atual && pos[a.agente]) { atual = a.agente; ativar(atual, false); }
+}
+
+function conectar() {
+  const es = new EventSource("/api/fluxo/eventos?voltar=40");
+  es.addEventListener("fluxo", m => { fila.push(JSON.parse(m.data)); tocador(); });
+  es.addEventListener("agora", m => estado(JSON.parse(m.data)));
+  es.onerror = () => { $("#estado").dataset.s = "desligado"; $("#estadoTxt").textContent = "reconectando…"; };
+}
+
+document.querySelectorAll(".vel button").forEach(b => b.onclick = () => {
+  velocidade = Number(b.dataset.v); document.querySelectorAll(".vel button").forEach(x => x.setAttribute("aria-pressed", x === b)); tocador();
+});
+if (new URLSearchParams(location.search).get("embed")) document.body.classList.add("embed");
+carregar().then(conectar);
+setInterval(carregar, 10000);
+fetch("/api/projetos").then(r => r.json()).then(j => { const z = (j.projetos || []).find(p => p.kit === "circulo"); if (z) $("#linkLoop").href = "/missao/" + z.id; }).catch(() => {});
+</script>
+</body>
+</html>

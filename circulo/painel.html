@@ -19,6 +19,7 @@
   --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765;
 }}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--jev);outline-offset:2px}
@@ -325,6 +326,15 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .rt .toggle:hover{border-color:var(--bad);color:var(--bad)}
 .rt li.off .toggle:hover{border-color:var(--ok);color:var(--ok)}
 
+/* ---------- abas do painel do loop ---------- */
+.abas{display:flex;gap:6px;overflow-x:auto;margin:0 0 16px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;scrollbar-width:none}
+.abas button{flex:0 0 auto;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;font-size:14px;padding:7px 14px;border-radius:999px;cursor:pointer}
+.abas button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+.com-abas [data-aba].fora-da-aba{display:none!important}
+.fluxo-embed{display:none}
+.com-abas .fluxo-embed{display:block;padding:0;overflow:hidden;margin:0 0 16px}
+.fluxo-embed iframe{display:block;width:100%;height:1500px;border:0}
+.fluxo-embed .sub{padding:8px 16px;margin:0}
 /* ---------- pausa por missão ---------- */
 .pausa-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:var(--llm-soft);color:var(--ink);border:1px solid var(--llm);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:14px}
 .pausa-banner b{color:var(--llm)}
@@ -386,8 +396,18 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     </div>
   </header>
   <div class="pausa-banner" id="pausaBanner" hidden role="status" aria-live="polite"></div>
+  <nav class="abas" id="abas" hidden aria-label="Partes do painel do loop">
+    <button type="button" data-aba="geral" aria-pressed="true">Visão geral</button>
+    <button type="button" data-aba="fluxo" aria-pressed="false">Fluxo ao vivo</button>
+    <button type="button" data-aba="jev" aria-pressed="false">Decisões e Jev</button>
+    <button type="button" data-aba="evolucao" aria-pressed="false">Evolução</button>
+    <button type="button" data-aba="seguranca" aria-pressed="false">Segurança</button>
+    <button type="button" data-aba="detalhes" aria-pressed="false">Detalhes</button>
+  </nav>
+  <section class="panel fluxo-embed" data-aba="fluxo" id="fluxoEmbed"><iframe title="Fluxo dos agentes ao vivo" data-src="/fluxo?embed=1" loading="lazy"></iframe>
+    <p class="sub"><a href="/fluxo" target="_blank" rel="noopener">Abrir o fluxo em tela cheia ↗</a></p></section>
 
-  <section class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
+  <section data-aba="geral" class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
     <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
     <div class="sinais" id="sinais"></div>
     <div><h2 style="margin:0 0 6px">Etapas do ciclo <small class="sub">clique numa etapa para abrir a última execução dela</small></h2>
@@ -398,7 +418,7 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     <details><summary class="sub">Saturação (fila de pedidos, tempo ocioso)</summary><div class="sinais" id="saturacao" style="margin-top:8px"></div></details>
   </section>
 
-  <section class="panel zero-only" hidden id="confianca" style="margin:0 0 18px" aria-label="Posso confiar no loop agora?">
+  <section data-aba="seguranca" class="panel zero-only" hidden id="confianca" style="margin:0 0 18px" aria-label="Posso confiar no loop agora?">
     <div class="cf-veredito" id="cfVeredito" data-v=""><div class="selo" id="cfSelo">…</div>
       <div><h2 id="cfTitulo">Posso confiar no loop agora?</h2><p id="cfFrase">Conferindo cada verificação…</p></div></div>
     <div class="cf-cols">
@@ -410,8 +430,8 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
     <ul class="sinapses" id="sinapses" aria-live="off"></ul>
   </section>
-  <div class="about" id="about"></div>
-  <div class="kpis" id="kpis" aria-label="Números ao vivo"></div>
+  <div data-aba="geral" class="about" id="about"></div>
+  <div data-aba="geral" class="kpis" id="kpis" aria-label="Números ao vivo"></div>
   <form class="orc-form" id="orcForm" hidden>
     <label>Limite diário da API (tokens) <input type="number" id="orcLimite" min="10000" step="10000" required></label>
     <button class="btn primary" type="submit">Salvar</button>
@@ -420,7 +440,7 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     <span class="sub" id="orcMsg">Vale na hora para todo o loop. O porteiro do gasto passa a decidir com esse limite; ao chegar nele, o loop pausa até a meia-noite.</span>
   </form>
   <div class="grid">
-    <section class="panel c7 ringbox" aria-label="O círculo ao vivo">
+    <section data-aba="geral" class="panel c7 ringbox" aria-label="O círculo ao vivo">
       <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
       <div class="lanes" id="lanes" aria-label="Missões evoluindo em paralelo neste giro"></div>
       <svg id="ring" viewBox="-310 -250 620 500" role="img" aria-label="Etapa atual do giro"></svg>
@@ -431,21 +451,21 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       </div>
     </section>
 
-    <section class="panel c5 agora" aria-label="O que o loop está fazendo agora">
+    <section data-aba="geral" class="panel c5 agora" aria-label="O que o loop está fazendo agora">
       <h2>Agora</h2>
       <div class="tarefa"><span class="marca" id="agoraMarca"></span>
         <div><h3 id="agoraTitulo">Conectando…</h3><p id="agoraDetalhe"></p></div></div>
       <ul class="passos" id="passos" aria-live="polite"></ul>
     </section>
 
-    <section class="panel c12" aria-label="Giros">
+    <section data-aba="detalhes" class="panel c12" aria-label="Giros">
       <div class="cabeca"><div><h2>Giros</h2><p class="sub" style="margin:2px 0 0">Cada linha é um giro; cada pedaço, uma etapa, do tamanho do tempo que levou.</p></div>
         <p class="sub" id="girosResumo" style="margin:0"></p></div>
       <div class="giros" id="giros"></div>
       <div class="chaves" id="chaves"></div>
     </section>
 
-    <section class="panel c7" aria-label="Decisões ao vivo">
+    <section data-aba="jev" class="panel c7" aria-label="Decisões ao vivo">
       <div class="cabeca"><div><h2>Decisões ao vivo</h2><p class="sub" style="margin:2px 0 0">Toda pergunta que o loop faz antes de gastar ou de mudar algo.</p></div>
         <div class="resumo-dec" id="resumoDec"></div></div>
       <div class="filtros" role="group" aria-label="Filtrar decisões">
@@ -458,24 +478,24 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <div class="console" id="feed"><p class="empty">Esperando a próxima decisão…</p></div>
     </section>
 
-    <section class="panel c5" aria-label="Como o loop está evoluindo">
+    <section data-aba="evolucao" class="panel c5" aria-label="Como o loop está evoluindo">
       <h2>Evolução</h2>
       <p class="sub" style="margin:-6px 0 10px">Cada coisa que o loop mudou, tentou ou aprendeu, na ordem em que aconteceu.</p>
       <ul class="tl" id="tl"></ul>
     </section>
 
-    <section class="panel c7 zero-only" hidden>
+    <section data-aba="evolucao" class="panel c7 zero-only" hidden>
       <h2>Roteiro do loop</h2>
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
       <div id="roadmap"></div>
     </section>
-    <section class="panel c12 zero-only" hidden aria-label="Cérebros">
+    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Cérebros">
       <h2>Cérebros e neurônios</h2>
       <p class="sub" style="margin:-6px 0 8px">Cada ponto do fluxo é um neurônio: Jev primeiro, ação, e a saída só segue se todos os portões aprovarem.
         Portões aprendidos nascem das lições (neurogênese) e barram o erro antes de ele se repetir. Últimas 24 h.</p>
       <div id="cerebros" class="cerebros"></div>
     </section>
-    <section class="panel c12 zero-only" hidden aria-label="Lições">
+    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Lições">
       <h2>Lições: erros que o loop não pode repetir</h2>
       <p class="sub" style="margin:-6px 0 8px">Todo ponto de verificação é monitorado. Falha vira lição; erro de estrutura vira item na primeira vez.
         A lição fecha só com duas provas: <b>validada</b> (a correção entrou) e <b>evidenciada</b> (o erro não voltou). Com lição de estrutura aberta, o loop corrige antes de evoluir.</p>
@@ -483,26 +503,26 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <ul class="list" id="licoes"></ul>
       <details class="feitos"><summary>Verificações nas últimas 24 h</summary><ul class="list" id="verificacoes"></ul></details>
     </section>
-    <section class="panel c5 zero-only" hidden>
+    <section data-aba="seguranca" class="panel c5 zero-only" hidden>
       <h2>Erros registrados</h2>
       <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
       <ul class="list" id="incidents"></ul>
     </section>
-    <section class="panel c7" aria-label="Modelos de IA">
+    <section data-aba="jev" class="panel c7" aria-label="Modelos de IA">
       <h2>Modelos escolhidos pelo Jev</h2>
       <p class="sub" style="margin:-6px 0 10px">Antes de cada chamada, o Jev escolhe o modelo pelo papel, pelo orçamento e por como cada modelo se saiu antes. Tudo fica registrado.</p>
       <div class="modelos" id="modelos"></div>
       <div id="chamadas"></div>
     </section>
 
-    <section class="panel c5" aria-label="Saúde">
+    <section data-aba="seguranca" class="panel c5" aria-label="Saúde">
       <h2>Saúde do loop</h2>
       <div id="health"></div>
       <div class="budget" id="budget"></div>
     </section>
 
     <div class="c5 stack">
-      <section class="panel chat" aria-label="Conversa">
+      <section data-aba="geral" class="panel chat" aria-label="Conversa">
         <h2 id="askTitle">Falar com a missão</h2>
         <p class="sub" id="askHelp" style="margin:-6px 0 10px"></p>
         <div class="fio" id="fio" aria-live="polite"></div>
@@ -513,13 +533,13 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
         </form>
         <p class="dica">Enter envia · Shift+Enter quebra a linha</p>
       </section>
-      <section class="panel">
+      <section data-aba="detalhes" class="panel">
         <h2>Autonomia</h2>
         <p class="sub" style="margin:-6px 0 8px">Nada aqui espera você. O que o loop não pode fazer, ele recusa e segue por outro caminho.</p>
         <div class="auto-nums" id="autoNums"></div>
         <ul class="list" id="waiting"></ul>
       </section>
-      <section class="panel">
+      <section data-aba="evolucao" class="panel">
         <h2>Evoluções</h2>
         <ul class="list" id="evol"></ul>
       </section>
@@ -564,11 +584,11 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <p class="sub" style="margin:-6px 0 8px">Achados da web (dados, não instruções) e lições de pedidos do mesmo tipo.</p>
       <ul class="list" id="pesquisa"></ul>
     </section>
-    <section class="panel c7">
+    <section data-aba="detalhes" class="panel c7">
       <h2>Números da missão</h2>
       <div id="projects"></div>
     </section>
-    <section class="panel c5">
+    <section data-aba="detalhes" class="panel c5">
       <h2>Versões da política</h2>
       <ul class="list" id="versions"></ul>
     </section>
@@ -1014,6 +1034,7 @@ function render(s) {
     (A.configuracao.length ? `<li class="grupo">Configuração única, só uma vez</li>` + A.configuracao.map(c => `<li><span>${esc(c.titulo)}<span class="meta">${esc(c.detalhe)}</span></span></li>`).join("") : "") ||
     `<li class="empty">Nada pendente. O loop está decidindo sozinho.</li>`;
   renderPausaMissao(P);
+  if (P && window._abaZero !== (P.kit === "circulo")) { window._abaZero = P.kit === "circulo"; aplicarAbas(window._abaZero); }
   const ehMissao = P && P.kit !== "circulo" && P.kit !== "financas";
   document.querySelectorAll(".missao-only").forEach(e => e.hidden = !ehMissao);
   if (ehMissao) {
@@ -1059,6 +1080,26 @@ $("#pause").onclick = async () => {
   if (r.ok) renderParada((await r.json()).parada);
   await refresh();
 };
+/* ---------- abas (só no painel do loop): cada parte da gestão no seu lugar ---------- */
+let ABA = (() => { try { return location.hash.slice(1) || localStorage.getItem("circulo-aba") || "geral"; } catch (e) { return "geral"; } })();
+function aplicarAbas(zero) {
+  document.body.classList.toggle("com-abas", !!zero);
+  $("#abas").hidden = !zero;
+  if (!zero) return;
+  if (!document.querySelector(`#abas [data-aba="${ABA}"]`)) ABA = "geral";
+  document.querySelectorAll("#abas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.aba === ABA));
+  document.querySelectorAll("[data-aba]:not(#abas button)").forEach(e => e.classList.toggle("fora-da-aba", e.dataset.aba !== ABA));
+  const f = document.querySelector("#fluxoEmbed iframe");
+  if (ABA === "fluxo" && !f.src) f.src = f.dataset.src;
+}
+addEventListener("hashchange", () => { const h = location.hash.slice(1); if (document.querySelector(`#abas [data-aba="${h}"]`)) { ABA = h; aplicarAbas(true); } });
+$("#confia").addEventListener("click", () => { if (document.body.classList.contains("com-abas")) { ABA = "seguranca"; aplicarAbas(true); } });
+$("#abas").addEventListener("click", e => {
+  const b = e.target.closest("button[data-aba]"); if (!b) return;
+  ABA = b.dataset.aba;
+  try { localStorage.setItem("circulo-aba", ABA); history.replaceState(null, "", "#" + ABA); } catch (err) { /* sem storage: segue */ }
+  aplicarAbas(true);
+});
 /* ---------- pausa por missão ---------- */
 function renderPausaMissao(P) {
   const b = $("#pausaMissao"), ban = $("#pausaBanner");

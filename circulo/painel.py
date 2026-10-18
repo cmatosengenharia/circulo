@@ -255,8 +255,9 @@ def make_handler(db_path: str):
             m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
                 return self._entrega(int(m.group(1)), q.get("v", [None])[0])
-            if u.path in ("/", "/integracoes", "/rastros") or u.path.startswith(("/projeto/", "/missao/")):
-                body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html"}.get(u.path, "painel.html"))
+            if u.path in ("/", "/integracoes", "/rastros", "/fluxo") or u.path.startswith(("/projeto/", "/missao/")):
+                body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html",
+                              "/fluxo": "fluxo.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -270,6 +271,12 @@ def make_handler(db_path: str):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif u.path == "/api/fluxo":
+                from .fluxo import visao as fluxo_visao
+                self._json(fluxo_visao(self._store()))
+            elif u.path == "/api/fluxo/eventos":
+                v = q.get("voltar", ["0"])[0]
+                self._sse_fluxo(int(v) if v.isdigit() else 0)
             elif u.path == "/metrics":
                 from .observabilidade import prometheus
                 body = prometheus(self._store()).encode()
@@ -350,6 +357,30 @@ def make_handler(db_path: str):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def _sse_fluxo(self, voltar: int = 0):
+            """Fluxo dos agentes ao vivo: cada evento novo (etapa, pergunta ao Jev, LLM, verificação, erro) assim que
+            entra no banco, e o 'agora' do loop a cada segundo."""
+            from .fluxo import agora, cursor_inicial, eventos
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            store = self._store()
+            cur = cursor_inicial(store, min(voltar, 400))
+            ultimo_agora = 0.0
+            try:
+                while True:
+                    evs, cur = eventos(store, cur)
+                    for e in evs:
+                        self.wfile.write(f"event: fluxo\ndata: {json.dumps(e, ensure_ascii=False)}\n\n".encode())
+                    if time.time() - ultimo_agora >= 1.0:
+                        ultimo_agora = time.time()
+                        self.wfile.write(f"event: agora\ndata: {json.dumps(agora(store), ensure_ascii=False)}\n\n".encode())
+                    self.wfile.flush()
+                    time.sleep(0.4)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
         def _sse(self, desde: int, projeto: int | None = None, so_status: bool = False):
             self.send_response(200)

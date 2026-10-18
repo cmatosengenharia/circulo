@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.19.0 — 2026-10-18
+
+**Gestão mais clara: fluxo dos agentes ao vivo, painel do loop em abas e tudo o que o Jev oferece.**
+
+- **Fluxo ao vivo** (`/fluxo`, botão na tela inicial e aba no painel do loop):
+  - cada agente do loop é um nó num círculo, com o Jev no centro e a LLM e o GitHub ao lado;
+  - a cada passagem de etapa, uma bolinha vai do agente que terminou ao próximo, e um balão diz o que ele fez;
+  - quando um agente pergunta ao Jev, a bolinha vai até o centro e volta, na cor de quem decidiu: Jev, ou a regra
+    quando o Jev ficou em dúvida. O mesmo vale para chamadas de LLM e para o GitHub. Verificações piscam verde ou
+    vermelho e erros tremem o nó;
+  - log narrado ao lado ("Developer chamou a LLM…") e velocidade ajustável (tempo real, 3×, pausar);
+  - os eventos chegam por SSE (`/api/fluxo/eventos`) assim que entram no banco.
+- **Agentes que nascerem na autoevolução** (uma tarefa nova na trilha) entram sozinhos no círculo, com a mesma
+  animação, o selo "novo" e as métricas: execuções, duração p50 e tendência ("↓ 12% mais rápido"), falhas e tokens.
+- **Painel do loop em abas**: Visão geral · Fluxo ao vivo · Decisões e Jev · Evolução · Segurança · Detalhes.
+  A aba escolhida fica guardada. Corrigido: a faixa de pausa e o formulário do limite apareciam vazios em telas
+  onde deveriam estar escondidos.
+- **Jev, a partir da documentação da TypeSafe**:
+  - **laboratório de perguntas** (`jev_lab.py`): as perguntas mais usadas (vale gastar, qual tarefa, evoluir?)
+    vão em dobro na mesma chamada, a atual e uma variante em inglês com a condição explícita e os campos do estado
+    entre crases, como a doc recomenda. O custo é quase zero, porque perguntas na mesma chamada saem quase pelo
+    preço de uma. Com 40 pares e ganho de 15 pontos de confiança, a variante vira a oficial sozinha, com alerta;
+    se o ganho sumir, volta;
+  - **versão exata registrada**: a resposta traz o modelo versionado (ex.: jev-1.13.0), e uma troca de versão
+    vira alerta, porque os limiares foram calibrados na anterior. A versão pode ser fixada com `JEV_MODEL`;
+  - **retentativa** com espera exponencial em 429/529/5xx, como a doc pede;
+  - decisões gravadas com horário fracionado, para ordenar certo no fluxo.
+- Prometheus: `circulo_jev_lab_confianca_ratio{pergunta,forma}`.
+
 ## 1.18.0 — 2026-10-18
 
 **Pausar missão por missão**, sem parar o loop nem as outras missões.

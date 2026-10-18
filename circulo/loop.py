@@ -265,6 +265,8 @@ class Circle:
             observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
             if r.tick % RASTRO_A_CADA == 0:
                 rastro.verificar(ctx)
+                from . import jev_lab
+                jev_lab.avaliar(s, ctx.reply)        # adota (ou desfaz) a forma de perguntar ao Jev que provou ganho
         except Exception as exc:  # noqa: BLE001 — observar nunca derruba o giro
             r.errors.append(f"rastro: {exc!r}")
         self._stage("descanso")
