@@ -253,8 +253,8 @@ def make_handler(db_path: str):
             m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
                 return self._entrega(int(m.group(1)), q.get("v", [None])[0])
-            if u.path == "/" or u.path.startswith(("/projeto/", "/missao/")):
-                body = _page("home.html" if u.path == "/" else "painel.html")
+            if u.path == "/" or u.path == "/integracoes" or u.path.startswith(("/projeto/", "/missao/")):
+                body = _page("home.html" if u.path == "/" else "integracoes.html" if u.path == "/integracoes" else "painel.html")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -276,6 +276,12 @@ def make_handler(db_path: str):
                 self._json({"projetos": cards(st), "loop": e["loop"], "orcamento": e["orcamento"], "demo": bool(st.get("demo")), "versao": __version__,
                             "autonomia": e["autonomia"],
                             "saude": e["saude"], "novos_na_fila": novos_na_fila(st)})
+            elif u.path == "/api/chaves":
+                if not self._host_local():
+                    return self._json({"erro": "proibido"}, 403)
+                from .cofre import Cadastro
+                from .configuracao import ENV_FILE
+                self._json({"chaves": Cadastro(self._store(), ENV_FILE).listar()})
             elif u.path == "/api/conselho":
                 from .perguntas import Conselho
                 from .agents import Ctx  # noqa: F401 — o conselho só lê o store aqui
@@ -302,6 +308,11 @@ def make_handler(db_path: str):
                 self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
                 self._json({"erro": "não encontrado"}, 404)
+
+        def _host_local(self) -> bool:
+            """Contra DNS rebinding: o Host precisa ser o próprio computador."""
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+            return host in ("127.0.0.1", "localhost", "::1")
 
         def _entrega(self, pid: int, v: str | None):
             st = self._store()
@@ -407,6 +418,20 @@ def make_handler(db_path: str):
                     return self._json({"erro": "ação desconhecida"}, 400)
                 store.set("controle", {"pausado": bool(c.get("pausado")), "modo_seguro": bool(c.get("modo_seguro"))})
                 return self._json({"ok": True, "controle": store.get("controle")})
+            if u.path in ("/api/chaves", "/api/chaves/migrar"):
+                # chaves de integração: só do painel local; a resposta nunca traz o valor de uma chave
+                if not self._host_local():
+                    return self._json({"erro": "proibido"}, 403)
+                from .cofre import Cadastro
+                from .configuracao import ENV_FILE
+                cad = Cadastro(store, ENV_FILE)
+                try:
+                    if u.path.endswith("/migrar"):
+                        return self._json({"ok": True, **cad.migrar()})
+                    return self._json({"ok": True, **cad.gravar(str(data.get("nome", "")).strip().upper(),
+                                                                 data.get("valor"), str(data.get("ajuda", "")))})
+                except (ValueError, RuntimeError) as exc:
+                    return self._json({"erro": str(exc)}, 400)
             if u.path == "/api/orcamento":
                 # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
                 from .budget import definir_limite

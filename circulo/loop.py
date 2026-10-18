@@ -695,7 +695,9 @@ class Circle:
         if getattr(self, "_env_mtime", "nunca") == "nunca":
             return False
         atual = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
-        return atual != self._env_mtime and self.store.get("reiniciar_ao_mudar_config", True)
+        # chave cadastrada/trocada no painel (cofre do sistema): o arquivo pode nem mudar
+        no_painel = float(self.store.get("config_alterada_em") or 0) > float(getattr(self, "_iniciado_em", time.time()))
+        return (atual != self._env_mtime or no_painel) and self.store.get("reiniciar_ao_mudar_config", True)
 
     def run_forever(self, max_ticks: int | None = None, sleep: Callable[[float], None] | None = None) -> None:
         sleep = sleep or (lambda sec: self._stop.wait(sec))
@@ -705,6 +707,7 @@ class Circle:
         self.store.set("loop_iniciado_em", time.time())
         from .configuracao import ENV_FILE
         self._env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
+        self._iniciado_em = time.time()
         n = 0
         try:
             while not self._stop.is_set():

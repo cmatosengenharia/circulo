@@ -42,6 +42,12 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
     carregar_env()                        # configuração única: o loop lê as chaves sozinho
     from . import configuracao as cfg
+    try:                                  # e as que você cadastrou no painel, do cofre do sistema (Keychain)
+        from .cofre import Cadastro
+        from .state import Store
+        Cadastro(Store(os.path.join(args.data, "circulo.db")), cfg.ENV_FILE).carregar_no_ambiente()
+    except Exception:  # noqa: BLE001 — sem cofre, segue com o arquivo
+        pass
     from .loop import Circle
 
     if args.cmd == "configurar":

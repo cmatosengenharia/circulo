@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — integrações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
+  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2;
+  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --bad-soft:#F6DCD8; --idle:#AEB8C2;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
+  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14;
+  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--jev);outline-offset:2px}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 56px}
+.back{display:inline-block;color:var(--muted);text-decoration:none;font-weight:600;margin-bottom:6px}
+.back::before{content:"‹ "}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 18px;max-width:72ch}
+.cofre{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:0 0 18px}
+.cofre b{font-weight:700}
+.chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.falta{background:var(--bad-soft);color:var(--bad)}.chip.aviso{background:var(--llm-soft);color:var(--llm)}
+.lista{display:grid;gap:12px}
+.chave{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.chave .top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.chave h2{font-size:15px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+.chave p{margin:4px 0 10px;color:var(--muted);font-size:13.5px}
+.linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.linha input{flex:1 1 260px;min-width:0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--ink)}.btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btn.perigo:hover{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.teste{font-size:12.5px;color:var(--muted);margin-top:8px}
+.msg{font-size:13px;margin-top:6px;min-height:1em}
+.msg.erro{color:var(--bad)}.msg.ok{color:var(--ok)}
+details.nova{margin-top:16px;background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:12px 16px}
+details.nova summary{cursor:pointer;font-weight:700}
+.campos{display:grid;gap:8px;margin-top:10px}
+.campos input{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);min-width:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">Todas as missões</a>
+  <h1>Integrações</h1>
+  <p class="sub">As chaves que o loop usa para falar com o Jev, a LLM e o GitHub. Ficam no cofre do sistema, nunca voltam para a tela (só os 4 últimos caracteres) e cada mudança reinicia o loop sozinho para valer.</p>
+  <div class="cofre" id="cofre">Conferindo o cofre…</div>
+  <div class="lista" id="lista" aria-live="polite"></div>
+  <details class="nova">
+    <summary>Cadastrar outra integração</summary>
+    <form class="campos" id="nova">
+      <input id="novoNome" placeholder="NOME_DA_CHAVE (ex.: OPENAI_API_KEY)" pattern="[A-Za-z][A-Za-z0-9_]{2,63}" required autocomplete="off">
+      <input id="novaAjuda" placeholder="Para que serve (opcional)" autocomplete="off">
+      <input id="novoValor" type="password" placeholder="Valor" required autocomplete="new-password">
+      <div class="linha"><button class="btn primary" type="submit">Cadastrar</button><span class="msg" id="novaMsg"></span></div>
+    </form>
+  </details>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const COFRE = {keychain: "Keychain do macOS (criptografado pelo sistema)", "secret-service": "Secret Service do Linux (criptografado)", arquivo: "arquivo de configuração com permissão 600"};
+const TESTE = {TYPESAFE_API_KEY: "Jev (decisões)", ANTHROPIC_API_KEY: "Motor das missões (LLM)", ANTHROPIC_WORKSPACE_ID: "Motor das missões (LLM)",
+  GITHUB_TOKEN: "Gate de merge", CIRCULO_REPO: "Gate de merge", CIRCULO_REPO_DIR: "Developer (corrige o próprio código)"};
+async function post(url, body) {
+  const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify(body)});
+  return [r.ok, await r.json()];
+}
+async function carregar() {
+  const r = await fetch("/api/chaves"); const j = await r.json();
+  const itens = j.chaves.filter(c => c.nome), meta = j.chaves.find(c => c._testes) || {_testes: {}};
+  const cofre = itens[0] ? itens[0].cofre : "arquivo", noArquivo = itens.filter(c => c.onde === "arquivo" && c.segredo);
+  $("#cofre").innerHTML = `<span>Cofre: <b>${esc(COFRE[cofre] || cofre)}</b></span>` +
+    (cofre !== "arquivo" && noArquivo.length ? `<span class="chip aviso">${noArquivo.length} chave(s) ainda em texto no arquivo</span>
+      <button class="btn primary" id="migrar">Mover para o cofre</button>` : "") +
+    (meta._testado_em ? `<span class="chip">conexões testadas às ${new Date(meta._testado_em * 1000).toLocaleTimeString("pt-BR")}</span>` : "");
+  $("#lista").innerHTML = itens.map(c => {
+    const t = meta._testes[TESTE[c.nome]];
+    const st = c.cadastrada ? `<span class="chip ok">cadastrada${c.onde ? " · " + esc(c.onde) : ""}${c.final ? " · " + esc(c.final) : ""}</span>` : `<span class="chip falta">falta</span>`;
+    return `<section class="chave" data-nome="${esc(c.nome)}"><div class="top"><h2>${esc(c.nome)}</h2>${st}</div>
+      <p>${esc(c.ajuda)}</p>
+      <form class="linha" data-nome="${esc(c.nome)}">
+        <input type="${c.segredo ? "password" : "text"}" name="valor" autocomplete="${c.segredo ? "new-password" : "off"}"
+          placeholder="${c.cadastrada ? (c.segredo ? "Nova chave para trocar" : esc(c.valor || "")) : "Cole aqui"}" aria-label="Valor de ${esc(c.nome)}">
+        <button class="btn primary" type="submit">${c.cadastrada ? "Trocar" : "Cadastrar"}</button>
+        ${c.cadastrada ? `<button class="btn perigo" type="button" data-remover="${esc(c.nome)}">Remover</button>` : ""}
+      </form>
+      ${t ? `<div class="teste">Teste: <span class="chip ${t.estado === "ligado" ? "ok" : t.estado === "parado" ? "falta" : "aviso"}">${esc(t.estado)}</span> ${esc(t.detalhe)}</div>` : ""}
+      <div class="msg" aria-live="polite"></div></section>`;
+  }).join("");
+}
+document.addEventListener("submit", async e => {
+  const f = e.target.closest("form.linha"); if (!f) return;
+  e.preventDefault();
+  const v = f.valor.value.trim(), msg = f.closest(".chave").querySelector(".msg"); if (!v) return;
+  f.querySelector("button[type=submit]").disabled = true;
+  const [ok, j] = await post("/api/chaves", {nome: f.dataset.nome, valor: v});
+  f.valor.value = "";
+  msg.className = "msg " + (ok ? "ok" : "erro");
+  msg.textContent = ok ? `Salva no ${j.onde}${j.final ? " (final " + j.final + ")" : ""}. O loop reinicia para valer.` : j.erro;
+  setTimeout(carregar, 1200);
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-remover]");
+  if (b) {
+    b.disabled = true;
+    await post("/api/chaves", {nome: b.dataset.remover, valor: ""});
+    carregar();
+  }
+  if (e.target.closest("#migrar")) {
+    e.target.disabled = true;
+    const [ok, j] = await post("/api/chaves/migrar", {});
+    $("#cofre").insertAdjacentHTML("beforeend", `<span class="msg ${ok ? "ok" : "erro"}">${ok ? "Movidas: " + esc((j.movidas || []).join(", ") || "nenhuma") : esc(j.erro)}</span>`);
+    setTimeout(carregar, 1500);
+  }
+});
+$("#nova").onsubmit = async e => {
+  e.preventDefault();
+  const [ok, j] = await post("/api/chaves", {nome: $("#novoNome").value.trim().toUpperCase(), valor: $("#novoValor").value, ajuda: $("#novaAjuda").value});
+  $("#novaMsg").className = "msg " + (ok ? "ok" : "erro");
+  $("#novaMsg").textContent = ok ? `Cadastrada no ${j.onde}.` : j.erro;
+  if (ok) { $("#nova").reset(); carregar(); }
+};
+carregar();
+</script>
+</body>
+</html>

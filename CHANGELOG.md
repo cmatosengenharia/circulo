@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.15.0 — 2026-10-18
+
+Produto, parte 1: **cadastro de chaves de integração no painel**, guardadas com segurança.
+
+- Nova tela **Integrações** (`/integracoes`, botão na tela inicial), com as chaves do Jev, da LLM, do GitHub e do
+  repositório, mais **qualquer outra integração** que você cadastrar (nome em MAIÚSCULAS).
+- **Cofre do sistema** (`cofre.py`), escolhido sozinho:
+  - **macOS: Keychain** (criptografado pelo sistema). O valor vai para o comando `security` pelo stdin, nunca na
+    linha de comando, e por isso não aparece no `ps`;
+  - **Linux: Secret Service** (`secret-tool`);
+  - sem cofre do sistema: o arquivo de configuração com permissão 600.
+  Também dá para forçar com `CIRCULO_COFRE=keychain|secret-service|arquivo`.
+- **A tela e a API nunca devolvem o valor de uma chave**: só se está cadastrada, onde está, os 4 últimos caracteres e
+  o resultado do teste de conexão.
+- Proteções do cadastro: cabeçalho do painel, origem local e **Host local** (contra DNS rebinding); nome validado e
+  valor sem quebra de linha.
+- Cada mudança vira alerta ("Você trocou a chave X (final …abcd) no keychain") e **reinicia o loop limpo** para
+  valer. Na volta, o diagnóstico testa as conexões e a tela mostra o resultado.
+- **Mover para o cofre**: um botão seu move as chaves que ainda estão em texto no arquivo. Cada uma só é apagada do
+  arquivo depois de lida de volta, igual, no cofre.
+- Ao iniciar, o loop lê o arquivo e depois o cofre, sem sobrescrever o que já veio do ambiente.
+
 ## 1.14.0 — 2026-10-18
 
 - **Limite diário da API customizável pelo painel**: no número "% da API hoje" (✎), você escolhe o limite em tokens ou
