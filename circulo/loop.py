@@ -258,7 +258,7 @@ class Circle:
             if violations:
                 raise ValueError("invariante violado; lançamento desfeito: " + "; ".join(violations))
             if kind == "despesa":
-                self.shadow.record(tx_id, cat["confidence"], cat["category"])
+                self.shadow.record(tx_id, cat, p["description"], hour)
             check = "" if cat["auto_accept"] else " (baixa confiança: o loop reclassifica sozinho quando aprender mais)"
             msg = f"#{tx_id} {fmt_brl(p['amount_cents'])} {p['description']} → {cat['category']}/{cat['tag']}{check}"
         elif kind == "correcao":

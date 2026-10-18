@@ -5,13 +5,16 @@ import json
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 from . import finance
-from .agents import Ctx, ReviewerFinance, tokens_of
-from .decision import LocalJev, Question
-from .policy import PolicyStore, PolicyViolation, fingerprint, level_of_change
+from .agents import Categorizer, Ctx, ReviewerFinance, tokens_of
+from .decision import TAG_EXEMPLOS, LocalJev, Question, exemplos_de_tag
+from .policy import PolicyStore, PolicyViolation, changed_top_keys, fingerprint, level_of_change
 
 RESOLVED = "('confirmed','corrected')"
+MAX_EXEMPLOS = 12
+CUSTO_CICLO = 0.02      # um ciclo do tamanho estimado só se paga se ganhar ~2 pontos na régua
 
 
 @dataclass
@@ -27,6 +30,29 @@ def utility(accepted: bool, wrong: bool) -> float:
     if accepted:
         return -3.0 if wrong else 1.0
     return 0.5 if wrong else -0.2
+
+
+def valor_portfolio(cycles: list, pf: dict, est_tokens: int, desde: int = 0) -> list[float]:
+    """Replay do retorno decrescente com os parâmetros `pf`: para cada ciclo que rodou depois de outro,
+    a política teria rodado (valor = ganho aceito − custo do ciclo) ou já teria parado o projeto (valor 0)?
+    Só conta ciclos a partir do giro `desde` (o shadow só vale com decisões que vieram depois dele)."""
+    por_projeto: dict[int, list] = defaultdict(list)
+    for c in cycles:
+        por_projeto[c["project_id"]].append(c)
+    out = []
+    for seq in por_projeto.values():
+        streak = 0
+        for prev, nxt in pairwise(seq):
+            if prev["fase"] in ("melhoria", "adiado_valor") or prev["aceita"] == 0:   # mesmo critério do motor
+                streak = 0 if (prev["ganho"] or 0) >= pf["min_gain"] else streak + 1
+            parou = streak >= pf["plateau_cycles"]
+            if parou:
+                streak = 0                                   # reabrir zera o contador
+            if nxt["tick"] < desde:
+                continue
+            ganho = (nxt["ganho"] or 0.0) if nxt["aceita"] else 0.0
+            out.append(0.0 if parou else ganho - CUSTO_CICLO * nxt["tokens"] / max(est_tokens, 1))
+    return out
 
 
 class MetaLearner:
@@ -108,10 +134,61 @@ class MetaLearner:
                                   {"occurrences": len(near), "consistency": 1.0})]
         return []
 
+    def question_candidates(self) -> list[Candidate]:
+        """Instruções do spend_tag aprendem com as correções de tag: viram exemplos dentro da pergunta (nível 2 → shadow)."""
+        s = self.ctx.store
+        instr = self.ctx.policy["questions"]["spend_tag_instructions"]
+        exemplos = exemplos_de_tag(instr)
+        fixes = s.q("SELECT l.description, f.new_value FROM feedback f JOIN ledger l ON l.id=f.tx_id WHERE f.field='tag'")
+        resolved = s.q(f"SELECT description, tag FROM ledger WHERE kind='despesa' AND status IN {RESOLVED}")
+        per_token: dict[str, Counter] = defaultdict(Counter)
+        for r in fixes:
+            for tok in set(tokens_of(r["description"])):
+                per_token[tok][r["new_value"]] += 1
+        novos, n_total, cons_min = {}, 0, 1.0
+        for tok, tags in sorted(per_token.items(), key=lambda kv: -sum(kv[1].values())):
+            tag, n = tags.most_common(1)[0]
+            if n < 2 or exemplos.get(tok) == tag:
+                continue
+            with_tok = [r for r in resolved if tok in tokens_of(r["description"])]
+            consistency = sum(r["tag"] == tag for r in with_tok) / len(with_tok) if with_tok else 0.0
+            if consistency < 0.75:
+                continue
+            novos[tok] = tag
+            n_total += n
+            cons_min = min(cons_min, consistency)
+        if not novos:
+            return []
+        merged = list({**exemplos, **novos}.items())[-MAX_EXEMPLOS:]
+        base = instr.split(TAG_EXEMPLOS, 1)[0].strip()
+        new = f"{base} {TAG_EXEMPLOS} " + "; ".join(f"{t} → {g}" for t, g in merged) + "."
+        return [Candidate("question", "Pergunta do tag aprende: " + ", ".join(f"'{t}' → {g}" for t, g in novos.items()),
+                          [{"op": "set", "path": "questions.spend_tag_instructions", "value": new}],
+                          {"occurrences": n_total, "consistency": round(cons_min, 3)})]
+
+    def portfolio_candidates(self) -> list[Candidate]:
+        """Retorno decrescente: se o replay mostra ciclos queimados depois do plateau, propõe parar um ciclo antes."""
+        pf = self.ctx.policy["portfolio"]
+        n = int(pf["plateau_cycles"])
+        if n <= 1:
+            return []
+        cycles = self.ctx.store.q("SELECT project_id, tick, fase, ganho, aceita, tokens FROM cycles ORDER BY id")
+        est = int(pf.get("est_cycle_tokens", 9000))
+        alt = {**pf, "plateau_cycles": n - 1}
+        atual, menor = valor_portfolio(cycles, pf, est), valor_portfolio(cycles, alt, est)
+        diff = [(a, b) for a, b in zip(atual, menor, strict=True) if a != b]   # mesmos ciclos: um valor por ciclo nos dois
+        if len(diff) < 3 or sum(menor) <= sum(atual):
+            return []
+        melhor = sum(b > a for a, b in diff) / len(diff)
+        return [Candidate("portfolio", f"Portfólio para antes: plateau {n}→{n - 1} ({len(diff)} ciclos sem retorno no replay)",
+                          [{"op": "set", "path": "portfolio.plateau_cycles", "value": n - 1}],
+                          {"occurrences": len(diff), "consistency": round(melhor, 3)})]
+
     # ---------------------------------------------------- decisão + apply
     def step(self) -> list[str]:
         log = []
-        for c in self.domain_candidates() + self.circle_candidates() + self.distillation_candidates():
+        for c in (self.domain_candidates() + self.circle_candidates() + self.question_candidates()
+                  + self.portfolio_candidates() + self.distillation_candidates()):
             r = self.process(c)
             if r:
                 log.append(r)
@@ -195,13 +272,45 @@ class Shadow:
     def __init__(self, ctx: Ctx):
         self.ctx = ctx
 
-    def record(self, tx_id: int, confidence: float, category: str) -> None:
+    def record(self, tx_id: int, cat: dict, description: str, hour: int) -> None:
         sh = self.ctx.policies.shadow()
         if not sh:
             return
         version, body, _ = sh
-        would = confidence >= body["thresholds"]["auto_accept_category"] and category != "outros"
-        self.ctx.store.x("INSERT OR IGNORE INTO shadow_obs(version,tx_id,would_accept) VALUES(?,?,?)", (version, tx_id, int(would)))
+        would = cat["confidence"] >= body["thresholds"]["auto_accept_category"] and cat["category"] != "outros"
+        tag_shadow = None
+        if body["questions"] != self.ctx.policy["questions"]:
+            # a pergunta do shadow vai ao Jev com o mesmo lançamento; a resposta só é medida, nunca gravada no ledger
+            q = Categorizer(self.ctx).questions(body)["spend_tag"]
+            tag_shadow = self.ctx.dl.ask("spend_tag", q, {"description": description, "hour": hour, "regras": body["rules"]}).value
+        self.ctx.store.x("INSERT OR IGNORE INTO shadow_obs(version,tx_id,would_accept,tag_ativa,tag_shadow) VALUES(?,?,?,?,?)",
+                         (version, tx_id, int(would), cat["tag"], tag_shadow))
+
+    def _medidas(self, version: int, body: dict, started: int) -> dict[str, tuple[float, float, int]]:
+        """(utilidade shadow, utilidade ativa, n) para cada parte da política que o shadow mudou."""
+        s, active = self.ctx.store, self.ctx.policy
+        changed = changed_top_keys(active, body)
+        out = {}
+        if "questions" in changed:
+            rows = s.q(f"""SELECT o.tag_ativa, o.tag_shadow, l.tag FROM shadow_obs o JOIN ledger l ON l.id=o.tx_id
+                WHERE o.version=? AND o.tag_shadow IS NOT NULL AND l.status IN {RESOLVED}""", (version,))
+            n = len(rows) or 1
+            out["questions"] = (sum(r["tag_shadow"] == r["tag"] for r in rows) / n,
+                                sum(r["tag_ativa"] == r["tag"] for r in rows) / n, len(rows))
+        if "portfolio" in changed:
+            cycles = s.q("SELECT project_id, tick, fase, ganho, aceita, tokens FROM cycles ORDER BY id")
+            est = int(active["portfolio"].get("est_cycle_tokens", 9000))
+            us = valor_portfolio(cycles, body["portfolio"], est, started)
+            ua = valor_portfolio(cycles, active["portfolio"], est, started)
+            n = len(us) or 1
+            out["portfolio"] = (sum(us) / n, sum(ua) / n, len(us))
+        if "thresholds" in changed or not out:
+            rows = s.q(f"""SELECT o.would_accept, l.auto_accepted, l.status FROM shadow_obs o
+                JOIN ledger l ON l.id=o.tx_id WHERE o.version=? AND l.status IN {RESOLVED}""", (version,))
+            n = len(rows) or 1
+            out["thresholds"] = (sum(utility(bool(r["would_accept"]), r["status"] == "corrected") for r in rows) / n,
+                                 sum(utility(bool(r["auto_accepted"]), r["status"] == "corrected") for r in rows) / n, len(rows))
+        return out
 
     def evaluate(self) -> str | None:
         sh = self.ctx.policies.shadow()
@@ -210,17 +319,17 @@ class Shadow:
         version, body, started = sh
         cfg = self.ctx.policy["shadow"]
         age = self.ctx.store.tick - (started or 0)
-        rows = self.ctx.store.q(f"""SELECT o.would_accept, l.auto_accepted, l.status FROM shadow_obs o
-            JOIN ledger l ON l.id=o.tx_id WHERE o.version=? AND l.status IN {RESOLVED}""", (version,))
-        if age < cfg["min_ticks"] or len(rows) < cfg["min_observations"]:
+        medidas = self._medidas(version, body, started or 0)
+        if age < cfg["min_ticks"] or min(n for _, _, n in medidas.values()) < cfg["min_observations"]:
             if age > 50 * cfg["min_ticks"]:
                 self._close(version, False, "sem observações suficientes")
                 return "shadow expirado"
             return None
-        u_shadow = sum(utility(bool(r["would_accept"]), r["status"] == "corrected") for r in rows) / len(rows)
-        u_active = sum(utility(bool(r["auto_accepted"]), r["status"] == "corrected") for r in rows) / len(rows)
-        win = u_shadow > u_active + cfg["min_gain"]
-        self._close(version, win, f"utilidade shadow={u_shadow:.3f} ativa={u_active:.3f} n={len(rows)}")
+        # cada parte mudada precisa ganhar por conta própria: uma não compensa a piora da outra
+        win = all(us > ua + cfg["min_gain"] for us, ua, _ in medidas.values())
+        self._close(version, win, " · ".join(f"{k}: utilidade shadow={us:.3f} ativa={ua:.3f} n={n}" for k, (us, ua, n) in medidas.items()))
+        u_shadow = sum(us for us, _, _ in medidas.values()) / len(medidas)
+        u_active = sum(ua for _, ua, _ in medidas.values()) / len(medidas)
         return f"shadow v{version} {'promovido' if win else 'descartado'} ({u_shadow:.2f} vs {u_active:.2f})"
 
     def _close(self, version: int, promote: bool, note: str) -> None:
