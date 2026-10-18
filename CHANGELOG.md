@@ -9,6 +9,9 @@ vermelha. Correções:
   main atual. Se der conflito, o Developer resolve (1.9.2).
 - **Neurônio `gate:main`**: CI da main vermelho vira lição de estrutura na hora (`gate:main_vermelha`), com item no
   topo da fila.
+- Corpo: checa a main a cada 10 minutos, além de logo depois de cada merge. Antes eram 60 giros, que no descanso
+  longo davam horas. A validação antes da troca já provou seu valor: recusou rodar a main quebrada (4ccc632) e
+  registrou a lição #2.
 - As duas correções da lição #1 convivem: a troca direta (1.9.1) e o caminho livre que o Developer escreveu sozinho
   (PR #4, `corpo_caminho.py`). O teste do PR #4 foi ajustado para isso.
 

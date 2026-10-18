@@ -43,7 +43,7 @@ def test_codigo_novo_validado_vira_o_corpo_e_reinicia(circle, repos, tmp_path):
     c = Corpo(circle.ctx, vivo, tmp_path, validacao=OK)
     assert not c.precisa()
     novo = evoluir(dev)
-    circle.store.set("corpo", {"checado_tick": -10**6})
+    circle.store.set("corpo", {"checado_em": 0})
     assert c.precisa()
     (vivo / "anotacao_local.txt").write_text("não pode sumir\n")      # mudança local fica guardada
     r = c.run()
@@ -65,7 +65,7 @@ def test_codigo_que_nao_passa_na_validacao_nao_vira_corpo(circle, repos, tmp_pat
     c = Corpo(circle.ctx, vivo, tmp_path, validacao=OK)
     r = c.run()
     assert r["status"] == "reprovado" and git(vivo, "rev-parse", "HEAD") == antes and not c.reiniciar
-    circle.store.set("corpo", {**circle.store.get("corpo"), "checado_tick": -10**6})
+    circle.store.set("corpo", {**circle.store.get("corpo"), "checado_em": 0})
     assert not c.precisa()                                             # não tenta de novo o mesmo código reprovado
     assert novo in circle.store.get("corpo")["reprovados"]
     assert circle.store.one("SELECT classe FROM licoes WHERE assinatura='corpo:validacao_falhou'")["classe"] == "estrutural"
