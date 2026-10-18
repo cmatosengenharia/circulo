@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.3 — 2026-10-18
+
+- Esperar o espaçamento entre tentativas não conta como estagnação: o vigia de progresso só considera o trabalho que
+  pode rodar agora. Antes, o conserto do PR #6 esperando a vez contaria como "parado" e geraria uma lição falsa.
+- Espaçamento do Developer: 2 giros, não 10. Com o descanso longo de 5 min, 10 giros viravam 50 min de espera para
+  consertar um PR.
+
 ## 1.11.2 — 2026-10-18
 
 - **Batimento durante o giro**: o loop só escrevia o batimento entre giros. Com o Developer trabalhando 8 minutos no

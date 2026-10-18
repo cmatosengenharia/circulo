@@ -33,7 +33,7 @@ from .state import Store
 
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
-ESPACO = {"corrigir_codigo": 10, "revisar_prs": 2}
+ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
@@ -484,7 +484,14 @@ class Circle:
         if not ignorar_estagnacao and int((self.store.get("progresso") or {}).get("sem", 0)) >= 3:
             return False
         try:
-            return any(self._tem_trabalho(t) for t in TRABALHO)
+            # só conta o trabalho que pode rodar AGORA: esperar o espaçamento (ESPACO, recusas) não é estagnação
+            s = self.store
+            last = s.get("idle_last", {}) or {}
+            rec = (s.get("progresso") or {}).get("recusas") or {}
+            def pronto(t):
+                espera = max(ESPACO.get(t, 1), min(64, 2 ** int(rec[t])) if rec.get(t) else 1)
+                return s.tick - int(last.get(t, -10**6)) >= espera
+            return any(pronto(t) and self._tem_trabalho(t) for t in TRABALHO)
         except Exception:  # noqa: BLE001
             return False
 
