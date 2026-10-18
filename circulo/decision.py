@@ -420,6 +420,165 @@ class LocalJev:
         return Decision("idle_task", "choice", best, 0.7, self.source)
 
 
+# ---------------------------------------------------------------- replay do aprendiz worth_spending
+# Reaprende em lote com as decisões em que a regra decidiu (agregado de todas, como no DAgger).
+# A meta é concordância com a regra em dados retidos e calibração (ECE); a confiança sobe só como efeito.
+# - replay priorizado pela perda (onde o Jev discorda da regra ou está em dúvida pesa mais);
+# - N passes limitados, parada antecipada se a concordância no holdout de 20% cair;
+# - temperatura T ajustada por NLL no holdout se o ECE estiver alto (não muda a acurácia);
+# - o modelo só é adotado se não piorar a concordância de antes e ficar calibrado.
+
+REPLAY_MAX_EXEMPLOS = 500
+REPLAY_MIN_EXEMPLOS = 40
+REPLAY_A_CADA = 20           # novos rótulos entre dois replays
+REPLAY_TAXA_DUVIDA = 0.5
+REPLAY_PASSES = 12
+REPLAY_ECE_AJUSTE = 0.05     # acima disto, ajusta T
+REPLAY_ECE_MAX = 0.10        # acima disto, o modelo não é adotado
+
+
+def _sig(z: float) -> float:
+    return 1 / (1 + math.exp(-z)) if z >= 0 else math.exp(z) / (1 + math.exp(z))
+
+
+def _worth_x(f: Mapping[str, Any], acoes: list[str]) -> list[float]:
+    v = float(f.get("value_signal") if f.get("value_signal") is not None else 0.5)
+    b = float(f.get("budget_left_ratio") if f.get("budget_left_ratio") is not None else 1.0)
+    s = 1 / (1 + int(f.get("est_tokens") or 0) / 50_000)
+    return [1.0, v, b, s, v * b, v * s, b * s, v * b * s] + [float(f.get("action") == a) for a in acoes]
+
+
+def worth_prob(modelo: Mapping[str, Any], f: Mapping[str, Any]) -> float:
+    """P(regra permitiria) segundo o modelo do replay, já com a temperatura."""
+    z = sum(w * x for w, x in zip(modelo["w"], _worth_x(f, modelo["acoes"]), strict=True))
+    return _sig(z / modelo.get("T", 1.0))
+
+
+def _ece(ps: list[float], ys: list[int], bins: int = 10) -> float:
+    caixas: dict[int, list[tuple[float, int]]] = {}
+    for p, y in zip(ps, ys, strict=True):
+        conf = max(p, 1 - p)
+        caixas.setdefault(min(bins - 1, int(conf * bins)), []).append((conf, int((p >= 0.5) == y)))
+    return sum(abs(sum(c for c, _ in cx) - sum(a for _, a in cx)) for cx in caixas.values()) / len(ps) if ps else 0.0
+
+
+def _nll(zs: list[float], ys: list[int], t: float) -> float:
+    return -sum(math.log(max(1e-12, _sig(z / t) if y else 1 - _sig(z / t))) for z, y in zip(zs, ys, strict=True))
+
+
+def _ajustar_t(zs: list[float], ys: list[int]) -> float:
+    lo, hi = math.log(0.05), math.log(20.0)            # busca ternária em log T (NLL é unimodal em T)
+    for _ in range(60):
+        a, b = lo + (hi - lo) / 3, hi - (hi - lo) / 3
+        if _nll(zs, ys, math.exp(a)) <= _nll(zs, ys, math.exp(b)):
+            hi = b
+        else:
+            lo = a
+    return math.exp((lo + hi) / 2)
+
+
+def _resolver(a: list[list[float]], b: list[float]) -> list[float]:
+    """Resolve a·x = b por eliminação de Gauss com pivô parcial (a é pequena: uma linha por feature)."""
+    n = len(b)
+    m = [list(linha) + [bi] for linha, bi in zip(a, b, strict=True)]
+    for c in range(n):
+        p = max(range(c, n), key=lambda r: abs(m[r][c]))
+        m[c], m[p] = m[p], m[c]
+        if abs(m[c][c]) < 1e-12:
+            continue
+        for r in range(c + 1, n):
+            f = m[r][c] / m[c][c]
+            if f:
+                m[r] = [x - f * y for x, y in zip(m[r], m[c], strict=True)]
+    x = [0.0] * n
+    for c in range(n - 1, -1, -1):
+        if abs(m[c][c]) >= 1e-12:
+            x[c] = (m[c][n] - sum(m[c][k] * x[k] for k in range(c + 1, n))) / m[c][c]
+    return x
+
+
+def replay_worth(m: dict, l2: float = 1e-2) -> dict:
+    """Um replay em lote sobre m['exemplos']; devolve m com 'replay' (relatório) e, se validado, 'modelo'."""
+    ex = m.get("exemplos", [])
+    acoes = sorted({str(e["features"].get("action")) for e in ex})
+    X = [_worth_x(e["features"], acoes) for e in ex]
+    Y = [int(e["desfecho"] == "permitido") for e in ex]
+    hold = [i for i in range(len(ex)) if i % 5 == 4]
+    treino = [i for i in range(len(ex)) if i % 5 != 4]
+    if not hold or not treino:
+        return m
+
+    def z(w, i):
+        return sum(a * b for a, b in zip(w, X[i], strict=True))
+
+    def concordancia(w, t=1.0):
+        return sum((_sig(z(w, i) / t) >= 0.5) == Y[i] for i in hold) / len(hold)
+
+    ant = m.get("modelo")
+    if ant and ant.get("acoes") == acoes:              # parte do modelo atual (DAgger: continua sobre o agregado)
+        w0 = list(ant["w"])
+    else:                                              # ou só da taxa-base da regra
+        pos = sum(Y[i] for i in treino)
+        w0 = [math.log((pos + 1) / (len(treino) - pos + 1))] + [0.0] * (len(X[0]) - 1)
+    # a régua de antes é o que está em uso: o modelo adotado, ou a taxa-base se ainda não há modelo
+    antes = (sum((worth_prob(ant, ex[i]["features"]) >= 0.5) == Y[i] for i in hold) / len(hold)) if ant \
+        else concordancia(w0)
+
+    def perda(w, i):
+        return -math.log(max(1e-12, _sig(z(w, i)) if Y[i] else 1 - _sig(z(w, i))))
+
+    def objetivo(w, a):
+        return sum(a[i] * perda(w, i) for i in treino) + 0.5 * l2 * sum(wj * wj for wj in w)
+
+    # Cada passe é um passo de Newton (IRLS) sobre o treino, com peso maior onde a perda é maior (discordância e
+    # dúvida pesam mais). SGD com features sem escala oscilava e parava cedo, e o modelo saía fraco e em dúvida.
+    k = len(X[0])
+    w, melhor, melhor_c, passes = list(w0), list(w0), concordancia(w0), 0
+    for _ in range(REPLAY_PASSES):
+        pr = {i: perda(w, i) + 0.05 for i in treino}
+        media = sum(pr.values()) / len(pr)
+        a = {i: 0.5 + 0.5 * pr[i] / media for i in treino}     # prioridade pela perda, média 1
+        g = [l2 * wj for wj in w]
+        h = [[l2 * (r == c) for c in range(k)] for r in range(k)]
+        for i in treino:
+            p = _sig(z(w, i))
+            r, s = a[i] * (p - Y[i]), a[i] * p * (1 - p)
+            for j in range(k):
+                g[j] += r * X[i][j]
+                if s:
+                    for c in range(k):
+                        h[j][c] += s * X[i][j] * X[i][c]
+        d = _resolver(h, g)
+        base, passo = objetivo(w, a), 1.0
+        for _ in range(12):                            # busca de passo: Newton cheio só se a perda cair
+            novo = [wj - passo * dj for wj, dj in zip(w, d, strict=True)]
+            if objetivo(novo, a) < base:
+                break
+            passo /= 2
+        else:
+            break                                      # nenhum passo melhora: convergiu
+        w = novo
+        passes += 1
+        c = concordancia(w)
+        if c < melhor_c:                               # parada antecipada: piorou em dados retidos
+            break
+        melhor, melhor_c = list(w), c
+
+    zs, ys = [z(melhor, i) for i in hold], [Y[i] for i in hold]
+    ece_antes = ece = _ece([_sig(v) for v in zs], ys)
+    t = 1.0
+    if ece > REPLAY_ECE_AJUSTE:
+        t = _ajustar_t(zs, ys)
+        ece = _ece([_sig(v / t) for v in zs], ys)
+    adotado = melhor_c >= antes and ece <= REPLAY_ECE_MAX
+    m = {**m, "replay": {"passes": passes, "concordancia_antes": round(antes, 4), "concordancia": round(melhor_c, 4),
+                         "ece_antes_t": round(ece_antes, 4), "ece": round(ece, 4), "T": round(t, 4),
+                         "holdout": len(hold), "exemplos": len(ex), "adotado": adotado}}
+    if adotado:
+        m["modelo"] = {"w": melhor, "acoes": acoes, "T": t}
+    return m
+
+
 # ---------------------------------------------------------------- DecisionLayer
 
 class DecisionLayer:
@@ -498,11 +657,40 @@ class DecisionLayer:
             m["exemplos"] = (m["exemplos"] + [{
                 "features": {k: state.get(k) for k in ("action", "est_tokens", "value_signal", "budget_left_ratio")},
                 "regra": round(float(regra.value), 4), "limiar": thr,
-                "desfecho": "permitido" if permitido else "negado"}])[-200:]
+                "desfecho": "permitido" if permitido else "negado"}])[-REPLAY_MAX_EXEMPLOS:]
+            m["desde_replay"] = int(m.get("desde_replay", 0)) + 1
+            if m["desde_replay"] >= REPLAY_A_CADA and len(m["exemplos"]) >= REPLAY_MIN_EXEMPLOS \
+                    and self._worth_taxa_duvida() > REPLAY_TAXA_DUVIDA:
+                m["desde_replay"] = 0
+                m = replay_worth(m)
             self.s.set(self.WORTH_KEY, m)
 
+    def _worth_taxa_duvida(self) -> float:
+        """Fração das últimas respostas do Jev no worth_spending abaixo de jev_incerto (lida do SQLite)."""
+        incerto = self._thr("jev_incerto", 0.25)
+        rows = self.s.q("SELECT confidence FROM decisions WHERE question='worth_spending' AND source='jev' "
+                        "ORDER BY id DESC LIMIT 100")
+        return sum(float(r["confidence"]) < incerto for r in rows) / len(rows) if rows else 0.0
+
+    def worth_replay(self) -> dict:
+        """Replay em lote sob demanda (independe da taxa de dúvida); devolve o relatório."""
+        with self._aprendiz_lock:
+            m = replay_worth(self.s.get(self.WORTH_KEY) or {"pesos": {}, "exemplos": []})
+            m["desde_replay"] = 0
+            self.s.set(self.WORTH_KEY, m)
+        return m.get("replay", {})
+
     def _worth_aprendido(self, state: Mapping[str, Any], d: Decision, incerto: float) -> Decision | None:
-        pos, n = (self.s.get(self.WORTH_KEY) or {}).get("pesos", {}).get(self._worth_balde(state), [0, 0])
+        m = self.s.get(self.WORTH_KEY) or {}
+        if m.get("modelo"):                            # modelo do replay validado em holdout substitui os baldes
+            q = worth_prob(m["modelo"], state)
+            if abs(2 * q - 1) < incerto:
+                return None
+            thr = self._worth_limiar(state)            # valor do lado do limiar que o modelo prevê
+            valor = thr + (1 - thr) * (2 * q - 1) if q >= 0.5 else thr * 2 * q
+            return Decision(d.name, "noul", valor, abs(2 * q - 1), "jev",
+                            {"jev_bruto": float(d.value), "p_permitido": q, "exemplos": float(len(m.get("exemplos", [])))})
+        pos, n = m.get("pesos", {}).get(self._worth_balde(state), [0, 0])
         if n == 0 or 2 * pos == n:
             return None
         p = (pos + 1) / (n + 2)                        # Laplace: poucos exemplos, pouca confiança
