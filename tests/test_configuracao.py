@@ -1,7 +1,6 @@
 import os
 import platform
 import stat
-import sys
 
 import pytest
 
