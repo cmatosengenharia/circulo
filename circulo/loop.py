@@ -27,6 +27,7 @@ from .harness_lab import HarnessLab
 from .self_dev import SelfDeveloper, build_self_dev
 from .incidents import Incidents
 from .memory import Memory
+from .metrics import METRICAS, Metricas, seguro
 from .projects import ensure_seed, intake, kit_project_id
 from .money import fmt_brl
 from .policy import PolicyStore
@@ -67,14 +68,16 @@ class TickResult:
 class Circle:
     def __init__(self, data_dir: str | Path = "data", jev: JevClient | None = None, llm: LLMClient | None = None,
                  now: Callable[[], datetime] | None = None, db_path: str | None = None,
-                 gate: MergeGate | None = None, self_dev: SelfDeveloper | None = None):
+                 gate: MergeGate | None = None, self_dev: SelfDeveloper | None = None, metricas: Metricas | None = None):
         self.data_dir = Path(data_dir)
+        self.metricas = metricas if metricas is not None else METRICAS
         store = Store(db_path or (self.data_dir / "circulo.db"))
         policies = PolicyStore(store)
         now = now or (lambda: datetime.now(TZ))
         budget = Budget(store, policies.get, now)
         dl = DecisionLayer(store, policies.get, budget, jev=jev if jev is not None else build_jev(),
                            llm=llm if llm is not None else build_llm())
+        dl.metricas = self.metricas
         self.ctx = Ctx(store, policies, budget, dl, self.data_dir, now)
         self.collector = Collector(self.ctx)
         self.categorizer = Categorizer(self.ctx)
@@ -136,6 +139,7 @@ class Circle:
     def _stage(self, name: str, extra: dict | None = None) -> None:
         """Etapa atual do giro, para o painel ao vivo. A trilha guarda cada passagem, para o círculo
         do painel animar etapa por etapa mesmo quando o giro inteiro dura milissegundos."""
+        seguro(self.metricas.etapa, name)      # a etapa anterior termina aqui: duração no histograma do /metrics
         now = time.time()
         e = {"nome": name, "tick": self.store.tick, "em": now, "projeto": self.ctx.dl.project_id,
              "run_id": self.store.get("run_id"), **(extra or {})}
@@ -264,7 +268,8 @@ class Circle:
         except Exception as exc:  # noqa: BLE001 — observar nunca derruba o giro
             r.errors.append(f"rastro: {exc!r}")
         self._stage("descanso")
-        s.set("run_id", None)                    # erro fora do giro (ex.: teste da parada) não cai na execução que já fechou
+        seguro(self.metricas.ciclo_concluido, s)
+        s.set("run_id", None)                   # erro fora do giro (ex.: teste da parada) não cai na execução que já fechou
         every = int(ctx.policy["loop"]["summary_every_ticks"])
         if r.tick % every == 0:
             self.write_summary()
