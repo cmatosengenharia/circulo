@@ -334,7 +334,13 @@ class SelfDeveloper:
         except Exception:  # noqa: BLE001 — registro nunca derruba o Developer
             pass
         if out.get("tokens"):
-            self.ctx.budget.charge(int(out["tokens"]), "llm")
+            # o Claude Code roda no login da sua conta (assinatura), não nos créditos da API: não entra no orçamento
+            # diário de tokens da API. Fica contado à parte (o limite da assinatura tem tratamento próprio: espera o reset).
+            from .budget import TZ
+            from datetime import datetime
+            dia = datetime.now(TZ).date().isoformat()
+            a = self.s.get("assinatura_tokens") or {}
+            self.s.set("assinatura_tokens", {dia: int(a.get(dia, 0)) + int(out["tokens"])})
         return out
 
     def _limite(self, out: dict) -> str | None:
@@ -348,7 +354,7 @@ class SelfDeveloper:
         return hora
 
     # ------------------------------------------------------------ um ciclo do Developer
-    def run_once(self, item_id: int | None = None) -> DevResult:
+    def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         if self.em_espera():
             e = self.s.get("self_dev_espera") or {}
             return DevResult(None, "aguardando_limite", f"{e.get('motivo', 'limite')} até {e.get('hora', '?')}")
@@ -365,8 +371,10 @@ class SelfDeveloper:
             r = self.s.one("SELECT * FROM incidents WHERE id=?", (iid,))
             inc = dict(r) if r else None
         n = (inc or {}).get("count", 3)
-        gate = self.ctx.dl.worth_spending("self_fix", {"est_tokens": EST_TOKENS, "value_signal": min(0.95, 0.6 + 0.1 * n)})
-        if not gate.allowed:
+        # um porteiro só: chamado pelo loop, o gasto já foi decidido lá (antes eram dois porteiros com limiares diferentes)
+        gate = None if autorizado else self.ctx.dl.worth_spending("self_fix", {"est_tokens": 0, "value_signal": min(0.95, 0.6 + 0.1 * n),
+                                                                                "custo": "assinatura"})
+        if gate is not None and not gate.allowed:
             return DevResult(item["id"], "adiado", gate.reason or "Jev: não compensa agora")
         # nível "domain": a mudança ainda passa por testes locais, CI, gate de merge e rollback de saúde
         evo = self.ctx.dl.should_evolve("domain", {"occurrences": n, "consistency": 1.0,

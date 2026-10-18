@@ -34,6 +34,7 @@ from .state import Store
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
 ESPACO = {"corrigir_codigo": 10, "revisar_prs": 2}
+ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
@@ -43,7 +44,7 @@ TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_
            "planejar_roteiro": "Planejando o próximo item do roteiro a partir da evidência",
            "estudar_pedido": "Estudando o pedido em fontes confiáveis antes de executar",
            "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu"}
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 40000, "planejar_roteiro": 3000, "estudar_pedido": 9000}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
 @dataclass
@@ -93,6 +94,8 @@ class Circle:
         if self.self_dev is not None:
             self.self_dev.recuperar()
             self.self_dev.concluir_mergeados()
+        from .budget import tirar_assinatura_do_orcamento
+        tirar_assinatura_do_orcamento(store)
         from .corpo import build_corpo
         from .estudo import Estudo
         from .planejador import Planejador
@@ -155,6 +158,8 @@ class Circle:
             return TickResult(s.tick, paused=True, pause_reason="orcamento")
         s.set("loop_status", "modo_seguro" if ctl["modo_seguro"] else "rodando")
         r = TickResult(s.next_tick())
+        havia_trabalho = self.trabalho_pendente(ignorar_estagnacao=True)
+        antes = self._progresso()
         circulo_pid = kit_project_id(s, "circulo")
         ctx.dl.project_id = circulo_pid          # fora de um pedido, quem trabalha é o próprio círculo
         self._stage("orquestrador")
@@ -219,6 +224,10 @@ class Circle:
                 r.errors.append(f"{stage}: {exc!r}\n{traceback.format_exc(limit=3)}")
                 self.incidents.record(stage, exc, circulo_pid)
 
+        try:
+            self._vigiar_progresso(havia_trabalho, antes, r)
+        except Exception as exc:  # noqa: BLE001
+            r.errors.append(f"progresso: {exc!r}")
         if self.corpo is not None:
             try:
                 self.corpo.validar(r.errors)     # evidência depois da troca de código: os primeiros giros
@@ -365,7 +374,10 @@ class Circle:
         # enquanto existir; manutenção gira em rodízio (a mais esquecida primeiro). O Jev decide o gasto.
         last = s.get("idle_last", {})
         staleness = {t: s.tick - int(last.get(t, -10**6)) for t in tasks}
-        trabalho = [t for t in TRABALHO if t in tasks and staleness[t] >= ESPACO.get(t, 1) and self._tem_trabalho(t)]
+        # recusado pelo porteiro do gasto: espera cada vez mais antes de tentar de novo (1, 2, 4… até 64 giros)
+        recusas = (s.get("progresso") or {}).get("recusas") or {}
+        trabalho = [t for t in TRABALHO if t in tasks and staleness[t] >= max(ESPACO.get(t, 1), min(64, 2 ** int(recusas.get(t, 0))) if recusas.get(t) else 1)
+                    and self._tem_trabalho(t)]
         manut = sorted((t for t in tasks if t not in TRABALHO or t == "revisar_prs"),
                        key=lambda t: (-staleness[t], tasks.index(t)))
         manut = [t for t in manut if t not in trabalho]
@@ -391,6 +403,9 @@ class Circle:
                 gate = ctx.dl.worth_spending("idle_evolution", contexto)
                 if not gate.allowed:
                     last[pick] = s.tick           # recusado agora: volta para o fim da fila
+                    pg = s.get("progresso") or {"sem": 0}
+                    pg.setdefault("recusas", {})[pick] = int(pg["recusas"].get(pick, 0)) + 1
+                    s.set("progresso", pg)
                     continue
             if pick not in ("corrigir_codigo", "evoluir_projeto"):
                 self._stage("idle", {"detalhe": TAREFAS.get(pick, pick)})
@@ -429,9 +444,44 @@ class Circle:
             return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
         return False
 
-    def trabalho_pendente(self) -> bool:
-        """Há trabalho real esperando? Então o próximo giro vem logo, em vez do descanso longo."""
+    # ------------------------------------------------------------ neurônio de progresso
+    def _progresso(self) -> tuple:
+        """Fotografia do que conta como avanço: roteiro, estudos, chamadas de LLM, PRs, merges, código rodando."""
+        s = self.store
+        r = s.one("SELECT COUNT(*) n, MAX(updated_at) u, SUM(estudo IS NOT NULL) e FROM roadmap")
+        return (r["n"], r["u"], r["e"], s.one("SELECT COUNT(*) n FROM llm_calls")["n"], s.one("SELECT COUNT(*) n FROM merges")["n"],
+                s.one("SELECT COUNT(*) n FROM prs")["n"], (s.get("corpo") or {}).get("sha"),
+                s.one("SELECT COUNT(*) n FROM deliverables")["n"])
+
+    def _vigiar_progresso(self, havia_trabalho: bool, antes: tuple, r) -> None:
+        """Girar sem avançar é um erro de estrutura, não "tudo bem". Havia trabalho e nada mudou por ESTAGNADO giros:
+        vira lição (com a causa: as recusas de gasto), a confiança do painel cai e o ritmo vai para o descanso longo."""
+        s = self.store
+        st = s.get("progresso") or {"sem": 0}
+        if not havia_trabalho or self._progresso() != antes:
+            if st.get("sem", 0) >= ESTAGNADO:
+                from .licoes import registrar as monitorar
+                monitorar(self.ctx, "loop:progresso", True, sujeito=f"voltou a avançar depois de {st['sem']} giros")
+            s.set("progresso", {"sem": 0, "ultimo_avanco_em": time.time(), "recusas": {}})
+            return
+        st["sem"] = int(st.get("sem", 0)) + 1
+        st.setdefault("desde", time.time())
+        if st["sem"] in (ESTAGNADO, ESTAGNADO * 5, ESTAGNADO * 25):
+            rec = st.get("recusas") or {}
+            causa = ", ".join(f"{t} recusado {n}x" for t, n in sorted(rec.items(), key=lambda kv: -kv[1])) or "sem recusa registrada"
+            from .licoes import registrar as monitorar
+            monitorar(self.ctx, "loop:progresso", False, sujeito=f"{st['sem']} giros sem avançar",
+                      motivo=f"havia trabalho pendente e nada avançou em {st['sem']} giros; causa provável: {causa}",
+                      assinatura="loop:estagnado", classe="estrutural")
+            self.ctx.reply(f"Estagnação: há trabalho esperando e nada avançou em {st['sem']} giros ({causa}).", "saude")
+        s.set("progresso", st)
+
+    def trabalho_pendente(self, ignorar_estagnacao: bool = False) -> bool:
+        """Há trabalho real esperando? Então o próximo giro vem logo, em vez do descanso longo.
+        Estagnado (girando sem avançar), o ritmo rápido não ajuda: vai para o descanso longo."""
         if self.controls()["pausado"]:
+            return False
+        if not ignorar_estagnacao and int((self.store.get("progresso") or {}).get("sem", 0)) >= 3:
             return False
         try:
             return any(self._tem_trabalho(t) for t in TRABALHO)
@@ -477,9 +527,9 @@ class Circle:
         elif pick == "revisar_prs":
             self.gate.run()
         elif pick == "planejar_roteiro":
-            self.planejador.run()
+            self.planejador.run(autorizado=True)       # o gasto já foi decidido acima: um porteiro só
         elif pick == "estudar_pedido":
-            self.estudo.run()
+            self.estudo.run(autorizado=True)
         elif pick == "atualizar_corpo":
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
@@ -487,7 +537,7 @@ class Circle:
             item = self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
-            res = self.self_dev.run_once()
+            res = self.self_dev.run_once(autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
                 # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")

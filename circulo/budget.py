@@ -10,6 +10,19 @@ from .state import Store
 TZ = ZoneInfo("America/Sao_Paulo")
 
 
+def tirar_assinatura_do_orcamento(store: Store) -> int:
+    """Correção única (1.11.0): até aqui os tokens do Claude Code (assinatura) eram somados ao orçamento da API e
+    o porteiro do gasto recusava tudo achando que o dia estava no fim. Devolve ao orçamento o que foi do Developer."""
+    if store.get("orcamento_sem_assinatura"):
+        return 0
+    total = 0
+    for r in store.q("SELECT tokens, created_at FROM llm_calls WHERE papel='developer' AND tokens > 0"):
+        dia = datetime.fromtimestamp(r["created_at"], TZ).date().isoformat()
+        total += store.run("UPDATE budget SET tokens=MAX(0, tokens-?) WHERE day=?", (int(r["tokens"]), dia)) and int(r["tokens"])
+    store.set("orcamento_sem_assinatura", {"devolvidos": total})
+    return total
+
+
 class BudgetExhausted(Exception):
     pass
 

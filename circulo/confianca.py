@@ -106,6 +106,16 @@ def confianca(store: Store, now: float | None = None) -> dict:
                      f"{v['n'] - (v['f'] or 0)} de {v['n']} verificações passaram",
                      f"{barrou['n']} portão(ões) aprendido(s) com erros; barraram {barrou['b']} vez(es) antes de chegar a um PR",
                      v["em"]))
+    pg = s.get("progresso") or {}
+    sem = int(pg.get("sem", 0))
+    rec = pg.get("recusas") or {}
+    causa = ", ".join(f"{t} recusado {n}x pelo porteiro do gasto" for t, n in sorted(rec.items(), key=lambda kv: -kv[1])[:3])
+    from .loop import ESTAGNADO
+    ck.append(_c("progresso", "seguranca", "Avançando?", "ok" if sem < 3 else "atencao" if sem < ESTAGNADO else "falha",
+                 "sim" if sem < 3 else f"{sem} giros sem avançar",
+                 (f"último avanço {_hora(pg.get('ultimo_avanco_em'))}" if sem < 3 else
+                  f"há trabalho esperando e nada avança; {causa or 'causa ainda não identificada'}"),
+                 pg.get("ultimo_avanco_em") or now))
     ult = s.q("SELECT tick, body, created_at FROM metrics ORDER BY tick DESC LIMIT 50")
     erros = [(r["tick"], e) for r in ult for e in json.loads(r["body"]).get("errors", [])]
     ck.append(_c("erros", "seguranca", "Erros nos últimos giros", "ok" if not erros else "atencao", f"{len(erros)} em {len(ult)} giros",

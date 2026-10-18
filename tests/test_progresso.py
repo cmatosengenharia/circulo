@@ -1,0 +1,78 @@
+"""Girar sem avançar é erro de estrutura: o loop percebe a estagnação, diz a causa e para de girar à toa."""
+import time
+
+from circulo.loop import ESTAGNADO
+
+
+def estagnar(circle, recusas=None):
+    """Simula trabalho pendente que nunca avança (o porteiro do gasto recusa tudo)."""
+    circle.trabalho_pendente = lambda ignorar_estagnacao=False: (ignorar_estagnacao or
+                                                                int((circle.store.get("progresso") or {}).get("sem", 0)) < 3)
+    circle._tem_trabalho = lambda t: False
+    for _ in range(ESTAGNADO):
+        circle.tick()
+        if recusas:
+            pg = circle.store.get("progresso")
+            pg["recusas"] = recusas
+            circle.store.set("progresso", pg)
+
+
+def test_estagnacao_vira_licao_com_a_causa_e_derruba_a_confianca(circle):
+    from circulo.confianca import confianca
+    estagnar(circle, recusas={"estudar_pedido": 27})
+    lic = circle.store.one("SELECT classe, item_id FROM licoes WHERE assinatura='loop:estagnado'")
+    assert lic["classe"] == "estrutural" and lic["item_id"]
+    assert circle.store.one("SELECT 1 FROM alerts WHERE message LIKE 'Estagnação%estudar_pedido recusado 27x%'")
+    circle.store.set("batimento", {"em": time.time(), "pid": 1})
+    c = {x["id"]: x for x in confianca(circle.store)["checks"]}["progresso"]
+    assert c["estado"] == "falha" and "estudar_pedido" in c["porque"]
+
+
+def test_estagnado_vai_para_o_descanso_longo(circle):
+    circle.store.set("progresso", {"sem": 3})
+    assert not circle.trabalho_pendente()
+    assert isinstance(circle.trabalho_pendente(ignorar_estagnacao=True), bool)
+
+
+def test_avanco_zera_a_contagem(circle):
+    circle.store.set("progresso", {"sem": ESTAGNADO + 2, "recusas": {"x": 3}})
+    antes = circle._progresso()
+    circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                   "VALUES('novo','d','loop','pendente','',999,0,1)")
+    circle._vigiar_progresso(True, antes, None)
+    assert circle.store.get("progresso")["sem"] == 0
+    assert circle.store.one("SELECT ok FROM verificacoes WHERE ponto='loop:progresso' ORDER BY id DESC LIMIT 1")["ok"] == 1
+
+
+def test_recusa_espera_cada_vez_mais(circle):
+    """Recusado pelo porteiro do gasto, a mesma tarefa não é tentada de novo no giro seguinte."""
+    circle.store.set("progresso", {"sem": 0, "recusas": {"estudar_pedido": 3}})
+    circle.store.set("idle_last", {"estudar_pedido": circle.store.tick})
+    circle.self_dev = object()
+    circle.estudo.precisa = lambda: True
+    escolhidas = {circle.tick().idle_task for _ in range(5)}
+    assert "estudar_pedido" not in escolhidas                    # 2^3 = 8 giros de espera
+
+
+def test_um_porteiro_so(circle):
+    """O loop decide o gasto uma vez; o estudo chamado por ele não pergunta de novo com outro limiar."""
+    from circulo.estudo import Estudo
+    perguntas = []
+    original = circle.ctx.dl.worth_spending
+    circle.ctx.dl.worth_spending = lambda a, c: perguntas.append(a) or original(a, c)
+    Estudo(circle.ctx).run(autorizado=True)
+    assert "estudo_pedido" not in perguntas
+
+
+def test_correcao_unica_do_orcamento(circle):
+    from datetime import datetime
+
+    from circulo.budget import TZ, tirar_assinatura_do_orcamento
+    dia = datetime.now(TZ).date().isoformat()
+    circle.store.set("orcamento_sem_assinatura", None)
+    circle.store.x("INSERT OR IGNORE INTO budget(day) VALUES(?)", (dia,))
+    circle.store.x("UPDATE budget SET tokens=150000 WHERE day=?", (dia,))
+    circle.store.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,created_at) VALUES(1,'developer','x','fixo',100000,1,?)", (time.time(),))
+    assert tirar_assinatura_do_orcamento(circle.store) == 100000
+    assert circle.store.one("SELECT tokens FROM budget WHERE day=?", (dia,))["tokens"] == 50000
+    assert tirar_assinatura_do_orcamento(circle.store) == 0        # só uma vez

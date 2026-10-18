@@ -76,7 +76,9 @@ def test_developer_corrige_erro_recorrente_e_abre_pr(circle, repo):
     assert circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"] == "PR #42"
     assert dev.busy() and dev.run_once().status == "ocupado"                              # um PR por vez
     assert not (repo.parent / f".circulo-wt-{item['id']}").exists()                        # worktree limpo
-    assert circle.ctx.budget.snapshot()["chamadas_llm"] >= 1
+    # Claude Code roda na assinatura: contado à parte, fora do orçamento de tokens da API (1.11.0)
+    assert circle.ctx.budget.snapshot()["chamadas_llm"] == 0
+    assert sum(circle.store.get("assinatura_tokens").values()) == 1234
 
 
 def test_testes_locais_reprovados_nao_enviam_nada(circle, repo):

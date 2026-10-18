@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.11.0 — 2026-10-18
+
+Incidente: das 11:20 às 12:13 o loop girou a cada 15 s sem avançar. Os dois pedidos do Cássio (#33 e #34) ficaram sem
+estudo, e o item #31, já estudado, ficou sem Developer. O painel dizia "Pode confiar". Três causas, todas de estrutura:
+
+1. **Orçamento contado errado**: os tokens do Claude Code (Developer, que roda na assinatura da sua conta e não nos
+   créditos da API) entravam no orçamento diário da API, cerca de 100 mil de 145 mil. Com "72% gasto", o porteiro do
+   gasto recusava tudo o que custava.
+2. **Dois porteiros com limiares diferentes**: o loop aprovava a tarefa (0,67 ≥ 0,4), e o estudo ou o Developer
+   perguntavam de novo com outro limiar e recusavam (0,33 < 0,5). A tarefa contava como "feita", e no giro seguinte
+   tudo se repetia. O aprendiz do Jev (PR #3) ainda imitava essas recusas.
+3. **Ninguém vigiava o progresso**: girar sem avançar não era tratado como erro.
+
+Correções:
+- Developer fora do orçamento da API. Os tokens da assinatura ficam contados à parte (`assinatura_tokens`); o limite da
+  assinatura já tem tratamento próprio (espera o reset). Correção única: o que foi do Developer volta ao orçamento.
+- **Um porteiro só**: chamados pelo loop, estudo, planejador e Developer não perguntam o gasto de novo. Custo
+  estimado do estudo corrigido para ~30 mil tokens, o valor real com a busca.
+- **Neurônio de progresso** (`loop:progresso`): havendo trabalho e nada avançando (roteiro, estudos, LLM, PRs,
+  merges, código, entregas) por 10 giros, a estagnação vira lição de estrutura com a causa ("estudar_pedido recusado
+  27x"), aparece um alerta, o painel mostra **"Avançando? Não"** como falha e o ritmo vai para o descanso longo.
+- **Recusa com espera crescente**: tarefa recusada pelo porteiro espera 1, 2, 4… até 64 giros antes de tentar de novo.
+
 ## 1.10.0 — 2026-10-18
 
 Central de confiança: o painel responde primeiro "posso confiar no loop agora?", em tempo real e em tudo.

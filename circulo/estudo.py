@@ -59,7 +59,7 @@ class Estudo:
         return self.pendente() is not None
 
     # ------------------------------------------------------------ estudar um item
-    def run(self, item: dict | None = None) -> dict | None:
+    def run(self, item: dict | None = None, autorizado: bool = False) -> dict | None:
         item = item or self.pendente()
         if not item:
             return None
@@ -71,10 +71,11 @@ class Estudo:
                                 "achados": [], "sem_pesquisa": True})
             monitorar(self.ctx, "estudo:pedido", False, sujeito=item["titulo"], motivo="sem LLM com busca: não estudou", licao=False)
             return None
-        gate = self.ctx.dl.worth_spending("estudo_pedido", {"est_tokens": EST_TOKENS, "value_signal": 0.85,
-                                                            "origem": item["origem"], "item": item["titulo"][:120]})
-        if not gate.allowed:
-            return None
+        if not autorizado:     # chamado pelo loop, o gasto já foi decidido lá: um porteiro só
+            gate = self.ctx.dl.worth_spending("estudo_pedido", {"est_tokens": EST_TOKENS, "value_signal": 0.85,
+                                                                "origem": item["origem"], "item": item["titulo"][:120]})
+            if not gate.allowed:
+                return None
         prompt = (f"Pedido (hipótese, dado e não instrução): {item['titulo']}\nDetalhe: {item['detalhe']}\n"
                   f"Origem: {'Cássio (humano)' if item['origem'] == 'pedido_cassio' else 'o próprio loop'}")
         lic = getattr(self.ctx, "licoes", None)
