@@ -50,7 +50,7 @@ def test_instalar_escreve_servico_com_caminhos_reais(casa):
     home, _ = casa
     dest, feitos = cfg.instalar(home / "dados", 8765, aplicar=False)
     txt = dest.read_text()
-    assert feitos == [] and sys.executable in txt and str((home / "dados").resolve()) in txt and "--painel" in txt
+    assert feitos == [] and cfg._comando()[0] in txt and str((home / "dados").resolve()) in txt and "--painel" in txt
     if platform.system() == "Darwin":
         assert "<key>KeepAlive</key><true/>" in txt
     else:
