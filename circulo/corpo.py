@@ -103,7 +103,9 @@ class Corpo:
             self._git(["reset", "-q"], check=False)
             patch = self.data / f"corpo-local-{int(time.time())}.patch"
             patch.write_text(diff + "\n", encoding="utf-8")
-        self._git(["checkout", "-q", "-B", "main", alvo])
+        # -f: arquivo não rastreado no caminho do código novo (ex.: cópia manual) já está guardado no patch acima
+        # (lição #1 da máquina do loop: sem -f, o checkout recusava e a troca nunca acontecia)
+        self._git(["checkout", "-q", "-f", "-B", "main", alvo])
         self._git(["reset", "-q", "--hard", alvo])   # (sem `git clean`: arquivo não rastreado nunca é apagado)
         self._set(estado="validando", sha=alvo, anterior=anterior, desde_tick=self.s.tick, giros_ok=0, erros=0,
                   patch=str(patch) if patch else None)

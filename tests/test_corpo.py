@@ -87,3 +87,16 @@ def test_erros_nos_primeiros_giros_voltam_para_o_codigo_anterior(circle, repos, 
 def test_em_testes_nunca_ha_corpo_de_verdade(circle):
     from circulo.corpo import build_corpo
     assert build_corpo(circle.ctx, circle.data_dir) is None and circle.corpo is None
+
+
+def test_arquivo_nao_rastreado_no_caminho_nao_trava_a_troca(circle, repos, tmp_path):
+    """lição #1 (máquina do loop): o código novo trazia um arquivo que já existia lá sem rastreio (cópia manual)
+    e o checkout recusava; a troca de corpo nunca acontecia."""
+    _, vivo, dev = repos
+    (dev / "novo.py").write_text("X = 1\n")
+    git(dev, "add", "novo.py")
+    novo = evoluir(dev)
+    (vivo / "novo.py").write_text("X = 0  # cópia manual\n")
+    r = Corpo(circle.ctx, vivo, tmp_path, validacao=OK).run()
+    assert r["status"] == "atualizado" and git(vivo, "rev-parse", "HEAD") == novo
+    assert (vivo / "novo.py").read_text() == "X = 1\n" and "cópia manual" in open(r["patch"]).read()

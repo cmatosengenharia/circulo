@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.9.1 — 2026-10-18
+
+Primeira lição real da máquina do loop (#1, estrutural), registrada sozinha minutos depois da 1.9.0. A troca de corpo
+falhava porque o código novo trazia arquivos que já existiam lá sem rastreio (cópias manuais) e o `git checkout`
+recusava. O ciclo funcionou: monitorou, registrou a lição, criou o portão, isolou a etapa e mandou o Developer corrigir.
+Só que a correção fica em `corpo.py`, que é constituição, e por isso coube ao humano.
+
+- Corpo: `checkout -f` depois de guardar o patch local. Teste de regressão "lição #1".
+- Developer: correção que exige mexer na constituição não fica sendo tentada a cada 10 giros. Vai para você
+  ("depende de você"), com aviso.
+- Erro em que o agente não acha o que mudar fica **em observação**, fora da fila. Vira feito quando o erro para de
+  acontecer, e a lição reabre o item se o erro voltar.
+
 ## 1.9.0 — 2026-10-18
 
 O loop passa a rodar o código que ele mesmo evoluiu. Antes, um PR mergeado pelo gate (ex.: #3, feito sozinho em

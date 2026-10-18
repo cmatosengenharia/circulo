@@ -59,7 +59,7 @@ def test_portao_nato_barra_constituicao_e_nada_e_enviado(circle, repo):  # noqa:
         (w / "circulo" / "merge_gate.py").write_text("# afrouxar o gate\n")
     gh = FakeGH()
     r = SelfDeveloper(circle.ctx, repo, Agente(mexe_na_constituicao, mexe_na_constituicao), gh, test_cmd=TEST_CMD).run_once()
-    assert r.status == "testes_falharam" and gh.prs == [] and "constituição" in r.detalhe
+    assert r.status == "fora_do_alcance" and gh.prs == [] and "constituição" in r.detalhe   # vai para você, sem retentar
 
 
 def test_licao_de_estrutura_cria_portao_e_o_pr_precisa_provar_a_licao(circle, repo):  # noqa: F811

@@ -756,7 +756,7 @@ function renderKpis(s) {
 }
 
 /* ---------- roteiro ---------- */
-const RCOR = {feito:"var(--ok)", parcial:"var(--jev)", em_andamento:"var(--llm)", pendente:"var(--idle)", contestado:"var(--bad)"};
+const RCOR = {feito:"var(--ok)", parcial:"var(--jev)", em_andamento:"var(--llm)", pendente:"var(--idle)", contestado:"var(--bad)", observacao:"var(--jev)"};
 function comLinks(txt, url) {
   const e = esc(txt);
   return url ? e.replace(/\b([0-9a-f]{7,10})\b/g, `<a href="${url}/commit/$1" target="_blank" rel="noopener">$1</a>`) : e;
@@ -775,6 +775,7 @@ function renderRoteiro(s) {
   $("#roadmap").innerHTML = `<div class="rt-prog" role="img" aria-label="${n("feito")} de ${itens.length} itens feitos">${["feito","parcial","em_andamento","pendente"].map(st => `<span style="width:${n(st) / tot * 100}%;background:${RCOR[st]}"></span>`).join("")}</div>
     <div class="rt-leg"><span><b>${n("feito")}</b> feitos</span><span><b>${n("parcial")}</b> parciais</span><span><b>${n("em_andamento")}</b> em andamento</span><span><b>${n("pendente")}</b> na fila</span>${itens.some(r => r.desativado) ? `<span><b>${itens.filter(r => r.desativado).length}</b> desativados por você</span>` : ""}</div>` +
     grupo("Em andamento", "sendo feito agora", ["em_andamento"]) + grupo("Na fila", "o Developer pega na ordem; os que dependem de você ficam de lado", ["pendente"]) +
+    grupo("Em observação", "o código parece corrigido; vira entregue quando o erro parar de acontecer", ["observacao"]) +
     grupo("Contestados pelo estudo", "a evidência contradiz o pedido; não serão executados a menos que você mande", ["contestado"]) +
     grupo("Parciais", "entregue em parte", ["parcial"]) +
     (off.length ? `<div class="rt-grupo">Desativados por você <small>o loop não mexe nestes · ${off.length}</small></div><ul class="rt">${off.map(card).join("")}</ul>` : "") +

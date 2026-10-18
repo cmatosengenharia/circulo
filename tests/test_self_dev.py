@@ -348,3 +348,25 @@ def test_pr_que_mudou_depois_da_reprovacao_nao_e_consertado_nem_fechado(circle, 
     circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": "0" * 40, "motivo": "checks falhando"}})
     r = dev.run_once()
     assert r.status == "aguardando_ci" and gh.closed == [] and dev.busy() and not dev.tem_trabalho()
+
+
+def test_erro_sem_mudanca_fica_em_observacao_e_sai_da_fila(circle, repo):
+    item = erro_recorrente(circle)
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(fix=False), FakeGH(), test_cmd=TEST_CMD)
+    assert dev.run_once().status == "sem_mudanca"
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "observacao"
+    assert dev.pick() is None or dev.pick()["id"] != item["id"]
+
+
+def test_correcao_que_exige_a_constituicao_vai_para_voce(circle, repo):
+    class MexeNoGate(FixAgent):
+        def run(self, task, workdir):
+            super().run(task, workdir)
+            (Path(workdir) / "circulo").mkdir(exist_ok=True)
+            (Path(workdir) / "circulo" / "corpo.py").write_text("# corrigir aqui\n")
+            return {"ok": True, "tokens": 1, "log": "ok"}
+    item = erro_recorrente(circle)
+    gh = FakeGH()
+    r = SelfDeveloper(circle.ctx, repo, MexeNoGate(), gh, test_cmd=TEST_CMD).run_once()
+    assert r.status == "fora_do_alcance" and gh.prs == []
+    assert "depende de você" in circle.store.one("SELECT evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"]

@@ -398,9 +398,20 @@ class SelfDeveloper:
                 self._set_item(item["id"], "pendente", "o agente terminou com erro; trabalho parcial descartado")
                 return DevResult(item["id"], "agente_falhou", str(out.get("log", ""))[-300:])
             if not _git(["status", "--porcelain"], wt):
-                self._set_item(item["id"], "pendente", "agente não produziu mudança")
+                if item["origem"] == "erro":
+                    # nada a mudar num erro: o código já pode estar corrigido. Fica em observação (fora da fila);
+                    # se o erro parar, vira feito sozinho; se voltar, a lição reabre o item.
+                    self._set_item(item["id"], "observacao", "em observação: o agente não achou o que mudar; o erro precisa parar de acontecer")
+                else:
+                    self._set_item(item["id"], "pendente", "agente não produziu mudança")
                 return DevResult(item["id"], "sem_mudanca", out.get("log", "")[-300:])
             ok, falha = self.portao_pr(wt, base, item["id"], item["titulo"])
+            if not ok and "constituição intacta:" in falha:
+                # a correção exige mexer na constituição: fora do alcance do loop. Não fica tentando: vai para você.
+                self._set_item(item["id"], "pendente", "depende de você: a correção exige mexer na constituição")
+                self.ctx.reply(f"Developer: “{item['titulo']}” só se corrige mexendo na constituição, que o loop não altera. "
+                               "Ficou para você no roteiro.", "fora_alcance")
+                return DevResult(item["id"], "fora_do_alcance", falha[-800:])
             if not ok:
                 self._set_item(item["id"], "pendente", "barrado nos portões antes do PR (lint, testes, constituição, tamanho, teste novo, portões aprendidos)")
                 self.ctx.reply(f"Developer: “{item['titulo']}” foi barrado nos portões antes do PR; nada foi enviado.", "saude")
