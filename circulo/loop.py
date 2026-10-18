@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, intencoes, parada
+from . import finance, intencoes, parada, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
@@ -252,6 +252,8 @@ class Circle:
             except Exception as exc:  # noqa: BLE001
                 r.errors.append(f"corpo: {exc!r}")
         self._record(r)
+        # traço tipado do giro (OTel GenAI) + painel de timeline/grafo; nunca levanta
+        telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
         self._stage("descanso")
         s.set("run_id", None)                    # erro fora do giro (ex.: teste da parada) não cai na execução que já fechou
         every = int(ctx.policy["loop"]["summary_every_ticks"])

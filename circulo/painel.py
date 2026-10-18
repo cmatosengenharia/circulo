@@ -254,6 +254,14 @@ def make_handler(db_path: str):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif u.path == "/telemetria":
+                pag = Path(db_path).parent / "telemetria" / "index.html"
+                body = pag.read_bytes() if pag.exists() else "<p>Sem traço ainda: o painel aparece depois do primeiro giro.</p>".encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
             elif u.path == "/api/estado":
                 self._json(estado(self._store(), projeto))
             elif u.path == "/api/projetos":
