@@ -218,6 +218,12 @@ def prometheus(store: Store, now: float | None = None) -> str:
         m("circulo_slo_alvo_ratio", "gauge", "Alvo do SLO.", [({"slo": x["id"]}, x["alvo"])])
         m("circulo_slo_orcamento_restante_ratio", "gauge", "Orçamento de erro restante do SLO (1 = intacto, < 0 = violado).",
           [({"slo": x["id"]}, x["orcamento_restante"])])
+    from .jev_lab import VARIANTES, placar
+    for qid in VARIANTES:
+        p = placar(store, qid)
+        if p["n"]:
+            m("circulo_jev_lab_confianca_ratio", "gauge", "Confiança média do Jev por forma de perguntar (laboratório).",
+              [({"pergunta": qid, "forma": "atual"}, p["conf_pt"]), ({"pergunta": qid, "forma": "variante_en"}, p["conf_en"])])
     b = store.get("batimento") or {}
     m("circulo_batimento_timestamp_segundos", "gauge", "Último batimento do processo do loop.", [({}, b.get("em"))])
     # cada métrica com HELP/TYPE uma vez só (o formato exige)

@@ -434,6 +434,19 @@ CREATE TABLE IF NOT EXISTS elos (
 CREATE INDEX IF NOT EXISTS elos_de ON elos(de);
 CREATE INDEX IF NOT EXISTS elos_para ON elos(para);
 
+-- laboratório do Jev: a mesma pergunta em duas formulações, na mesma chamada, para adotar a melhor com evidência
+CREATE TABLE IF NOT EXISTS jev_lab (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pergunta TEXT NOT NULL,
+  valor_pt TEXT,
+  conf_pt REAL,
+  valor_en TEXT,
+  conf_en REAL,
+  modelo TEXT,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jev_lab_p ON jev_lab(pergunta, id);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
