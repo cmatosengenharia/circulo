@@ -64,10 +64,10 @@ jobs:
           fetch-depth: 0
       - name: PR de agente não altera a constituição
         if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/')
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          changed=$(git diff --name-only "$BASE" HEAD -- circulo/merge_gate.py circulo/policy.py circulo/budget.py circulo/guardrails.py circulo/self_dev.py .github/)
+          # HEAD é o merge do PR na main atual; HEAD^1 é a main atual. Comparar com base.sha (a main de quando o PR
+          # abriu) acusava como "do agente" mudanças que entraram na main depois.
+          changed=$(git diff --name-only HEAD^1 HEAD -- circulo/merge_gate.py circulo/policy.py circulo/budget.py circulo/guardrails.py circulo/self_dev.py .github/)
           if [ -n "$changed" ]; then echo "::error::Constituição alterada por agente: $changed"; exit 1; fi
           echo "Constituição intacta."
       - name: Fora de PR de agente

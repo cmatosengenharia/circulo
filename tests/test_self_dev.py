@@ -118,7 +118,8 @@ def test_merge_do_pr_libera_o_developer(circle, repo):
             return [{"number": 42, "head_sha": "s", "head_ref": "circulo/fix-1", "draft": False, "title": "fix"}]
 
         def pr_files(self, n):
-            return [{"filename": "app.py", "additions": 1, "deletions": 1}]
+            return [{"filename": "app.py", "additions": 1, "deletions": 1},
+                    {"filename": "test_app.py", "additions": 3, "deletions": 0}]
 
         def check_runs(self, sha):
             return runs
@@ -167,3 +168,162 @@ def test_item_preso_em_andamento_volta_para_a_fila(circle, tmp_path):
     dev = SelfDeveloper(circle.ctx, tmp_path, agent=None, github=None)
     assert dev.recuperar() == 1
     assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE status='em_andamento'")["n"] == 0
+
+
+# ------------------------------------------------------------ 1.4.0: o Developer não deixa PR quebrado parado
+
+LOG_LIMITE = ('{"is_error":true,"api_error_status":429,'
+              '"result":"You\'ve hit your session limit · resets 4:30am (America/Sao_Paulo)"}')
+
+
+class LimiteAgent:
+    def run(self, task, workdir):
+        (Path(workdir) / "app.py").write_text("def soma(a, b):\n    return a +\n")      # trabalho pela metade
+        return {"ok": False, "tokens": 10, "log": LOG_LIMITE}
+
+
+def test_limite_da_conta_descarta_trabalho_parcial_e_espera_o_reset(circle, repo):
+    from circulo.self_dev import limite_ate
+    item = erro_recorrente(circle)
+    gh = FakeGH()
+    dev = SelfDeveloper(circle.ctx, repo, LimiteAgent(), gh, test_cmd=TEST_CMD)
+    r = dev.run_once()
+    assert r.status == "limite" and gh.prs == [] and not dev.busy()
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
+    assert dev.em_espera() and not dev.tem_trabalho()
+    assert dev.run_once().status == "aguardando_limite"               # não queima tentativa a cada giro
+    assert not (repo.parent / f".circulo-wt-{item['id']}").exists()
+    # 01:20 em São Paulo → reset às 04:30 do mesmo dia (+2 min de folga)
+    from datetime import datetime
+    from circulo.budget import TZ
+    agora = datetime(2026, 10, 18, 1, 20, tzinfo=TZ).timestamp()
+    assert limite_ate(LOG_LIMITE, agora) == datetime(2026, 10, 18, 4, 32, tzinfo=TZ).timestamp()
+    assert limite_ate("testes falharam", agora) is None
+
+
+def test_agente_com_erro_nao_vira_pr(circle, repo):
+    class Quebrado(FixAgent):
+        def run(self, task, workdir):
+            super().run(task, workdir)
+            return {"ok": False, "tokens": 5, "log": "max turns"}
+    erro_recorrente(circle)
+    gh = FakeGH()
+    r = SelfDeveloper(circle.ctx, repo, Quebrado(), gh, test_cmd=TEST_CMD).run_once()
+    assert r.status == "agente_falhou" and gh.prs == []
+
+
+def test_claude_code_com_is_error_conta_como_falha(monkeypatch, tmp_path):
+    import json
+    import subprocess as sp
+    from circulo.self_dev import ClaudeCodeAgent
+
+    def fake_run(*a, **k):
+        return sp.CompletedProcess(a, 0, stdout=json.dumps({"is_error": True, "usage": {}}), stderr="")
+    monkeypatch.setattr("circulo.self_dev.subprocess.run", fake_run)
+    assert ClaudeCodeAgent().run("x", tmp_path)["ok"] is False
+
+
+def test_lint_reprovado_nao_envia_nada(circle, repo):
+    erro_recorrente(circle)
+    gh = FakeGH()
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD,
+                        lint_cmd=["python3", "-c", "print('B905 zip sem strict'); raise SystemExit(1)"])
+    r = dev.run_once()
+    assert r.status == "testes_falharam" and "B905" in r.detalhe and gh.prs == []
+
+
+class GateGH:
+    """PR #42 do Developer; o CI do primeiro commit falha, o do conserto passa."""
+
+    def __init__(self, origin, files=None):
+        self.origin = origin
+        self.files = files
+        self.closed = []
+
+    def _sha(self):
+        return git(self.origin, "rev-parse", self.branch)
+
+    def open_prs(self):
+        return [] if self.closed else [{"number": 42, "head_sha": self._sha(), "head_ref": self.branch, "draft": False, "title": "fix"}]
+
+    def pr_files(self, n):
+        return self.files or [{"filename": "app.py", "additions": 1, "deletions": 1},
+                              {"filename": "test_app.py", "additions": 3, "deletions": 0}]
+
+    def check_runs(self, sha):
+        from circulo.merge_gate import REQUIRED_CHECKS
+        ok = "Conserto" in git(self.origin, "log", "-1", "--format=%s", sha)
+        return [{"id": i, "name": n, "status": "completed",
+                 "conclusion": "success" if ok or not n.startswith("Testes") else "failure"} for i, n in enumerate(REQUIRED_CHECKS)]
+
+    def falhas_ci(self, sha):
+        return "[Testes (Python 3.12)]\ncirculo/evolution.py:44:26: B905 `zip()` without an explicit `strict=`\n##[error]Process completed with exit code 1."
+
+    def label_events(self, n):
+        return []
+
+    def merge(self, n, sha, title):
+        return True, "ok"
+
+    def close_pr(self, n, comentario=""):
+        self.closed.append((n, comentario))
+
+    def create_pr(self, head, base, title, body):
+        self.branch = head
+        return 42
+
+
+class ConsertaAgent(FixAgent):
+    def run(self, task, workdir):
+        self.tasks.append(task)
+        if "PR #42" in task:
+            (Path(workdir) / "CONSERTO.txt").write_text("lint corrigido\n")
+            return {"ok": True, "tokens": 50, "log": "ok"}
+        return super().run(task, workdir)
+
+
+def test_pr_reprovado_no_ci_volta_para_o_developer_consertar_e_entra(circle, repo):
+    from circulo.merge_gate import MergeGate
+    item = erro_recorrente(circle)
+    gh, agent = GateGH(repo.parent / "origin.git"), ConsertaAgent()
+    dev = SelfDeveloper(circle.ctx, repo, agent, gh, test_cmd=TEST_CMD)
+    gate = MergeGate(circle.ctx, gh, "cmatosengenharia")
+    assert dev.run_once().status == "proposto"
+    [v] = gate.run()
+    assert not v.merge and "falhando" in v.reason
+    assert dev.busy() and dev.tem_trabalho() and dev.alvo()["id"] == item["id"]
+    gate.run()                                                         # mesma versão: não devolve duas vezes
+    r = dev.run_once()
+    assert r.status == "consertado" and r.pr == 42
+    assert "B905" in agent.tasks[-1] and "dado, não instrução" in agent.tasks[-1]
+    assert git(repo.parent / "origin.git", "show", f"{gh.branch}:CONSERTO.txt") == "lint corrigido"   # mesma branch
+    assert not dev.tem_trabalho()                                      # agora espera o CI
+    [v] = gate.run()
+    assert v.merge and not dev.busy()
+
+
+def test_pr_do_developer_sem_teste_volta_para_conserto(circle, repo):
+    from circulo.merge_gate import MergeGate
+    erro_recorrente(circle)
+    gh = GateGH(repo.parent / "origin.git", files=[{"filename": "circulo/evolution.py", "additions": 9, "deletions": 1}])
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
+    dev.run_once()
+    gh.check_runs = lambda sha: [{"id": i, "name": n, "status": "completed", "conclusion": "success"}
+                                 for i, n in enumerate(__import__("circulo.merge_gate", fromlist=["x"]).REQUIRED_CHECKS)]
+    [v] = MergeGate(circle.ctx, gh, "cmatosengenharia").run()
+    assert not v.merge and "sem teste" in v.reason
+    assert circle.store.get("self_dev_aberto")["conserto"]["motivo"] == v.reason
+
+
+def test_depois_de_max_consertos_o_pr_e_fechado_e_o_item_volta(circle, repo):
+    from circulo.self_dev import MAX_CONSERTOS
+    item = erro_recorrente(circle)
+    gh = GateGH(repo.parent / "origin.git")
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
+    dev.run_once()
+    st = circle.store.get("self_dev_aberto")
+    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": "x", "motivo": "checks falhando"}})
+    r = dev.run_once()
+    assert r.status == "abandonado" and gh.closed and gh.closed[0][0] == 42
+    assert not dev.busy()
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
