@@ -32,15 +32,16 @@ from .policy import PolicyStore
 from .state import Store
 
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
-TRABALHO = ("evoluir_projeto", "corrigir_codigo", "revisar_prs")
+TRABALHO = ("evoluir_projeto", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
 ESPACO = {"corrigir_codigo": 10, "revisar_prs": 2}
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
-VALOR = {"corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
+VALOR = {"planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
            "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
            "revisar_prs": "Revisando PRs abertos no gate", "evoluir_harness": "Testando prompts por A/B", "conectar_missoes": "Ligando missões que se complementam",
-           "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código"}
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 40000}
+           "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código",
+           "planejar_roteiro": "Planejando o próximo item do roteiro a partir da evidência"}
+IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 40000, "planejar_roteiro": 3000}
 
 
 @dataclass
@@ -87,6 +88,8 @@ class Circle:
         if self.self_dev is not None:
             self.self_dev.recuperar()
             self.self_dev.concluir_mergeados()
+        from .planejador import Planejador
+        self.planejador = Planejador(self.ctx, self.self_dev)
         self.ctx.policies.before_change = lambda: guardrails.snapshot(self.ctx.store, self.data_dir, "mudanca")
         self.ctx.store.set("motor_pronto", self.engine.ready)
         self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
@@ -324,6 +327,8 @@ class Circle:
             tasks.append("evoluir_harness")
         if self.self_dev is not None and self.self_dev.tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
+        if self.planejador.precisa() and "planejar_roteiro" not in tasks:
+            tasks.append("planejar_roteiro")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
         if self.controls()["modo_seguro"]:
@@ -386,6 +391,8 @@ class Circle:
             return bool(self.engine.ready and self.engine.candidates())
         if t == "corrigir_codigo":
             return self.self_dev is not None and self.self_dev.tem_trabalho()
+        if t == "planejar_roteiro":
+            return self.planejador.precisa()
         if t == "revisar_prs":
             return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
         return False
@@ -437,6 +444,8 @@ class Circle:
             self.developer.idle()
         elif pick == "revisar_prs":
             self.gate.run()
+        elif pick == "planejar_roteiro":
+            self.planejador.run()
         elif pick == "corrigir_codigo":
             item = self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"),

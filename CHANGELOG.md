@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.5.0 — 2026-10-18
+
+O loop nunca fica sem o que evoluir. Com o PR #2 mergeado, o roteiro ficou sem nada que o Developer pudesse pegar, o
+ritmo adaptativo passou ao descanso longo (300 s entre giros) e o giro só fazia manutenção.
+
+- Planejador do roteiro (`planejador.py`): com o roteiro vazio para o Developer e nenhum PR aberto, o loop junta a
+  própria evidência e propõe UM item pequeno e mensurável para o próprio código. A evidência inclui as decisões em que o
+  Jev ficou abaixo de `jev_incerto` por pergunta, as chamadas de LLM e falhas dos últimos 7 dias, os incidentes
+  abertos, as avaliações recentes do gate, o roteiro e a saúde. O item entra com origem "loop" ("do loop" no painel), e
+  o Developer pega como qualquer outro: worktree, Claude Code, lint e testes, PR, CI e gate.
+- O Jev decide o gasto (`worth_spending`) e o modelo (`pick_model`); a chamada fica em `llm_calls` com o papel
+  "planejador". Limites: uma tentativa a cada 30 min, no máximo 6 itens por dia, título repetido descartado,
+  constituição fora do alcance. No modo seguro, não planeja.
+- Ordem do Developer: erro recorrente, depois seu pedido, depois item planejado pelo loop.
+
 ## 1.4.3 — 2026-10-18
 
 - Item do roteiro cujo PR do Developer entrou na main vira "feito" sozinho, com a evidência "PR #n mergeado". Isso vale
