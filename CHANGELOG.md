@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.3 — 2026-10-18
+
+- Item do roteiro cujo PR do Developer entrou na main vira "feito" sozinho, com a evidência "PR #n mergeado". Isso vale
+  no merge e também ao religar, para PRs que já tinham entrado (o item #26 estava "em andamento" com o PR #1 mergeado).
+
 ## 1.4.2 — 2026-10-18
 
 - Conserto só vale para a versão do PR que foi reprovada: se a branch mudou depois (commit novo, main atualizada no PR),

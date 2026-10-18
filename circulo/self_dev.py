@@ -85,6 +85,14 @@ def limite_ate(log: str, agora: float) -> float | None:
     return alvo.timestamp() + 120     # 2 min de folga depois do reset
 
 
+def concluir_mergeados(store) -> int:
+    n = 0
+    for r in store.q("SELECT number FROM prs WHERE status='mergeado'"):
+        n += store.run("UPDATE roadmap SET status='feito', evidencia=?, updated_at=? WHERE status='em_andamento' AND evidencia=?",
+                       (f"PR #{r['number']} mergeado", time.time(), f"PR #{r['number']}"))
+    return n
+
+
 def garantir_ruff() -> bool:
     """O lint local precisa ser o mesmo do CI. Sem o ruff instalado, tenta instalar uma vez (pip, sem perguntar)."""
     import importlib.util
@@ -200,6 +208,10 @@ class SelfDeveloper:
         return self.s.run("UPDATE roadmap SET status='pendente', evidencia='retomado: a execução anterior foi interrompida', "
                           "updated_at=? WHERE status='em_andamento' AND evidencia LIKE 'branch %' AND id IS NOT ?",
                           (time.time(), aberto))
+
+    def concluir_mergeados(self) -> int:
+        """Item do roteiro cujo PR já entrou na main vira "feito" (o merge é a evidência)."""
+        return concluir_mergeados(self.s)
 
     def busy(self) -> bool:
         st = self.s.get("self_dev_aberto")

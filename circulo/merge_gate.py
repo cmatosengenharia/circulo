@@ -199,6 +199,8 @@ class MergeGate:
             dev = s.get("self_dev_aberto") or {}
             if dev.get("pr") == v.number:     # PR do Developer entrou: libera o próximo
                 s.set("self_dev_aberto", {**dev, "fechado": True, "merged": True})
+            from .self_dev import concluir_mergeados
+            concluir_mergeados(s)              # o item do roteiro desse PR vira "feito"
         elif v.details.get("fora_do_alcance"):
             self.ctx.reply(f"PR #{v.number} recusado: {v.reason}. A missão segue por outro caminho.", "fora_alcance")
             s.x("UPDATE prs SET status='fechado', updated_at=? WHERE number=?", (time.time(), v.number))

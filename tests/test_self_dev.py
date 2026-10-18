@@ -300,6 +300,7 @@ def test_pr_reprovado_no_ci_volta_para_o_developer_consertar_e_entra(circle, rep
     assert not dev.tem_trabalho()                                      # agora espera o CI
     [v] = gate.run()
     assert v.merge and not dev.busy()
+    assert circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"] == "PR #42 mergeado"
 
 
 def test_pr_do_developer_sem_teste_volta_para_conserto(circle, repo):
