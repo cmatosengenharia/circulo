@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 — 2026-10-17
+
+- Serviço 24/7 roda dentro da pasta de dados e usa o executável `circulo` do ambiente. Antes, no macOS, o clone `~/Projects/circulo` escondia o pacote instalado e o loop caía ao subir.
+
 ## 1.0.1 — 2026-10-17
 
 - O loop percebe quando o arquivo de configuração muda (você salvou as chaves) e reinicia sozinho já com elas; o serviço 24/7 o sobe de novo.

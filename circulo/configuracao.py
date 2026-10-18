@@ -164,20 +164,27 @@ def _unit_path() -> Path:
     return Path.home() / ".config" / "systemd" / "user" / "circulo.service"
 
 
+def _comando() -> list[str]:
+    """O executável `circulo` do próprio ambiente. Não usa `python -m`: ele põe a pasta atual no sys.path,
+    e uma pasta `circulo/` ao lado (o clone do repo) esconderia o pacote instalado."""
+    exe = Path(sys.executable).parent / "circulo"
+    return [str(exe)] if exe.exists() else [sys.executable, "-m", "circulo"]
+
+
 def servico_instalado() -> bool:
     return _plist_path().exists() if platform.system() == "Darwin" else _unit_path().exists()
 
 
 def plist(data_dir: Path, porta: int) -> str:
     data_dir = Path(data_dir).resolve()
-    args = [sys.executable, "-m", "circulo", "--data", str(data_dir), "run", "--painel", "--porta", str(porta)]
+    args = [*_comando(), "--data", str(data_dir), "run", "--painel", "--porta", str(porta)]
     arr = "\n".join(f"    <string>{a}</string>" for a in args)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key><string>{LABEL}</string>
-  <key>WorkingDirectory</key><string>{data_dir.parent}</string>
+  <key>WorkingDirectory</key><string>{data_dir}</string>
   <key>ProgramArguments</key>
   <array>
 {arr}
@@ -201,10 +208,10 @@ Description=Circulo autoevolutivo Jev First
 After=network-online.target
 
 [Service]
-WorkingDirectory={data_dir.parent}
 Environment=CIRCULO_ENV={ENV_FILE}
 Environment=PATH={os.environ.get("PATH", "/usr/bin:/bin")}
-ExecStart={sys.executable} -m circulo --data {data_dir} run --painel --porta {porta}
+ExecStart={" ".join(_comando())} --data {data_dir} run --painel --porta {porta}
+WorkingDirectory={data_dir}
 Restart=always
 RestartSec=10
 

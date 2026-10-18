@@ -86,3 +86,16 @@ def test_loop_reinicia_sozinho_quando_a_configuracao_muda(circle, casa, monkeypa
 
     circle.run_forever(max_ticks=50, sleep=sleep)
     assert circle.store.tick < 50 and circle.store.get("ultimo_reinicio")["motivo"] == "configuração alterada"
+
+
+def test_servico_roda_na_pasta_de_dados_e_nao_e_escondido_pelo_clone(tmp_path):
+    """Regressão: com WorkingDirectory=~/Projects e `python -m`, a pasta ~/Projects/circulo (o clone)
+    escondia o pacote instalado e o loop caía ao subir."""
+    from circulo import configuracao as cfg
+    dados = tmp_path / "circulo-dados"
+    p = cfg.plist(dados, 8765)
+    assert f"<key>WorkingDirectory</key><string>{dados.resolve()}</string>" in p
+    u = cfg.unit(dados, 8765)
+    assert f"WorkingDirectory={dados.resolve()}" in u
+    cmd = cfg._comando()
+    assert cmd[0].endswith("circulo") or cmd[1:3] == ["-m", "circulo"]
