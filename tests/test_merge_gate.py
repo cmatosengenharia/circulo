@@ -176,3 +176,21 @@ def test_sem_permissao_checks_le_os_jobs_pelo_actions(monkeypatch):
 
     monkeypatch.setattr(gh, "_req", req)
     assert gh.check_runs("abc1234") == [{"id": 1, "name": "Testes (Python 3.12)", "status": "completed", "conclusion": "success"}]
+
+
+def test_pr_atras_da_main_e_atualizado_antes_do_merge(circle):
+    gh = FakeGH([pr()])
+    atualizados = []
+    gh.atras_da_main = lambda sha: 2
+    gh.update_branch = lambda n: atualizados.append(n)
+    [v] = gate(circle, gh).run()
+    assert not v.merge and "atrás da main" in v.reason and atualizados == [1] and gh.merged == []
+
+
+def test_main_vermelha_vira_licao_de_estrutura(circle):
+    gh = FakeGH([])
+    gh.main_ci = lambda: ("abc1234def", "failure")
+    gate(circle, gh).run()
+    gate(circle, gh).run()                                     # o mesmo sha não registra duas vezes
+    lic = circle.store.one("SELECT classe, ocorrencias, item_id FROM licoes WHERE assinatura='gate:main_vermelha'")
+    assert lic["classe"] == "estrutural" and lic["ocorrencias"] == 1 and lic["item_id"]

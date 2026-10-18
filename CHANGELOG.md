@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.3 — 2026-10-18
+
+O gate mergeou o PR #4 com CI verde, mas o CI tinha rodado sobre a main antiga, antes da 1.9.1, e a main ficou
+vermelha. Correções:
+
+- **PR atrás da main não entra**: o gate traz a main para a branch (update-branch) e espera o CI de novo, agora sobre a
+  main atual. Se der conflito, o Developer resolve (1.9.2).
+- **Neurônio `gate:main`**: CI da main vermelho vira lição de estrutura na hora (`gate:main_vermelha`), com item no
+  topo da fila.
+- As duas correções da lição #1 convivem: a troca direta (1.9.1) e o caminho livre que o Developer escreveu sozinho
+  (PR #4, `corpo_caminho.py`). O teste do PR #4 foi ajustado para isso.
+
 ## 1.9.2 — 2026-10-18
 
 Dois jeitos de o Developer ficar parado para sempre esperando um PR, achados enquanto ele resolvia a lição #1 sozinho

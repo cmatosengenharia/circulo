@@ -95,15 +95,12 @@ def test_licao_1_arquivo_nao_rastreado_que_a_main_traz_nao_trava_a_troca(circle,
     novo = evoluir(dev)
     (vivo / "igual.py").write_text("X = 1\n")                         # cópia manual, idêntica à main
     (vivo / "diferente.py").write_text("Y = 'local'\n")               # cópia manual que divergiu
-    with pytest.raises(RuntimeError):                                  # o erro do incidente, sem o caminho livre
-        Corpo(circle.ctx, vivo, tmp_path, validacao=OK).run()
-    assert git(vivo, "rev-parse", "HEAD") != novo                      # o checkout abortado não mudou nada
+    # duas correções da mesma lição convivem: o corpo troca direto (checkout -f depois de guardar o patch, 1.9.1)
+    # e, se a troca ainda esbarrar, o caminho livre do Developer (PR #4) libera e tenta de novo
     r = atualizar_corpo(Corpo(circle.ctx, vivo, tmp_path, validacao=OK))
     assert r["status"] == "atualizado" and git(vivo, "rev-parse", "HEAD") == novo
     assert (vivo / "diferente.py").read_text() == "Y = 2\n" and (vivo / "igual.py").read_text() == "X = 1\n"
-    assert r["liberado"]["removidos"] == ["igual.py"] and r["liberado"]["guardados"] == ["diferente.py"]
-    guardado = tmp_path / r["liberado"]["pasta"] / "diferente.py"
-    assert guardado.read_text() == "Y = 'local'\n"                     # nada diferente se perde
+    assert "Y = 'local'" in open(r["patch"]).read()                    # nada diferente se perde
 
 
 def test_licao_1_sem_colisao_o_erro_continua_visivel(circle, repos, tmp_path, monkeypatch):

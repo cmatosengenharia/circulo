@@ -131,6 +131,21 @@ class MergeGate:
             return Verdict(n, sha, False, f"fora do alcance: PR de agente altera a constituição ({', '.join(const)})",
                            {"constituicao": const, "fora_do_alcance": True})
 
+        atras = getattr(self.gh, "atras_da_main", None)
+        if atras is not None:
+            try:
+                n_atras = atras(sha)
+            except Exception:  # noqa: BLE001
+                n_atras = 0
+            if n_atras:
+                # o CI do PR precisa ter rodado sobre a main ATUAL (lição do PR #4: CI verde sobre main antiga,
+                # merge e main vermelha). Traz a main para a branch; o CI roda de novo.
+                try:
+                    self.gh.update_branch(n)
+                    return Verdict(n, sha, False, f"branch {n_atras} commit(s) atrás da main: atualizada, o CI roda de novo")
+                except Exception:  # noqa: BLE001 — conflito: o Developer resolve
+                    return Verdict(n, sha, False, "conflito com a main: o Developer precisa trazer a main para a branch",
+                                   {"conserto": True, "conflito": True})
         estado = getattr(self.gh, "pr_state", None)
         if estado is not None and pr.get("head_ref", "").startswith(DEVELOPER_BRANCH_PREFIX):
             try:
@@ -167,6 +182,7 @@ class MergeGate:
         out = []
         abertos = self.gh.open_prs()
         self._pr_do_developer_sumiu({p["number"] for p in abertos})
+        self._vigiar_main()
         for pr in abertos:
             v = self.evaluate(pr)
             if v.merge:
@@ -176,6 +192,24 @@ class MergeGate:
             self._log(v)
             out.append(v)
         return out
+
+    def _vigiar_main(self) -> None:
+        """Neurônio `gate:main`: a main vermelha é um erro de estrutura (algo entrou quebrado). Vira lição na hora."""
+        ci = getattr(self.gh, "main_ci", None)
+        if ci is None:
+            return
+        try:
+            sha, conclusao = ci()
+        except Exception:  # noqa: BLE001
+            return
+        s = self.ctx.store
+        if not sha or conclusao not in ("success", "failure") or s.get("main_ci_visto") == sha:
+            return
+        s.set("main_ci_visto", sha)
+        from .licoes import registrar as monitorar
+        monitorar(self.ctx, "gate:main", conclusao == "success", sujeito=sha[:12],
+                  motivo="" if conclusao == "success" else f"CI da main falhou no {sha[:7]}: algo entrou quebrado",
+                  assinatura="gate:main_vermelha", classe="estrutural")
 
     def _pr_do_developer_sumiu(self, abertos: set[int]) -> None:
         """PR do Developer fechado ou mergeado fora do gate (por você, no GitHub): o Developer não fica esperando
@@ -323,6 +357,17 @@ class GitHubREST:
                 fim = next((i for i, x in enumerate(limpas) if x.startswith("##[error]")), len(limpas))
                 partes.append(f"[{j['name']}]\n" + "\n".join(limpas[max(0, fim - linhas):fim + 1]))
         return "\n".join(partes)
+
+    def atras_da_main(self, sha: str) -> int:
+        return int(self._req("GET", f"/compare/main...{sha}").get("behind_by", 0))
+
+    def update_branch(self, number: int) -> None:
+        self._req("PUT", f"/pulls/{number}/update-branch", {})
+
+    def main_ci(self) -> tuple[str | None, str | None]:
+        runs = self._req("GET", "/actions/runs?branch=main&event=push&per_page=10")["workflow_runs"]
+        ci = [r for r in runs if r.get("name") == "CI" and r.get("status") == "completed"]
+        return (ci[0]["head_sha"], ci[0]["conclusion"]) if ci else (None, None)
 
     def pr_state(self, number: int) -> dict:
         p = self._req("GET", f"/pulls/{number}")
