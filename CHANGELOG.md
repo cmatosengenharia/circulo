@@ -16,6 +16,11 @@ Incidente: o loop girou mais de 1.400 vezes sem evoluir. O PR #1 do Developer (i
   espera o horário de reset ("resets 4:30am") em vez de tentar de novo a cada giro.
 - `ruff` entra nas dependências `dev`.
 
+## 1.4.1 — 2026-10-18
+
+- CI, job Constituição: compara o merge do PR com a main atual (`HEAD^1`), não com a main de quando o PR abriu.
+  Antes, uma mudança sua na main depois de o PR abrir aparecia como "constituição alterada por agente".
+
 ## 1.3.3 — 2026-10-18
 
 - Gate de merge: se o token não tiver a permissão Checks, lê os mesmos jobs do CI pela API do Actions.
