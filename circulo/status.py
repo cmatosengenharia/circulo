@@ -41,7 +41,9 @@ def loop_status(store: Store, now: float | None = None) -> dict:
 
     seguro = " em modo seguro" if ctl.get("modo_seguro") else ""
     nome = etapa.get("nome")
-    if nome and nome not in ("descanso", "pausado") and now - etapa.get("em", 0) < 10:
+    # etapa em curso (o fim do giro sempre volta para "descanso"); com o pulso durante o giro, etapa longa
+    # como o Developer continua "trabalhando", não some do painel depois de 10 s
+    if nome and nome not in ("descanso", "pausado"):
         projeto = None
         if etapa.get("projeto"):
             row = store.one("SELECT nome FROM projects WHERE id=?", (etapa["projeto"],))

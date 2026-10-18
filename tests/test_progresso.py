@@ -76,3 +76,12 @@ def test_correcao_unica_do_orcamento(circle):
     assert tirar_assinatura_do_orcamento(circle.store) == 100000
     assert circle.store.one("SELECT tokens FROM budget WHERE day=?", (dia,))["tokens"] == 50000
     assert tirar_assinatura_do_orcamento(circle.store) == 0        # só uma vez
+
+
+def test_esperar_o_espacamento_nao_e_estagnacao(circle):
+    """Conserto do Developer espera o espaçamento desde a última tentativa: isso não conta como trabalho parado."""
+    circle._tem_trabalho = lambda t: t == "corrigir_codigo"
+    circle.store.set("idle_last", {"corrigir_codigo": circle.store.tick})
+    assert not circle.trabalho_pendente(ignorar_estagnacao=True)
+    circle.store.set("idle_last", {"corrigir_codigo": circle.store.tick - 2})
+    assert circle.trabalho_pendente(ignorar_estagnacao=True)

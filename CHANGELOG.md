@@ -19,6 +19,19 @@ Central de confiança em três níveis (Endsley), sinais de ouro, trilha write-a
   próprio loop aperta o botão quando sobe e depois toda semana, gira, confere pelo mesmo caminho e retoma. O
   resultado é o neurônio `loop:parada` (falha vira lição de estrutura).
 
+## 1.11.3 — 2026-10-18
+
+- Esperar o espaçamento entre tentativas não conta como estagnação: o vigia de progresso só considera o trabalho que
+  pode rodar agora. Antes, o conserto do PR #6 esperando a vez contaria como "parado" e geraria uma lição falsa.
+- Espaçamento do Developer: 2 giros, não 10. Com o descanso longo de 5 min, 10 giros viravam 50 min de espera para
+  consertar um PR.
+
+## 1.11.2 — 2026-10-18
+
+- **Batimento durante o giro**: o loop só escrevia o batimento entre giros. Com o Developer trabalhando 8 minutos no
+  item #32, o painel mostrava "Desligado" e "Atenção" com o loop trabalhando normalmente. Agora um pulso escreve o
+  batimento a cada 5 s também durante o giro, e a etapa em curso continua "Trabalhando" pelo tempo que durar.
+
 ## 1.11.1 — 2026-10-18
 
 Achado na validação das 12:57: o Developer trabalhou 6 min (56 passos) no item #32, bateu no limite de uso da

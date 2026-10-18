@@ -115,3 +115,52 @@ def test_tarefa_do_roteiro_passa_no_porteiro_do_gasto_mesmo_sendo_cara(circle):
     from circulo.loop import IDLE_COST, VALOR
     g = circle.ctx.dl.worth_spending("idle_evolution", {"est_tokens": IDLE_COST["corrigir_codigo"], "value_signal": VALOR["corrigir_codigo"]})
     assert g.allowed            # antes: valor 0,6 dava 0,39 contra limiar 0,4 e o Developer nunca rodava
+
+
+def test_batimento_continua_durante_giro_longo(circle, monkeypatch):
+    """Etapa longa (Developer por minutos) não pode fazer o painel achar que o loop desligou."""
+    import time
+    from circulo.status import loop_status
+    circle.HEARTBEAT_EVERY = 0.05
+    vistos = []
+    original = circle.tick
+
+    def tick_longo():
+        circle._stage("developer", {"detalhe": "Claude Code trabalhando"})
+        inicio = circle.store.get("batimento")["em"]
+        time.sleep(0.3)
+        vistos.append((circle.store.get("batimento")["em"] > inicio, loop_status(circle.store)["estado"]))
+        return original()
+    circle.tick = tick_longo
+    circle.heartbeat()
+    circle._tick_com_pulso()
+    assert vistos == [(True, "trabalhando")]
+
+
+def test_merge_com_a_main_mantem_parada_semanal_e_pulso(circle):
+    """lição #4 (conflito com a main): o giro do run_forever precisa manter as duas intenções — o teste semanal da
+    parada (PR #6) e o batimento durante o giro (main 1.11.2). Resolver o conflito escolhendo um lado perde o outro."""
+    chamadas = []
+    circle.testar_parada = lambda: chamadas.append("parada")
+    original = circle._tick_com_pulso
+    circle._tick_com_pulso = lambda: (chamadas.append("pulso"), original())[1]
+    circle.run_forever(max_ticks=1, sleep=lambda s: None)
+    assert chamadas == ["parada", "pulso"]
+
+
+def test_sem_marcador_de_conflito_no_repositorio():
+    """lição #4: marcador de conflito esquecido quebra o ruff (pyproject.toml ilegível) e o gate recusa o PR."""
+    import subprocess
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parent.parent
+    arquivos = subprocess.run(["git", "ls-files"], cwd=raiz, capture_output=True, text=True).stdout.split()
+    abre, meio, fecha = "<" * 7 + " ", "=" * 7, ">" * 7 + " "
+    sujos = []
+    for nome in arquivos:
+        p = raiz / nome
+        if p.suffix not in {".py", ".toml", ".md", ".cfg", ".txt", ".yml", ".yaml", ".json"} or not p.is_file():
+            continue
+        linhas = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if any(linha.startswith((abre, fecha)) or linha == meio for linha in linhas):
+            sujos.append(nome)
+    assert sujos == []
