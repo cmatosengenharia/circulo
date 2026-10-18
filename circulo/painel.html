@@ -325,6 +325,10 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .rt .toggle:hover{border-color:var(--bad);color:var(--bad)}
 .rt li.off .toggle:hover{border-color:var(--ok);color:var(--ok)}
 
+/* ---------- conexões e paralelo ---------- */
+.ligar,.paralelo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.ligar select,.paralelo select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);max-width:100%}
+#conexoes li{display:flex;gap:8px;align-items:center;justify-content:space-between}
 /* ---------- limite da API ---------- */
 .orc-btn{all:unset;cursor:pointer;font-size:inherit}.orc-btn b{font-size:22px}
 .orc-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:-6px 0 18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
@@ -520,10 +524,21 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <p class="sub" style="margin:-6px 0 8px">Como o loop sabe que acertou antes de seguir: medição antes e depois (inclusive nos critérios ocultos), verificação, o Jev a favor e a contraprova do Jev contra a piora.</p>
       <ul class="list" id="evidencias"></ul>
     </section>
-    <section class="panel c5 ev-only" hidden>
+    <section class="panel c5 missao-only" hidden>
       <h2>Conexões</h2>
-      <p class="sub" style="margin:-6px 0 8px">Missões relacionadas pelo Jev. Compartilham memória e contexto; quando se complementam, a integração entra na régua.</p>
+      <p class="sub" style="margin:-6px 0 8px">Missões que se conhecem: compartilham memória, contexto e lições; quando se complementam, a integração entra na régua. O Jev liga sozinho; o que você ligar ou separar vale acima dele.</p>
       <ul class="list" id="conexoes"></ul>
+      <form class="ligar" id="ligar">
+        <select id="ligarCom" aria-label="Outra missão"></select>
+        <select id="ligarRel" aria-label="Relação">
+          <option value="complementa">complementa</option><option value="consome">usa a saída</option>
+          <option value="mesmo_publico">mesmo público</option><option value="compartilha_dados">compartilha dados</option>
+        </select>
+        <button class="btn" type="submit">Ligar</button>
+      </form>
+      <div class="paralelo"><label>Giros em paralelo nesta missão
+        <select id="paralelo" aria-label="Giros em paralelo"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <span class="sub">Cada giro gera variantes em paralelo, cada uma com um ângulo; fica a melhor na régua. Custa N vezes, limitado pelo orçamento.</span></div>
     </section>
     <section class="panel c7 geral-only" hidden>
       <h2>Entrega</h2>
@@ -991,15 +1006,26 @@ function render(s) {
     (A.fora_do_alcance.length ? `<li class="grupo">Fora do alcance (recusado, sem espera)</li>` + A.fora_do_alcance.map(a => `<li><span>${esc(a.message)}</span><span class="sub">${hora(a.created_at)}</span></li>`).join("") : "") +
     (A.configuracao.length ? `<li class="grupo">Configuração única, só uma vez</li>` + A.configuracao.map(c => `<li><span>${esc(c.titulo)}<span class="meta">${esc(c.detalhe)}</span></span></li>`).join("") : "") ||
     `<li class="empty">Nada pendente. O loop está decidindo sozinho.</li>`;
-  const temEv = P && (s.evidencias || []).length + (s.conexoes || []).length > 0;
+  const ehMissao = P && P.kit !== "circulo" && P.kit !== "financas";
+  document.querySelectorAll(".missao-only").forEach(e => e.hidden = !ehMissao);
+  if (ehMissao) {
+    const REL2 = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
+    const ckey = JSON.stringify([s.conexoes, s.outras_missoes, P.paralelo]);
+    if (ckey !== window._ckey) {
+      window._ckey = ckey;
+      $("#conexoes").innerHTML = (s.conexoes || []).length ? s.conexoes.map(c => `<li><span><a href="/missao/${c.id}">${esc(c.nome)}</a><span class="meta">${c.origem === "humano" ? "ligada por você" : esc(c.evidencia)}${c.licoes_trocadas ? ` · ${c.licoes_trocadas} lições trocadas` : ""}</span></span><span class="chip">${REL2[c.relacao] || esc(c.relacao)}</span><button class="btn" data-separar="${c.id}" title="Separar estas missões">Separar</button></li>`).join("")
+        : `<li class="empty">Nenhuma missão ligada ainda.</li>`;
+      $("#ligarCom").innerHTML = (s.outras_missoes || []).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join("");
+      $("#ligar").hidden = !(s.outras_missoes || []).length;
+      $("#paralelo").value = String(P.paralelo || 1);
+    }
+  }
+  const temEv = P && (s.evidencias || []).length > 0;
   document.querySelectorAll(".ev-only").forEach(e => e.hidden = !temEv);
   if (temEv) {
     const DEC = {base:"primeira versão", avancar:"avançou", refazer:"refazer", descartar:"descartada", cumprida:"missão cumprida"};
     $("#evidencias").innerHTML = s.evidencias.length ? s.evidencias.map(e => `<li><span>${e.versao ? "v" + e.versao + " · " : ""}giro ${e.tick}<span class="meta">${esc(e.motivo)}</span></span><span class="chip ${esc(e.decisao)}">${DEC[e.decisao] || esc(e.decisao)}</span></li>`).join("")
       : `<li class="empty">Nenhum ciclo avaliado ainda.</li>`;
-    const REL = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
-    $("#conexoes").innerHTML = s.conexoes.length ? s.conexoes.map(c => `<li><span><a href="/missao/${c.id}">${esc(c.nome)}</a><span class="meta">${esc(c.evidencia)}${c.licoes_trocadas ? ` · ${c.licoes_trocadas} lições trocadas` : ""}</span></span><span class="chip">${REL[c.relacao] || esc(c.relacao)}</span></li>`).join("")
-      : `<li class="empty">Nenhuma missão relacionada por enquanto.</li>`;
   }
   $("#evol").innerHTML = s.evolucoes.length ? s.evolucoes.map(e =>
     `<li><span>${esc(e.description)}<br><span class="sub">nível ${e.level}</span></span><span class="chip ${esc(e.status)}">${EVOL[e.status] || esc(e.status)}</span></li>`).join("")
@@ -1113,6 +1139,9 @@ document.addEventListener("click", e => {
   if (e.target.closest("#orcBtn")) { $("#orcForm").hidden = false; $("#orcLimite").value = S && S.orcamento ? S.orcamento.limite : ""; $("#orcLimite").focus(); }
 });
 $("#orcFechar").onclick = () => { $("#orcForm").hidden = true; };
+$("#ligar").onsubmit = async e => { e.preventDefault(); await post("/api/ligacoes", {a: Number(PID), b: Number($("#ligarCom").value), relacao: $("#ligarRel").value}); window._ckey = null; refresh(); };
+document.addEventListener("click", async e => { const b = e.target.closest("[data-separar]"); if (b) { b.disabled = true; await post("/api/ligacoes", {a: Number(PID), b: Number(b.dataset.separar), relacao: "nenhuma"}); window._ckey = null; refresh(); } });
+$("#paralelo").onchange = async () => { await post("/api/missao/paralelo", {id: Number(PID), n: Number($("#paralelo").value)}); refresh(); };
 async function salvarLimite(limite) {
   const r = await fetch("/api/orcamento", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({limite})});
   const j = await r.json();

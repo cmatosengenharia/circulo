@@ -456,7 +456,7 @@ class Store:
                   ("trail", "detalhe", "TEXT"), ("roadmap", "desativado", "INTEGER"), ("alerts", "evento", "INTEGER"),
                   ("shadow_obs", "tag_ativa", "TEXT"), ("shadow_obs", "tag_shadow", "TEXT"),
                   ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"),
-                  ("perguntas", "cerebro", "TEXT"))
+                  ("perguntas", "cerebro", "TEXT"), ("projects", "paralelo", "INTEGER"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.16.0 — 2026-10-18
+
+Produto, parte 2: **giros em paralelo na mesma missão** e **missões que se conhecem sob o seu controle**.
+
+- **Giros em paralelo** (1 a 4 por missão, no painel da missão): a cada ciclo o motor gera N variantes ao mesmo
+  tempo, cada uma por um **ângulo diferente**:
+  - na construção, prioriza um critério de peso alto da régua;
+  - na melhoria, parte de uma pergunta de uma perspectiva diferente, sobre um critério fraco diferente.
+  As variantes que passam na verificação disputam um **torneio na régua** (visível e depois oculta). Só a vencedora
+  segue para a catraca, o portão de avanço do Jev e a evidência, como sempre. As perguntas das que perderam contam
+  como "não rendeu" no placar das perspectivas. O resultado do torneio fica na nota do ciclo ("3 giros em paralelo;
+  venceu a variante 2 (v1: 0.40, v2: 0.85, v3: 0.40)"). **Limitado pelo orçamento**: se não couber, roda um só.
+- **Missões que se conhecem**: o grafo de missões que o Jev mantém (contexto e memória compartilhados, integração na
+  régua, lições que viajam entre missões) virou recurso de produto no painel:
+  - **Ligar** uma missão a outra (complementa, usa a saída, mesmo público, compartilha dados) e **Separar**;
+  - a ligação feita por você **vale acima do Jev**: ele não muda nem apaga. Separar também impede o Jev de religar;
+  - ao ligar com "complementa" ou "usa a saída", a integração entra na régua das duas na hora;
+  - cada conexão mostra quem ligou e quantas lições já trocaram.
+- APIs: `POST /api/missao/paralelo {id, n}` e `POST /api/ligacoes {a, b, relacao}`, com alerta em cada mudança.
+
 ## 1.15.0 — 2026-10-18
 
 Produto, parte 1: **cadastro de chaves de integração no painel**, guardadas com segurança.

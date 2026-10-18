@@ -273,6 +273,7 @@ def cards(store: Store) -> list[dict]:
                 atividade[23 - h] += 1
         out.append({
             "id": pid, "nome": p["nome"], "pedido": p["pedido"], "tipo": p["tipo"], "tipo_rotulo": TIPOS.get(p["tipo"], ("?",))[0],
+            "paralelo": int(p["paralelo"] or 1) if "paralelo" in p.keys() else 1,
             "kit": p["kit"], "status": p["status"], "proposito": p["proposito"],
             "decisoes": dec["n"] or 0, "sem_llm": (dec["sem_llm"] or 0) / dec["n"] if dec["n"] else None,
             "giros": dec["giros"] or 0, "ultima_atividade": dec["ultima"] or p["updated_at"],

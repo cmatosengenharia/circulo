@@ -111,7 +111,9 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "merges": _rows(s.q("SELECT pr, merged, reason, created_at FROM merges ORDER BY id DESC LIMIT 10")),
         "aguardando": aguardando,
         "autonomia": autonomia(s),
-        **({"conexoes": conexoes(s, projeto), "evidencias": _rows(s.q(
+        **({"conexoes": conexoes(s, projeto), "outras_missoes": _rows(s.q(
+            "SELECT id, nome FROM projects WHERE id!=? AND kit NOT IN ('circulo') AND status!='arquivado' ORDER BY nome", (projeto,))),
+            "evidencias": _rows(s.q(
             "SELECT tick, fase, versao, antes, depois, oculta_antes, oculta_depois, jev_avanca, jev_contraprova, decisao, motivo, created_at "
             "FROM evidence WHERE project_id=? ORDER BY id DESC LIMIT 15", (projeto,)))} if projeto else {}),
         "projetos": projetos,
@@ -184,7 +186,7 @@ def autonomia(s: Store) -> dict:
 
 
 def conexoes(s: Store, pid: int) -> list[dict]:
-    rows = s.q("""SELECT pr.id, pr.nome, pr.tipo, l.relacao, l.forca, l.evidencia FROM links l
+    rows = s.q("""SELECT pr.id, pr.nome, pr.tipo, l.relacao, l.forca, l.evidencia, l.origem FROM links l
                   JOIN projects pr ON pr.id = CASE WHEN l.a=? THEN l.b ELSE l.a END
                   WHERE (l.a=? OR l.b=?) AND l.relacao!='nenhuma' ORDER BY l.forca DESC""", (pid, pid, pid))
     out = []
@@ -432,6 +434,36 @@ def make_handler(db_path: str):
                                                                  data.get("valor"), str(data.get("ajuda", "")))})
                 except (ValueError, RuntimeError) as exc:
                     return self._json({"erro": str(exc)}, 400)
+            if u.path == "/api/missao/paralelo":
+                # giros em paralelo nesta missão: variantes que disputam um torneio a cada ciclo
+                from .engine import MAX_PARALELO
+                try:
+                    pid, n = int(data.get("id")), int(data.get("n"))
+                except (TypeError, ValueError):
+                    return self._json({"erro": "id e n são obrigatórios"}, 400)
+                if not (1 <= n <= MAX_PARALELO) or not store.one("SELECT 1 FROM projects WHERE id=? AND kit!='circulo'", (pid,)):
+                    return self._json({"erro": f"n entre 1 e {MAX_PARALELO}, numa missão"}, 400)
+                store.x("UPDATE projects SET paralelo=?, updated_at=? WHERE id=?", (n, time.time(), pid))
+                nome = store.one("SELECT nome FROM projects WHERE id=?", (pid,))["nome"]
+                store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES('controle',?,?,?)",
+                        (f"Você definiu {n} giro(s) em paralelo para “{nome}”.", time.time(), pid))
+                return self._json({"ok": True, "id": pid, "n": n})
+            if u.path == "/api/ligacoes":
+                # você liga ou separa missões; vale acima do Jev
+                from .graph import MissionGraph
+
+                class _C:
+                    pass
+                c = _C()
+                c.store = store
+                try:
+                    r = MissionGraph(c, None).ligar(int(data.get("a")), int(data.get("b")), str(data.get("relacao", "")))
+                except (TypeError, ValueError) as exc:
+                    return self._json({"erro": str(exc)}, 400)
+                store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES('controle',?,?,?)",
+                        (f"Você {'separou' if r['relacao'] == 'nenhuma' else 'ligou'} as missões #{r['a']} e #{r['b']}"
+                         + ("" if r["relacao"] == "nenhuma" else f" ({r['relacao'].replace('_', ' ')})") + ".", time.time(), r["a"]))
+                return self._json({"ok": True, **r})
             if u.path == "/api/orcamento":
                 # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
                 from .budget import definir_limite

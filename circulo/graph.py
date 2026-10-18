@@ -55,7 +55,10 @@ class MissionGraph:
         qs = {f"rel_{o['id']}": Question("choice", f"Qual a relação entre “{me['nome']}” e “{o['nome']}”?", RELACOES) for o in outras}
         res = self.ctx.dl.ask_many({"missao": me, "outras": outras}, qs)
         novas = []
+        humanas = {(r["a"], r["b"]) for r in self.s.q("SELECT a, b FROM links WHERE origem='humano'")}
         for o in outras:
+            if tuple(sorted((pid, o["id"]))) in humanas:
+                continue          # ligação decidida por você: o Jev não muda nem apaga
             d = res[f"rel_{o['id']}"]
             a, b = sorted((pid, o["id"]))
             if d.value == "nenhuma" or d.confidence < 0.5:
@@ -150,6 +153,25 @@ class MissionGraph:
                      (lesson_id, mid, lic["project_id"], lg["id"], time.time()))
             n += 1
         return n
+
+    def ligar(self, a: int, b: int, relacao: str) -> dict:
+        """Você liga (ou separa, com 'nenhuma') duas missões. Vale acima do Jev e passa a valer já no próximo ciclo:
+        contexto e memória compartilhados, integração na régua e lições que viajam."""
+        if relacao not in RELACOES or a == b:
+            raise ValueError("relação inválida")
+        pa, pb = (self.s.one("SELECT id, nome, kit FROM projects WHERE id=?", (x,)) for x in (a, b))
+        if not pa or not pb or "circulo" in (pa["kit"], pb["kit"]):
+            raise ValueError("missão inválida")
+        x, y = sorted((a, b))
+        agora = time.time()
+        self.s.x("INSERT INTO links(a,b,relacao,forca,evidencia,origem,created_at,updated_at) VALUES(?,?,?,1.0,?,'humano',?,?) "
+                 "ON CONFLICT(a,b) DO UPDATE SET relacao=excluded.relacao, forca=1.0, evidencia=excluded.evidencia, "
+                 "origem='humano', updated_at=excluded.updated_at",
+                 (x, y, relacao, "você ligou" if relacao != "nenhuma" else "você separou", agora, agora))
+        if relacao in INTEGRA:
+            self._criterio_integracao(a, dict(pb))
+            self._criterio_integracao(b, dict(pa))
+        return {"a": x, "b": y, "relacao": relacao}
 
     def conectar_todas(self) -> int:
         n = 0

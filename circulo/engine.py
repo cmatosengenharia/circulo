@@ -78,6 +78,7 @@ def _strip_fences(text: str) -> str:
     return m.group(1).strip() if m else text.strip()
 
 
+MAX_PARALELO = 4          # giros em paralelo na mesma missão (variantes que disputam um torneio)
 MIN_ACHADOS = 2            # régua só com evidência: achados aceitos pelo Jev
 MIN_FONTES_PESQUISA = 2    # ... vindos de fontes distintas
 MAX_PESQUISAS = 3          # depois disso segue com o que tem (registrado no monitoramento)
@@ -91,6 +92,7 @@ class Engine:
         self.graph = None   # MissionGraph (ligado pelo loop): contexto e memória compartilhados
         self.on_stage = None  # callback do loop: cada ciclo deixa a passagem na trilha do círculo
         self._tl = threading.local()   # braço do A/B de prompt, por thread
+        self._tokens_lock = threading.Lock()   # giros em paralelo na mesma missão somam tokens no mesmo ciclo
 
     # ------------------------------------------------------------ utilidades
     @property
@@ -124,7 +126,8 @@ class Engine:
         registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
                       tokens=out.tokens, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
         self.ctx.budget.charge(out.tokens, "llm")
-        res.tokens += out.tokens
+        with self._tokens_lock:
+            res.tokens += out.tokens
         self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id) VALUES(?,?,?,?,?,?,?)",
                  (self.s.tick, f"llm:{role}", json.dumps(model), 1.0, "llm", time.time(), project["id"]))
         return out.text, out.citations
@@ -169,6 +172,15 @@ class Engine:
         res = self.ctx.dl.ask_many({"projetos": cands}, qs)
         ranked = sorted(cands, key=lambda c: -float(res[f"val_{c['id']}"].value))
         return [c["id"] for c in ranked[:k]]
+
+    def giros_paralelos(self, p: dict) -> int:
+        """Quantos giros em paralelo nesta missão: o que você escolheu para ela (1 a MAX_PARALELO), limitado pelo
+        orçamento que dá para gastar agora (cada variante custa um ciclo)."""
+        escolhido = int(p.get("paralelo") or self.ctx.policy["portfolio"].get("paralelo_por_missao", 1) or 1)
+        escolhido = max(1, min(escolhido, MAX_PARALELO))
+        est = sum(self._role(r)["max_tokens"] for r in ("builder",)) + 1500
+        cabe = max(1, self.ctx.budget.spendable() // max(est, 1))
+        return int(min(escolhido, cabe))
 
     def run_parallel(self, on_stage=None) -> list[CycleResult]:
         on_stage = on_stage or self.on_stage
@@ -378,33 +390,70 @@ class Engine:
             prompt = (f"Pedido: {p['pedido']}\nPropósito: {p['proposito']}\nFormato da entrega: {fmt} "
                       f"({'um único arquivo HTML completo, CSS embutido' if fmt == 'html' else 'Markdown'})\n\n"
                       f"Régua de qualidade:\n{regua}{licoes}{ctx_txt}")
+        from .licoes import registrar as monitorar
+        n = self.giros_paralelos(p)
+        prompts, perguntas = [], []
+        if cur is None:
+            # vários giros: cada variante parte de um ângulo da régua (o critério de maior peso que ela prioriza)
+            enfase = sorted(visiveis, key=lambda c: -c["peso"])
+            for i in range(n):
+                foco = f"\n\nÂngulo desta variante: priorize “{enfase[i % len(enfase)]['texto']}”." if n > 1 and enfase else ""
+                prompts.append(prompt + foco)
         else:
             role = "improver"
             notas = json.loads(cur["notas"] or "{}")
-            fracos = sorted(visiveis, key=lambda c: notas.get(c["id"], 0))[:3]
+            fracos = sorted(visiveis, key=lambda c: notas.get(c["id"], 0))[:max(3, n)]
             # a melhoria parte de uma pergunta de quem usa esta missão (perspectivas do tipo, criadas pelo Questionador
-            # uma vez por tipo; a pergunta do ciclo sai sem LLM)
+            # uma vez por tipo; a pergunta do ciclo sai sem LLM). Em paralelo: uma pergunta e um critério por variante.
             from .perguntas import pergunta_da_missao
-            self._tl.pergunta = pergunta_da_missao(self.ctx, p, fracos[0]["texto"]) if fracos else None
-            pergunta_txt = f"Pergunta deste ciclo: {self._tl.pergunta[1]}\n" if self._tl.pergunta else ""
-            prompt = (f"Pedido: {p['pedido']}\nFormato: {fmt}\n{pergunta_txt}Critérios mais fracos agora:\n" +
-                      "\n".join(f"- {c['texto']} (nota {notas.get(c['id'], 0):.2f})" for c in fracos) +
-                      f"\n\nRégua completa:\n{regua}{licoes}{ctx_txt}\n\nEntrega atual:\n{cur['content'][:12000]}")
-        text, _ = self._gen(role, prompt, res, p)
-        content = _strip_fences(text)
-        ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
-        from .licoes import registrar as monitorar
-        monitorar(self.ctx, "missao:verificacao_saida", ok, sujeito=p.get("nome") or f"missão {p['id']}",
-                  motivo="" if ok else f"checagens reprovadas: {checks}", licao=False)
-        if not ok:
-            falhas = [k for k, v in checks.items() if v < 0.5]
-            text, _ = self._gen(role, prompt + f"\n\nA versão anterior foi reprovada nas checagens: {', '.join(falhas)}. Corrija.", res, p)
+            for i in range(n):
+                alvo = fracos[i % len(fracos)] if fracos else None
+                pq = pergunta_da_missao(self.ctx, p, alvo["texto"]) if alvo else None
+                perguntas.append(pq)
+                pergunta_txt = f"Pergunta deste ciclo: {pq[1]}\n" if pq else ""
+                prompts.append(f"Pedido: {p['pedido']}\nFormato: {fmt}\n{pergunta_txt}Critérios mais fracos agora:\n" +
+                               "\n".join(f"- {c['texto']} (nota {notas.get(c['id'], 0):.2f})" for c in fracos[:3]) +
+                               f"\n\nRégua completa:\n{regua}{licoes}{ctx_txt}\n\nEntrega atual:\n{cur['content'][:12000]}")
+
+        def variante(i):
+            text, _ = self._gen(role, prompts[i], res, p)
             content = _strip_fences(text)
             ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
-        if not ok:
-            res.aceita, res.nota = False, f"reprovada na verificação pós-LLM: {checks}"
+            monitorar(self.ctx, "missao:verificacao_saida", ok, sujeito=p.get("nome") or f"missão {p['id']}",
+                      motivo="" if ok else f"checagens reprovadas: {checks}", licao=False)
+            if not ok:
+                falhas = [k for k, v in checks.items() if v < 0.5]
+                text, _ = self._gen(role, prompts[i] + f"\n\nA versão anterior foi reprovada nas checagens: {', '.join(falhas)}. Corrija.", res, p)
+                content = _strip_fences(text)
+                ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
+            return content, ok, checks
+
+        if n == 1:
+            saidas = [variante(0)]
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=n, thread_name_prefix=f"giro-{p['id']}") as ex:
+                saidas = list(ex.map(variante, range(n)))
+        boas = [(i, c, ch) for i, (c, ok, ch) in enumerate(saidas) if ok]
+        if not boas:
+            for pq in perguntas:
+                if pq:
+                    self.s.x("UPDATE perguntas SET status='descartada', updated_at=? WHERE id=?", (time.time(), pq[0]))
+            res.aceita, res.nota = False, f"reprovada na verificação pós-LLM: {saidas[0][2]}"
             return
-        ev = self.evaluate(content, rub["criteria"])
+        # torneio: todas as variantes aprovadas são medidas na régua; a melhor (visível, depois oculta) segue adiante
+        medidas = [(i, c, ch, self.evaluate(c, rub["criteria"])) for i, c, ch in boas]
+        vencedora, content, checks, ev = max(medidas, key=lambda m: (m[3]["visivel"], m[3]["oculta"]))
+        self._tl.pergunta = perguntas[vencedora] if perguntas else None
+        for j, pq in enumerate(perguntas):          # as perguntas das variantes que perderam não renderam a versão
+            if pq and j != vencedora:
+                self.s.x("UPDATE perguntas SET status='descartada', updated_at=? WHERE id=?", (time.time(), pq[0]))
+        if n > 1:
+            res.nota = ""
+            self._tl.torneio = f"{n} giros em paralelo; venceu a variante {vencedora + 1} " + \
+                "(" + ", ".join(f"v{i + 1}: {m[3]['visivel']:.2f}" for i, m in enumerate(medidas)) + ")"
+        else:
+            self._tl.torneio = None
         res.nota_antes = cur["nota"] if cur else None
         res.nota_depois = ev["visivel"]
         # catraca: não pode piorar na régua visível nem cair mais que a tolerância na oculta
@@ -445,6 +494,9 @@ class Engine:
                         self.reopen(lg["id"], f"missão ligada “{p['nome']}” ganhou v{ver}")
         if not res.nota:
             res.nota = f"v{ver} {'aceita' if aceita else 'descartada pela catraca'} (nota {ev['visivel']:.2f}, oculta {ev['oculta']:.2f})"
+        if getattr(self._tl, "torneio", None):
+            res.nota += f" · {self._tl.torneio}"
+            self._tl.torneio = None
         ativadas = self.mem.lesson_outcome(res.lessons, res.ganho if aceita else 0.0, self.ctx.policy["portfolio"]["min_gain"])
         if self.graph:
             for lid in ativadas:          # o que deu certo aqui é testado nas missões ligadas
