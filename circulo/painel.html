@@ -362,6 +362,14 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
       <div id="roadmap"></div>
     </section>
+    <section class="panel c12 zero-only" hidden aria-label="Lições">
+      <h2>Lições: erros que o loop não pode repetir</h2>
+      <p class="sub" style="margin:-6px 0 8px">Todo ponto de verificação é monitorado. Falha vira lição; erro de estrutura vira item na primeira vez.
+        A lição fecha só com duas provas: <b>validada</b> (a correção entrou) e <b>evidenciada</b> (o erro não voltou). Com lição de estrutura aberta, o loop corrige antes de evoluir.</p>
+      <div class="rt-leg" id="licoesResumo"></div>
+      <ul class="list" id="licoes"></ul>
+      <details class="feitos"><summary>Verificações nas últimas 24 h</summary><ul class="list" id="verificacoes"></ul></details>
+    </section>
     <section class="panel c5 zero-only" hidden>
       <h2>Erros registrados</h2>
       <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
@@ -830,6 +838,13 @@ function render(s) {
     const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
     $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
       : `<li class="empty">Nenhum erro registrado até agora.</li>`;
+    const LC = s.licoes || {}, ps = LC.por_status || {};
+    const LS = {aberta:"aberta", em_correcao:"em correção", validada:"validada", evidenciada:"evidenciada", reincidente:"REINCIDENTE"};
+    $("#licoesResumo").innerHTML = `<span><b>${LC.reincidencias || 0}</b> reincidências</span><span><b>${LC.abertas_estruturais || 0}</b> de estrutura abertas</span>` +
+      Object.keys(LS).map(k => `<span><b>${ps[k] || 0}</b> ${LS[k]}</span>`).join("");
+    $("#licoes").innerHTML = (LC.ultimas || []).length ? LC.ultimas.map(l => `<li><span>#${l.id} ${esc(l.descricao)}<span class="meta">${esc(l.assinatura)} · ${esc(l.classe)} · ${l.ocorrencias}x${l.reincidencias ? ` · reincidiu ${l.reincidencias}x` : ""}${l.item_id ? ` · item #${l.item_id}` : ""}${l.pr ? ` · PR #${l.pr}` : ""}</span></span><span class="chip ${esc(l.status)}">${LS[l.status] || esc(l.status)}</span></li>`).join("")
+      : `<li class="empty">Nenhuma lição ainda.</li>`;
+    $("#verificacoes").innerHTML = (LC.verificacoes_24h || []).map(v => `<li><span>${esc(v.ponto)}<span class="meta">${v.total} verificações · ${v.falhas || 0} falhas</span></span><span class="chip ${v.falhas ? "aberto" : "resolvido"}">${v.total ? Math.round(100 * (v.total - (v.falhas || 0)) / v.total) : 100}% ok</span></li>`).join("") || `<li class="empty">Nenhuma verificação ainda.</li>`;
   }
   renderKpis(s); renderAgora(); renderGiros(s.giros); renderRitmo(s.ritmo); renderTimeline(s.linha_do_tempo); renderModelos(s.llm);
   if (!passos.length && s.giros && s.giros.length) {           // primeira carga: passos do último giro

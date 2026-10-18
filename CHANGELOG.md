@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.6.0 — 2026-10-18
+
+Maturidade: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez.
+Ciclo: estudar (evidência) → testar → **validar** → aprender → corrigir → **evidenciar** → evoluir.
+
+- **Todo ponto de verificação é monitorado** (tabela `verificacoes`): lint e testes locais do Developer, saída do
+  Claude Code, reprovação no CI e no gate, merge, saída do planejador, verificação pós-LLM e evidência das missões,
+  shadow, rollback de saúde e exceções do giro. O painel mostra a taxa de acerto por ponto nas últimas 24 h.
+- **Falha vira lição** (tabela `licoes`) com assinatura estável da causa (`gate:ci:lint:B905`,
+  `planejador:saida_invalida`, `incidente:<digital>`...):
+  - estrutural (erro do próprio loop): vira item do roteiro na **primeira** vez (antes: só a partir da 2ª);
+  - trabalho (lint/teste no PR, rollback de evolução): vira prevenção nos prompts;
+  - ambiente (limite de conta, rede): só vira item se repetir 5x em 24 h.
+- A lição fecha com duas provas: **validada** (o item foi feito: PR mergeado ou incidente resolvido) e **evidenciada**
+  (200 giros sem reaparecer).
+- **Reincidência**: assinatura que volta depois de corrigida. Gera alerta, o item volta para o topo da fila e a contagem
+  fica no painel. Zero reincidências é o indicador de maturidade.
+- **Só se autoevolui depois de corrigir**: com lição estrutural aberta, o planejador não propõe item novo e a
+  meta-evolução do círculo para; só o domínio (suas correções) continua.
+- **Lições no contexto**: o Developer (tarefa e conserto) e o planejador recebem a lista "erros que o círculo já
+  cometeu. Não repita nenhum deles".
+- Painel do loop: seção "Lições" com reincidências, estados, assinaturas e verificações.
+- Planejador: `max_tokens` 1500 e resposta em uma linha. Com 700, a resposta saía cortada e o JSON ficava inválido.
+  Foi o primeiro erro que motivou a lição `planejador:saida_invalida`.
+
 ## 1.5.0 — 2026-10-18
 
 O loop nunca fica sem o que evoluir. Com o PR #2 mergeado, o roteiro ficou sem nada que o Developer pudesse pegar, o

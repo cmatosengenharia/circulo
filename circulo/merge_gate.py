@@ -184,6 +184,12 @@ class MergeGate:
                     log = ""
             s.set("self_dev_aberto", {**dev, "conserto": {"sha": v.sha, "motivo": v.reason, "log": log[-4000:]},
                                       "conserto_sha": v.sha})
+            # toda reprovação é uma verificação que falhou: vira lição (prevenção para o Developer não repetir)
+            from .licoes import registrar as monitorar
+            const = "Constituição" in v.reason
+            monitorar(self.ctx, "gate:ci", False, sujeito=f"PR #{v.number}", motivo=f"{v.reason}\n{log[-1500:]}",
+                      assinatura=("gate:ci:constituicao" if const else "gate:sem_teste" if v.details.get("sem_teste") else None),
+                      classe="estrutural" if const else None)
             self.ctx.reply(f"PR #{v.number} não passou no gate ({v.reason}); o Developer vai consertar na mesma branch.", "saude")
         last = s.one("SELECT reason FROM merges WHERE pr=? AND sha=? ORDER BY id DESC LIMIT 1", (v.number, v.sha))
         if last and last["reason"] == v.reason:
@@ -191,6 +197,8 @@ class MergeGate:
         s.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(?,?,?,?,?,?)",
             (v.number, v.sha, int(v.merge), v.reason, json.dumps(v.details, ensure_ascii=False), time.time()))
         if v.merge:
+            from .licoes import registrar as monitorar
+            monitorar(self.ctx, "gate:merge", True, sujeito=f"PR #{v.number}")
             self.ctx.reply(f"Merge automático do PR #{v.number} ({v.details.get('lines', 0)} linhas).", "merge")
             from .projects import kit_project_id
             s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'mergeado',?,?) "

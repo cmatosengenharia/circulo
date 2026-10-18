@@ -360,6 +360,9 @@ class Engine:
         text, _ = self._gen(role, prompt, res, p)
         content = _strip_fences(text)
         ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
+        from .licoes import registrar as monitorar
+        monitorar(self.ctx, "missao:verificacao_saida", ok, sujeito=p.get("nome") or f"missão {p['id']}",
+                  motivo="" if ok else f"checagens reprovadas: {checks}", licao=False)
         if not ok:
             falhas = [k for k, v in checks.items() if v < 0.5]
             text, _ = self._gen(role, prompt + f"\n\nA versão anterior foi reprovada nas checagens: {', '.join(falhas)}. Corrija.", res, p)
@@ -379,6 +382,8 @@ class Engine:
         if decisao in ("refazer", "descartar") and aceita:
             aceita = False
             res.nota = motivo
+        monitorar(self.ctx, "missao:evidencia", aceita, sujeito=p.get("nome") or f"missão {p['id']}",
+                  motivo="" if aceita else str(res.nota or motivo), licao=False)
         ver = (self.s.one("SELECT COALESCE(MAX(version),0) v FROM deliverables WHERE project_id=?", (p["id"],))["v"] or 0) + 1
         path = self.ctx.data_dir / "projetos" / str(p["id"]) / f"v{ver}.{EXT[fmt]}"
         path.parent.mkdir(parents=True, exist_ok=True)

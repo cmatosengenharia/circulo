@@ -125,6 +125,41 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at REAL NOT NULL
 );
 
+-- todo ponto de verificação (validação, verificação, evidência) deixa um registro: o loop se monitora
+CREATE TABLE IF NOT EXISTS verificacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tick INTEGER NOT NULL,
+  ponto TEXT NOT NULL,
+  sujeito TEXT,
+  ok INTEGER NOT NULL,
+  assinatura TEXT,
+  motivo TEXT,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_verificacoes_ponto ON verificacoes(ponto, created_at);
+CREATE INDEX IF NOT EXISTS idx_verificacoes_assinatura ON verificacoes(assinatura, created_at);
+
+-- erros aprendidos: uma assinatura por causa; o mesmo erro de estrutura só acontece uma vez
+CREATE TABLE IF NOT EXISTS licoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  assinatura TEXT NOT NULL UNIQUE,
+  ponto TEXT NOT NULL,
+  classe TEXT NOT NULL,          -- estrutural | trabalho | ambiente
+  descricao TEXT NOT NULL,
+  prevencao TEXT,
+  status TEXT NOT NULL,          -- aberta | em_correcao | validada | evidenciada | reincidente
+  ocorrencias INTEGER NOT NULL,
+  reincidencias INTEGER NOT NULL,
+  item_id INTEGER,
+  pr INTEGER,
+  primeira_tick INTEGER,
+  ultima_tick INTEGER,
+  corrigida_tick INTEGER,
+  evidenciada_tick INTEGER,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS incidents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fingerprint TEXT NOT NULL UNIQUE,

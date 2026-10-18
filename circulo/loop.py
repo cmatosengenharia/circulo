@@ -74,6 +74,9 @@ class Circle:
         self.analyst = Analyst(self.ctx)
         self.planner = Planner(self.ctx)
         self.developer = Developer(self.ctx)
+        from .licoes import Licoes
+        self.licoes = Licoes(self.ctx.store, self.ctx.reply)
+        self.ctx.licoes = self.licoes         # todo ponto de verificação do círculo registra aqui
         self.meta = MetaLearner(self.ctx)
         self.shadow = Shadow(self.ctx)
         self.health = HealthMonitor(self.ctx)
@@ -93,6 +96,7 @@ class Circle:
         self.ctx.policies.before_change = lambda: guardrails.snapshot(self.ctx.store, self.data_dir, "mudanca")
         self.ctx.store.set("motor_pronto", self.engine.ready)
         self.incidents = Incidents(self.ctx.store, self.ctx.dl, self.ctx.reply, lambda: kit_project_id(self.ctx.store, "circulo"))
+        self.incidents.licoes = self.licoes
         finance.base(store)
         ensure_seed(store)
         recovered = store.recover_interrupted()
@@ -187,13 +191,15 @@ class Circle:
 
         # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar).
         #    Modo seguro congela os níveis 2 e 3: só a saúde continua rodando (e pode fazer rollback).
-        stages = [("health", self.health.check)]
+        stages = [("licoes", self.licoes.revisar), ("health", self.health.check)]
         if not ctl["modo_seguro"]:
+            # só se autoevolui depois de corrigir os próprios erros: com lição de estrutura aberta, só o domínio evolui
+            self.meta.so_dominio = self.licoes.bloqueia_evolucao()
             stages = [("meta", self.meta.step), ("shadow", self.shadow.evaluate)] + stages
         for stage, fn in stages:
             if self.incidents.isolated(stage):
                 continue                       # autocorreção: etapa em quarentena não roda
-            self._stage({"meta": "meta_learner", "shadow": "shadow", "health": "saude"}[stage])
+            self._stage({"meta": "meta_learner", "shadow": "shadow", "health": "saude", "licoes": "licoes"}[stage])
             try:
                 out = fn()
                 if stage == "meta":
@@ -492,6 +498,7 @@ class Circle:
             "orcamento": self.ctx.budget.snapshot(), "painel": self.planner.report(),
             "propostas": {r["status"]: r["c"] for r in s.q("SELECT status, COUNT(*) c FROM proposals GROUP BY status")},
             "jev": self.ctx.dl.jev.source,
+            "licoes": self.licoes.resumo(),
         }
 
     def write_summary(self) -> Path:

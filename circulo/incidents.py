@@ -56,7 +56,17 @@ class Incidents:
                               first_tick,last_tick,status) VALUES(?,?,?,?,?,?,1,?,?,?,?,'aberto')""",
                            (fp, stage, type(exc).__name__, str(exc)[:500], trace, project_id, now, now, tick, tick))
         inc = dict(self.s.one("SELECT * FROM incidents WHERE id=?", (iid,)))
-        self._learn(inc)
+        lic = getattr(self, "licoes", None)
+        if lic is not None:
+            # a lição decide: erro de estrutura vira item na PRIMEIRA vez; ambiente (rede, limite) só se recorrente
+            try:
+                lic.verificar(f"execucao:{stage}", False, sujeito=stage, motivo=f"{inc['kind']}: {inc['message']}",
+                              assinatura=f"incidente:{fp}", detalhe_item=f"(incidente #{inc['id']},",
+                              titulo=f"Corrigir erro: {inc['kind']} em {stage}")
+            except Exception:  # noqa: BLE001 — registrar nunca derruba quem registra
+                pass
+        else:
+            self._learn(inc)
         self._maybe_isolate(stage, inc)
         return inc
 

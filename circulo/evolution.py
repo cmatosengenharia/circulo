@@ -187,8 +187,10 @@ class MetaLearner:
     # ---------------------------------------------------- decisão + apply
     def step(self) -> list[str]:
         log = []
-        for c in (self.domain_candidates() + self.circle_candidates() + self.question_candidates()
-                  + self.portfolio_candidates() + self.distillation_candidates()):
+        cands = self.domain_candidates()
+        if not getattr(self, "so_dominio", False):
+            cands += self.circle_candidates() + self.question_candidates() + self.portfolio_candidates() + self.distillation_candidates()
+        for c in cands:
             r = self.process(c)
             if r:
                 log.append(r)
@@ -328,6 +330,9 @@ class Shadow:
         # cada parte mudada precisa ganhar por conta própria: uma não compensa a piora da outra
         win = all(us > ua + cfg["min_gain"] for us, ua, _ in medidas.values())
         self._close(version, win, " · ".join(f"{k}: utilidade shadow={us:.3f} ativa={ua:.3f} n={n}" for k, (us, ua, n) in medidas.items()))
+        from .licoes import registrar as monitorar     # experimento é monitorado; hipótese reprovada não é erro
+        monitorar(self.ctx, "evolucao:shadow", win, sujeito=f"shadow v{version}", motivo="" if win else "não ganhou da política ativa",
+                  licao=False)
         u_shadow = sum(us for us, _, _ in medidas.values()) / len(medidas)
         u_active = sum(ua for _, ua, _ in medidas.values()) / len(medidas)
         return f"shadow v{version} {'promovido' if win else 'descartado'} ({u_shadow:.2f} vs {u_active:.2f})"
@@ -376,4 +381,8 @@ class HealthMonitor:
                 restored = self.ctx.policies.rollback(f"saúde: viol={len(violations)} correção={rate:.0%} antes={rate_before:.0%}")
                 m["rolled_back"] = restored
                 self.ctx.reply(f"Rollback automático da política v{version} → v{restored}.", "saude")
+                from .licoes import registrar as monitorar
+                monitorar(self.ctx, "saude:rollback", False, sujeito=f"política v{version}",
+                          motivo=f"evolução piorou a saúde: viol={len(violations)} correção={rate:.0%} antes={rate_before:.0%}",
+                          assinatura=f"saude:rollback:v{version}", classe="trabalho")
         return m
