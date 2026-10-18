@@ -117,6 +117,27 @@ def test_licao_1_sem_colisao_o_erro_continua_visivel(circle, repos, tmp_path, mo
         atualizar_corpo(c)
 
 
+def test_licao_2_troca_direta_nao_esbarra_e_main_consertada_vira_corpo(circle, repos, tmp_path):
+    """Lição #2 (corpo:validacao_falhou): o teste do PR #4 exigia que `Corpo.run()` abortasse na colisão com não
+    rastreados, mas a 1.9.1 já trocava direto (-f); a main ficou vermelha e o corpo reprovou o código novo.
+    O contrato: a troca direta não esbarra, e a main reprovada não trava o corpo quando o conserto chega."""
+    from circulo.corpo_caminho import atualizar_corpo
+    _, vivo, dev = repos
+    (dev / "novo.py").write_text("X = 1\n")
+    git(dev, "add", "novo.py")
+    vermelha = evoluir(dev, "V = (\n")                                 # main vermelha: não passa na validação
+    (vivo / "novo.py").write_text("X = 0  # cópia manual\n")
+    c = Corpo(circle.ctx, vivo, tmp_path, validacao=OK)
+    assert c.run()["status"] == "reprovado" and vermelha in circle.store.get("corpo")["reprovados"]
+    consertada = evoluir(dev)                                          # o conserto chega à main
+    circle.store.set("corpo", {**circle.store.get("corpo"), "checado_tick": -10**6})
+    assert c.precisa()                                                 # o sha reprovado não bloqueia o novo
+    r = atualizar_corpo(c)
+    assert r["status"] == "atualizado" and "liberado" not in r         # trocou direto, sem o caminho livre
+    assert git(vivo, "rev-parse", "HEAD") == consertada and (vivo / "novo.py").read_text() == "X = 1\n"
+    assert "cópia manual" in open(r["patch"]).read()
+
+
 def test_em_testes_nunca_ha_corpo_de_verdade(circle):
     from circulo.corpo import build_corpo
     assert build_corpo(circle.ctx, circle.data_dir) is None and circle.corpo is None
