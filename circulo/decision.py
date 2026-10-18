@@ -76,6 +76,23 @@ def norm(text: str) -> str:
     return "".join(c for c in t if not unicodedata.combining(c))
 
 
+# Exemplos que o Meta-Learner acrescenta às instruções do spend_tag a partir das correções da família.
+TAG_EXEMPLOS = "Exemplos corrigidos pela família:"
+
+
+def exemplos_de_tag(instructions: str) -> dict[str, str]:
+    """{termo: tag} escritos nas instruções como 'termo → tag; termo → tag.'"""
+    if TAG_EXEMPLOS not in instructions:
+        return {}
+    out = {}
+    for par in instructions.split(TAG_EXEMPLOS, 1)[1].strip().rstrip(".").split(";"):
+        if "→" in par:
+            termo, tag = (x.strip() for x in par.split("→", 1))
+            if termo and tag:
+                out[norm(termo)] = tag
+    return out
+
+
 # ---------------------------------------------------------------- Jev real
 
 class JevHttpClient:
@@ -235,6 +252,10 @@ class LocalJev:
         return Decision("category", "choice", "outros", 0.3, self.source)
 
     def _q_spend_tag(self, q, s):
+        d = f" {norm(s.get('description', ''))} "
+        for termo, tag in exemplos_de_tag(q.instructions).items():
+            if tag in q.options() and re.search(rf"(?<!\w){re.escape(termo)}(?!\w)", d):
+                return Decision("spend_tag", "choice", tag, 0.75, self.source)
         r = self.match_rule(s.get("description", ""), s.get("regras", []))
         hour = int(s.get("hour", 12))
         late = hour >= 22 or hour < 5
