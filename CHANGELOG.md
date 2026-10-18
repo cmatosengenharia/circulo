@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5 — 2026-10-17
+
+- Ao subir, o loop testa de verdade as conexões (Jev, Claude e GitHub, só leitura) e registra o resultado no painel: chave errada aparece na hora.
+
 ## 1.0.4 — 2026-10-17
 
 - Salvar a configuração acorda o loop do descanso na hora (antes esperava o próximo giro, até alguns minutos).

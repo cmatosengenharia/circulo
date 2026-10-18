@@ -92,7 +92,10 @@ def main(argv: list[str] | None = None) -> None:
         print(snapshot(c.store, c.data_dir, "manual"))
         return
     if args.cmd == "run":
-        cfg.registrar(c.store, cfg.diagnostico())   # o painel mostra o estado real da configuração
+        # Ao subir (inclusive depois de você salvar as chaves), o loop testa as conexões de verdade e registra
+        # o resultado: chave errada aparece no painel na hora, não no primeiro ciclo que precisar dela.
+        testar = os.environ.get("CIRCULO_TESTAR_AO_SUBIR", "1") == "1"
+        cfg.registrar(c.store, cfg.diagnostico(testar_conexoes=testar))
         if args.painel:
             from .painel import serve
             serve(c.store.path, args.porta, background=True)

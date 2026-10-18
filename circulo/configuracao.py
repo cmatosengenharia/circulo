@@ -95,6 +95,18 @@ def _llm_ok() -> tuple[bool, str]:
         return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
 
 
+def _github_ok() -> tuple[bool, str]:
+    """Só leitura: lista PRs e lê os checks da main. Não cria nada."""
+    try:
+        from .merge_gate import GitHubREST
+        gh = GitHubREST(os.environ["CIRCULO_REPO"], os.environ["GITHUB_TOKEN"])
+        prs = gh.open_prs()
+        checks = gh.check_runs("main")
+        return True, f"acesso ao repo ok ({len(prs)} PR abertos, {len(checks)} checks na main)"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
+
+
 def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
     """Sem `testar_conexoes`, não gasta nada: só confere o que está configurado."""
     p: list[Peca] = []
@@ -124,8 +136,12 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
         ok, det = _llm_ok() if testar_conexoes else (True, "chave e SDK presentes (use --testar para chamar a API)")
         p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else "Confira ANTHROPIC_API_KEY."))
     gh = bool(os.environ.get("GITHUB_TOKEN") and os.environ.get("CIRCULO_REPO"))
-    p.append(Peca("Gate de merge", "ligado" if gh else "parado", "PRs de agente avaliados e mergeados sozinhos" if gh
-                  else "sem GITHUB_TOKEN/CIRCULO_REPO", "" if gh else "Preencha GITHUB_TOKEN e CIRCULO_REPO."))
+    if not gh:
+        p.append(Peca("Gate de merge", "parado", "sem GITHUB_TOKEN/CIRCULO_REPO", "Preencha GITHUB_TOKEN e CIRCULO_REPO."))
+    else:
+        ok, det = _github_ok() if testar_conexoes else (True, "PRs de agente avaliados e mergeados sozinhos (use --testar para chamar a API)")
+        p.append(Peca("Gate de merge", "ligado" if ok else "parado", det,
+                      "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita, Actions e Commit statuses em leitura."))
     repo = os.environ.get("CIRCULO_REPO_DIR")
     claude = shutil.which(os.environ.get("CIRCULO_CODE_AGENT", "claude"))
     dev_ok = bool(repo and (Path(repo) / ".git").exists() and claude)

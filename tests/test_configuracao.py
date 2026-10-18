@@ -99,3 +99,23 @@ def test_servico_roda_na_pasta_de_dados_e_nao_e_escondido_pelo_clone(tmp_path):
     assert f"WorkingDirectory={dados.resolve()}" in u
     cmd = cfg._comando()
     assert cmd[0].endswith("circulo") or cmd[1:3] == ["-m", "circulo"]
+
+
+def test_gate_testa_o_token_de_verdade_quando_pedido(monkeypatch):
+    from circulo import merge_gate
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("CIRCULO_REPO", "dono/repo")
+
+    class Falha:
+        def __init__(self, *a, **k): ...
+        def open_prs(self): raise PermissionError("401 Bad credentials")
+
+    class Ok(Falha):
+        def open_prs(self): return []
+        def check_runs(self, sha): return [{"name": "Testes"}]
+
+    gate = lambda: next(x for x in cfg.diagnostico(testar_conexoes=True) if x.nome == "Gate de merge")  # noqa: E731
+    monkeypatch.setattr(merge_gate, "GitHubREST", Falha)
+    assert gate().estado == "parado" and "401" in gate().detalhe
+    monkeypatch.setattr(merge_gate, "GitHubREST", Ok)
+    assert gate().estado == "ligado" and "1 checks" in gate().detalhe
