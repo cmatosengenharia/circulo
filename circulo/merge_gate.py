@@ -13,6 +13,7 @@ Nada aqui espera o humano:
 from __future__ import annotations
 
 import json
+import re
 import os
 import time
 import urllib.error
@@ -210,7 +211,21 @@ class GitHubREST:
         return self._req("GET", f"/pulls/{number}/files?per_page=100")
 
     def check_runs(self, sha):
-        return self._req("GET", f"/commits/{sha}/check-runs?per_page=100")["check_runs"]
+        try:
+            return self._req("GET", f"/commits/{sha}/check-runs?per_page=100")["check_runs"]
+        except urllib.error.HTTPError as e:
+            if e.code != 403:
+                raise
+        # Token sem a permissão Checks: lê os mesmos jobs pela API do Actions (permissão Actions, leitura).
+        filtro = f"head_sha={sha}" if re.fullmatch(r"[0-9a-f]{7,40}", sha) else f"branch={sha}"
+        corridas = self._req("GET", f"/actions/runs?{filtro}&per_page=20")["workflow_runs"]
+        if not re.fullmatch(r"[0-9a-f]{7,40}", sha) and corridas:
+            corridas = [r for r in corridas if r["head_sha"] == corridas[0]["head_sha"]]
+        jobs = []
+        for run in corridas:
+            for j in self._req("GET", f"/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]:
+                jobs.append({"id": j["id"], "name": j["name"], "status": j["status"], "conclusion": j.get("conclusion")})
+        return jobs
 
     def label_events(self, number):
         return [{"event": e["event"], "label": (e.get("label") or {}).get("name"), "actor": (e.get("actor") or {}).get("login", "")}

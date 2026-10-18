@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3 — 2026-10-18
+
+- Gate de merge: se o token não tiver a permissão Checks, lê os mesmos jobs do CI pela API do Actions.
+
 ## 1.3.2 — 2026-10-18
 
 - Testes herméticos: os testes que o Developer roda antes de abrir PR não herdam chaves nem o repositório, e nenhum

@@ -156,3 +156,23 @@ def test_loop_inclui_revisao_de_prs_no_idle(tmp_path, clock):
     c.gate = gate(c, FakeGH([pr()]))
     tasks = {c.tick().idle_task for _ in range(10)}
     assert "revisar_prs" in tasks and c.gate.gh.merged == [(1, "abc")]
+
+
+def test_sem_permissao_checks_le_os_jobs_pelo_actions(monkeypatch):
+    import io
+    import urllib.error
+    from circulo.merge_gate import GitHubREST
+    gh = GitHubREST("dono/repo", "t")
+
+    def req(method, path, body=None):
+        if "/check-runs" in path:
+            raise urllib.error.HTTPError(path, 403, "Forbidden", {}, io.BytesIO(b"{}"))
+        if path.startswith("/actions/runs?"):
+            assert "head_sha=abc1234" in path
+            return {"workflow_runs": [{"id": 9, "head_sha": "abc1234"}]}
+        if path.startswith("/actions/runs/9/jobs"):
+            return {"jobs": [{"id": 1, "name": "Testes (Python 3.12)", "status": "completed", "conclusion": "success"}]}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(gh, "_req", req)
+    assert gh.check_runs("abc1234") == [{"id": 1, "name": "Testes (Python 3.12)", "status": "completed", "conclusion": "success"}]

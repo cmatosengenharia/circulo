@@ -122,7 +122,7 @@ def _github_ok() -> tuple[bool, str]:
         gh = GitHubREST(os.environ["CIRCULO_REPO"], os.environ["GITHUB_TOKEN"])
         etapa = "listar PRs (permissão Pull requests)"
         prs = gh.open_prs()
-        etapa = "ler os checks da main (permissão Checks, leitura)"
+        etapa = "ler os checks da main (permissão Checks ou Actions, leitura)"
         checks = gh.check_runs("main")
         return True, f"acesso ao repo ok ({len(prs)} PR abertos, {len(checks)} checks na main)"
     except Exception as exc:  # noqa: BLE001
@@ -163,7 +163,7 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
     else:
         ok, det = _github_ok() if testar_conexoes else (True, "PRs de agente avaliados e mergeados sozinhos (use --testar para chamar a API)")
         p.append(Peca("Gate de merge", "ligado" if ok else "parado", det,
-                      "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita, Checks em leitura."))
+                      "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita; Checks (ou Actions) em leitura."))
     repo = os.environ.get("CIRCULO_REPO_DIR")
     claude = shutil.which(os.environ.get("CIRCULO_CODE_AGENT", "claude"))
     dev_ok = bool(repo and (Path(repo) / ".git").exists() and claude)
