@@ -370,6 +370,20 @@ CREATE TABLE IF NOT EXISTS frescor (
 );
 CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
 
+CREATE TABLE IF NOT EXISTS run_errors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT,                    -- execução (giro) em que o erro aconteceu: o painel abre o erro por ele
+  tick INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  message TEXT NOT NULL,
+  trace TEXT,
+  incident_id INTEGER,
+  em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS run_errors_run ON run_errors(run_id);
+CREATE INDEX IF NOT EXISTS run_errors_em ON run_errors(em);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -404,13 +418,14 @@ class Store:
                   ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"),
                   ("trail", "detalhe", "TEXT"), ("roadmap", "desativado", "INTEGER"), ("alerts", "evento", "INTEGER"),
                   ("shadow_obs", "tag_ativa", "TEXT"), ("shadow_obs", "tag_shadow", "TEXT"),
-                  ("roadmap", "estudo", "TEXT"))
+                  ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
             cols = {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}
             if col not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        self.db.execute("CREATE INDEX IF NOT EXISTS trail_run ON trail(run_id)")
 
     # ---------- utilidades ----------
     def tx(self):

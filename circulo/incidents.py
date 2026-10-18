@@ -56,7 +56,12 @@ class Incidents:
                               first_tick,last_tick,status) VALUES(?,?,?,?,?,?,1,?,?,?,?,'aberto')""",
                            (fp, stage, type(exc).__name__, str(exc)[:500], trace, project_id, now, now, tick, tick))
         inc = dict(self.s.one("SELECT * FROM incidents WHERE id=?", (iid,)))
-        lic = getattr(self, "licoes", None)
+        # cada ocorrência fica presa à execução em que aconteceu (o incidente agrupa; a ocorrência localiza)
+        rid = self.s.x("INSERT INTO run_errors(run_id,tick,stage,kind,message,trace,incident_id,em) VALUES(?,?,?,?,?,?,?,?)",
+                       (self.s.get("run_id"), tick, stage, type(exc).__name__, str(exc)[:500], trace, iid, now))
+        if rid % 500 == 0:
+            self.s.x("DELETE FROM run_errors WHERE em < ?", (now - 30 * 86400,))
+        lic =getattr(self, "licoes", None)
         if lic is not None:
             # a lição decide: erro de estrutura vira item na PRIMEIRA vez; ambiente (rede, limite) só se recorrente
             try:
