@@ -23,6 +23,7 @@ ENV_FILE = Path(os.environ.get("CIRCULO_ENV", Path.home() / ".config" / "circulo
 CHAVES = (
     ("TYPESAFE_API_KEY", "Jev real (TypeSafe). Sem ela: decisor local com o mesmo contrato."),
     ("ANTHROPIC_API_KEY", "LLM: motor das missões, pesquisa na web, evolução do harness."),
+    ("ANTHROPIC_WORKSPACE_ID", "Só se a chave da Anthropic não for de um workspace: o ID do workspace (wrkspc_...). Chave criada dentro de um workspace não precisa."),
     ("GITHUB_TOKEN", "Token fine-grained só do repo circulo (Contents, Pull requests, Checks: leitura e escrita)."),
     ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
     ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
@@ -108,7 +109,9 @@ def _llm_ok() -> tuple[bool, str]:
         r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model=modelo, max_tokens=5)
         return True, f"respondeu ({modelo}, {r.tokens} tokens)"
     except Exception as exc:  # noqa: BLE001
-        return False, f"falhou: {_erro(exc)}"
+        dica = (" → crie a chave dentro de um workspace no Console, ou preencha ANTHROPIC_WORKSPACE_ID"
+                if "anthropic-workspace-id" in str(exc) else "")
+        return False, f"falhou: {_erro(exc)}{dica}"
 
 
 def _github_ok() -> tuple[bool, str]:

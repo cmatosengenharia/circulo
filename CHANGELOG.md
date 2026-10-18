@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 — 2026-10-18
+
+- Chave da Anthropic sem workspace: `ANTHROPIC_WORKSPACE_ID` opcional, enviado no cabeçalho `anthropic-workspace-id`.
+
 ## 1.2.1 — 2026-10-18
 
 - Teste de conexões mostra o erro inteiro (com o corpo da resposta) e em qual passo falhou; teste do Claude usa o modelo pequeno da política; permissão certa do token do GitHub (Checks em leitura).

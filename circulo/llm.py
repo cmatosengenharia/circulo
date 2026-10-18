@@ -29,7 +29,9 @@ class AnthropicLLM:
 
     def __init__(self, default_model: str | None = None):
         import anthropic  # noqa: import tardio
-        self.client = anthropic.Anthropic()
+        # chave da organização (sem workspace) exige dizer o workspace em cada chamada
+        ws = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+        self.client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": ws} if ws else None)
         self.default_model = default_model or os.environ.get("CIRCULO_LLM_MODEL", "claude-haiku-5-5")
 
     def generate(self, *, system, prompt, model, max_tokens, web_search=0):
