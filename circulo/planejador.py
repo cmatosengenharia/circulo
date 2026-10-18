@@ -106,9 +106,14 @@ class Planejador:
     def run(self, autorizado: bool = False) -> dict | None:
         self.s.set("planejador", {"em": time.time()})
         # a evolução parte de uma pergunta: o conselho escolhe (SQL + Jev, sem LLM); sem pergunta com dor, não gasta
-        from .perguntas import PERSONAS, Conselho
+        from .perguntas import Conselho, gerar, personas
         conselho = Conselho(self.ctx)
         conselho.acompanhar()
+        try:
+            gerar(self.ctx)          # o Questionador (LLM especializada): 1x por dia, ou antes se as perguntas se esgotarem
+        except Exception:  # noqa: BLE001 — gerar perguntas nunca impede de responder as que já existem
+            pass
+        PERSONAS = personas(self.s)
         pergunta = conselho.escolher()
         if pergunta is None:
             return None

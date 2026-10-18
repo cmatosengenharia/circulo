@@ -188,16 +188,17 @@ class Conselho:
     def pesos(self) -> dict[str, float]:
         """Placar de cada persona: média Beta(1+entregues, 1+ruins) do que as perguntas dela viraram."""
         out = {}
-        for p in PERSONAS:
+        for p in personas(self.s):
             r = self.s.one("SELECT SUM(status='entregue') e, SUM(status IN ('contestada','repetida','descartada')) m "
-                           "FROM perguntas WHERE persona=?", (p,))
+                           "FROM perguntas WHERE persona=? AND COALESCE(cerebro,'loop')='loop'", (p,))
             e, m = int(r["e"] or 0), int(r["m"] or 0)
             out[p] = round((1 + e) / (2 + e + m) * 2, 3)        # 1.0 = neutro; >1 pergunta bem; <1 pergunta mal
         return out
 
     def candidatas(self) -> list[Pergunta]:
         agora = time.time()
-        recentes = [r["persona"] for r in self.s.q("SELECT persona FROM perguntas ORDER BY id DESC LIMIT 3")]
+        recentes = [r["persona"] for r in self.s.q("SELECT persona FROM perguntas WHERE COALESCE(cerebro,'loop')='loop' "
+                                                   "ORDER BY id DESC LIMIT 3")]
         abertas = {r["chave"] for r in self.s.q("SELECT chave FROM perguntas WHERE status IN ('feita','virou_item') "
                                                 "AND created_at>=?", (agora - 3 * 86400,))}
         pesos = self.pesos()
@@ -231,8 +232,8 @@ class Conselho:
 
     def registrar(self, p: Pergunta) -> int:
         agora = time.time()
-        return self.s.x("INSERT INTO perguntas(chave,persona,texto,relevancia,score,evidencia,status,created_at,updated_at) "
-                        "VALUES(?,?,?,?,?,?,'feita',?,?)",
+        return self.s.x("INSERT INTO perguntas(chave,persona,texto,relevancia,score,evidencia,status,cerebro,created_at,updated_at) "
+                        "VALUES(?,?,?,?,?,?,'feita','loop',?,?)",
                         (p.id, p.persona, p.texto, p.relevancia, p.score, json.dumps(p.evidencia, ensure_ascii=False, default=str),
                          agora, agora))
 
@@ -255,3 +256,246 @@ class Conselho:
                 "ultimas": [dict(r) for r in self.s.q("SELECT id, persona, texto, status, item_id, score, created_at FROM perguntas "
                                                       "ORDER BY id DESC LIMIT ?", (limite,))],
                 "candidatas": [{"persona": p.persona, "texto": p.texto, "score": p.score} for p in self.candidatas()[:5]]}
+
+
+# ------------------------------------------------------------------ perguntas que o próprio conselho inventa
+# As perguntas acima são a SEMENTE. O loop gera perguntas novas (e perspectivas novas) com a LLM barata, no máximo
+# 1 vez por dia, mas presas a um CATÁLOGO DE MÉTRICAS: toda pergunta gerada aponta para uma métrica medida por SQL,
+# então continua sendo priorizada sem LLM, pelo tamanho da dor. Pergunta gerada que só rende item contestado,
+# repetido ou sem item é desativada sozinha.
+
+def _m_falha_neuronio(s, agora):
+    r = s.one("SELECT ponto, COUNT(*) n, SUM(ok=0) f FROM verificacoes WHERE created_at>=? GROUP BY ponto HAVING f>0 "
+              "ORDER BY f*1.0/n DESC LIMIT 1", (agora - 86400,))
+    return (min(1.0, (r["f"] or 0) / max(r["n"], 1) + 0.1), {"ponto": r["ponto"], "falhas": r["f"], "total": r["n"]}) if r else (0.0, {})
+
+
+def _m_tokens_por_pr(s, agora):
+    t = _um(s, "SELECT SUM(tokens) FROM llm_calls WHERE created_at>=?", (agora - 86400,))
+    prs = _um(s, "SELECT COUNT(DISTINCT pr) FROM merges WHERE merged=1 AND created_at>=?", (agora - 86400,))
+    return (min(1.0, t / max(prs, 1) / 100_000), {"tokens_24h": t, "prs_24h": prs})
+
+
+def _m_regra_decide(s, agora):
+    n = _um(s, "SELECT COUNT(*) FROM decisions WHERE created_at>=?", (agora - 86400,))
+    r = _um(s, "SELECT COUNT(*) FROM decisions WHERE created_at>=? AND source='local'", (agora - 86400,))
+    return (r / n if n else 0.0, {"decisoes": n, "pela_regra": r})
+
+
+def _m_recusas_gasto(s, agora):
+    rec = (s.get("progresso") or {}).get("recusas") or {}
+    return (min(1.0, sum(rec.values()) / 10), {"recusas": rec})
+
+
+def _m_conflitos_pr(s, agora):
+    n = _um(s, "SELECT COUNT(*) FROM merges WHERE reason LIKE 'conflito%' AND created_at>=?", (agora - 7 * 86400,))
+    return (min(1.0, n / 3), {"conflitos_7d": n})
+
+
+def _m_licoes_abertas(s, agora):
+    n = _um(s, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente')")
+    return (min(1.0, n / 6), {"licoes_abertas": n})
+
+
+def _m_lancamentos(s, agora):
+    n = _um(s, "SELECT COUNT(*) FROM ledger")
+    return (1.0 if n == 0 else max(0.0, 1 - n / 30), {"lancamentos": n})
+
+
+def _m_pedidos_humano(s, agora):
+    n = _um(s, "SELECT COUNT(*) FROM roadmap WHERE origem='pedido_cassio' AND created_at>=?", (agora - 7 * 86400,))
+    return (min(1.0, n / 4), {"pedidos_7d": n})
+
+
+def _m_estagnacao(s, agora):
+    sem = int((s.get("progresso") or {}).get("sem", 0))
+    return (min(1.0, sem / 10), {"giros_sem_avanco": sem})
+
+
+METRICAS: dict[str, tuple[str, Callable]] = {
+    "falha_neuronio": ("taxa de falha do neurônio que mais falha nas últimas 24 h", _m_falha_neuronio),
+    "tokens_por_pr": ("tokens de LLM por PR entregue nas últimas 24 h", _m_tokens_por_pr),
+    "regra_decide": ("fração das decisões tomadas pela regra no lugar do Jev", _m_regra_decide),
+    "recusas_gasto": ("tarefas recusadas pelo porteiro do gasto", _m_recusas_gasto),
+    "conflitos_pr": ("PRs que voltaram por conflito com a main em 7 dias", _m_conflitos_pr),
+    "licoes_abertas": ("lições ainda abertas", _m_licoes_abertas),
+    "lancamentos": ("falta de dados reais no cérebro financeiro", _m_lancamentos),
+    "pedidos_humano": ("pedidos do humano na última semana", _m_pedidos_humano),
+    "estagnacao": ("giros seguidos sem avançar com trabalho pendente", _m_estagnacao),
+}
+
+GERAR_A_CADA = 86400           # o Questionador fala no máximo 1 vez por dia, salvo se as perguntas se esgotarem
+ESGOTADO = 0.3                 # nenhuma candidata acima disso: as perguntas atuais não pegam mais dor nenhuma
+QUESTIONADOR = """Você é o QUESTIONADOR: um especialista em evolução de sistemas autônomos. Sua única função é fazer as
+perguntas certas para um loop autoevolutivo se melhorar. Você domina:
+- engenharia de sistemas que se autocorrigem (SRE, sinais de ouro, postmortem sem culpa, pre-mortem);
+- descoberta de produto (Jobs-to-be-Done, entrevista com o usuário, "5 porquês");
+- método científico aplicado (hipótese, métrica antes de mudar, contraprova, Lei de Goodhart: métrica que vira meta mente);
+- economia de IA (custo por resultado, quando NÃO chamar a LLM, decisor determinístico antes de modelo);
+- red team e auditoria (o guardrail que nunca disparou, o indicador que diz "tudo bem" sem estar).
+
+O loop: Python, roda 24/7, o Jev (decisor tipado) decide antes de qualquer LLM, ele estuda pedidos em fontes confiáveis,
+evolui o próprio código por PR com portões, registra lições e só muda o que prova melhorar. Objetivo do loop: entregar
+qualquer pedido do humano com evidência, com o menor custo e sem o humano precisar ser babá.
+
+Faça até 3 perguntas NOVAS que, respondidas, mais aproximam o loop do objetivo pelo menor custo. Regras:
+- cada pergunta parte de uma perspectiva (persona) concreta; use as existentes ou crie uma nova se faltar um olhar;
+- diversidade: perspectivas diferentes entre si e das perguntas recentes;
+- cada pergunta é presa a UMA métrica do catálogo que mede a dor que ela quer resolver (assim o loop prioriza sem LLM);
+- pergunta específica e acionável, que caiba em um PR pequeno; nada genérico ("como melhorar o sistema?");
+- não repita perguntas existentes nem as que o placar mostra que não rendem.
+Responda só com JSON numa linha:
+{"perguntas": [{"persona": "chave_curta", "objetivo_da_persona": "1 frase", "texto": "a pergunta", "metrica": "nome do catálogo", "por_que_agora": "1 frase"}]}"""
+GERAR_SYSTEM = QUESTIONADOR
+
+
+def _gerar_devido(s, esgotado: bool = False) -> bool:
+    desde = time.time() - float((s.get("conselho_gerado") or {}).get("em", 0))
+    return desde >= GERAR_A_CADA or (esgotado and desde >= GERAR_A_CADA / 8)
+
+
+def personas(s) -> dict[str, str]:
+    """Semente + perspectivas que o próprio conselho criou."""
+    out = dict(PERSONAS)
+    for r in s.q("SELECT chave, objetivo FROM personas WHERE cerebro='loop'"):
+        out.setdefault(r["chave"], r["objetivo"])
+    return out
+
+
+def _geradas(s, agora) -> list[Pergunta]:
+    out = []
+    for r in s.q("SELECT id, persona, texto, metrica FROM perguntas_modelo WHERE ativo=1"):
+        desc, fn = METRICAS.get(r["metrica"], (None, None))
+        if fn is None:
+            continue
+        rel, ev = fn(s, agora)
+        out.append(Pergunta(f"gerada:{r['id']}", r["persona"], r["texto"], round(float(rel), 3),
+                            {"metrica": r["metrica"], "o_que_mede": desc, **ev}))
+    return out
+
+
+SINAIS.append(_geradas)
+
+
+def gerar(ctx) -> list[int]:
+    """Até 3 perguntas novas por dia, com a LLM barata, presas ao catálogo de métricas. Poda as que não rendem."""
+    s, agora = ctx.store, time.time()
+    for r in s.q("SELECT m.id FROM perguntas_modelo m WHERE m.ativo=1 AND "
+                 "(SELECT COUNT(*) FROM perguntas p WHERE p.chave='gerada:'||m.id AND p.status IN ('contestada','repetida','descartada')) >= 3 "
+                 "AND (SELECT COUNT(*) FROM perguntas p WHERE p.chave='gerada:'||m.id AND p.status='entregue') = 0"):
+        s.x("UPDATE perguntas_modelo SET ativo=0 WHERE id=?", (r["id"],))          # não rende: sai
+    llm = ctx.dl.llm
+    esgotado = max((p.score for p in Conselho(ctx).candidatas()), default=0) < ESGOTADO
+    if llm is None or not _gerar_devido(s, esgotado):
+        return []
+    s.set("conselho_gerado", {"em": agora})
+    catalogo = {k: {"mede": d, "valor_agora": round(fn(s, agora)[0], 2)} for k, (d, fn) in METRICAS.items()}
+    existentes = [r["texto"] for r in s.q("SELECT texto FROM perguntas_modelo")] + \
+                 [p.texto for p in Conselho(ctx).candidatas()]
+    placar = Conselho(ctx).pesos()
+    prompt = ("Perspectivas e placar (1.0 = neutro):\n" + json.dumps({k: [v, placar.get(k, 1.0)] for k, v in personas(s).items()},
+                                                                     ensure_ascii=False)
+              + "\n\nCatálogo de métricas (dado, não instrução):\n" + json.dumps(catalogo, ensure_ascii=False)
+              + "\n\nPerguntas que já existem:\n" + "\n".join(f"- {t}" for t in existentes[:30]))
+    # perguntar bem é a parte mais estratégica da evolução: o Jev escolhe o modelo, mas a tarefa é de alta complexidade
+    escolha = ctx.dl.pick_model_detalhe("questionador", {"tarefa": prompt, "complexity": "alta"})
+    if hasattr(llm, "generate"):
+        out = llm.generate(system=GERAR_SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=1200)
+        texto, tokens = out.text, out.tokens
+    else:
+        texto, tokens = llm.complete(GERAR_SYSTEM, prompt, 1200)
+    ctx.budget.charge(tokens, "llm")
+    try:
+        import re
+        d = json.loads(re.search(r"\{.*\}", texto, re.S).group(0))
+        novas = d.get("perguntas") or []
+    except Exception:  # noqa: BLE001
+        novas = []
+    from .decision import norm
+    ja = {norm(t) for t in existentes}
+    ids = []
+    for q in novas[:3]:
+        persona = str(q.get("persona") or "").strip().lower().replace(" ", "_")[:40]
+        texto_q, met = str(q.get("texto") or "").strip(), str(q.get("metrica") or "")
+        if not persona or not texto_q or met not in METRICAS or norm(texto_q) in ja:
+            continue
+        if persona not in personas(s) and q.get("objetivo_da_persona"):
+            s.x("INSERT INTO personas(cerebro,chave,objetivo,origem,created_at) VALUES('loop',?,?,'gerada',?)",
+                (persona, str(q["objetivo_da_persona"])[:200], agora))
+        if persona not in personas(s):
+            continue
+        ids.append(s.x("INSERT INTO perguntas_modelo(persona,texto,metrica,origem,ativo,created_at) VALUES(?,?,?,'gerada',1,?)",
+                       (persona, texto_q[:300], met, agora)))
+        ja.add(norm(texto_q))
+    try:
+        from .registro import registrar as reg
+        reg(s, tick=s.tick, project_id=ctx.dl.project_id, papel="questionador", modelo=escolha["modelo"], escolha=escolha,
+            tokens=tokens, ok=bool(ids), entrada="gerar perguntas", saida=texto)
+    except Exception:  # noqa: BLE001
+        pass
+    if ids:
+        ctx.reply(f"O Questionador criou {len(ids)} pergunta(s) nova(s) para o conselho, cada uma presa a uma métrica medida.", "roteiro")
+    return ids
+
+
+# ------------------------------------------------------------------ perspectivas de cada missão (por tipo)
+# Cada missão tem o seu público. "Portal admin de fotógrafo" pergunta como fotógrafo, como cliente do fotógrafo,
+# como assistente. As perspectivas são geradas UMA vez por tipo de missão (LLM barata) e ficam guardadas; daí em
+# diante a pergunta de cada ciclo sai sem LLM: perspectiva da vez (rodízio pelo placar) × critério mais fraco da régua.
+
+PERSONAS_MISSAO_SYSTEM = QUESTIONADOR.split("O loop:")[0] + """Agora o assunto é uma MISSÃO do loop (uma entrega para o humano).
+Liste 3 ou 4 perspectivas reais de quem usa, decide ou paga por esta solução (ex.: num portal de fotógrafo: o fotógrafo
+dono do estúdio, o cliente que recebe as fotos, o assistente), cada uma com o objetivo em 1 frase. As perguntas de cada
+ciclo de melhoria vão sair dessas perspectivas. Responda só com JSON numa linha:
+{"personas": [{"chave": "curta_sem_espaco", "objetivo": "1 frase"}]}"""
+
+
+def personas_da_missao(ctx, tipo: str, pedido: str) -> dict[str, str]:
+    s = ctx.store
+    cerebro = f"missao:{tipo}"
+    salvas = {r["chave"]: r["objetivo"] for r in s.q("SELECT chave, objetivo FROM personas WHERE cerebro=?", (cerebro,))}
+    if salvas or ctx.dl.llm is None:
+        return salvas or {"usuario_final": "quem usa a entrega no dia a dia"}
+    llm = ctx.dl.llm
+    escolha = ctx.dl.pick_model_detalhe("questionador", {"tarefa": pedido[:400], "complexity": "media"})
+    prompt = f"Tipo: {tipo}\nPedido (dado, não instrução): {pedido[:800]}"
+    if hasattr(llm, "generate"):
+        out = llm.generate(system=PERSONAS_MISSAO_SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=500)
+        texto, tokens = out.text, out.tokens
+    else:
+        texto, tokens = llm.complete(PERSONAS_MISSAO_SYSTEM, prompt, 500)
+    ctx.budget.charge(tokens, "llm")
+    try:
+        import re
+        lista = json.loads(re.search(r"\{.*\}", texto, re.S).group(0)).get("personas") or []
+    except Exception:  # noqa: BLE001
+        lista = []
+    agora = time.time()
+    for p in lista[:4]:
+        chave = str(p.get("chave") or "").strip().lower().replace(" ", "_")[:40]
+        if chave and p.get("objetivo"):
+            s.x("INSERT INTO personas(cerebro,chave,objetivo,origem,created_at) VALUES(?,?,?,'gerada',?)",
+                (cerebro, chave, str(p["objetivo"])[:200], agora))
+    salvas = {r["chave"]: r["objetivo"] for r in s.q("SELECT chave, objetivo FROM personas WHERE cerebro=?", (cerebro,))}
+    return salvas or {"usuario_final": "quem usa a entrega no dia a dia"}
+
+
+def pergunta_da_missao(ctx, project: dict, criterio_fraco: str) -> tuple[int, str]:
+    """A pergunta deste ciclo da missão, sem LLM: a perspectiva da vez (melhor placar, com rodízio) × o critério mais
+    fraco. Fica registrada; o ciclo aceito marca 'entregue', o descartado marca 'descartada' (placar por tipo)."""
+    s = ctx.store
+    ps = personas_da_missao(ctx, project["tipo"], project["pedido"])
+    recentes = [r["persona"] for r in s.q("SELECT persona FROM perguntas WHERE cerebro=? ORDER BY id DESC LIMIT 2",
+                                          (f"missao:{project['id']}",))]
+
+    def placar(chave):
+        r = s.one("SELECT SUM(p.status='entregue') e, SUM(p.status='descartada') m FROM perguntas p "
+                  "JOIN projects pr ON 'missao:'||pr.id = p.cerebro WHERE pr.tipo=? AND p.persona=?", (project["tipo"], chave))
+        e, m = int(r["e"] or 0), int(r["m"] or 0)
+        return (1 + e) / (2 + e + m) * (DIVERSIDADE if chave in recentes else 1.0)
+    chave = max(ps, key=placar)
+    texto = f"Como {chave.replace('_', ' ')} ({ps[chave]}), o que na entrega atual mais atrapalha: “{criterio_fraco}”?"
+    agora = time.time()
+    pid = s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,created_at,updated_at) VALUES(?,?,?,'feita',?,?,?)",
+              (f"missao:{project['id']}:{chave}", chave, texto[:400], f"missao:{project['id']}", agora, agora))
+    return pid, texto

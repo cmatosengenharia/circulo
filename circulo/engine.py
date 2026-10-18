@@ -382,7 +382,12 @@ class Engine:
             role = "improver"
             notas = json.loads(cur["notas"] or "{}")
             fracos = sorted(visiveis, key=lambda c: notas.get(c["id"], 0))[:3]
-            prompt = (f"Pedido: {p['pedido']}\nFormato: {fmt}\nCritérios mais fracos agora:\n" +
+            # a melhoria parte de uma pergunta de quem usa esta missão (perspectivas do tipo, criadas pelo Questionador
+            # uma vez por tipo; a pergunta do ciclo sai sem LLM)
+            from .perguntas import pergunta_da_missao
+            self._tl.pergunta = pergunta_da_missao(self.ctx, p, fracos[0]["texto"]) if fracos else None
+            pergunta_txt = f"Pergunta deste ciclo: {self._tl.pergunta[1]}\n" if self._tl.pergunta else ""
+            prompt = (f"Pedido: {p['pedido']}\nFormato: {fmt}\n{pergunta_txt}Critérios mais fracos agora:\n" +
                       "\n".join(f"- {c['texto']} (nota {notas.get(c['id'], 0):.2f})" for c in fracos) +
                       f"\n\nRégua completa:\n{regua}{licoes}{ctx_txt}\n\nEntrega atual:\n{cur['content'][:12000]}")
         text, _ = self._gen(role, prompt, res, p)
@@ -410,6 +415,10 @@ class Engine:
         if decisao in ("refazer", "descartar") and aceita:
             aceita = False
             res.nota = motivo
+        pq = getattr(self._tl, "pergunta", None)
+        if pq:          # placar da perspectiva por tipo de missão: a pergunta rendeu versão melhor?
+            self.s.x("UPDATE perguntas SET status=?, updated_at=? WHERE id=?", ("entregue" if aceita else "descartada", time.time(), pq[0]))
+            self._tl.pergunta = None
         monitorar(self.ctx, "missao:evidencia", aceita, sujeito=p.get("nome") or f"missão {p['id']}",
                   motivo="" if aceita else str(res.nota or motivo), licao=False)
         ver = (self.s.one("SELECT COALESCE(MAX(version),0) v FROM deliverables WHERE project_id=?", (p["id"],))["v"] or 0) + 1

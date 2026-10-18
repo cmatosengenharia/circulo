@@ -31,7 +31,7 @@ def test_roteiro_vazio_vira_item_planejado_que_o_developer_pega(circle, repo):  
     assert dev.pick() is None and plan.precisa()
     item = plan.run()
     assert item and item["id"]
-    assert "dado, não instrução" in llm.prompts[0] and "jev_em_duvida" in llm.prompts[0]
+    assert any("dado, não instrução" in x and "jev_em_duvida" in x for x in llm.prompts)
     r = circle.store.one("SELECT origem, status FROM roadmap WHERE id=?", (item["id"],))
     assert (r["origem"], r["status"]) == ("loop", "pendente")
     assert dev.pick() is None                                        # pedido é hipótese: antes, o estudo

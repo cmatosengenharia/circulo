@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.13.0 — 2026-10-18
+
+As perguntas deixam de ser só fixas. Elas vêm de uma **LLM especializada nesse tipo de evolução** (pedido do Cássio),
+sem perder a economia.
+
+- **Questionador** (`perguntas.py`): papel de LLM com prompt de especialista em evolução de sistemas autônomos.
+  Conhece SRE e pre-mortem, Jobs-to-be-Done e "5 porquês", método científico e Lei de Goodhart, economia de IA (quando
+  NÃO chamar a LLM) e red team. Ele:
+  - cria perguntas novas e diversas, e cria **perspectivas novas** quando falta um olhar (ex.: "novato");
+  - prende **cada pergunta a uma métrica de um catálogo medido por SQL** (conflitos de PR, tokens por PR, regra no
+    lugar do Jev, recusas de gasto, lições abertas, estagnação…). Assim a priorização continua sem LLM, pelo tamanho
+    da dor;
+  - fala **no máximo 1 vez por dia**, ou antes (3 h) se as perguntas atuais se esgotarem (nenhuma candidata com
+    prioridade ≥ 0,3). O modelo é escolhido pelo Jev, como tarefa de alta complexidade;
+  - pergunta gerada que só rende item contestado, repetido ou sem item (3 vezes, nenhuma entrega) é desativada sozinha.
+- As 8 perspectivas e perguntas da 1.12 continuam como **semente** e como plano B sem LLM.
+- **Perguntas por tipo de missão**: o Questionador cria **uma vez por tipo** as perspectivas de quem usa, decide ou paga
+  (ex.: portal de fotógrafo → fotógrafo, cliente final, assistente). Cada ciclo de melhoria da missão parte de uma
+  pergunta "Como <perspectiva>, o que na entrega atual mais atrapalha <critério mais fraco>?", **sem LLM extra**:
+  ela entra no prompt do Improver que já ia rodar. Rodízio entre perspectivas, com placar por tipo de missão (versão
+  aceita = entregue).
+
 ## 1.12.0 — 2026-10-18
 
 A autoevolução parte de **perguntas**, feitas por um **conselho de perspectivas**, com economia primeiro.

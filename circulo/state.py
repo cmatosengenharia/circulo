@@ -191,6 +191,28 @@ CREATE TABLE IF NOT EXISTS perguntas (
   updated_at REAL NOT NULL
 );
 
+-- perspectivas do conselho: as do loop e as de cada tipo de missão (criadas pelo Questionador)
+CREATE TABLE IF NOT EXISTS personas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cerebro TEXT NOT NULL,         -- loop | missao:<tipo>
+  chave TEXT NOT NULL,
+  objetivo TEXT NOT NULL,
+  origem TEXT NOT NULL,          -- gerada
+  created_at REAL NOT NULL,
+  UNIQUE(cerebro, chave)
+);
+
+-- perguntas criadas pelo Questionador (LLM especializada), presas a uma métrica do catálogo (priorizadas sem LLM)
+CREATE TABLE IF NOT EXISTS perguntas_modelo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  persona TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  metrica TEXT NOT NULL,
+  origem TEXT NOT NULL,
+  ativo INTEGER NOT NULL,
+  created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS incidents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fingerprint TEXT NOT NULL UNIQUE,
@@ -433,7 +455,8 @@ class Store:
                   ("cycles", "braco", "TEXT"), ("cycles", "experimento", "INTEGER"),
                   ("trail", "detalhe", "TEXT"), ("roadmap", "desativado", "INTEGER"), ("alerts", "evento", "INTEGER"),
                   ("shadow_obs", "tag_ativa", "TEXT"), ("shadow_obs", "tag_shadow", "TEXT"),
-                  ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"))
+                  ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"),
+                  ("perguntas", "cerebro", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
