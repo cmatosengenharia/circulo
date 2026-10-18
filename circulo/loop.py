@@ -24,7 +24,8 @@ from . import guardrails
 from .engine import Engine
 from .graph import MissionGraph
 from .harness_lab import HarnessLab
-from .self_dev import SelfDeveloper, build_self_dev
+from .reparo import build_developer
+from .self_dev import SelfDeveloper
 from .incidents import Incidents
 from .memory import Memory
 from .metrics import METRICAS, Metricas, seguro
@@ -97,7 +98,7 @@ class Circle:
         self.graph = MissionGraph(self.ctx, self.memory)
         self.engine.graph = self.graph
         self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
-        self.self_dev = self_dev if self_dev is not None else build_self_dev(self.ctx)
+        self.self_dev = self_dev if self_dev is not None else build_developer(self.ctx)
         if self.self_dev is not None:
             self.self_dev.recuperar()
             self.self_dev.concluir_mergeados()
