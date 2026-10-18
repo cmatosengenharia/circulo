@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.7.0 — 2026-10-18
+
+Cérebros e neurônios. Cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros.
+
+- **Contrato do neurônio** (`neuronios.py`): estímulo → Jev primeiro → ação → **portões de saída** (todos precisam
+  aprovar para a saída seguir) → sinapse (`verificacoes`) → aprendizado (`licoes`).
+- **O PR só nasce se todos os portões aprovarem** (neurônio `developer:abrir_pr`): antes de existir PR, o Developer
+  passa localmente pelo mesmo que o gate do merge exige (constituição intacta, tamanho, teste novo), mais lint e testes
+  iguais ao CI e os portões aprendidos. Se barrar, ele corrige no mesmo worktree com a lista do que falhou e só desiste
+  depois disso. Vale também para o conserto de PR reprovado.
+- **Neurogênese**: a lição vira portão executável (tabela `portoes`), como dado e não como texto num prompt:
+  - lição de lint vira portão `ruff --select <código>`;
+  - lição de teste vira portão `pytest <teste>`;
+  - lição de estrutura com item vira portão obrigatório: o PR desse item precisa trazer um teste que cite "lição #N".
+    É esse teste, rodando no CI para sempre, que impede o erro de voltar.
+  Comandos só da allowlist (ruff, pytest). Os portões aprendidos aparecem na tarefa do Developer.
+- **Cérebros no painel**: Cérebro do Loop, um cérebro por missão e Cérebro Financeiro, com os neurônios de cada um,
+  disparos, quantos foram barrados e os portões aprendidos.
+- O ruff é instalado uma única vez quando falta (nunca dentro de testes).
+
 ## 1.6.0 — 2026-10-18
 
 Maturidade: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez.

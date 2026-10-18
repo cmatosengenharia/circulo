@@ -34,7 +34,10 @@ class FixAgent:
         self.tasks.append(task)
         if self.fix:
             (Path(workdir) / "app.py").write_text("def soma(a, b):\n    return a + b\n")
-            (Path(workdir) / "test_app.py").write_text("from app import soma\n\ndef test_soma():\n    assert soma(2, 2) == 4\n")
+            import re
+            m = re.search(r"lição #(\d+)", task)        # o teste de regressão cita a lição que ele prova
+            marca = f"    # lição #{m.group(1)}\n" if m else ""
+            (Path(workdir) / "test_app.py").write_text(f"from app import soma\n\ndef test_soma():\n{marca}    assert soma(2, 2) == 4\n")
         return {"ok": True, "tokens": 1234, "log": "ok"}
 
 

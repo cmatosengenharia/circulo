@@ -160,6 +160,22 @@ CREATE TABLE IF NOT EXISTS licoes (
   updated_at REAL NOT NULL
 );
 
+-- portões aprendidos (neurogênese): nascem de uma lição e barram o erro antes de a saída do neurônio seguir adiante
+CREATE TABLE IF NOT EXISTS portoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  neuronio TEXT NOT NULL,
+  tipo TEXT NOT NULL,            -- comando | proibido | obrigatorio
+  spec TEXT NOT NULL,
+  descricao TEXT,
+  licao_id INTEGER,
+  ativo INTEGER NOT NULL,
+  avaliacoes INTEGER NOT NULL,
+  bloqueios INTEGER NOT NULL,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL,
+  UNIQUE(neuronio, tipo, spec)
+);
+
 CREATE TABLE IF NOT EXISTS incidents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fingerprint TEXT NOT NULL UNIQUE,

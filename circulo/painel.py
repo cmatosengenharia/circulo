@@ -119,7 +119,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "conversa": conversa(s, projeto),
         "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
         **({"motor": motor(s, projeto)} if kit == "geral" else {}),
-        **({"roteiro": roteiro(s), "incidentes": incidentes(s), "licoes": _licoes(s), "quarentena": {
+        **({"roteiro": roteiro(s), "incidentes": incidentes(s), "licoes": _licoes(s), "cerebros": _cerebros(s), "quarentena": {
             k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
     }
 
@@ -130,6 +130,14 @@ def _licoes(s: Store) -> dict:
         return Licoes(s).resumo()
     except Exception:  # noqa: BLE001 — o painel nunca cai por causa de um bloco
         return {}
+
+
+def _cerebros(s: Store) -> list[dict]:
+    from .neuronios import cerebros
+    try:
+        return cerebros(s)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def conversa(s: Store, projeto: int | None, limite: int = 25) -> list[dict]:

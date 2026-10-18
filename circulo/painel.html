@@ -258,6 +258,10 @@ details.chamada pre{white-space:pre-wrap;font:12.5px/1.45 ui-monospace,SFMono-Re
 .rt .ev a{color:var(--jev);font-weight:600}
 .origem{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
 .origem.erro{background:var(--bad-soft);color:var(--bad)}
+.cerebros{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.cerebro{border:1px solid var(--line, rgba(127,127,127,.25));border-radius:12px;padding:10px 12px}
+.cerebro .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.cerebro .meta{font-size:12px;color:var(--muted)}
 .origem.voce{background:var(--llm-soft);color:var(--llm)}
 details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14px 0 6px;color:var(--muted)}
 
@@ -361,6 +365,12 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <h2>Roteiro do loop</h2>
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
       <div id="roadmap"></div>
+    </section>
+    <section class="panel c12 zero-only" hidden aria-label="Cérebros">
+      <h2>Cérebros e neurônios</h2>
+      <p class="sub" style="margin:-6px 0 8px">Cada ponto do fluxo é um neurônio: Jev primeiro, ação, e a saída só segue se todos os portões aprovarem.
+        Portões aprendidos nascem das lições (neurogênese) e barram o erro antes de ele se repetir. Últimas 24 h.</p>
+      <div id="cerebros" class="cerebros"></div>
     </section>
     <section class="panel c12 zero-only" hidden aria-label="Lições">
       <h2>Lições: erros que o loop não pode repetir</h2>
@@ -838,6 +848,10 @@ function render(s) {
     const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
     $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
       : `<li class="empty">Nenhum erro registrado até agora.</li>`;
+    $("#cerebros").innerHTML = (s.cerebros || []).map(c => `<div class="cerebro"><div class="top"><strong>${esc(c.cerebro)}</strong>
+      <span class="meta">${c.disparos} disparos · ${c.falhas} barrados${(c.portoes_aprendidos || []).length ? ` · ${c.portoes_aprendidos.reduce((a, p) => a + p.portoes, 0)} portões aprendidos` : ""}</span></div>
+      <ul class="list">${c.neuronios.sort((a, b) => b.falhas - a.falhas || b.disparos - a.disparos).slice(0, 14).map(n => `<li><span>${esc(n.neuronio)}<span class="meta">${n.disparos} disparos · ${n.falhas} barrados</span></span><span class="chip ${n.falhas ? "aberto" : "resolvido"}">${Math.round(100 * (n.disparos - n.falhas) / n.disparos)}% ok</span></li>`).join("")}</ul></div>`).join("")
+      || `<p class="sub">Nenhum neurônio disparou ainda.</p>`;
     const LC = s.licoes || {}, ps = LC.por_status || {};
     const LS = {aberta:"aberta", em_correcao:"em correção", validada:"validada", evidenciada:"evidenciada", reincidente:"REINCIDENTE"};
     $("#licoesResumo").innerHTML = `<span><b>${LC.reincidencias || 0}</b> reincidências</span><span><b>${LC.abertas_estruturais || 0}</b> de estrutura abertas</span>` +

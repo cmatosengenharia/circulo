@@ -96,7 +96,7 @@ class Licoes:
             self.reply(f"Erro novo registrado como lição #{lid} ({classe}): {descricao[:160]}", "licao")
             if classe == "estrutural":
                 self._abrir_item(lic, motivo, detalhe_item, titulo=titulo)
-            return dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lid,)))
+            return self._neurogenese(lid)
         lic = dict(row)
         reincidiu = lic["status"] in ("validada", "evidenciada")
         if reincidiu:
@@ -111,6 +111,18 @@ class Licoes:
             "SELECT COUNT(*) n FROM verificacoes WHERE assinatura=? AND ok=0 AND created_at>=?", (sig, agora - 86400))["n"] >= AMBIENTE_RECORRENTE
         if reincidiu and lic["classe"] != "trabalho" or recorrente_ambiente or (lic["classe"] == "estrutural" and not lic["item_id"]):
             self._abrir_item(lic, motivo, detalhe_item, topo=reincidiu, titulo=titulo)
+        return self._neurogenese(lic["id"])
+
+    def _neurogenese(self, lid: int) -> dict:
+        """A lição vira portão executável no neurônio onde o erro aconteceu (quando dá para checar mecanicamente)."""
+        lic = dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lid,)))
+        try:
+            from .neuronios import neurogenese
+            novos = neurogenese(self.s, lic)
+        except Exception:  # noqa: BLE001 — criar portão nunca derruba quem registra a lição
+            novos = []
+        if novos:
+            self.reply(f"Neurogênese: a lição #{lid} criou {len(novos)} portão(ões) novo(s) antes de abrir PR.", "licao")
         return lic
 
     def _abrir_item(self, lic: dict, motivo: str, detalhe_item: str = "", topo: bool = False, titulo: str = "") -> None:
