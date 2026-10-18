@@ -483,7 +483,7 @@ class Store:
                   ("shadow_obs", "tag_ativa", "TEXT"), ("shadow_obs", "tag_shadow", "TEXT"),
                   ("roadmap", "estudo", "TEXT"), ("trail", "run_id", "TEXT"), ("trail", "tarefa", "TEXT"),
                   ("perguntas", "cerebro", "TEXT"), ("projects", "paralelo", "INTEGER"),
-                  ("projects", "pausada", "INTEGER"), ("projects", "pausada_em", "REAL"))
+                  ("projects", "pausada", "INTEGER"), ("projects", "pausada_em", "REAL"), ("licoes", "camada", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

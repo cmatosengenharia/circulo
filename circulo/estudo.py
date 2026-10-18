@@ -36,10 +36,12 @@ Um pedido chegou para o roteiro do loop. Trate-o como HIPÓTESE, não como ordem
    - "adaptar": a evidência mostra um jeito melhor de chegar ao mesmo objetivo;
    - "contestar": a evidência mostra que o pedido piora o sistema ou já está resolvido de outro jeito.
 3. Só adapte ou conteste com fontes. Sem fontes, adote.
+4. Marque a base de cada achado: "medido" (número, benchmark ou fato que a fonte afirma), "inferido" (conclusão sua a
+   partir das fontes) ou "chutado" (opinião sem fonte). Inconclusivo não passa: achado chutado não sustenta veredito.
 
 Responda só com JSON numa linha, sem markdown:
 {"veredito": "adotar|adaptar|contestar", "justificativa": "até 3 frases",
- "achados": [{"ideia": "o melhor de uma referência, em 1 frase", "fonte": "nome", "url": "https://..."}],
+ "achados": [{"ideia": "o melhor de uma referência, em 1 frase", "fonte": "nome", "url": "https://...", "base": "medido|inferido|chutado"}],
  "item": {"titulo": "até 100 caracteres", "detalhe": "o que fazer e onde, até 4 frases", "sucesso": "métrica e alvo"}}"""
 
 
@@ -107,9 +109,19 @@ class Estudo:
         urls = {a.get("url") for a in r["achados"] if str(a.get("url", "")).startswith("http")}
         urls |= {c.get("url") for c in (out.citations or []) if c.get("url")}
         r["fontes"] = sorted(u for u in urls if u)
+        # evidência marcada (pstack): achado "chutado" não sustenta veredito; só conta o medido ou inferido com fonte
+        for a in r["achados"]:
+            a["base"] = a.get("base") if a.get("base") in ("medido", "inferido", "chutado") else (
+                "inferido" if str(a.get("url", "")).startswith("http") else "chutado")
+        sustentam = {a.get("url") for a in r["achados"] if a["base"] in ("medido", "inferido") and str(a.get("url", "")).startswith("http")}
+        r["evidencia"] = {b: sum(a["base"] == b for a in r["achados"]) for b in ("medido", "inferido", "chutado")}
         # portão mecânico: sem evidência, o loop não desobedece
         if r["veredito"] in ("adaptar", "contestar") and len(r["fontes"]) < MIN_FONTES:
             r["rebaixado"] = f"{r['veredito']} sem {MIN_FONTES} fontes distintas: adotado como pedido"
+            r["veredito"] = "adotar"
+        if r["veredito"] in ("adaptar", "contestar") and len(sustentam) < MIN_FONTES:
+            r["rebaixado"] = (f"{r['veredito']} sem {MIN_FONTES} achados medidos ou inferidos de fontes distintas "
+                              "(chute não sustenta veredito): adotado como pedido")
             r["veredito"] = "adotar"
         # Jev: a evidência sustenta o veredito? (só pode deixar mais conservador)
         if r["veredito"] != "adotar":
@@ -130,7 +142,8 @@ class Estudo:
         agora, iid = time.time(), item["id"]
         from .rastro import elo
         elo(self.s, f"item:{iid}", f"estudo:{iid}", "estudou", {"veredito": r.get("veredito"), "fontes": len(r.get("fontes", []))})
-        achados = "\n".join(f"- {a.get('ideia', '')} ({a.get('fonte', '')} {a.get('url', '')})".strip() for a in r.get("achados", [])[:8])
+        achados = "\n".join(f"- [{a.get('base', '?')}] {a.get('ideia', '')} ({a.get('fonte', '')} {a.get('url', '')})".strip()
+                             for a in r.get("achados", [])[:8] if a.get("base") != "chutado")
         evid = f"\n\nEstudo ({r['veredito']}): {r.get('justificativa', '')}" + (f"\nO melhor das referências:\n{achados}" if achados else "")
         novo = r.get("item") or {}
         if r["veredito"] == "adaptar" and novo.get("titulo") and novo.get("detalhe"):

@@ -69,6 +69,27 @@ def classificar(ponto: str, motivo: str) -> str:
     return "estrutural"
 
 
+# Camadas de prevenção, da mais fraca para a mais forte (Lauren Tan, "corrigir na camada mais forte"):
+# revisão humana < regra/portão aprendido (o agente pode pular) < CI (teste ou lint que barra) < arquitetura (o erro
+# fica impossível de escrever). Lição que volta, ou que se repete muito, ainda não subiu de camada: sobe uma.
+CAMADAS = ("revisao", "regra", "ci", "arquitetura")
+NOME_CAMADA = {"revisao": "revisão humana", "regra": "regra (portão aprendido)", "ci": "CI (teste ou lint)",
+               "arquitetura": "arquitetura (erro impossível)"}
+REPETICOES_PARA_SUBIR = 5
+
+
+def instrucao_camada(camada: str) -> str:
+    return {"ci": "Subir de camada: a prevenção desta lição precisa virar um teste ou regra de lint que o CI roda e que "
+                  "falha quando o padrão do erro aparece (ex.: tests/test_arquitetura.py), não só uma instrução.",
+            "arquitetura": "Subir de camada: mude a estrutura do código para que este erro fique impossível de escrever "
+                           "(uma única forma de fazer, tipos, fronteira de módulo), e remova o caminho antigo."}.get(camada, "")
+
+
+def subir(camada: str | None) -> str:
+    c = camada if camada in CAMADAS else "regra"
+    return CAMADAS[min(len(CAMADAS) - 1, CAMADAS.index(c) + 1)]
+
+
 class Licoes:
     def __init__(self, store, reply=None):
         self.s = store
@@ -95,7 +116,7 @@ class Licoes:
         descricao = _descricao(ponto, motivo)
         if row is None:
             lid = self.s.x("""INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,
-                              primeira_tick,ultima_tick,created_at,updated_at) VALUES(?,?,?,?,?,'aberta',1,0,?,?,?,?)""",
+                              primeira_tick,ultima_tick,created_at,updated_at,camada) VALUES(?,?,?,?,?,'aberta',1,0,?,?,?,?,'regra')""",
                            (sig, ponto, classe, descricao, f"Não repetir: {descricao}", tick, tick, agora, agora))
             lic = dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lid,)))
             self.reply(f"Erro novo registrado como lição #{lid} ({classe}): {descricao[:160]}", "licao")
@@ -112,6 +133,19 @@ class Licoes:
         else:
             self.s.x("UPDATE licoes SET ocorrencias=ocorrencias+1, ultima_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
         lic = dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lic["id"],)))
+        repetiu = lic["classe"] != "ambiente" and lic["ocorrencias"] == REPETICOES_PARA_SUBIR and (lic.get("camada") or "regra") == "regra"
+        if reincidiu or repetiu:
+            # voltou (ou se repete): a prevenção atual não segura; sobe uma camada e o item pede a prevenção nela
+            nova = subir(lic.get("camada"))
+            if nova != lic.get("camada"):
+                self.s.x("UPDATE licoes SET camada=?, prevencao=?, updated_at=? WHERE id=?",
+                         (nova, f"{NOME_CAMADA[nova]}: {lic['descricao']}"[:500], agora, lic["id"]))
+                self.reply(f"Lição #{lic['id']} subiu de camada: {NOME_CAMADA.get(lic.get('camada') or 'regra')} → {NOME_CAMADA[nova]} "
+                           f"({'reincidiu' if reincidiu else f'repetiu {REPETICOES_PARA_SUBIR} vezes'}).", "licao")
+                lic = dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lic["id"],)))
+                detalhe_item = (detalhe_item + " " if detalhe_item else "") + instrucao_camada(nova)
+                if repetiu and not reincidiu:
+                    self._abrir_item(lic, motivo, detalhe_item, titulo=titulo, forcar=True)
         recorrente_ambiente = lic["classe"] == "ambiente" and self.s.one(
             "SELECT COUNT(*) n FROM verificacoes WHERE assinatura=? AND ok=0 AND created_at>=?", (sig, agora - 86400))["n"] >= AMBIENTE_RECORRENTE
         if reincidiu and lic["classe"] != "trabalho" or recorrente_ambiente or (lic["classe"] == "estrutural" and not lic["item_id"]):
@@ -130,9 +164,13 @@ class Licoes:
             self.reply(f"Neurogênese: a lição #{lid} criou {len(novos)} portão(ões) novo(s) antes de abrir PR.", "licao")
         return lic
 
-    def _abrir_item(self, lic: dict, motivo: str, detalhe_item: str = "", topo: bool = False, titulo: str = "") -> None:
+    def _abrir_item(self, lic: dict, motivo: str, detalhe_item: str = "", topo: bool = False, titulo: str = "",
+                    forcar: bool = False) -> None:
         agora = time.time()
         if lic.get("item_id"):
+            if detalhe_item and "Subir de camada" in detalhe_item:
+                self.s.x("UPDATE roadmap SET detalhe=detalhe || ? WHERE id=? AND instr(detalhe, ?)=0",
+                         ("\n" + detalhe_item[-600:], lic["item_id"], instrucao_camada(lic.get("camada") or "")[:60] or "@@"))
             r = self.s.one("SELECT status FROM roadmap WHERE id=?", (lic["item_id"],))
             if r and r["status"] in ("pendente", "em_andamento"):
                 if topo:
@@ -207,7 +245,7 @@ class Licoes:
                 "abertas_estruturais": self.s.one("SELECT COUNT(*) n FROM licoes WHERE classe='estrutural' "
                                                   "AND status IN ('aberta','em_correcao','reincidente')")["n"],
                 "verificacoes_24h": pontos,
-                "ultimas": [dict(r) for r in self.s.q("SELECT id, assinatura, classe, status, descricao, ocorrencias, reincidencias, "
+                "ultimas": [dict(r) for r in self.s.q("SELECT id, assinatura, classe, status, descricao, ocorrencias, reincidencias, camada, "
                                                       "item_id, pr FROM licoes ORDER BY updated_at DESC LIMIT 12")]}
 
 

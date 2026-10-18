@@ -18,6 +18,7 @@
   --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765; --node:#1F2A36;
 }}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
 a{color:var(--jev)}
 :focus-visible{outline:2px solid var(--jev);outline-offset:2px}
@@ -164,10 +165,10 @@ const C = {x: 400, y: 318, r: 262};
 const EXT_POS = {jev: [400, 300], llm: [300, 430], github: [500, 430]};
 const ORDEM = ["orquestrador", "pedido", "decisao", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
                "revisar_prs", "evoluir_projeto", "conectar_missoes", "analisar_padroes", "revisar_baixa_confianca", "rodar_regressao",
-               "resumo", "propor_feature", "evoluir_harness", "meta_learner", "shadow", "licoes", "saude"];
+               "resumo", "propor_feature", "evoluir_harness", "jardinagem", "meta_learner", "shadow", "licoes", "saude"];
 const ICONE = {orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
   corrigir_codigo: "</>", revisar_prs: "✓", evoluir_projeto: "★", conectar_missoes: "⇄", analisar_padroes: "≋", revisar_baixa_confianca: "↺",
-  rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
+  rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", jardinagem: "✿", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
   jev: "Jev", llm: "LLM", github: "Git"};
 const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let AG = {}, pos = {}, atual = null, fila = [], velocidade = 1, rodando = false, catalogo = [];

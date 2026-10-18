@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("desinstalar", help="desliga o serviço 24/7 (o arquivo fica guardado, não é apagado)")
     dv = sub.add_parser("dev", help="pede ao Developer para corrigir um item do roteiro agora")
     dv.add_argument("--item", type=int, default=None)
+    sub.add_parser("verificar", help="verificação de ponta a ponta do painel pelo mapa de funcionalidades")
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
     args = ap.parse_args(argv)
@@ -52,6 +53,9 @@ def main(argv: list[str] | None = None) -> None:
         pass
     from .loop import Circle
 
+    if args.cmd == "verificar":
+        from .verificacao import main as verificar_main
+        raise SystemExit(verificar_main())
     if args.cmd == "configurar":
         path = cfg.configurar()
         print(f"Arquivo criado: {path}\nAbra, preencha as chaves e salve. Depois: circulo diagnostico && circulo instalar")

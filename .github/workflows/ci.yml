@@ -74,6 +74,27 @@ jobs:
         if: "!(github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/'))"
         run: echo "Mudança feita por você; o loop não decide sobre a constituição."
 
+  reproducao:
+    # Reprodução primeiro (pstack): em PR de agente, os testes novos precisam FALHAR no código da main atual e
+    # passar no do PR. Teste novo que já passa no código antigo não prova a mudança.
+    name: Reprodução primeiro
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Testes novos reproduzem o problema no código antigo
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/')
+        run: python -m circulo.reproducao --base HEAD^1 --head HEAD
+      - name: Fora de PR de agente
+        if: "!(github.event_name == 'pull_request' && startsWith(github.head_ref, 'circulo/'))"
+        run: echo "Mudança feita por você; a reprodução é exigida dos PRs do Developer."
+
   evidencia-reforcada:
     # Código de dinheiro pode mudar sozinho, mas só com propriedades provadas em milhares de casos.
     name: Evidência reforçada

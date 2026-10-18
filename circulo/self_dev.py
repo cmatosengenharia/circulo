@@ -45,7 +45,12 @@ Tarefa: {titulo}
 Detalhe: {detalhe}
 {incidente}
 Regras:
-- Corrija a causa, não o sintoma. Adicione um teste de regressão em tests/ que falharia antes da correção.
+- Reprodução primeiro: ANTES de mudar o código, escreva em tests/ o teste que reproduz o problema (ou o comportamento
+  novo) e rode-o para vê-lo FALHAR. Só então corrija e veja passar. O portão roda os testes novos no código antigo:
+  se todos já passarem lá, o PR não é aberto.
+- Corrija a causa, não o sintoma, na camada mais forte possível: primeiro tornar o erro impossível (estrutura,
+  tipos, uma única forma de fazer), depois um teste ou regra de lint que o pegue; instrução em texto é o último recurso.
+- A menor mudança que resolve. Não deixe comentário explicando gambiarra: conserte ou não faça.
 - Antes de terminar rode o mesmo que o CI: `python -m ruff check circulo tests --select E,F,W,B --ignore E501`
   (se o ruff existir) e `python -m pytest -q`. Só termine com os dois limpos.
 - Mudança pequena e completa: prefira entregar uma parte pronta e testada a uma mudança grande pela metade.
@@ -294,6 +299,15 @@ class SelfDeveloper:
                 ok, saida = self.verificar(wt)
                 falhas = [] if ok else [Resultado("lint e testes (iguais ao CI)", False, saida)]
             if not falhas:
+                # reprodução primeiro (playbook de bug fix do pstack): o teste novo precisa falhar no código antigo
+                from .reproducao import reproduz
+                try:
+                    ok, det, _ = reproduz(wt, base, None, env=ambiente_isolado())
+                except Exception as exc:  # noqa: BLE001 — sem conseguir conferir, não prova: barra
+                    ok, det = False, f"não consegui montar o código antigo para reproduzir: {exc}"
+                falhas = registrar(self.ctx, ABRIR_PR, [Resultado("reprodução primeiro", ok, "" if ok else det)], titulo)
+                self.evidencia_pr = det.splitlines()[0] if ok else ""
+            if not falhas:
                 falhas = registrar(self.ctx, ABRIR_PR, avaliar_aprendidos(self.s, ABRIR_PR, wt, adicionadas,
                                                                           ambiente_isolado(), item_id), titulo)
             if not falhas:
@@ -471,7 +485,9 @@ class SelfDeveloper:
                                        f"Correção automática (roteiro #{item['id']}).\n\nArquivos: {', '.join(changed)}\n\n"
                                        "O gate de merge do círculo decide sozinho: checks verdes, teste novo, Reviewer (Jev). "
                                        "PR que altera a constituição é recusado na hora.\n\n"
-                                       f"Rastro de ponta a ponta: item #{item['id']} · trace `{fio}`")
+                                       f"Rastro de ponta a ponta: item #{item['id']} · trace `{fio}`\n\n"
+                                       "Evidência (medida antes de abrir o PR): portões natos, lint e testes iguais ao CI, "
+                                       f"portões aprendidos — todos ok. Reprodução: {getattr(self, 'evidencia_pr', '') or 'n/a'}.")
             self.s.set("self_dev_aberto", {"item": item["id"], "branch": branch, "pr": pr, "em": time.time(), "fechado": False})
             todos = self.s.get("self_dev_wip") or {}
             if todos.pop(str(item["id"]), None) is not None:

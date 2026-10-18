@@ -1,0 +1,127 @@
+"""Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo.
+
+Lição da Lauren Tan (pstack, playbook de bug fix): correção só vale com a reprodução, a causa confirmada rodando e
+o teste passando depois. Um teste novo que já passa no código antigo não prova nada sobre a mudança.
+
+Como confere:
+1. acha as funções de teste NOVAS (que não existiam no código base) nos arquivos tests/test_*.py alterados;
+2. monta o código base num worktree temporário, com a pasta tests/ da versão nova (helpers e fixtures novos vêm junto);
+3. roda só os testes novos ali. Se TODOS passam no código antigo, a reprodução falhou: o PR não segue.
+   Se pelo menos um falha (ou nem importa, porque o código que ele testa ainda não existe), a reprodução existe.
+
+Roda em dois lugares (duas camadas): no portão do Developer antes do PR (`reproduz(wt, base)`, lendo a árvore de
+trabalho) e no CI dos PRs de agente (`python -m circulo.reproducao --base HEAD^1`), que o gate de merge exige verde.
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+def _git(args, cwd, check=True) -> str:
+    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if check and p.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {p.stderr.strip()[:300]}")
+    return p.stdout
+
+
+def _nomes_de_teste(fonte: str) -> set[str]:
+    """`test_x` e `Classe::test_y` definidos no arquivo (nível de módulo e classes Test*)."""
+    try:
+        arv = ast.parse(fonte)
+    except SyntaxError:
+        return set()
+    out = set()
+    for n in arv.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test"):
+            out.add(n.name)
+        elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
+            out |= {f"{n.name}::{m.name}" for m in n.body
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name.startswith("test")}
+    return out
+
+
+def _arquivos_de_teste(repo: Path, base: str, head: str | None) -> list[str]:
+    if head:
+        nomes = _git(["diff", "--name-only", "--diff-filter=AM", f"{base}...{head}", "--", "tests"], repo).split()
+    else:
+        nomes = _git(["diff", "--name-only", "--diff-filter=AM", base, "--", "tests"], repo).split()
+        nomes += _git(["ls-files", "--others", "--exclude-standard", "--", "tests"], repo).split()
+    return sorted({n for n in nomes if Path(n).name.startswith("test_") and n.endswith(".py")})
+
+
+def _ler(repo: Path, ref: str | None, caminho: str) -> str | None:
+    if ref is None:
+        p = repo / caminho
+        return p.read_text(encoding="utf-8") if p.exists() else None
+    p = subprocess.run(["git", "show", f"{ref}:{caminho}"], cwd=repo, capture_output=True, text=True)
+    return p.stdout if p.returncode == 0 else None
+
+
+def testes_novos(repo: str | Path, base: str, head: str | None = None) -> list[str]:
+    """Node ids do pytest das funções de teste que não existiam no base."""
+    repo = Path(repo)
+    out = []
+    for arq in _arquivos_de_teste(repo, base, head):
+        novo = _ler(repo, head, arq) or ""
+        antigo = _ler(repo, base, arq) or ""
+        for nome in sorted(_nomes_de_teste(novo) - _nomes_de_teste(antigo)):
+            out.append(f"{arq}::{nome}")
+    return out
+
+
+def reproduz(repo: str | Path, base: str, head: str | None = None, python: str | None = None,
+             env: dict | None = None, timeout: int = 600) -> tuple[bool, str, list[str]]:
+    """(ok, detalhe, testes_novos). ok=False quando todos os testes novos já passam no código antigo."""
+    repo = Path(repo)
+    novos = testes_novos(repo, base, head)
+    if not novos:
+        return True, "nenhuma função de teste nova (o portão do teste novo cuida disso)", []
+    tmp = Path(tempfile.mkdtemp(prefix="circulo-repro-"))
+    wt = tmp / "base"
+    try:
+        _git(["worktree", "add", "--detach", "-q", str(wt), _git(["rev-parse", base], repo).strip()], repo)
+        # a pasta tests/ da versão nova vai inteira (helpers, fixtures e conftest novos), o código continua o antigo
+        shutil.rmtree(wt / "tests", ignore_errors=True)
+        if head is None:
+            shutil.copytree(repo / "tests", wt / "tests", ignore=shutil.ignore_patterns("__pycache__"))
+        else:
+            for caminho in _git(["ls-tree", "-r", "--name-only", head, "tests"], repo).split():
+                destino = wt / caminho
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                destino.write_bytes(subprocess.run(["git", "show", f"{head}:{caminho}"], cwd=repo, capture_output=True).stdout)
+        amb = {**(env or os.environ), "PYTHONPATH": str(wt), "PYTHONDONTWRITEBYTECODE": "1"}
+        p = subprocess.run([python or sys.executable, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", *novos],
+                           cwd=wt, capture_output=True, text=True, timeout=timeout, env=amb)
+        saida = (p.stdout + p.stderr)[-1500:]
+        if p.returncode == 0:
+            return False, ("os testes novos já passam no código antigo, então não provam a mudança. Escreva um teste que "
+                           f"falhe sem a correção (reprodução) e passe com ela. Testes novos: {', '.join(novos)}"), novos
+        if p.returncode == 5:
+            return False, f"nenhum dos testes novos foi coletado no código antigo: {', '.join(novos)}", novos
+        falharam = [n for n in novos if f"FAILED {n}" in p.stdout or f"ERROR {n}" in p.stdout] or novos
+        return True, f"reproduzido: {len(falharam)} de {len(novos)} teste(s) novo(s) falham no código antigo\n{saida[-400:]}", novos
+    finally:
+        _git(["worktree", "remove", "--force", str(wt)], repo, check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Reprodução primeiro: os testes novos precisam falhar no código antigo.")
+    ap.add_argument("--base", required=True, help="commit/branch do código antigo (no CI de PR: HEAD^1, a main atual)")
+    ap.add_argument("--head", default="HEAD")
+    ap.add_argument("--repo", default=".")
+    a = ap.parse_args(argv)
+    ok, detalhe, novos = reproduz(a.repo, a.base, a.head)
+    print(("OK: " if ok else "REPROVADO: ") + detalhe)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

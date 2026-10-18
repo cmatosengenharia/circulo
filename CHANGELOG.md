@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.20.0 — 2026-10-18
+
+**As práticas da Lauren Tan (poteto: React Compiler, Grok Bot) para entregar rápido e seguro com agentes.**
+A tese dela, "primeiro confiança, depois paralelismo", virou cinco travas no loop.
+
+- **Reprodução primeiro** (`reproducao.py`, playbook de bug fix do pstack): os testes novos de uma mudança precisam
+  **falhar no código antigo** e passar no novo. Teste novo que já passava antes não prova nada, e o PR não é aberto.
+  Fica em duas camadas:
+  - no portão do Developer antes do PR, lendo a árvore de trabalho;
+  - num job novo do CI ("Reprodução primeiro") nos PRs de agente, que o gate exige verde.
+
+  A tarefa do Developer agora manda escrever o teste e vê-lo falhar antes de corrigir.
+- **Corrigir na camada mais forte**: cada lição registra em que camada está a prevenção (revisão, regra, CI ou
+  arquitetura). Lição que reincide, ou que se repete 5 vezes, **sobe uma camada**, e o item do roteiro pede a
+  prevenção nela, como um teste ou lint que barra no CI ou uma estrutura que torna o erro impossível. O painel
+  mostra a camada de cada lição.
+- **Verificação de ponta a ponta com mapa de funcionalidades** (`verificacao.py`, `circulo verificar`):
+  - sobe o painel num banco novo e confere cada tela e o que ela mostra;
+  - confere se todo id que o script procura existe na página e se toda tela tem a regra única do `[hidden]`
+    (foi isso que deixou a faixa vazia aparecer no 1.18);
+  - confere as APIs e o `/metrics`;
+  - roda no CI e na validação do corpo; com o Playwright, também abre num navegador e falha com erro de JS.
+- **Fronteiras da arquitetura no CI** (`tests/test_arquitetura.py`):
+  - o painel nunca importa quem age (Developer, gate, corpo, loop);
+  - a constituição não ganha dependência nova de módulo que o Developer pode mudar;
+  - só a linha de comando sobe o loop;
+  - nenhum módulo passa de 1000 linhas;
+  - os padrões ruins não passam do teto de hoje.
+- **Jardineiro** (agente novo, aparece no fluxo): a cada 6 h mede no próprio código os `except Exception`, os
+  `noqa`, as funções longas, os módulos grandes e os TODO. Crescimento acima de 10% em uma semana vira item do
+  roteiro para podar: primeiro para de crescer, depois limpa.
+- **Evidência marcada, e inconclusivo não passa**:
+  - no estudo, cada achado é medido, inferido ou chutado; adaptar ou contestar exige 2 achados medidos ou inferidos
+    de fontes distintas;
+  - no planejador, item "chutado" é descartado, e o medido leva o dado no detalhe;
+  - o PR do Developer traz a evidência da reprodução.
+
 ## 1.19.0 — 2026-10-18
 
 **Gestão mais clara: fluxo dos agentes ao vivo, painel do loop em abas e tudo o que o Jev oferece.**

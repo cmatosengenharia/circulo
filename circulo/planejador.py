@@ -39,8 +39,11 @@ arquiteto, auditor, cético, financeiro). Responda à pergunta com UM item de ro
 - não altere a constituição (merge_gate.py, policy.py, budget.py, guardrails.py, self_dev.py, .github/);
 - não repita um item que já está no roteiro.
 
+Marque a base do problema que o item resolve: "medido" (um número da evidência do loop mostra o problema), "inferido"
+(conclusão a partir da evidência) ou "chutado" (sem evidência). Inconclusivo não passa: item chutado é descartado.
+
 Responda só com JSON numa linha, sem markdown: {"titulo": "até 100 caracteres", "detalhe": "até 3 frases: o que mudar e onde",
-"sucesso": "métrica e alvo"}
+"sucesso": "métrica e alvo", "base": "medido|inferido|chutado", "dado": "o número da evidência que mostra o problema"}
 Se a resposta já existe ou exige mexer na constituição, responda {"sem_item": "por quê, em 1 frase"}."""
 
 
@@ -159,13 +162,19 @@ class Planejador:
         if not item:
             conselho.marcar(pid, "descartada")
             return None
+        if item.get("base") == "chutado":
+            # evidência marcada (pstack): o que não foi medido nem inferido da evidência não vira trabalho
+            conselho.marcar(pid, "descartada")
+            self.ctx.reply(f"Conselho ({pergunta.persona}): “{item['titulo'][:100]}” descartado: sem evidência (chute).", "roteiro")
+            return None
         existentes = {norm(r["titulo"]) for r in self.s.q("SELECT titulo FROM roadmap")}
         if norm(item["titulo"]) in existentes:
             conselho.marcar(pid, "repetida")
             return None
         ordem = (self.s.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
         agora = time.time()
-        detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}"
+        detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (
+            f"\nEvidência ({item['base']}): {item['dado']}" if item.get("dado") else "")
         detalhe = f"Pergunta do conselho ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
         rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
                        "VALUES(?,?,'loop','pendente',?,?,?,?)",
@@ -194,5 +203,5 @@ def _parse(texto: str) -> dict | None:
         return None
     if not isinstance(d, dict):
         return None
-    item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso")}
+    item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado")}
     return item if item["titulo"] and item["detalhe"] else None

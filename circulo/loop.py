@@ -47,7 +47,8 @@ TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_
            "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código",
            "planejar_roteiro": "Planejando o próximo item do roteiro a partir da evidência",
            "estudar_pedido": "Estudando o pedido em fontes confiáveis antes de executar",
-           "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu"}
+           "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu",
+           "jardinagem": "Medindo padrões ruins se espalhando no próprio código"}
 IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
@@ -392,6 +393,9 @@ class Circle:
             tasks.append("conectar_missoes")
         if self.engine.ready and "evoluir_harness" not in tasks:
             tasks.append("evoluir_harness")
+        from . import jardineiro
+        if jardineiro.precisa(self.store) and "jardinagem" not in tasks:
+            tasks.append("jardinagem")
         if self.self_dev is not None and self.self_dev.tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
@@ -598,6 +602,9 @@ class Circle:
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
+        elif pick == "jardinagem":
+            from . import jardineiro
+            jardineiro.podar(self.store, self.ctx.reply)
         elif pick == "evoluir_projeto":
             # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo
             self.engine.run_parallel(on_stage=lambda nome, pid, detalhe=None: self._stage(nome, {"projeto": pid, "detalhe": detalhe,

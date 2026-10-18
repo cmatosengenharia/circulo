@@ -28,9 +28,10 @@ def test_agente_novo_da_autoevolucao_entra_sozinho(circle):
     assert not any(a["novo"] for a in lista.values() if not a.get("externo"))   # os que já existiam não são "novos"
     s = circle.store
     t = s.tick + 1
+    base = __import__("time").time() - 10
     for etapa, tarefa, em in (("orquestrador", None, 1.0), ("idle", "otimizar_cache", 2.0), ("descanso", None, 3.5)):
         s.x("INSERT INTO trail(tick,etapa,project_id,em,detalhe,run_id,tarefa) VALUES(?,?,?,?,?,?,?)",
-            (t, etapa, None, __import__("time").time() - 10 + em, "Otimizando o cache" if tarefa else None, "abcabcabcabc", tarefa))
+            (t, etapa, None, base + em, "Otimizando o cache" if tarefa else None, "abcabcabcabc", tarefa))
     lista = {a["id"]: a for a in fluxo.agentes(s)}
     assert lista["otimizar_cache"]["novo"] and lista["otimizar_cache"]["faz"] == "Otimizando o cache"
     assert lista["otimizar_cache"]["execucoes_24h"] == 1 and lista["otimizar_cache"]["p50_ms"] == 1500
@@ -111,3 +112,19 @@ def test_versao_nova_do_jev_vira_alerta(circle):
     dl.ask("remember", Question("noul", "guardar?"), {})
     msg = circle.store.one("SELECT message FROM alerts ORDER BY id DESC LIMIT 1")["message"]
     assert "jev-1.13.0 → jev-1.14.0" in msg
+
+
+def test_jardineiro_transforma_crescimento_em_item(circle, tmp_path):
+    from circulo import jardineiro
+    pasta = tmp_path / "codigo"
+    pasta.mkdir()
+    (pasta / "a.py").write_text("def f():\n    try:\n        pass\n    except Exception:\n        pass\n")
+    agora = 1_000_000.0
+    assert jardineiro.podar(circle.store, pasta=pasta, now=agora) == []        # primeira medição: só a base
+    (pasta / "b.py").write_text("".join(f"def g{i}():\n    try:\n        pass\n    except Exception:\n        pass\n" for i in range(5)))
+    achados = jardineiro.podar(circle.store, pasta=pasta, now=agora + 7 * 86400)
+    assert achados and "except Exception" in achados[0] and "b.py (5)" in achados[0]
+    item = circle.store.one("SELECT titulo, origem FROM roadmap WHERE titulo LIKE 'Jardineiro:%'")
+    assert item["origem"] == "loop"
+    jardineiro.podar(circle.store, pasta=pasta, now=agora + 7 * 86400 + 1)
+    assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE titulo LIKE 'Jardineiro:%'")["n"] == 1   # sem duplicar

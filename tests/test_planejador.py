@@ -78,3 +78,24 @@ def test_loop_planeja_quando_fica_sem_trabalho(circle, repo):  # noqa: F811
     assert escolhido is not None
     assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE origem='loop'")["n"] == 1
     assert Path(repo).exists()
+
+
+def test_item_chutado_nao_vira_trabalho(circle, repo):  # noqa: F811
+    """Evidência marcada (pstack): inconclusivo não passa."""
+    class Chute(PlanLLM):
+        def complete(self, system, prompt, max_tokens):
+            return json.dumps({"titulo": "Trocar o banco por Postgres", "detalhe": "parece melhor",
+                               "sucesso": "mais rápido", "base": "chutado"}), 300
+    _, plan = preparar(circle, repo, Chute())
+    assert plan.run() is None
+    assert not circle.store.one("SELECT 1 FROM roadmap WHERE titulo LIKE 'Trocar o banco%'")
+
+
+def test_item_medido_leva_o_dado_no_detalhe(circle, repo):  # noqa: F811
+    class Medido(PlanLLM):
+        def complete(self, system, prompt, max_tokens):
+            return json.dumps({"titulo": "Pergunta do worth em inglês", "detalhe": "x", "sucesso": "confiança ≥ 0,5",
+                               "base": "medido", "dado": "44% das decisões abaixo de jev_incerto"}), 300
+    _, plan = preparar(circle, repo, Medido())
+    item = plan.run()
+    assert "Evidência (medido): 44%" in circle.store.one("SELECT detalhe FROM roadmap WHERE id=?", (item["id"],))["detalhe"]

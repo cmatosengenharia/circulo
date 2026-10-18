@@ -122,3 +122,25 @@ def test_licoes_independem_do_loop(tmp_path):
     s = Store(tmp_path / "x.db")
     L = Licoes(s)
     assert L.verificar("a", True) is None and L.resumo()["por_status"] == {}
+
+
+def test_licao_que_se_repete_sobe_de_camada_e_pede_prevencao_mais_forte(circle):
+    """Lauren Tan: correção que aparece de novo ainda não subiu de camada (regra → CI → arquitetura)."""
+    from circulo.licoes import REPETICOES_PARA_SUBIR
+    L = circle.licoes
+    for _ in range(REPETICOES_PARA_SUBIR):
+        L.verificar("developer:lint", False, sujeito="wt", motivo="circulo/x.py:1:1: B905 `zip()` without strict")
+    lic = circle.store.one("SELECT * FROM licoes WHERE assinatura='developer:lint:lint:B905'")
+    assert lic["camada"] == "ci"
+    item = circle.store.one("SELECT detalhe FROM roadmap WHERE id=?", (lic["item_id"],))
+    assert "Subir de camada" in item["detalhe"] and "CI" in item["detalhe"]
+
+
+def test_reincidencia_sobe_de_camada(circle):
+    L = circle.licoes
+    L.verificar("execucao:meta", False, motivo="RuntimeError: boom")
+    sig = circle.store.one("SELECT assinatura FROM licoes")["assinatura"]
+    circle.store.x("UPDATE licoes SET status='evidenciada' WHERE assinatura=?", (sig,))
+    L.verificar("execucao:meta", False, motivo="RuntimeError: boom")
+    lic = circle.store.one("SELECT camada, status FROM licoes WHERE assinatura=?", (sig,))
+    assert (lic["status"], lic["camada"]) == ("reincidente", "ci")
