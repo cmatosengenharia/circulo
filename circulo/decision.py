@@ -403,6 +403,12 @@ class LocalJev:
         best = max(s.get("projetos", []), key=valor)
         return Decision("next_project", "choice", str(best["id"]), 0.7, self.source)
 
+    def _q_evidencia_sustenta(self, q, s):
+        # regra: contrariar o pedido exige fontes; citações reais da busca valem mais que URLs escritas pela LLM
+        fontes = int(s.get("n_fontes", 0))
+        p = min(1.0, fontes / 3) * (0.9 if int(s.get("n_citacoes", 0)) else 0.6)
+        return self._noul("evidencia_sustenta", p if s.get("veredito") == "contestar" else min(1.0, p + 0.15))
+
     def _q_isolate_stage(self, q, s):
         n = int(s.get("falhas_recentes", 0))
         return self._noul("isolate_stage", 0.0 if n < 3 else min(1.0, 0.55 + 0.1 * n))

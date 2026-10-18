@@ -95,7 +95,11 @@ def test_agente_sem_mudanca(circle, repo):
 
 
 def test_sem_erros_pega_pedido_do_roteiro_mas_nunca_o_que_depende_de_voce(circle, repo):
+    from circulo.estudo import Estudo
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), FakeGH(), test_cmd=TEST_CMD)
+    assert dev.pick() is None                                         # pedido ainda não estudado
+    while Estudo(circle.ctx).pendente():
+        Estudo(circle.ctx).run()
     item = dev.pick()
     assert item["origem"] == "pedido_cassio" and "depende de você" not in item["evidencia"]
     circle.store.x("UPDATE roadmap SET status='feito' WHERE evidencia NOT LIKE '%depende de você%'")

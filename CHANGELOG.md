@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.8.0 — 2026-10-18
+
+O pedido é uma hipótese, não uma ordem gravada em pedra. O loop só executa depois de estudar em fontes confiáveis,
+e só desobedece com evidência.
+
+- **Neurônio de estudo** (`estudo.py`), antes de o Developer pegar seu pedido ou um item planejado pelo loop:
+  - o Jev decide o gasto;
+  - pesquisa na web (com citações) das principais referências e do que cada uma faz de melhor;
+  - veredito:
+    - **adotar**: o estudo é anexado ao item e entra na tarefa do Developer;
+    - **adaptar**: o item é reescrito pela evidência, o pedido original fica registrado e você é avisado;
+    - **contestar**: o item não é executado e o loop explica com as fontes. Pelo botão "Executar mesmo assim" no
+      roteiro, você reafirma e ele segue, com a decisão registrada.
+- **Portão mecânico**: adaptar ou contestar exige pelo menos 2 fontes distintas. Sem evidência, o loop não desobedece.
+  Depois o Jev confere se a evidência sustenta o veredito (só pode deixar mais conservador). Sinapse: `estudo:pedido`.
+  Resposta inválida vira a lição `estudo:saida_invalida`.
+- O Developer só pega pedido (seu ou do loop) já estudado. Erro do próprio loop não passa pelo estudo: a evidência é o
+  próprio erro. O planejador não cria item novo enquanto houver item esperando estudo.
+- **Missões** (ex.: portal admin de fotógrafo): a pesquisa trata o pedido como hipótese, busca as principais
+  referências do mercado e o melhor de cada uma, com URL. A régua só nasce com evidência suficiente (≥2 achados
+  aceitos pelo Jev, de ≥2 fontes distintas); senão pesquisa de novo, até 3 vezes. Se a evidência sugerir ajustar o
+  pedido ("CONTESTA"), você é avisado e a régua considera o ajuste. Sinapse: `missao:pesquisa`.
+- Painel: grupo "Contestados pelo estudo" no roteiro.
+
 ## 1.7.0 — 2026-10-18
 
 Cérebros e neurônios. Cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros.

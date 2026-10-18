@@ -10,8 +10,8 @@ from test_self_dev import TEST_CMD, FakeGH, git, repo  # noqa: F401 — fixture 
 
 def item_do_loop(circle, titulo="Melhorar algo"):
     circle.store.x("UPDATE roadmap SET status='feito'")
-    return circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
-                          "VALUES(?,?,'loop','pendente','x',999,0,0)", (titulo, "detalhe"))
+    return circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,estudo) "
+                          "VALUES(?,?,'loop','pendente','x',999,0,0,'{}')", (titulo, "detalhe"))   # já estudado
 
 
 class Agente:

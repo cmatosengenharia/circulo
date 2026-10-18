@@ -57,6 +57,9 @@ class Planejador:
             return False
         if self.dev.busy() or self.dev.em_espera() or self.dev.pick() is not None:
             return False
+        est = getattr(self, "estudo", None)
+        if est is not None and est.precisa():
+            return False          # há item esperando estudo: ainda não falta trabalho
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
             return False          # primeiro corrige os próprios erros, depois evolui

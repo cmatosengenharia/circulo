@@ -214,11 +214,12 @@ class SelfDeveloper:
             # primeiro erros recorrentes; depois pedidos do roteiro que não dependem de algo fora do código
             # item desativado por você no painel nunca é pego
             r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0 ORDER BY ordem LIMIT 1")
+                 # pedido é hipótese: só entra depois de estudado (pesquisa em fontes confiáveis + veredito)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
-                               "AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1")
-                 # por último, o que o próprio loop planejou a partir da evidência
+                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1")
+                 # por último, o que o próprio loop planejou a partir da evidência (também estudado)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='loop' AND status='pendente' AND COALESCE(desativado,0)=0 "
-                               "ORDER BY ordem LIMIT 1"))
+                               "AND estudo IS NOT NULL ORDER BY ordem LIMIT 1"))
         return dict(r) if r else None
 
     def recuperar(self) -> int:

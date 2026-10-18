@@ -136,6 +136,7 @@ def test_painel_sobe_antes_do_loop_e_mostra_desligado(tmp_path):
 def test_desativar_item_do_roteiro_tira_da_fila_do_developer(circle, painel):
     from circulo.self_dev import SelfDeveloper
     dev = SelfDeveloper(circle.ctx, circle.data_dir, agent=None, github=None)
+    circle.store.x("UPDATE roadmap SET estudo='{}'")                 # já estudados (o estudo tem teste próprio)
     primeiro = dev.pick()
     assert primeiro is not None
     code, _ = post(painel + "/api/roteiro", {"id": primeiro["id"], "ativo": False}, {"X-Circulo": "1"})

@@ -51,6 +51,7 @@ class CycleResult:
     tokens: int = 0
     nota: str = ""
     lessons: list[int] = field(default_factory=list)
+    fontes: int = 0
 
     @property
     def ganho(self) -> float:
@@ -76,6 +77,10 @@ def _strip_fences(text: str) -> str:
     m = re.search(r"```(?:html|markdown|md)?\s*\n(.*?)```", text, re.S)
     return m.group(1).strip() if m else text.strip()
 
+
+MIN_ACHADOS = 2            # régua só com evidência: achados aceitos pelo Jev
+MIN_FONTES_PESQUISA = 2    # ... vindos de fontes distintas
+MAX_PESQUISAS = 3          # depois disso segue com o que tem (registrado no monitoramento)
 
 class Engine:
     def __init__(self, ctx: Ctx, memory: Memory, lab=None):
@@ -239,7 +244,15 @@ class Engine:
         if rub is None or stale:
             res = CycleResult(pid, "pesquisa")
             self._fase(pid, "Pesquisando o melhor que existe na internet")
-            self.research(p, res)
+            n = self.research(p, res)
+            # portão: régua só com evidência suficiente; senão pesquisa de novo (até MAX_PESQUISAS seguidas)
+            chave = f"pesquisas_sem_evidencia:{pid}"
+            fracas = int(self.s.get(chave) or 0)
+            if (n < MIN_ACHADOS or getattr(res, "fontes", 0) < MIN_FONTES_PESQUISA) and fracas + 1 < MAX_PESQUISAS:
+                self.s.set(chave, fracas + 1)
+                res.nota = (res.nota or "") + f"; evidência insuficiente ({n} achados, {getattr(res, 'fontes', 0)} fontes): pesquisa de novo"
+                return res
+            self.s.set(chave, 0)
             self._fase(pid, "Montando a régua de qualidade a partir da pesquisa")
             self.build_rubric(p, res)
             return res
@@ -262,7 +275,11 @@ class Engine:
         lessons = self.mem.playbook(p["tipo"])
         prompt = (f"Tipo de solução: {p['tipo']}\nPedido: {p['pedido']}\nPropósito: {p['proposito']}\n"
                   f"O que já aprendemos neste tipo de pedido:\n" + "\n".join(f"- {x['text']}" for x in lessons) +
-                  "\n\nListe de 5 a 10 achados sobre o que funciona melhor hoje, cada um com a fonte.")
+                  "\n\nO pedido é uma hipótese, não uma ordem. Pesquise em fontes confiáveis (documentação oficial, empresas "
+                  "reconhecidas, estudos) quais são as principais referências do mercado para isso e o que cada uma faz de melhor. "
+                  "Liste de 5 a 10 achados sobre o que funciona melhor hoje, cada um com a fonte (URL). "
+                  "Se a evidência mostrar que o pedido, como foi feito, não é o melhor caminho, acrescente uma linha "
+                  "'- CONTESTA: o que mudar e por quê | fonte'.")
         text, cites = self._gen("researcher", prompt, res, p)
         achados = _lines(text)
         if not achados:
@@ -278,6 +295,17 @@ class Engine:
             n += 1
         self.s.x("UPDATE projects SET ultima_pesquisa_tick=? WHERE id=?", (self.s.tick, p["id"]))
         res.nota = f"{n} achados aceitos de {len(achados)}"
+        contesta = [(a, f) for a, f in achados if a.upper().startswith("CONTESTA")]
+        if contesta:   # a evidência ajusta o pedido: vira orientação para a régua, e você fica sabendo
+            a, f = contesta[0]
+            self.ctx.reply(f"Na pesquisa de “{p['nome']}”, a evidência sugere ajustar o pedido: {a.split(':', 1)[-1].strip()[:240]}"
+                           + (f" (fonte: {f[:120]})" if f else "") + ". A régua vai considerar isso.", "resposta")
+        fontes = {(fonte or "").strip() for (a, fonte) in achados if (fonte or "").startswith("http")} | \
+                 {c.get("url") for c in cites if c.get("url")}
+        res.fontes = len(fontes)
+        from .licoes import registrar as monitorar
+        monitorar(self.ctx, "missao:pesquisa", n >= MIN_ACHADOS and len(fontes) >= MIN_FONTES_PESQUISA, sujeito=p["nome"],
+                  motivo=f"{n} achados aceitos, {len(fontes)} fontes distintas", licao=False)
         return n
 
     # ------------------------------------------------------------ régua

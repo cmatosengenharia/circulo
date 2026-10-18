@@ -366,6 +366,11 @@ def make_handler(db_path: str):
                     return self._json({"erro": "item não encontrado"}, 404)
                 ativo = bool(data.get("ativo"))
                 store.x("UPDATE roadmap SET desativado=?, updated_at=? WHERE id=?", (0 if ativo else 1, time.time(), item))
+                if ativo and store.one("SELECT 1 FROM roadmap WHERE id=? AND status='contestado'", (item,)):
+                    # você reafirmou um item que o estudo contestou: segue como pedido, decisão registrada
+                    store.x("UPDATE roadmap SET status='pendente', evidencia='contestado pelo estudo; você reafirmou', "
+                            "estudo=json_set(COALESCE(estudo,'{}'),'$.reafirmado_pelo_humano',?), updated_at=? WHERE id=?",
+                            (time.time(), time.time(), item))
                 titulo = store.one("SELECT titulo FROM roadmap WHERE id=?", (item,))["titulo"]
                 store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
                         ("controle", f"Você {'reativou' if ativo else 'desativou'} o item #{item} do roteiro: {titulo}", time.time(),
