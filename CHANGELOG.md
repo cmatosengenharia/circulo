@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.12.0 — 2026-10-18
+
+Central de confiança em três níveis (Endsley), sinais de ouro, trilha write-ahead e parada testada (item #32).
+
+- **Trilha write-ahead** (`circulo/intencoes.py`): cada pedido e cada tarefa do loop gravam a intenção antes de rodar.
+  O registro leva ator, motivo, a regra que decidiu (regra, Jev ou LLM, com o valor e o limiar do gasto) e as entradas.
+  Se o registro falhar, a ação não roda. A tabela `intencoes` é só de acréscimo (gatilhos recusam UPDATE e DELETE) e
+  cada linha é encadeada pelo hash da anterior. `divergencia()` conta ações executadas sem intenção prévia; o alvo é 0.
+- **Perceber · Entender · Projetar**: Perceber traz o estado e os quatro sinais de ouro (latência do giro em p99,
+  tráfego, erros, saturação). Entender mostra por que a última ação foi tomada e qual regra decidiu, lido da trilha, e
+  não do push. Projetar mostra o próximo passo e o risco. Cada card tem fato, significado e projeção, mais a idade da
+  leitura ("lido há X s"), marcada **obsoleto** acima de 3 s.
+- **Frescor como SLO**: cada medição do painel fica guardada (tabela `frescor`), e `painel:frescor` verifica o p99 das
+  últimas 24 h (meta ≤ 3 s), não a última leitura. O painel envia a pior idade vista a cada 10 s, ou seja, a cauda.
+- **Parada verificável** (`circulo/parada.py`): o botão **Parar** grava a intenção, liga a pausa e só mostra
+  "Parado e verificado ✓" quando o loop confirma no giro e nenhuma ação começa depois disso (`GET /api/parada`). O
+  próprio loop aperta o botão quando sobe e depois toda semana, gira, confere pelo mesmo caminho e retoma. O
+  resultado é o neurônio `loop:parada` (falha vira lição de estrutura).
+
 ## 1.11.1 — 2026-10-18
 
 Achado na validação das 12:57: o Developer trabalhou 6 min (56 passos) no item #32, bateu no limite de uso da

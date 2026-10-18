@@ -322,6 +322,8 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .cf-col li[data-e="falha"]{border-left-color:var(--bad);background:var(--bad-soft)}.cf-col li[data-e="info"]{border-left-color:var(--jev)}
 .cf-col .t{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
 .cf-col .t .velho{color:var(--bad);font-weight:700}
+.cf-col .idade{font-size:11.5px;color:var(--muted)}.cf-col .idade.obsoleto{color:var(--bad);font-weight:700}
+.cf-col .pj{font-size:12.5px;margin-top:2px}.cf-col .pj::before{content:"→ ";color:var(--muted)}
 .cf-col .v{font-weight:600;overflow-wrap:anywhere}.cf-col .p{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 .sinapses{list-style:none;margin:10px 0 0;padding:0;max-height:260px;overflow:auto;font-size:13px}
 .sinapses li{display:grid;grid-template-columns:70px 18px minmax(0,1fr);gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
@@ -350,9 +352,9 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     <div class="cf-veredito" id="cfVeredito" data-v=""><div class="selo" id="cfSelo">…</div>
       <div><h2 id="cfTitulo">Posso confiar no loop agora?</h2><p id="cfFrase">Conferindo cada verificação…</p></div></div>
     <div class="cf-cols">
-      <div class="cf-col"><h3>Agora · o que está acontecendo</h3><ul id="cfAgora"></ul></div>
-      <div class="cf-col"><h3>Segurança · está tudo certo?</h3><ul id="cfSeg"></ul></div>
-      <div class="cf-col"><h3>A seguir · o que vem</h3><ul id="cfProx"></ul></div>
+      <div class="cf-col"><h3>Perceber · estado e sinais de ouro</h3><ul id="cfAgora"></ul></div>
+      <div class="cf-col"><h3>Entender · por que agiu e qual regra decidiu</h3><ul id="cfSeg"></ul></div>
+      <div class="cf-col"><h3>Projetar · próximo passo e risco</h3><ul id="cfProx"></ul></div>
     </div>
     <div class="cf-barra"><h2 style="margin:0">Sinapses ao vivo <small class="sub">cada verificação de cada neurônio, no momento em que acontece</small></h2>
       <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
@@ -846,7 +848,7 @@ function render(s) {
   const V = L.vivo || {estado: L.status, titulo: STATUS[L.status] || L.status};
   st.dataset.s = V.estado; $("#stateText").textContent = V.titulo;
   document.body.classList.toggle("paused", V.estado.startsWith("pausado") || V.estado === "desligado");
-  $("#pause").textContent = L.controle.pausado ? "Retomar o loop" : "Pausar o loop";
+  if (CF && CF.parada) renderParada(CF.parada); else $("#pause").textContent = L.controle.pausado ? "Retomar o loop" : "Parar o loop";
   $("#safe").setAttribute("aria-checked", L.controle.modo_seguro);
   const P = s.projeto;
   if (P) {
@@ -967,7 +969,12 @@ async function post(path, body) {
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify(body)});
   await refresh(); return r.ok;
 }
-$("#pause").onclick = () => post("/api/controle", {acao: S && S.loop.controle.pausado ? "retomar" : "pausar"});
+$("#pause").onclick = async () => {
+  const r = await fetch("/api/parada", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"},
+    body: JSON.stringify({acao: S && S.loop.controle.pausado ? "retomar" : "parar"})});
+  if (r.ok) renderParada((await r.json()).parada);
+  await refresh();
+};
 $("#safe").onclick = () => post("/api/controle", {acao:"modo_seguro", ligado: !(S && S.loop.controle.modo_seguro)});
 /* ---------- conversa ---------- */
 let enviando = [];                      // mensagens enviadas que o painel ainda não viu no banco
@@ -1012,11 +1019,23 @@ function renderConfianca() {
   $("#confia").dataset.v = CF.veredito; $("#confiaTxt").textContent = curto;
   if (!ZERO && CF.circulo_id) $("#confia").href = "/missao/" + CF.circulo_id + "#confianca";
   $("#cfVeredito").dataset.v = CF.veredito; $("#cfSelo").textContent = selo; $("#cfTitulo").textContent = curto; $("#cfFrase").textContent = CF.frase;
+  // idade da leitura: há quanto tempo o servidor montou o que está na tela; acima de 3 s o card é obsoleto
+  const lido = Math.max(0, Date.now() / 1000 - CF.gerado_em), obsoleto = lido > (CF.obsoleto_s || 3);
   const item = c => { const velho = c.fresco_s && c.dado_em && Date.now() / 1000 - c.dado_em > c.fresco_s;
     return `<li data-e="${c.estado}"><div class="t"><span>${esc(c.titulo)}</span><span class="${velho ? "velho" : ""}" title="quando a fonte produziu este dado">${velho ? "dado velho · " : ""}${ha(c.dado_em)}</span></div>
-      <div class="v">${esc(String(c.valor))}</div>${c.porque ? `<div class="p">${esc(c.porque)}</div>` : ""}</li>`; };
+      <div class="v">${esc(String(c.valor))}</div>${c.porque ? `<div class="p">${esc(c.porque)}</div>` : ""}${c.projecao ? `<div class="pj">${esc(c.projecao)}</div>` : ""}
+      <div class="idade ${obsoleto ? "obsoleto" : ""}" title="idade da leitura que está na tela">${obsoleto ? "obsoleto · " : ""}lido há ${lido.toFixed(1)} s</div></li>`; };
   const grupo = g => CF.checks.filter(c => c.grupo === g).map(item).join("") || `<li data-e="info"><div class="p">Nada aqui agora.</div></li>`;
   $("#cfAgora").innerHTML = grupo("agora"); $("#cfSeg").innerHTML = grupo("seguranca"); $("#cfProx").innerHTML = grupo("proximo");
+  renderParada(CF.parada);
+}
+/* parada verificável: o botão só diz "parado" quando o loop confirmou e nenhuma ação começou depois */
+function renderParada(p) {
+  if (!p) return;
+  const b = $("#pause");
+  b.textContent = p.estado === "aguardando" ? "Parando… (esperando o loop confirmar)" : p.estado === "parado" ? "Parado e verificado ✓ · Retomar"
+    : p.estado === "vazou" ? "Pausado, mas agindo! · Retomar" : p.pausado ? "Retomar o loop" : "Parar o loop";
+  b.title = p.estado === "parado" ? `o loop confirmou a parada no giro ${p.tick} e nenhuma ação começou depois` : "Para o loop: o giro em andamento termina e nenhum outro começa.";
 }
 function renderSinapses() {
   const so = $("#soFalhas").checked, l = sinapses.filter(v => !so || !v.ok).slice(0, 40);
@@ -1034,7 +1053,12 @@ function renderAoVivo() {
   renderConfianca();
 }
 setInterval(renderAoVivo, 1000);
-setInterval(() => { if (atrasoMs != null) post("/api/frescor", {atraso_ms: Math.round(atrasoMs)}).catch(() => {}); }, 60000);
+// SLO de frescor em p99: manda a pior idade vista na janela (a cauda), não a média nem a última
+let piorAtraso = null;
+function medirAtraso() { if (CF) piorAtraso = Math.max(piorAtraso || 0, atrasoMs || 0, Date.now() - CF.gerado_em * 1000); }
+setInterval(medirAtraso, 1000);
+setInterval(() => { if (piorAtraso != null) { const a = Math.round(piorAtraso); piorAtraso = null;
+  fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a})}).catch(() => {}); } }, 10000);
 function connect() {
   const filtro = ZERO ? "" : Q;
   const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));

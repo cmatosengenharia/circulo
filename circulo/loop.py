@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance
+from . import finance, intencoes, parada
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
@@ -58,6 +58,7 @@ class TickResult:
     shadow: str | None = None
     health: dict = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    inicio: float = field(default_factory=time.time)
 
 
 class Circle:
@@ -151,6 +152,7 @@ class Circle:
         if ctl["pausado"]:
             s.set("loop_status", "pausado_humano")
             self._stage("pausado")
+            parada.confirmar(s)                  # a parada só vale quando o próprio loop diz que parou
             return TickResult(s.tick, paused=True, pause_reason="humano")
         if ctx.budget.exhausted():
             s.set("loop_status", "pausado_orcamento")
@@ -179,14 +181,22 @@ class Circle:
             self._stage("pedido", {"evento": ev["id"], "projeto": pid})
             ctx.dl.project_id = pid
             ctx.evento = ev["id"]
+            seq = None
             try:
+                # write-ahead: a intenção entra na trilha antes; sem registro, o pedido não é executado
+                seq = intencoes.registrar(s, f"pedido:{ev['kind']}", "pedido seu na fila vem antes da evolução natural",
+                                          {"evento": ev["id"], "texto": str(payload.get("text") or payload.get("pedido") or "")[:200]},
+                                          regra="regra: a fila de pedidos tem prioridade")
                 with s.tx():
                     if ev["kind"] == "novo_projeto":
                         self.new_project(payload)
                     else:
                         self.handle(payload, ev["id"])
                 s.finish_event(ev["id"], True)
+                intencoes.concluir(s, seq, True)
             except Exception as exc:  # noqa: BLE001 — o círculo não pode morrer
+                if seq is not None:
+                    intencoes.concluir(s, seq, False, repr(exc))
                 s.finish_event(ev["id"], False, repr(exc))
                 r.errors.append(f"evento {ev['id']}: {exc!r}")
                 self.incidents.record(f"pedido:{ev['kind']}", exc, pid)
@@ -391,16 +401,22 @@ class Circle:
                 manut.remove(escolha)
                 manut.insert(0, escolha)
         ordem = trabalho + manut
+        escolhida_pelo_jev = None if trabalho or len(manut) <= 1 else manut[0]
         for pick in ordem:
             est = IDLE_COST.get(pick, 0)
+            contexto = {"task": pick, "esquecida_ha_giros": min(staleness[pick], 10**4)}
+            regra = ("regra: trabalho real roda a cada giro enquanto existir" if pick in trabalho else
+                     "Jev escolheu entre as 3 manutenções mais esquecidas" if pick == escolhida_pelo_jev else
+                     "regra: rodízio de manutenção, a mais esquecida primeiro")
             if est > 0:   # só pergunta ao Jev quando há gasto
-                contexto = {"est_tokens": est, "value_signal": VALOR.get(pick, 0.6), "task": pick,
-                            "esquecida_ha_giros": min(staleness[pick], 10**4)}
+                contexto.update({"est_tokens": est, "value_signal": VALOR.get(pick, 0.6)})
                 if pick == "corrigir_codigo" and self.self_dev is not None:
                     item = self.self_dev.alvo()
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
                         contexto.update({"item": item["titulo"], "origem": item["origem"]})
                 gate = ctx.dl.worth_spending("idle_evolution", contexto)
+                d = gate.decision
+                regra += f"; gasto autorizado por {d.source} ({float(d.value):.2f} ≥ {gate.threshold:.2f})"
                 if not gate.allowed:
                     last[pick] = s.tick           # recusado agora: volta para o fim da fila
                     pg = s.get("progresso") or {"sem": 0}
@@ -410,7 +426,9 @@ class Circle:
             if pick not in ("corrigir_codigo", "evoluir_projeto"):
                 self._stage("idle", {"detalhe": TAREFAS.get(pick, pick)})
             try:
-                self._run_idle_task(pick)
+                # write-ahead: intenção (motivo, regra que decidiu, entradas) gravada antes; só então a tarefa roda
+                intencoes.executar(s, pick, lambda pick=pick: self._run_idle_task(pick), motivo=TAREFAS.get(pick, pick),
+                                   entradas=contexto, regra=regra)
             except Exception as exc:  # noqa: BLE001
                 last[pick] = s.tick
                 s.set("idle_last", last)
@@ -565,7 +583,8 @@ class Circle:
     # ------------------------------------------------------------ métricas e resumo
     def _record(self, r: TickResult) -> None:
         body = {"handled": r.handled_event, "idle": r.idle_task, "evolutions": r.evolutions, "shadow": r.shadow,
-                "health": r.health, "errors": r.errors, "budget": self.ctx.budget.snapshot()}
+                "health": r.health, "errors": r.errors, "budget": self.ctx.budget.snapshot(),
+                "duracao_ms": round(1000 * (time.time() - r.inicio))}   # sinal de ouro: latência do giro
         self.store.x("INSERT OR REPLACE INTO metrics(tick,body,created_at) VALUES(?,?,?)",
                      (r.tick, json.dumps(body, ensure_ascii=False), time.time()))
 
@@ -602,6 +621,13 @@ class Circle:
         out.write_text("\n".join(lines) + "\n", encoding="utf-8")
         s.x("UPDATE alerts SET delivered=1 WHERE kind!='resposta' AND delivered=0")
         return out
+
+    def testar_parada(self) -> bool | None:
+        try:
+            return parada.testar(self)
+        except Exception as exc:  # noqa: BLE001 — o teste nunca derruba o loop; a falha vira incidente
+            self.incidents.record("parada", exc, kit_project_id(self.store, "circulo"))
+            return False
 
     # ------------------------------------------------------------ para sempre
     def stop(self, *_):
@@ -649,6 +675,8 @@ class Circle:
                     self.store.set("ultimo_reinicio", {"em": time.time(), "motivo": "configuração alterada"})
                     break
                 self.heartbeat()
+                if parada.teste_vencido(self.store):
+                    self.testar_parada()             # kill switch testado toda semana, pelo mesmo caminho do botão
                 r = self.tick()
                 n += 1
                 if self.corpo is not None and self.corpo.reiniciar:
