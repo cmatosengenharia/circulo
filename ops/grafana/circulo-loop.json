@@ -1,0 +1,73 @@
+{
+  "title": "Círculo — loop",
+  "uid": "circulo-loop",
+  "description": "Métricas do loop expostas por circulo/metrics.py (circulo run --metricas-porta 9464). Opcional: o loop não depende do Grafana.",
+  "tags": ["circulo", "prometheus"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {"from": "now-24h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {"name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0}
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Desde o último ciclo",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"refId": "A", "expr": "time() - circulo_loop_ultimo_ciclo_timestamp_seconds"}],
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": null}, {"color": "orange", "value": 900}, {"color": "red", "value": 3600}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none"}
+    },
+    {
+      "id": 2, "type": "stat", "title": "PRs por estado",
+      "gridPos": {"h": 6, "w": 9, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"refId": "A", "expr": "sum by (estado) (circulo_loop_prs_total)", "legendFormat": "{{estado}}"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "none", "graphMode": "none"}
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "PRs na última hora",
+      "gridPos": {"h": 6, "w": 9, "x": 15, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"refId": "A", "expr": "sum by (estado) (increase(circulo_loop_prs_total[1h]))", "legendFormat": "{{estado}}"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []}
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Decisões do Jev por resultado (por minuto)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"refId": "A", "expr": "sum by (fonte, resultado) (rate(circulo_loop_decisoes_jev_total[5m])) * 60",
+                   "legendFormat": "{{fonte}} / {{resultado}}"}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"stacking": {"mode": "normal"}}}, "overrides": []}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Duração das etapas (p95)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le, etapa) (rate(circulo_loop_etapa_duracao_seconds_bucket[15m])))",
+                   "legendFormat": "{{etapa}}"}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}
+    },
+    {
+      "id": 6, "type": "table", "title": "Etapas: p50 / p95 / p99 (1 h)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {"refId": "p50", "instant": true, "format": "table", "legendFormat": "p50",
+         "expr": "histogram_quantile(0.50, sum by (le, etapa) (rate(circulo_loop_etapa_duracao_seconds_bucket[1h])))"},
+        {"refId": "p95", "instant": true, "format": "table", "legendFormat": "p95",
+         "expr": "histogram_quantile(0.95, sum by (le, etapa) (rate(circulo_loop_etapa_duracao_seconds_bucket[1h])))"},
+        {"refId": "p99", "instant": true, "format": "table", "legendFormat": "p99",
+         "expr": "histogram_quantile(0.99, sum by (le, etapa) (rate(circulo_loop_etapa_duracao_seconds_bucket[1h])))"}
+      ],
+      "transformations": [{"id": "merge", "options": {}}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}
+    }
+  ]
+}

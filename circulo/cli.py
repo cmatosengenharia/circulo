@@ -15,7 +15,9 @@ def main(argv: list[str] | None = None) -> None:
     r = sub.add_parser("run", help="loop infinito (pausa só por orçamento ou por você)")
     r.add_argument("--painel", action="store_true", help="serve o painel local junto com o loop")
     r.add_argument("--porta", type=int, default=8765)
-    pn = sub.add_parser("painel", help="só o painel local (o loop roda em outro processo)")
+    r.add_argument("--metricas-porta", type=int, default=None,
+                   help="expõe /metrics (prometheus_client) nesta porta; desligado por padrão (ou CIRCULO_METRICS_PORT)")
+    pn =sub.add_parser("painel", help="só o painel local (o loop roda em outro processo)")
     pn.add_argument("--porta", type=int, default=8765)
     d = sub.add_parser("demo", help="loop acelerado com pedidos simulados + painel, em dados separados")
     d.add_argument("--porta", type=int, default=8765)
@@ -106,6 +108,15 @@ def main(argv: list[str] | None = None) -> None:
             from .painel import serve
             serve(c.store.path, args.porta, background=True)
             print(f"painel em http://127.0.0.1:{args.porta}")
+        from . import metrics
+        porta = metrics.porta_configurada(args.metricas_porta)
+        if porta:
+            endereco = os.environ.get("CIRCULO_METRICS_ADDR", "127.0.0.1")
+            try:
+                c.metricas.servir(porta, endereco)
+                print(f"métricas em http://{endereco}:{porta}/metrics")
+            except (RuntimeError, OSError) as exc:   # sem o pacote ou porta ocupada: o loop roda sem /metrics
+                print(f"métricas desligadas: {exc}")
         print(f"círculo rodando (decisor: {c.ctx.dl.jev.source}). Ctrl+C para parar; o estado fica salvo.")
         c.run_forever()
     elif args.cmd == "tick":

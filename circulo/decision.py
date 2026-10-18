@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Mapping, Protocol
 
 from .budget import Budget
+from .metrics import METRICAS, seguro
 from .state import Store
 
 Kind = Literal["choice", "score", "noul"]
@@ -609,24 +610,31 @@ class DecisionLayer:
         self._local = threading.local()        # missão em atendimento, por thread (missões rodam em paralelo)
         self._default_project: int | None = None
         self._aprendiz_lock = threading.Lock()
+        self.metricas = METRICAS               # /metrics do loop (o Circle troca por um registry isolado nos testes)
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:
+        jev_fora = False
         try:
             out, tokens = self.jev.ask_many(state, questions)
             self.budget.charge_jev(max(1, tokens // 1000))  # Jev ~1000x mais barato que LLM
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError, OSError) as exc:
             out, _ = self.local.ask_many(state, questions)
             self.s.set("jev_last_error", str(exc)[:300])
+            jev_fora = True
         incerto = self._thr("jev_incerto", 0.25)
         for qid, q in questions.items():
             d = out.get(qid)
+            resultado = "indisponivel" if jev_fora else "confiante"
             if d is None or not self._valid(q, d):
                 out[qid] = self.local.ask_many(state, {qid: q})[0][qid]
+                resultado = "indisponivel"
             elif d.source == "jev" and d.confidence < incerto and qid == "worth_spending" and \
                     (aprendido := self._worth_aprendido(state, d, incerto)) is not None:
                 out[qid] = aprendido         # a dúvida do Jev, ajustada pelo que ele já aprendeu imitando a regra
+                resultado = "aprendido"
             elif d.source == "jev" and d.confidence < incerto and not qid.startswith(("crit_", "rel_")):
+                resultado = "incerto"
                 # Cascata: o Jev respondeu "não sei" (perto de 50%, confiança baixa). A resposta dele fica registrada,
                 # e a decisão passa para a regra determinística, em vez de um meio-termo que trava tudo.
                 self._log(d)
@@ -635,6 +643,7 @@ class DecisionLayer:
                 if qid == "worth_spending":
                     self._worth_rotular(state, regra)
             self._log(out[qid])
+            seguro(self.metricas.decisao, out[qid].source, resultado)
         return out
 
     # --- Jev aprende o worth_spending imitando a regra quando está em dúvida
