@@ -13,6 +13,11 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      antes (Codex: caminhos sensíveis read-only mesmo dentro da raiz gravável), restaurada do merge-base com a main
      depois (modificados, novos e apagados), cada reversão vira o evento `developer:constituicao_revertida`, e a lista
      vai no prompt do reparo. O gate do merge continua sendo a barreira independente.
+  6. Teto de tokens por item, checado ANTES de cada chamada (o limite checado depois estoura: SWE-agent #1240):
+     tokens já gastos no item + estimativa da próxima > max(2× a mediana dos PRs entregues em 24 h, piso fixo) →
+     nenhuma chamada; o parcial fica guardado e o item vai para o fatiador, sem exceção.
+  7. A mesma falha 2x seguidas (node id + linha do erro normalizada, `assinatura_falha`) não ganha outra chamada:
+     o item vai para o fatiador na hora, sem esperar as LIMITE falhas.
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -22,15 +27,26 @@ from __future__ import annotations
 import os
 import re
 import stat
+import statistics
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
-from .self_dev import CORRECAO_LOCAL, LINT_CMD, SelfDeveloper, _git, ambiente_isolado, build_self_dev, garantir_ruff
+from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
+                       garantir_ruff)
 
 REPARO = "developer:reparo"
 REVERTIDA = "developer:constituicao_revertida"
+TETO, REPETIDA = CORTES
+PISO_TETO = 100_000
+JANELA_TETO = 86400
+ULTIMA_FALHA = "developer_ultima_falha"         # {worktree do item: assinatura_falha da última falha local}
+PREFIXO_TITULO = re.compile(r"^(?:reparo|conserto do PR #\d+): ")
+FALHA_PYTEST = re.compile(r"^(?:FAILED|ERROR) (\S+)(?: - (.*))?$", re.M)
+FALHA_LINT = re.compile(r"^(\S+\.py):\d+:\d+: ([A-Z]+\d+\b.*)$", re.M)
 PROTEGIDOS = (f"\nNUNCA altere a constituição (somente leitura; o que mudar nela é revertido antes do PR): "
               f"{', '.join(CONSTITUICAO)}.")
 MAX_RODADAS_REPARO = 1
@@ -54,24 +70,100 @@ def saida_focada(texto: str, limite: int = LINHAS_FEEDBACK) -> str:
     return "\n".join((corpo[-resto:] if resto else []) + resumo)
 
 
+def _normal(linha: str) -> str:
+    linha = re.sub(r"0x[0-9a-f]+", "0x?", linha, flags=re.I)
+    linha = re.sub(r"(?<![\w.])/(?:[^/\s:]+/)+", "", linha)          # diretórios absolutos (tmp) mudam a cada rodada
+    return re.sub(r"\s+", " ", linha).strip()
+
+
+def assinatura_falha(saida: str) -> str:
+    """Node id + linha do erro normalizada de cada falha do pytest; arquivo + código + mensagem de cada erro do ruff
+    (sem linha e coluna, que mudam com a edição). '' = falha sem formato reconhecido (nunca conta como repetida)."""
+    falhas = [f"{n} - {m}" for n, m in FALHA_PYTEST.findall(saida or "")]
+    falhas += [f"{p}: {e}" for p, e in FALHA_LINT.findall(saida or "")]
+    return "\n".join(sorted({_normal(f) for f in falhas}))
+
+
 def _ambiente() -> dict:
     """O ambiente isolado dos portões, sem bytecode: o `git add -A` levaria o `__pycache__` dos testes para o PR."""
     return {**ambiente_isolado(), "PYTHONDONTWRITEBYTECODE": "1"}
 
 
 class DeveloperComReparo(SelfDeveloper):
-    def __init__(self, *a, fix_cmds: list[list[str]] | None = None, **kw):
+    def __init__(self, *a, fix_cmds: list[list[str]] | None = None, piso_teto: int = PISO_TETO, **kw):
         auto_testes = kw.get("test_cmd") is None
         super().__init__(*a, **kw)
         if auto_testes:
             self.test_cmd = [*self.test_cmd, "--tb=short"]
         self.fix_cmds = fix_cmds        # None = automático: o ruff --fix do CI quando o lint é o ruff do CI
+        self.piso_teto = piso_teto
         self._base: str | None = None
         self._rodada = 0
+        self._item_id: int | None = None   # item no portão do PR (o reparo guarda o parcial dele ao cortar)
+        self._consertando = False
+        self._repetida = False
+        self._cortado = ""
 
     def run_once(self, *a, **kw):
-        self._rodada = 0
-        return super().run_once(*a, **kw)
+        self._rodada, self._cortado = 0, ""
+        r = super().run_once(*a, **kw)
+        if self._cortado and r.status == "agente_falhou" and not r.pr:
+            self._set_item(r.item_id, "pendente", f"{self._cortado}; vai para o fatiador")
+            return DevResult(r.item_id, "teto", self._cortado)
+        return r
+
+    def consertar(self):
+        self._consertando = True
+        try:
+            return super().consertar()
+        finally:
+            self._consertando = False
+
+    # ------------------------------------------------------------ teto de tokens por item
+    def _tokens_do_item(self, titulo: str) -> tuple[int, int]:
+        """(tokens, chamadas) do Developer no item: a rodada principal, o reparo e o conserto do PR."""
+        item = PREFIXO_TITULO.sub("", titulo)
+        gastos = [int(r["tokens"] or 0) for r in self.s.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' "
+                                                          "AND instr(entrada, ?) > 0", (item,))
+                  if PREFIXO_TITULO.sub("", r["entrada"] or "") == item]
+        return sum(gastos), len(gastos)
+
+    def teto(self) -> int:
+        """max(2× a mediana de tokens dos PRs entregues em 24 h, piso): um dia ruim não encolhe o teto abaixo do piso."""
+        por_pr = [self._tokens_do_item(r["titulo"])[0]
+                  for r in self.s.q("SELECT titulo FROM prs WHERE status='mergeado' AND updated_at>=?",
+                                    (time.time() - JANELA_TETO,))]
+        return max(2 * int(statistics.median(por_pr)) if por_pr else 0, self.piso_teto)
+
+    def _estimativa(self, tokens: int, chamadas: int) -> int:
+        """A próxima chamada custa a média das anteriores do item (ou do Developer em 24 h, se é a primeira)."""
+        if chamadas:
+            return tokens // chamadas
+        r = self.s.one("SELECT AVG(tokens) t FROM llm_calls WHERE papel='developer' AND tokens > 0 AND created_at>=?",
+                       (time.time() - JANELA_TETO,))
+        return int(r["t"] or 0)
+
+    def _cortar(self, wt: Path, motivo: str) -> dict:
+        """Sem chamada: o item vai para o fatiador. No reparo o parcial vira commit local da branch (a rodada principal
+        já guarda o dela; o conserto está num PR empurrado)."""
+        from .licoes import registrar as monitorar
+        monitorar(self.ctx, TETO, False, sujeito=wt.name, licao=False, motivo=motivo)
+        if self._item_id is not None and not self._consertando:
+            wip = (self.s.get("self_dev_wip") or {}).get(str(self._item_id))
+            self._guardar_parcial(self._item_id, _git(["rev-parse", "--abbrev-ref", "HEAD"], wt), wt, wip)
+        self._cortado = motivo
+        return {"ok": False, "tokens": 0, "log": motivo, "teto": True}
+
+    def _mesma_falha(self, wt: Path, saida: str) -> bool:
+        """A falha é a mesma da rodada anterior do item: pede a divisão em vez de outra chamada."""
+        from .licoes import registrar as monitorar
+        sig, todas = assinatura_falha(saida), self.s.get(ULTIMA_FALHA) or {}
+        repetida = bool(sig) and todas.get(wt.name) == sig
+        self.s.set(ULTIMA_FALHA, {**todas, wt.name: sig})
+        if repetida:
+            monitorar(self.ctx, REPETIDA, False, sujeito=wt.name, licao=False,
+                      motivo=f"repetiu a mesma falha da rodada anterior: {sig[:300]}")
+        return repetida
 
     # ------------------------------------------------------------ constituição em camadas
     def _travar(self, wt: Path) -> dict[Path, int]:
@@ -124,6 +216,10 @@ class DeveloperComReparo(SelfDeveloper):
         return caminhos
 
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
+        tokens, chamadas = self._tokens_do_item(titulo)
+        estimativa, teto = self._estimativa(tokens, chamadas), self.teto()
+        if tokens + estimativa > teto:
+            return self._cortar(wt, f"teto de tokens do item: {tokens} gastos + ~{estimativa} da próxima chamada > {teto}")
         self._rodada += 1
         modos = self._travar(wt)
         try:
@@ -183,10 +279,13 @@ class DeveloperComReparo(SelfDeveloper):
             if p.returncode != 0:
                 saida = saida_focada(p.stdout + p.stderr)
                 if registrar:
+                    self._repetida = self._mesma_falha(wt, saida) or self._repetida
                     monitorar(self.ctx, f"developer:{nome}", False, sujeito=str(wt.name), motivo=saida)
                 return False, saida
             if registrar:
                 monitorar(self.ctx, f"developer:{nome}", True, sujeito=str(wt.name))
+        if registrar:
+            self.s.set(ULTIMA_FALHA, {**(self.s.get(ULTIMA_FALHA) or {}), wt.name: ""})   # verde: nada a repetir
         return True, ""
 
     # ------------------------------------------------------------ portão de abrir PR com 1 rodada de reparo
@@ -200,7 +299,7 @@ class DeveloperComReparo(SelfDeveloper):
         from .licoes import assinatura_de
         from .licoes import registrar as monitorar
         from .neuronios import ABRIR_PR, Resultado, avaliar_aprendidos, diff_do_worktree, portoes_natos_pr, registrar
-        self._base = base
+        self._base, self._item_id, self._repetida = base, item_id, False
         texto, rodada = "", None          # rodada = {"sig", "tokens"} depois que o agente reparou
         try:
             for tentativa in range(1 + MAX_RODADAS_REPARO):
@@ -227,12 +326,17 @@ class DeveloperComReparo(SelfDeveloper):
                               motivo=f"rodada 1/{MAX_RODADAS_REPARO} não resolveu; {rodada['tokens']} tokens\n{texto}")
                     break
                 sig = assinatura_de(REPARO, texto)
-                if tentativa == MAX_RODADAS_REPARO or self._ja_desistiu(sig):
-                    if tentativa < MAX_RODADAS_REPARO:
+                if tentativa == MAX_RODADAS_REPARO or self._repetida or self._ja_desistiu(sig):
+                    if self._repetida:
+                        texto += "\n(reparo não repetido: a mesma falha da rodada anterior; o item vai para o fatiador)"
+                    elif tentativa < MAX_RODADAS_REPARO:
                         texto += f"\n(reparo não repetido: a mesma falha já resistiu a uma rodada; lição {sig})"
                     break
                 out = self._agente(CORRECAO_LOCAL.format(titulo=titulo, falhas=texto, licoes=self._licoes_txt(item_id))
                                    + PROTEGIDOS, wt, f"reparo: {titulo}")
+                if out.get("teto"):
+                    texto += f"\n(reparo não chamado: {out['log']}; o item vai para o fatiador)"
+                    break
                 rodada = {"sig": sig, "tokens": int(out.get("tokens") or 0)}
                 if not out.get("ok"):
                     # agente que parou (limite da conta, máximo de passos) não prova que a falha resiste: sem lição
@@ -242,7 +346,7 @@ class DeveloperComReparo(SelfDeveloper):
             monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=texto)
             return False, texto
         finally:
-            self._base = None
+            self._base = self._item_id = None
 
 
 def build_developer(ctx) -> DeveloperComReparo | None:
