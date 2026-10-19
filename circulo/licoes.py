@@ -48,6 +48,7 @@ VERDES_PARA_FECHAR = 2      # execuções seguidas com exit 0 no main
 NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
 ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
 NODE_ID = re.compile(r"teste:(tests/[\w./-]+\.py::\S+)")
+DO_ITEM = re.compile(r"(?:\.circulo-wt-|roteiro #)(\d+)$")   # o worktree e o rótulo do Developer levam o id do item
 
 AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit your [a-z ]{0,20}limit|timed? ?out|"
                       r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http(?: error:?)? ?5\d\d|bad gateway|"
@@ -188,12 +189,16 @@ class Licoes:
 
     # ------------------------------------------------------------ monitorar todo ponto de verificação
     def verificar(self, ponto: str, ok: bool, sujeito: str = "", motivo: str = "", assinatura: str | None = None,
-                  classe: str | None = None, licao: bool = True, detalhe_item: str = "", titulo: str = "") -> dict | None:
-        """Registra o resultado da verificação. Falha (com `licao=True`) vira ou reforça uma lição."""
+                  classe: str | None = None, licao: bool = True, detalhe_item: str = "", titulo: str = "",
+                  item_id: int | None = None) -> dict | None:
+        """Registra o resultado da verificação, com o item do roteiro em execução. Falha (com `licao=True`) vira ou
+        reforça uma lição."""
         tick, agora = self.s.tick, time.time()
         sig = (assinatura or assinatura_de(ponto, motivo)) if not ok else assinatura
-        vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at) VALUES(?,?,?,?,?,?,?)",
-                       (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig, (motivo or "")[:1000], agora))
+        item, item_titulo = item_de(self.s, sujeito, item_id)
+        vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo) "
+                       "VALUES(?,?,?,?,?,?,?,?,?)", (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig,
+                                                     (motivo or "")[:1000], agora, item, item_titulo))
         if vid % 500 == 0:
             self.s.x("DELETE FROM verificacoes WHERE id <= ?", (vid - MAX_VERIFICACOES,))
         if ok or not licao:
@@ -471,6 +476,15 @@ def _descricao(ponto: str, motivo: str) -> str:
     m = (motivo or "").strip().splitlines()
     linha = next((x for x in m if re.search(r"error|erro|falh|FAILED|\.py:\d+", x, re.I)), m[0] if m else "")
     return f"{ponto}: {linha.strip()[:200]}" if linha else ponto
+
+
+def item_de(store, sujeito: str = "", item_id: int | None = None) -> tuple[int | None, str]:
+    """(id, título) do item do roteiro: pelo id, pelo worktree `.circulo-wt-N`/`roteiro #N` ou pelo título exato."""
+    if item_id is None and (m := DO_ITEM.search(sujeito or "")):
+        item_id = int(m.group(1))
+    r = (store.one("SELECT id, titulo FROM roadmap WHERE id=?", (item_id,)) if item_id is not None else
+         store.one("SELECT id, titulo FROM roadmap WHERE titulo=? ORDER BY id DESC LIMIT 1", (sujeito,)) if sujeito else None)
+    return (r["id"], r["titulo"]) if r else (None, "")
 
 
 def registrar(ctx, ponto: str, ok: bool, **kw) -> dict | None:
