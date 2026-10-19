@@ -42,6 +42,7 @@ TENTATIVAS = "planejador_tentativas"   # kv: o resultado de cada tentativa real 
 ESPERA = "intervalo"        # prefixo do motivo de espera entre tentativas: não é causa de trava, a última tentativa é
 MAX_TENTATIVAS = 4          # tentativas com falha antes da quarentena
 IDADE_MAX = 3600            # pergunta mais velha que isso que falha vai para a quarentena
+PRAZO_PORTEIRO = 2 * 3600   # pergunta mais velha que isso que o porteiro recusa abaixo do limiar é descartada (destino explícito)
 PROGRESSO = ("virou_item", "descartada", "repetida")
 TRANSITORIAS = (TimeoutError, ConnectionError, urllib.error.URLError, sqlite3.OperationalError)
 PERMANENTES = (KeyError, TypeError, AttributeError, ValueError, NameError, ImportError, IndexError)
@@ -377,16 +378,22 @@ def registrar_tentativa(store, pergunta_id: int | None, desfecho: str, motivo: s
 
 
 def registrar_porteiro(store, pergunta_id: int | None, gate, now: float | None = None) -> dict:
-    """O que o porteiro do gasto decidiu sobre a pergunta neste ciclo, medido: quem lê a trava cita isto, não adivinha."""
+    """O que o porteiro do gasto decidiu sobre a pergunta neste ciclo, medido: quem lê a trava cita isto, não adivinha.
+    A recusa abaixo do limiar de uma pergunta mais velha que PRAZO_PORTEIRO a descarta: a espera tem prazo máximo."""
+    now = now or time.time()
     if gate.allowed:
         motivo = "acima_do_limiar"
     else:
         motivo = "orcamento_insuficiente" if gate.reason else "abaixo_do_limiar"
-    rec = {"em": now or time.time(), "pergunta_id": pergunta_id, "decisao": "aceitou" if gate.allowed else "recusou", "motivo": motivo,
+    rec = {"em": now, "pergunta_id": pergunta_id, "decisao": "aceitou" if gate.allowed else "recusou", "motivo": motivo,
            "limiar": round(float(gate.threshold), 3), "valor": round(float(gate.decision.value), 3), "fonte": gate.decision.source}
     reg = store.get(PORTEIRO) or {}
     ant = reg.get("ultimo") or {}
     mesmo = all(ant.get(k) == rec[k] for k in ("pergunta_id", "decisao", "motivo"))
     rec["seguidas"] = int(ant.get("seguidas", 0)) + 1 if mesmo else 1
     store.set(PORTEIRO, {"ultimo": rec, "historico": [*reg.get("historico", []), rec][-HISTORICO:]})
+    if motivo == "abaixo_do_limiar" and pergunta_id is not None:
+        store.x("UPDATE perguntas SET status='descartada_abaixo_do_limiar', motivo=?, updated_at=? WHERE id=? AND status='valida' AND created_at<=?",
+                (f"porteiro worth_spending.idle_evolution recusou {rec['valor']:.2f} < limiar {rec['limiar']:.2f} "
+                 f"depois de {int(PRAZO_PORTEIRO / 60)} min de espera", now, pergunta_id, now - PRAZO_PORTEIRO))
     return rec

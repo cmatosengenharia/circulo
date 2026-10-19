@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS perguntas (
   relevancia REAL,
   score REAL,
   evidencia TEXT,
-  status TEXT NOT NULL,          -- feita | virou_item | entregue | contestada | repetida | descartada | quarentenada
+  status TEXT NOT NULL,          -- feita | virou_item | entregue | contestada | repetida | descartada | quarentenada | recusada_porteiro | descartada_abaixo_do_limiar
   item_id INTEGER,
   created_at REAL NOT NULL,
   updated_at REAL NOT NULL
