@@ -1,4 +1,5 @@
 """Reparo do Developer antes do PR: ruff --fix sem LLM, depois no máximo 1 rodada do agente com a saída focada."""
+import os
 import re
 from pathlib import Path
 
@@ -103,6 +104,63 @@ def test_falha_que_persiste_desiste_sem_pr_e_nao_repete_o_reparo_da_mesma_assina
     assert r.status == "testes_falharam" and gh.prs == [] and "reparo não repetido" in r.detalhe
     assert len(agent.tasks) == 1 + MAX_RODADAS_REPARO + 1
     assert len(verificacoes(circle, "developer:reparo")) == 1
+
+
+class ConstituicaoAgent(ZipAgent):
+    """Em cada rodada, além da correção, força a escrita na constituição (fura o chmod, como um agente faria):
+    edita .github/workflows/ci.yml e circulo/self_dev.py, cria um arquivo novo em .github/ e apaga um existente."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.gravaveis = []
+
+    def run(self, task, workdir):
+        wt = Path(workdir)
+        alvos = [wt / ".github/workflows/ci.yml", wt / "circulo/self_dev.py"]
+        self.gravaveis.append([os.access(p, os.W_OK) for p in alvos])
+        for p in alvos:
+            os.chmod(p, 0o644)
+            p.write_text(p.read_text() + f"# rodada {len(self.tasks) + 1}\n")
+        os.chmod(wt / ".github", 0o755)
+        os.chmod(wt / ".github/workflows", 0o755)
+        (wt / ".github/novo.yml").write_text("on: push\n")
+        os.chmod(wt / ".github/CODEOWNERS", 0o644)
+        (wt / ".github/CODEOWNERS").unlink()
+        return super().run(task, workdir)
+
+
+def test_constituicao_editada_pelo_agente_e_revertida_em_cada_rodada_e_o_pr_sai(circle, repo, tmp_path):  # noqa: F811
+    """Regressão (lições #10 e #11): a constituição fica somente leitura em cada rodada (inclusive o reparo), o que o
+    agente forçar é revertido do merge-base (modificado, novo e apagado), cada reversão vira evento e o PR sai."""
+    (repo / ".github/workflows").mkdir(parents=True)
+    (repo / ".github/workflows/ci.yml").write_text("on: pull_request\n")
+    (repo / ".github/CODEOWNERS").write_text("* @dono\n")
+    (repo / "circulo").mkdir()
+    (repo / "circulo/self_dev.py").write_text("X = 1\n")
+    git(repo, "add", "-A")
+    git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "constituição")
+    git(repo, "push", "-q", "origin", "main")
+    erro_recorrente(circle)
+    agent = ConstituicaoAgent(conserta_na=2)
+    dev, gh = dev_de(circle, repo, tmp_path, agent)
+    r = dev.run_once()
+    assert r.status == "proposto" and gh.prs, r.detalhe
+    assert len(agent.tasks) == 2 and agent.gravaveis == [[False, False], [False, False]]     # somente leitura nas 2 rodadas
+    assert ".github/" in agent.tasks[1] and "circulo/self_dev.py" in agent.tasks[1]          # a lista no prompt do reparo
+    assert [v["ok"] for v in verificacoes(circle, "developer:abrir_pr:constituicao_intacta")] == [1, 1]
+    branch = gh.prs[0][0]
+    assert set(r.detalhe.split(", ")) == {"app.py", "test_app.py"}
+    origin = repo.parent / "origin.git"
+    assert git(origin, "show", f"{branch}:.github/workflows/ci.yml") == "on: pull_request"
+    assert git(origin, "show", f"{branch}:circulo/self_dev.py") == "X = 1"
+    assert git(origin, "show", f"{branch}:.github/CODEOWNERS") == "* @dono"
+    assert ".github/novo.yml" not in git(origin, "ls-tree", "-r", "--name-only", branch)
+    eventos = verificacoes(circle, "developer:constituicao_revertida")
+    assert len(eventos) == 2 and all(v["ok"] == 1 for v in eventos)
+    for n, v in enumerate(eventos, 1):
+        assert f"rodada {n}" in v["motivo"]
+        for caminho in (".github/workflows/ci.yml", "circulo/self_dev.py", ".github/novo.yml", ".github/CODEOWNERS"):
+            assert caminho in v["motivo"]
 
 
 def test_saida_focada_corta_pelo_final_sem_cortar_o_resumo_do_pytest():
