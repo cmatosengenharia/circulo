@@ -152,3 +152,23 @@ def test_cada_tipo_de_missao_tem_suas_perspectivas_e_a_pergunta_do_ciclo_nao_gas
     assert len(q.chamadas) == 1                                     # perspectivas geradas uma vez por tipo
     assert t1.startswith("Como fotografo") or t1.startswith("Como cliente final")
     assert t1 != t2                                                 # rodízio entre perspectivas
+
+
+def test_falha_local_no_worktree_e_do_item_e_nunca_do_diretorio(circle):
+    """A falha local grava o item do roteiro no registro; o ranking agrupa por id do item e mostra o título."""
+    from circulo.licoes import registrar
+    from circulo.perguntas import _arquiteto
+    s, agora = circle.store, time.time()
+    item = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+               "VALUES('Simplificar o fatiador','x','loop','em_andamento','',1,?,?)", (agora, agora))
+    registrar(circle.ctx, "developer:testes", False, sujeito=f".circulo-wt-{item}", motivo="tests/a.py:1: AssertionError")
+    gravada = s.one("SELECT item_id, item_titulo FROM verificacoes WHERE ponto='developer:testes' ORDER BY id DESC LIMIT 1")
+    assert (gravada["item_id"], gravada["item_titulo"]) == (item, "Simplificar o fatiador")
+    # registro antigo, sem item gravado: o diretório só resolve o item na leitura; sem item, cai em 'sem_item'
+    for sujeito in (f".circulo-wt-{item}", f".circulo-wt-{item}", ".circulo-wt-999", ".circulo-wt-999"):
+        s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,motivo,created_at) VALUES(0,'developer:lint',?,0,'E1',?)",
+            (sujeito, agora))
+    ranking = _arquiteto(s, agora)[0].evidencia["itens_com_mais_falhas_locais"]
+    assert ranking[0] == {"item": item, "titulo": "Simplificar o fatiador", "n": 3}
+    assert {"item": "sem_item", "titulo": "sem_item", "n": 2} in ranking
+    assert not [x for x in ranking if ".circulo-wt-" in str(x)]
