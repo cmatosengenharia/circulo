@@ -24,7 +24,7 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
-from .planejador import GATE, PORTEIRO
+from .planejador import ESPERA, GATE, MAX_TENTATIVAS, PORTEIRO, TENTATIVAS
 
 INTERVALO = 60                   # segundos entre passagens da thread
 ESPERA_PERGUNTA = 30 * 60        # pergunta validada esperando mais que isso = trava
@@ -59,6 +59,13 @@ def _causa_porteiro(u: dict) -> str:
             f"{u['motivo']} (medido {u['valor']:.2f}, limiar {u['limiar']:.2f}, fonte {u['fonte']})")
 
 
+def _causa_tentativa(t: dict, now: float) -> str:
+    """O resultado medido da última tentativa real do planejador (planejador.registrar_tentativa)."""
+    falha = f"falhou ({t['classe_da_falha']})" if t.get("classe_da_falha") else t["desfecho"]
+    return (f"última tentativa do planejador há {int((now - t['em']) / 60)} min, pergunta #{t['pergunta_id']} "
+            f"(tentativa {t['tentativas']}/{MAX_TENTATIVAS}): {falha}: {t['motivo']}")
+
+
 def s_pergunta_valida_parada(s, now):
     r = s.one("SELECT COUNT(*) n, MIN(created_at) em FROM perguntas WHERE status='valida'")
     # a idade só cresce: acima do limite agora e na verificação anterior (INTERVALO atrás) = 2 verificações seguidas
@@ -68,10 +75,18 @@ def s_pergunta_valida_parada(s, now):
     u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
     gate = _kv(s, GATE, {}) or {}
     motivo = gate.get("motivo") if now - float(gate.get("em", 0) or 0) < 30 * 60 else None
-    causa = f"o planejador não planeja: {motivo}" if motivo else _causa_porteiro(u)
-    return {"chave": "pergunta_valida_parada", "titulo": f"{r['n']} pergunta(s) validada(s) pelo Jev esperando há {int((now - r['em']) / 60)} min sem virar item",
-            "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None,
-                          "porteiro": u or None, "planejador_motivo": motivo},
+    tent = _kv(s, TENTATIVAS, {}) or {}
+    ult = tent.get("ultima")
+    if motivo and motivo.startswith(ESPERA):
+        motivo = None                        # o planejador roda a cada intervalo: a causa está no resultado da tentativa
+    causa = (f"o planejador não planeja: {motivo}" if motivo else _causa_tentativa(ult, now) if ult else _causa_porteiro(u))
+    progresso = tent.get("ultimo_progresso_em")
+    sem_progresso = int((now - float(progresso)) / 60) if progresso else None
+    return {"chave": "pergunta_valida_parada", "titulo": f"{r['n']} pergunta(s) validada(s) pelo Jev esperando há {int((now - r['em']) / 60)} min sem virar item "
+                                                         f"(último progresso {f'há {sem_progresso} min' if sem_progresso is not None else 'nunca medido'})",
+            "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "sem_progresso_min": sem_progresso,
+                          "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None,
+                          "porteiro": u or None, "planejador_motivo": motivo, "ultima_tentativa": ult},
             "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)), "sugestao": causa}
 
 
