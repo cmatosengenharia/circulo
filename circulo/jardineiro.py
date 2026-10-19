@@ -26,6 +26,12 @@ INDICADORES = {"except_exception": "blocos `except Exception` (erros engolidos)"
                "todo": "TODO/FIXME/gambiarra no código"}
 
 
+def _engole_exception(h: ast.ExceptHandler) -> bool:
+    """`except Exception` (ou numa tupla) que não termina em raise: o erro some ali."""
+    tipos = h.type.elts if isinstance(h.type, ast.Tuple) else [h.type]
+    return any(isinstance(t, ast.Name) and t.id == "Exception" for t in tipos) and not isinstance(h.body[-1], ast.Raise)
+
+
 def medir(pasta: str | Path | None = None) -> dict:
     pasta = Path(pasta) if pasta else Path(__file__).parent
     tot = dict.fromkeys(INDICADORES, 0)
@@ -33,14 +39,15 @@ def medir(pasta: str | Path | None = None) -> dict:
     for p in sorted(pasta.glob("*.py")):
         txt = p.read_text(encoding="utf-8")
         linhas = txt.splitlines()
-        d = {"except_exception": len(re.findall(r"except\s+(?:\(?\s*)?Exception\b", txt)),
-             "noqa": sum("noqa" in ln for ln in linhas),
+        d = {"except_exception": 0, "noqa": sum("noqa" in ln for ln in linhas),
              "todo": len(re.findall(r"#.*\b(TODO|FIXME|XXX|gambiarra|hack)\b", txt, re.I)),
              "modulos_grandes": int(len(linhas) > MODULO_GRANDE), "funcoes_longas": 0}
         try:
             for n in ast.walk(ast.parse(txt)):
                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and (n.end_lineno or n.lineno) - n.lineno + 1 > FUNCAO_LONGA:
                     d["funcoes_longas"] += 1
+                elif isinstance(n, ast.ExceptHandler) and _engole_exception(n):
+                    d["except_exception"] += 1
         except SyntaxError:
             pass
         por_arquivo[p.name] = d

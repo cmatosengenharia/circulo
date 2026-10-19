@@ -24,7 +24,7 @@ CONSTITUICAO_PODE_IMPORTAR = {
 ATUADORES = {"self_dev", "merge_gate", "corpo", "loop"}
 SOBEM_O_LOOP = {"cli", "demo", "confianca"}       # confianca só lê uma constante (ESTAGNADO)
 MAX_LINHAS = 1000
-TETO_JARDIM = {"except_exception": 70, "noqa": 75, "funcoes_longas": 14, "modulos_grandes": 1, "todo": 8}
+TETO_JARDIM = {"except_exception": 64, "noqa": 75, "funcoes_longas": 14, "modulos_grandes": 1, "todo": 8}
 
 
 def grafo() -> dict[str, set[str]]:
@@ -57,6 +57,16 @@ def test_so_a_linha_de_comando_sobe_o_loop():
 def test_nenhum_modulo_gigante():
     grandes = {p.name: n for p in PACOTE.glob("*.py") if (n := len(p.read_text(encoding="utf-8").splitlines())) > MAX_LINHAS}
     assert not grandes, grandes
+
+
+def test_except_exception_conta_so_o_erro_engolido(tmp_path):
+    """lição #17: registrar a falha e repropagar não engole o erro; só o bloco que engole entra no teto."""
+    (tmp_path / "a.py").write_text(
+        '"""menciona `except Exception` só no texto"""\n'
+        "def engole():\n    try:\n        pass\n    except Exception:\n        pass\n"
+        "def repropaga():\n    try:\n        pass\n    except Exception as exc:\n        print(exc)\n        raise\n"
+        "def converte():\n    try:\n        pass\n    except (Exception, OSError) as exc:\n        raise RuntimeError() from exc\n")
+    assert medir(tmp_path)["total"]["except_exception"] == 1
 
 
 def test_padroes_ruins_nao_crescem():

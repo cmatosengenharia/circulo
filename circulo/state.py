@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS perguntas (
   relevancia REAL,
   score REAL,
   evidencia TEXT,
-  status TEXT NOT NULL,          -- feita | virou_item | entregue | contestada | repetida | descartada
+  status TEXT NOT NULL,          -- feita | virou_item | entregue | contestada | repetida | descartada | quarentenada
   item_id INTEGER,
   created_at REAL NOT NULL,
   updated_at REAL NOT NULL
@@ -506,7 +506,7 @@ class Store:
                   ("decisions", "probabilidades", "TEXT"), ("licoes", "node_id", "TEXT"), ("licoes", "origens", "TEXT"),
                   ("licoes", "checagens", "TEXT"),
                   ("perguntas", "eixo", "TEXT"), ("perguntas", "pertinencia", "REAL"), ("perguntas", "acionavel", "INTEGER"),
-                  ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"))
+                  ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"), ("perguntas", "motivo", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
