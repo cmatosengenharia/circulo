@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 packages = ["circulo"]
 
 [tool.setuptools.package-data]
-circulo = ["painel.html", "home.html", "integracoes.html", "rastros.html", "fluxo.html"]
+circulo = ["painel.html", "home.html", "integracoes.html", "rastros.html", "fluxo.html", "jobs_rotulados.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

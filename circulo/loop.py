@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, intencoes, parada, telemetria
+from . import finance, intencoes, jobs, parada, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
@@ -50,7 +50,8 @@ TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_
            "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu",
            "jardinagem": "Medindo padrões ruins se espalhando no próprio código",
            "checar_licoes": "Reexecutando no main os testes das lições para fechar ou reabrir",
-           "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev"}
+           "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev",
+           "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana"}
 IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
@@ -200,6 +201,7 @@ class Circle:
             self._stage("pedido", {"evento": ev["id"], "projeto": pid})
             ctx.dl.project_id = pid
             ctx.evento = ev["id"]
+            seguro(jobs.registrar, ctx, ev["id"])   # o job do pedido: regra calibrada; 'desconhecido' antes da LLM
             seq = None
             try:
                 # write-ahead: a intenção entra na trilha antes; sem registro, o pedido não é executado
@@ -407,6 +409,8 @@ class Circle:
         from . import indagador
         if indagador.precisa(self.store, self.engine) and "indagar" not in tasks:
             tasks.append("indagar")
+        if jobs.precisa(self.store) and "antecipar" not in tasks:
+            tasks.append("antecipar")
         if self._dev_tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
@@ -624,6 +628,8 @@ class Circle:
             self.planejador.run(autorizado=True)       # o gasto já foi decidido acima: um porteiro só
         elif pick == "estudar_pedido":
             self.estudo.run(autorizado=True)
+        elif pick == "antecipar":
+            jobs.antecipar(self.store)
         elif pick == "atualizar_corpo":
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
