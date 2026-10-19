@@ -170,18 +170,18 @@ def test_porteiro_grava_a_decisao_sobre_a_pergunta_a_cada_ciclo(circle):
     assert len(circle.store.get(PORTEIRO)["historico"]) == 3
 
 
-def _registro(circle, valor, vezes):
+def _registro(circle, valor, vezes, em=None):
     from circulo.decision import Gate
     from circulo.planejador import registrar_porteiro
     for _ in range(vezes):
-        registrar_porteiro(circle.store, _pergunta_id(circle), Gate(valor >= 0.4, Decision("worth_spending", "noul", valor, 0.8, "jev"), 0.4))
+        registrar_porteiro(circle.store, _pergunta_id(circle), Gate(valor >= 0.4, Decision("worth_spending", "noul", valor, 0.8, "jev"), 0.4), now=em)
 
 
 def test_alerta_de_trava_cita_o_motivo_medido_da_ultima_recusa(circle):
     _trava_pergunta(circle)
     a = {x["chave"]: x for x in vigia.sondar(circle.store)}["pergunta_valida_parada"]
     assert "não está rodando" not in a["sugestao"] and "sem registro" in a["sugestao"]     # sem registro: não adivinha a causa
-    _registro(circle, 0.33, 2)
+    _registro(circle, 0.33, 2, em=time.time() - vigia.ESPERA_PERGUNTA - vigia.INTERVALO)   # recusa antiga: sem decisão recente
     a = {x["chave"]: x for x in vigia.sondar(circle.store)}["pergunta_valida_parada"]
     assert "abaixo_do_limiar" in a["sugestao"] and "0.33" in a["sugestao"] and "0.40" in a["sugestao"]
     assert "não está rodando" not in a["sugestao"]
@@ -209,3 +209,30 @@ def test_recusada_n_vezes_pelo_mesmo_motivo_vira_recusada_pelo_porteiro_e_abre_r
     assert s.one("SELECT COUNT(*) n FROM vigia WHERE chave='pergunta_valida_parada'")["n"] == 0   # não repete o alerta
     v.rodar()
     assert s.one("SELECT COUNT(*) n FROM roadmap WHERE titulo LIKE 'Vigia: revisar o limiar%'")["n"] == 1
+
+
+def test_recusa_recente_do_porteiro_nao_e_trava_e_a_espera_conta_da_ultima_decisao(circle):
+    """A pergunta #16: validada há 106 min, recusada de propósito (0.33 < 0.40, 1x). Isso é load shedding, não trava."""
+    agora = time.time()
+    _trava_pergunta(circle, ha=106 * 60)
+    _registro(circle, 0.33, 1, em=agora - 5 * 60)
+    assert "pergunta_valida_parada" not in {a["chave"] for a in vigia.sondar(circle.store, agora)}
+    assert vigia.Vigia(circle.ctx).rodar(agora)["achados"] == 0
+    assert circle.store.one("SELECT COUNT(*) n FROM vigia WHERE chave='pergunta_valida_parada'")["n"] == 0
+    depois = agora - 5 * 60 + vigia.ESPERA_PERGUNTA + vigia.INTERVALO      # sem decisão do porteiro recente: aí sim é trava
+    a = {x["chave"]: x for x in vigia.sondar(circle.store, depois)}["pergunta_valida_parada"]
+    assert a["evidencia"]["esperando_min"] == int((vigia.ESPERA_PERGUNTA + vigia.INTERVALO) / 60)
+    assert a["evidencia"]["recusa_porteiro"]["motivo"] == "abaixo_do_limiar" and "abaixo_do_limiar" in a["titulo"]
+
+
+def test_pergunta_recusada_alem_do_prazo_recebe_descarte_explicito(circle):
+    from circulo.planejador import PRAZO_PORTEIRO
+    _trava_pergunta(circle, ha=PRAZO_PORTEIRO - 60)
+    pid = _pergunta_id(circle)
+    _registro(circle, 0.33, 1)
+    assert circle.store.one("SELECT status FROM perguntas WHERE id=?", (pid,))["status"] == "valida"   # dentro do prazo: espera
+    circle.store.x("UPDATE perguntas SET created_at=? WHERE id=?", (time.time() - PRAZO_PORTEIRO, pid))
+    _registro(circle, 0.33, 1)
+    r = circle.store.one("SELECT status, motivo FROM perguntas WHERE id=?", (pid,))
+    assert r["status"] == "descartada_abaixo_do_limiar" and "0.33" in r["motivo"] and "0.40" in r["motivo"]
+    assert PRAZO_PORTEIRO + vigia.ESPERA_PERGUNTA + vigia.INTERVALO <= 240 * 60   # destino explícito em até 240 min

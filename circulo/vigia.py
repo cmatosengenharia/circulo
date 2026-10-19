@@ -67,12 +67,16 @@ def _causa_tentativa(t: dict, now: float) -> str:
 
 
 def s_pergunta_valida_parada(s, now):
-    r = s.one("SELECT COUNT(*) n, MIN(created_at) em FROM perguntas WHERE status='valida'")
+    desde = {p["id"]: float(p["created_at"]) for p in s.q("SELECT id, created_at FROM perguntas WHERE status='valida'")}
+    u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
+    recusa = u if u.get("decisao") == "recusou" and u.get("pergunta_id") in desde else None
+    if recusa:                               # recusa registrada é load shedding, não trava: a espera conta da última decisão
+        desde[recusa["pergunta_id"]] = max(desde[recusa["pergunta_id"]], float(recusa["em"]))
+    r = {"n": len(desde), "em": min(desde.values(), default=now)}
     # a idade só cresce: acima do limite agora e na verificação anterior (INTERVALO atrás) = 2 verificações seguidas
-    if not r["n"] or now - float(r["em"] or now) < ESPERA_PERGUNTA + INTERVALO:
+    if not r["n"] or now - r["em"] < ESPERA_PERGUNTA + INTERVALO:
         return None
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
-    u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
     gate = _kv(s, GATE, {}) or {}
     motivo = gate.get("motivo") if now - float(gate.get("em", 0) or 0) < 30 * 60 else None
     tent = _kv(s, TENTATIVAS, {}) or {}
@@ -82,11 +86,13 @@ def s_pergunta_valida_parada(s, now):
     causa = (f"o planejador não planeja: {motivo}" if motivo else _causa_tentativa(ult, now) if ult else _causa_porteiro(u))
     progresso = tent.get("ultimo_progresso_em")
     sem_progresso = int((now - float(progresso)) / 60) if progresso else None
+    rec = (f"; última recusa do porteiro há {int((now - float(recusa['em'])) / 60)} min: {recusa['motivo']} "
+           f"{recusa['valor']:.2f} < {recusa['limiar']:.2f}" if recusa else "")
     return {"chave": "pergunta_valida_parada", "titulo": f"{r['n']} pergunta(s) validada(s) pelo Jev esperando há {int((now - r['em']) / 60)} min sem virar item "
-                                                         f"(último progresso {f'há {sem_progresso} min' if sem_progresso is not None else 'nunca medido'})",
+                                                         f"(último progresso {f'há {sem_progresso} min' if sem_progresso is not None else 'nunca medido'}{rec})",
             "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "sem_progresso_min": sem_progresso,
                           "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None,
-                          "porteiro": u or None, "planejador_motivo": motivo, "ultima_tentativa": ult},
+                          "porteiro": u or None, "recusa_porteiro": recusa, "planejador_motivo": motivo, "ultima_tentativa": ult},
             "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)), "sugestao": causa}
 
 
