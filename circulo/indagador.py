@@ -375,6 +375,9 @@ def indagar(ctx, project: dict | None = None) -> dict:
                        (c["chave"], c["persona"], c["texto"][:400], c.get("relevancia"), round(c["pertinencia"] * (1 + c["acionavel"]) / 3, 4),
                         json.dumps(c["evidencia"], ensure_ascii=False, default=str), c["veredito"], cer, c["eixo"], c["pertinencia"],
                         c["acionavel"], json.dumps(c["classificacao"], ensure_ascii=False), agora, agora)))
+        if c["veredito"] == "valida":
+            from .planejador import marcar_etapa
+            marcar_etapa(s, ids[-1], "validada", {"cerebro": cer})
     marcas = dict(s.get("indagador") or {})
     marcas[cer] = agora
     s.set("indagador", marcas)

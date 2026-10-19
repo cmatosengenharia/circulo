@@ -20,6 +20,7 @@ Limites:
 from __future__ import annotations
 
 import json
+import random
 import re
 import sqlite3
 import time
@@ -46,6 +47,12 @@ PRAZO_PORTEIRO = 2 * 3600   # pergunta mais velha que isso que o porteiro recusa
 PROGRESSO = ("virou_item", "descartada", "repetida")
 TRANSITORIAS = (TimeoutError, ConnectionError, urllib.error.URLError, sqlite3.OperationalError)
 PERMANENTES = (KeyError, TypeError, AttributeError, ValueError, NameError, ImportError, IndexError)
+ESPERA_RETRY = 2.0          # s antes da única nova tentativa (5xx ou timeout), mais o jitter
+JITTER = 3.0                # s: espalha as novas tentativas (repetir na hora tende a cair no mesmo 502)
+REAGENDA = "planejador_reagendado"   # kv: a pergunta que falhou duas vezes volta no giro em que vencer, não no idle_task
+REAGENDA_S = 120            # prazo da volta (≤ 15 min, o alvo de pergunta_para_item)
+ETAPAS = ("validada", "porteiro_decidiu", "planejador_chamado", "item_gravado")
+dormir = time.sleep
 
 SYSTEM = """Você é o Planejador do círculo autoevolutivo (repositório Python `circulo`, só stdlib, SQLite).
 O círculo é um loop 24/7 que recebe pedidos, transforma em missões, mede, aprende e corrige o próprio código por PR.
@@ -94,8 +101,9 @@ class Planejador:
             pass
         return motivo is None
 
-    def motivo(self) -> str | None:
-        """Por que NÃO planejar agora (None = planejar). Cada motivo é um fato medido, não um palpite."""
+    def motivo(self, no_giro: bool = False) -> str | None:
+        """Por que NÃO planejar agora (None = planejar). Cada motivo é um fato medido, não um palpite.
+        no_giro: a pergunta acabou de ser validada (ou o reagendamento venceu), então o intervalo não se aplica."""
         if self.dev is None or self.ctx.dl.llm is None:
             return "sem LLM ou sem Developer"
         if self.dev.em_espera():
@@ -111,7 +119,7 @@ class Planejador:
             return "lição estrutural aberta: primeiro corrige, depois evolui"
         espera = INTERVALO_RAPIDO if fila == 0 else INTERVALO
         desde = time.time() - float((self.s.get("planejador") or {}).get("em", 0))
-        if desde < espera:
+        if desde < espera and not no_giro:
             return f"{ESPERA}: última tentativa há {int(desde)} s (espera {espera} s)"
         hoje, teto = self._hoje(), self.teto()
         if hoje >= teto:
@@ -159,12 +167,44 @@ class Planejador:
         try:
             pid, desfecho, motivo, item = self._tentar(autorizado)
         except Exception as exc:
-            registrar_tentativa(self.s, alvo["id"] if alvo else None, "falhou", f"{type(exc).__name__}: {exc}",
-                                classe=classe_da_falha(exc), reply=self.ctx.reply)
+            pid, classe = (alvo["id"] if alvo else None), classe_da_falha(exc)
+            rec = registrar_tentativa(self.s, pid, "falhou", f"{type(exc).__name__}: {exc}", classe=classe, reply=self.ctx.reply)
+            if classe == "transitoria" and rec["tentativas"] and rec["quarentena"] is None:
+                self.s.set(REAGENDA, {"pergunta_id": pid, "vence_em": time.time() + REAGENDA_S})
             raise
         registrar_tentativa(self.s, pid, desfecho, motivo, classe="transitoria" if desfecho == "porteiro_recusou" else None,
                             reply=self.ctx.reply, validada=alvo is not None and alvo["id"] == pid)
         return item
+
+    def no_giro(self, validou: bool = False) -> dict | None:
+        """Chamado pelo giro logo após a validação, ou quando o reagendamento vence: a pergunta não espera o idle_task.
+        Uma chamada por giro; a nova tentativa em falha é só do cliente (_gerar)."""
+        reag = self.s.get(REAGENDA) or {}
+        venceu = bool(reag) and time.time() >= float(reag["vence_em"])
+        if venceu:
+            self.s.set(REAGENDA, {})        # vencido sai do kv mesmo travado: senão o loop nunca descansa
+        if not (validou or venceu) or self.motivo(no_giro=True) is not None:
+            return None
+        return self.run()
+
+    def _gerar(self, prompt: str, modelo: str, pid: int | None) -> tuple[str, int]:
+        """A chamada ao LLM com a única nova tentativa da cadeia: só 5xx ou timeout, depois de espera curta com jitter."""
+        llm = self.ctx.dl.llm
+        tentativa, motivo = 1, None
+        while True:
+            marcar_etapa(self.s, pid, "planejador_chamado", {"tentativa": tentativa, "motivo": motivo})
+            try:
+                if hasattr(llm, "generate"):
+                    out = llm.generate(system=SYSTEM, prompt=prompt, model=modelo, max_tokens=MAX_TOKENS)
+                    return out.text, out.tokens
+                return llm.complete(SYSTEM, prompt, MAX_TOKENS)
+            except Exception as exc:
+                motivo = _repetivel(exc)
+                if tentativa == 1 and motivo:
+                    dormir(ESPERA_RETRY + random.uniform(0, JITTER))
+                    tentativa += 1
+                    continue
+                raise
 
     def _tentar(self, autorizado: bool) -> tuple[int | None, str, str, dict | None]:
         # a evolução parte de uma pergunta: o conselho escolhe (SQL + Jev, sem LLM); sem pergunta com dor, não gasta
@@ -188,10 +228,15 @@ class Planejador:
             if pergunta is None:
                 return None, "sem_pergunta", "nenhuma pergunta do conselho com dor", None
             pid = conselho.registrar(pergunta)
+        ja = self.s.one("SELECT item_id FROM perguntas WHERE id=? AND item_id IS NOT NULL", (pid,))
+        if ja:                 # idempotente pelo id da pergunta: uma nova tentativa não grava um segundo item
+            conselho.marcar(pid, "virou_item")
+            return pid, "repetida", f"a pergunta já virou o item #{ja['item_id']}", None
         ev = self.evidencia()
         if not autorizado:     # chamado pelo loop, o gasto já foi decidido lá: um porteiro só
             gate = self.ctx.dl.worth_spending("planejar_roteiro", {"est_tokens": EST_TOKENS, "value_signal": 0.8,
                                                                    "itens_hoje": self._hoje()})
+            marcar_etapa(self.s, pid, "porteiro_decidiu", {"porteiro": "planejar_roteiro", "aceitou": gate.allowed})
             if not gate.allowed:
                 return pid, "porteiro_recusou", (f"worth_spending.planejar_roteiro recusou ({float(gate.decision.value):.2f} "
                                                  f"< {float(gate.threshold):.2f})"), None
@@ -201,14 +246,9 @@ class Planejador:
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.contexto():
             prompt += "\n\n" + lic.contexto()
-        llm = self.ctx.dl.llm
         escolha = self.ctx.dl.pick_model_detalhe("planejador", {"tarefa": prompt})
         t0 = time.time()
-        if hasattr(llm, "generate"):
-            out = llm.generate(system=SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=MAX_TOKENS)
-            texto, tokens = out.text, out.tokens
-        else:
-            texto, tokens = llm.complete(SYSTEM, prompt, MAX_TOKENS)
+        texto, tokens = self._gerar(prompt, escolha["modelo"], pid)
         self.ctx.budget.charge(tokens, "llm")
         item = _parse(texto)
         sem_item = _sem_item(texto)             # "não há item novo" também é resposta válida
@@ -254,11 +294,12 @@ class Planejador:
         agora = time.time()
         detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (
             f"\nEvidência ({item['base']}): {item['dado']}" if item.get("dado") else "")
-        detalhe = f"Pergunta do conselho ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
+        detalhe = f"Pergunta do conselho #{pid} ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
         rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
                        "VALUES(?,?,'loop','pendente',?,?,?,?)",
-                       (item["titulo"][:200], detalhe[:2000], f"pergunta do conselho: {pergunta.persona}", ordem, agora, agora))
+                       (item["titulo"][:200], detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora))
         conselho.marcar(pid, "virou_item", rid)
+        marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")
         return pid, "virou_item", f"item #{rid}", {**item, "id": rid, "pergunta": pergunta.texto, "persona": pergunta.persona}
 
@@ -333,9 +374,45 @@ def _parse(texto: str) -> dict | None:
     return item if item["titulo"] and item["detalhe"] else None
 
 
+def _status_http(exc: BaseException) -> int | None:
+    st = getattr(exc, "status_code", None) or getattr(exc, "code", None)   # SDK da Anthropic | urllib.error.HTTPError
+    return st if isinstance(st, int) else None
+
+
+def _repetivel(exc: BaseException) -> str | None:
+    """'5xx' ou 'timeout' (vale a única nova tentativa); None para o resto, inclusive 4xx (repetir dá o mesmo erro)."""
+    st = _status_http(exc)
+    if st is not None:
+        return "5xx" if st >= 500 else None
+    return "timeout" if isinstance(exc, TimeoutError) or "Timeout" in type(exc).__name__ else None
+
+
+def marcar_etapa(store, pergunta_id: int | None, etapa: str, detalhe: dict | None = None) -> None:
+    """Uma sub-etapa da pergunta validada até o item, sempre com o id da pergunta (lição #15)."""
+    if pergunta_id is None:
+        return
+    store.x("INSERT INTO pergunta_etapas(pergunta_id,etapa,detalhe,em) VALUES(?,?,?,?)",
+            (pergunta_id, etapa, json.dumps(detalhe, ensure_ascii=False) if detalhe else None, time.time()))
+
+
+def eventos(store, pergunta_id: int) -> list[dict]:
+    return [{"etapa": r["etapa"], "em": r["em"], "detalhe": json.loads(r["detalhe"]) if r["detalhe"] else None}
+            for r in store.q("SELECT etapa, detalhe, em FROM pergunta_etapas WHERE pergunta_id=? ORDER BY id", (pergunta_id,))]
+
+
+def esperas(store, pergunta_id: int) -> list[dict]:
+    """Cada passagem entre dois eventos, com a espera atribuída à sub-etapa que a encerrou."""
+    evs = eventos(store, pergunta_id)
+    return [{"pergunta_id": pergunta_id, "etapa": b["etapa"], "espera_s": round(b["em"] - a["em"], 3)}
+            for a, b in zip(evs, evs[1:], strict=False)]
+
+
 def classe_da_falha(exc: BaseException) -> str:
-    """transitoria (repetir pode dar certo), permanente (erro de código: repetir dá o mesmo) ou desconhecida."""
-    if isinstance(exc, TRANSITORIAS):
+    """transitoria (repetir pode dar certo), permanente (erro de código ou 4xx: repetir dá o mesmo) ou desconhecida."""
+    st = _status_http(exc)
+    if st is not None and 400 <= st < 500:
+        return "permanente"
+    if isinstance(exc, TRANSITORIAS) or _repetivel(exc):
         return "transitoria"
     if isinstance(exc, PERMANENTES):
         return "permanente"
@@ -392,6 +469,7 @@ def registrar_porteiro(store, pergunta_id: int | None, gate, now: float | None =
     mesmo = all(ant.get(k) == rec[k] for k in ("pergunta_id", "decisao", "motivo"))
     rec["seguidas"] = int(ant.get("seguidas", 0)) + 1 if mesmo else 1
     store.set(PORTEIRO, {"ultimo": rec, "historico": [*reg.get("historico", []), rec][-HISTORICO:]})
+    marcar_etapa(store, pergunta_id, "porteiro_decidiu", {"porteiro": "idle_evolution", "aceitou": gate.allowed})
     if motivo == "abaixo_do_limiar" and pergunta_id is not None:
         store.x("UPDATE perguntas SET status='descartada_abaixo_do_limiar', motivo=?, updated_at=? WHERE id=? AND status='valida' AND created_at<=?",
                 (f"porteiro worth_spending.idle_evolution recusou {rec['valor']:.2f} < limiar {rec['limiar']:.2f} "

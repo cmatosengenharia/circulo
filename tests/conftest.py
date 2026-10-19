@@ -26,6 +26,13 @@ def no_keys(monkeypatch):
     monkeypatch.setenv("CIRCULO_SEM_DEVELOPER", "1")
 
 
+@pytest.fixture(autouse=True)
+def sem_espera_do_retry(monkeypatch):
+    # a única nova tentativa do Planejador espera segundos com jitter; nos testes, a espera é instantânea
+    from circulo import planejador
+    monkeypatch.setattr(planejador, "dormir", lambda s: None, raising=False)
+
+
 @pytest.fixture
 def clock():
     return Clock(NOON)

@@ -237,6 +237,7 @@ class Circle:
                 r.errors.append(f"idle: {exc!r}")
                 if not getattr(exc, "_registrado", False):
                     self.incidents.record("idle", exc, circulo_pid)
+        seguro(self.planejador.no_giro)          # pergunta reagendada após 5xx/timeout volta no giro em que vence
 
         # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar).
         #    Modo seguro congela os níveis 2 e 3: só a saúde continua rodando (e pode fazer rollback).
@@ -625,6 +626,9 @@ class Circle:
             return True
         if (s.get("corpo") or {}).get("estado") == "validando":
             return True
+        from .planejador import REAGENDA
+        if s.get(REAGENDA):
+            return True
         return any(self._tem_trabalho(t) for t in TRABALHO)
 
     def ritmo(self, r, pendente: bool) -> tuple[str, float]:
@@ -707,7 +711,9 @@ class Circle:
             self.licoes.checar_no_main(self.corpo.repo)
         elif pick == "indagar":
             from . import indagador
-            indagador.rodar(self.ctx, self.engine)
+            res = indagador.rodar(self.ctx, self.engine)
+            if res and res["cerebro"] == "loop" and res["validas"]:
+                seguro(self.planejador.no_giro, validou=True)   # a pergunta validada vira item neste giro (falha fica em TENTATIVAS)
         elif pick == "evoluir_projeto":
             # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo
             self.engine.run_parallel(on_stage=lambda nome, pid, detalhe=None: self._stage(nome, {"projeto": pid, "detalhe": detalhe,
