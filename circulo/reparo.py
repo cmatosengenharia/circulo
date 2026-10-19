@@ -9,20 +9,30 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
   3. Cada rodada vira a verificação `developer:reparo`, com os tokens gastos.
   4. Falha que persiste depois da rodada: desiste sem PR e a lição fica registrada pela assinatura. A mesma assinatura
      não ganha outra rodada (Olausson et al., ICLR 2024: mais rodadas sem feedback melhor não pagam o custo).
+  5. A constituição em camadas, em toda rodada do agente (a principal, o reparo e o conserto): somente leitura no SO
+     antes (Codex: caminhos sensíveis read-only mesmo dentro da raiz gravável), restaurada do merge-base com a main
+     depois (modificados, novos e apagados), cada reversão vira o evento `developer:constituicao_revertida`, e a lista
+     vai no prompt do reparo. O gate do merge continua sendo a barreira independente.
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
 """
 from __future__ import annotations
 
+import os
 import re
+import stat
 import subprocess
 import sys
 from pathlib import Path
 
+from .merge_gate import CONSTITUICAO
 from .self_dev import CORRECAO_LOCAL, LINT_CMD, SelfDeveloper, _git, ambiente_isolado, build_self_dev, garantir_ruff
 
 REPARO = "developer:reparo"
+REVERTIDA = "developer:constituicao_revertida"
+PROTEGIDOS = (f"\nNUNCA altere a constituição (somente leitura; o que mudar nela é revertido antes do PR): "
+              f"{', '.join(CONSTITUICAO)}.")
 MAX_RODADAS_REPARO = 1
 LINHAS_FEEDBACK = 60
 ALTERADOS, NOVOS = "{alterados}", "{novos}"      # marcadores nos comandos de autofix: viram a lista de arquivos .py
@@ -44,6 +54,11 @@ def saida_focada(texto: str, limite: int = LINHAS_FEEDBACK) -> str:
     return "\n".join((corpo[-resto:] if resto else []) + resumo)
 
 
+def _ambiente() -> dict:
+    """O ambiente isolado dos portões, sem bytecode: o `git add -A` levaria o `__pycache__` dos testes para o PR."""
+    return {**ambiente_isolado(), "PYTHONDONTWRITEBYTECODE": "1"}
+
+
 class DeveloperComReparo(SelfDeveloper):
     def __init__(self, *a, fix_cmds: list[list[str]] | None = None, **kw):
         auto_testes = kw.get("test_cmd") is None
@@ -52,6 +67,70 @@ class DeveloperComReparo(SelfDeveloper):
             self.test_cmd = [*self.test_cmd, "--tb=short"]
         self.fix_cmds = fix_cmds        # None = automático: o ruff --fix do CI quando o lint é o ruff do CI
         self._base: str | None = None
+        self._rodada = 0
+
+    def run_once(self, *a, **kw):
+        self._rodada = 0
+        return super().run_once(*a, **kw)
+
+    # ------------------------------------------------------------ constituição em camadas
+    def _travar(self, wt: Path) -> dict[Path, int]:
+        """Somente leitura no SO para os caminhos protegidos (pastas inclusive: nada novo nem apagado dentro).
+        Devolve os modos originais, para destravar depois."""
+        modos: dict[Path, int] = {}
+        for nome in CONSTITUICAO:
+            raiz = wt / nome
+            if not raiz.exists():
+                continue
+            caminhos = [raiz, *raiz.rglob("*")] if raiz.is_dir() else [raiz]
+            for p in sorted(caminhos, key=lambda p: len(p.parts), reverse=True):   # de dentro para fora
+                if p.is_symlink():
+                    continue
+                modos[p] = stat.S_IMODE(p.stat().st_mode)
+                os.chmod(p, modos[p] & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+        return modos
+
+    @staticmethod
+    def _destravar(modos: dict[Path, int]) -> None:
+        for p, modo in sorted(modos.items(), key=lambda x: len(x[0].parts)):     # de fora para dentro
+            try:
+                os.chmod(p, modo)
+            except FileNotFoundError:
+                pass
+
+    def _merge_base(self, wt: Path) -> str:
+        if self._base:
+            return self._base
+        for ref in ("origin/main", "main"):
+            mb = _git(["merge-base", "HEAD", ref], wt, check=False)
+            if mb:
+                return mb
+        return "HEAD"
+
+    def _reverter(self, wt: Path, titulo: str) -> list[str]:
+        """Restaura a constituição do merge-base com a main: modificados, apagados, novos no índice e soltos."""
+        base = self._merge_base(wt)
+        rastreados = _git(["diff", "--name-only", base, "--", *CONSTITUICAO], wt, check=False).splitlines()
+        soltos = _git(["ls-files", "--others", "--exclude-standard", "--", *CONSTITUICAO], wt, check=False).splitlines()
+        if rastreados:
+            _git(["restore", f"--source={base}", "--staged", "--worktree", "--", *rastreados], wt, check=False)
+        if soltos:
+            _git(["clean", "-fdq", "--", *CONSTITUICAO], wt, check=False)
+        caminhos = sorted(set(rastreados + soltos))
+        if caminhos:
+            from .licoes import registrar as monitorar
+            monitorar(self.ctx, REVERTIDA, True, sujeito=titulo[:120], licao=False,
+                      motivo=f"rodada {self._rodada}: {', '.join(caminhos)} restaurados de {base[:12]}")
+        return caminhos
+
+    def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
+        self._rodada += 1
+        modos = self._travar(wt)
+        try:
+            return super()._agente(task, wt, titulo, papel)
+        finally:
+            self._destravar(modos)
+            self._reverter(wt, titulo)
 
     # ------------------------------------------------------------ passo determinístico
     def _resolver_lint(self) -> None:
@@ -78,7 +157,7 @@ class DeveloperComReparo(SelfDeveloper):
                 argv += alterados if x == ALTERADOS else novos if x == NOVOS else [x]
             if (ALTERADOS in cmd and not alterados) or (NOVOS in cmd and not novos):
                 continue
-            subprocess.run(argv, cwd=wt, capture_output=True, text=True, timeout=300, env=ambiente_isolado())
+            subprocess.run(argv, cwd=wt, capture_output=True, text=True, timeout=300, env=_ambiente())
             rodou = True
         return rodou
 
@@ -90,7 +169,7 @@ class DeveloperComReparo(SelfDeveloper):
         from .licoes import registrar as monitorar
 
         def rodar(cmd):
-            return subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=900, env=ambiente_isolado())
+            return subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=900, env=_ambiente())
 
         for nome, cmd in etapas:
             p = rodar(cmd)
@@ -132,7 +211,7 @@ class DeveloperComReparo(SelfDeveloper):
                     falhas = [] if ok else [Resultado("lint e testes (iguais ao CI)", False, saida)]
                 if not falhas:
                     falhas = registrar(self.ctx, ABRIR_PR, avaliar_aprendidos(self.s, ABRIR_PR, wt, adicionadas,
-                                                                              ambiente_isolado(), item_id), titulo)
+                                                                              _ambiente(), item_id), titulo)
                 if not falhas:
                     if rodada:
                         monitorar(self.ctx, REPARO, True, sujeito=titulo, assinatura=rodada["sig"],
@@ -152,8 +231,8 @@ class DeveloperComReparo(SelfDeveloper):
                     if tentativa < MAX_RODADAS_REPARO:
                         texto += f"\n(reparo não repetido: a mesma falha já resistiu a uma rodada; lição {sig})"
                     break
-                out = self._agente(CORRECAO_LOCAL.format(titulo=titulo, falhas=texto, licoes=self._licoes_txt(item_id)),
-                                   wt, f"reparo: {titulo}")
+                out = self._agente(CORRECAO_LOCAL.format(titulo=titulo, falhas=texto, licoes=self._licoes_txt(item_id))
+                                   + PROTEGIDOS, wt, f"reparo: {titulo}")
                 rodada = {"sig": sig, "tokens": int(out.get("tokens") or 0)}
                 if not out.get("ok"):
                     # agente que parou (limite da conta, máximo de passos) não prova que a falha resiste: sem lição
