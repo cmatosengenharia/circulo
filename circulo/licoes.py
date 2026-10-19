@@ -22,9 +22,13 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    só pela reexecução do node id num worktree descartável do main: exit 0 em 2 execuções seguidas (sha e exit
    ficam registrados). Exit 4/5 (não coletado) vira `obsoleta` e não fecha. Reabre só se o node id falhar no main
    em um sha posterior ao do fechamento; falhar no worktree de um Developer não é falhar no main.
+8. Lição sem node id cuja causa está em causas.py herda o node id do alias e o mesmo ciclo; como a checagem é
+   emprestada, também reabre se o teste sumir do main ou mudar de corpo (impressão do AST no sha do main).
 """
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
 import os
 import re
@@ -34,6 +38,8 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+from .causas import node_por_causa
 
 EVID_GIROS = 200            # sem reaparecer por tantos giros depois de corrigida = evidenciada
 AMBIENTE_RECORRENTE = 5     # ocorrências de erro de ambiente em 24h que pedem código mais resiliente
@@ -82,6 +88,11 @@ def node_id_de(assinatura: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+def alvo_de(lic) -> str | None:
+    """O node id que prova a lição: o próprio ou o do alias da causa."""
+    return lic["node_id"] or node_por_causa(lic["assinatura"])
+
+
 def licao_de(store, assinatura: str):
     """A lição da assinatura: lição de teste é achada pelo node id, as outras pela assinatura exata."""
     node = node_id_de(assinatura)
@@ -101,6 +112,20 @@ def sha_do_main(repo: str | Path) -> str:
     repo = Path(repo)
     _git(repo, "fetch", "-q", "origin", "main", check=False)
     return _git(repo, "rev-parse", "--verify", "-q", "origin/main", check=False) or _git(repo, "rev-parse", "main")
+
+
+def impressao_no_main(repo: str | Path, sha: str, node_id: str) -> str | None:
+    """Hash do AST do teste no sha do main (comentário e formato não contam); None se o teste não existe lá."""
+    arquivo, *nomes = node_id.split("::")
+    try:
+        corpo = ast.parse(_git(Path(repo), "show", f"{sha}:{arquivo}", check=False))
+    except SyntaxError:
+        return None
+    for nome in nomes:
+        corpo = next((n for n in getattr(corpo, "body", []) if getattr(n, "name", None) == nome.split("[")[0]), None)
+        if corpo is None:
+            return None
+    return hashlib.sha256(ast.dump(corpo).encode()).hexdigest()[:16] if nomes else None
 
 
 def reexecutar_no_main(repo: str | Path, node_ids: list[str], sha: str | None = None, python: str | None = None,
@@ -196,7 +221,7 @@ class Licoes:
         if sig not in origens:
             self.s.x("UPDATE licoes SET origens=? WHERE id=?", (json.dumps(origens + [sig]), lic["id"]))
         # lição de teste só reincide pela reexecução no main (checar_testes), não pelo worktree de um Developer
-        reincidiu = lic["status"] in ("validada", "evidenciada") and not node
+        reincidiu = lic["status"] in ("validada", "evidenciada") and not alvo_de(lic)
         if reincidiu:
             self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ocorrencias=ocorrencias+1, "
                      "ultima_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
@@ -285,6 +310,8 @@ class Licoes:
         # lição de trabalho/ambiente sem item: vale como aprendida quando para de acontecer
         for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','reincidente') AND item_id IS NULL AND node_id IS NULL "
                             "AND ultima_tick < ?", (tick - EVID_GIROS,)):
+            if node_por_causa(lic["assinatura"]):
+                continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
@@ -323,16 +350,18 @@ class Licoes:
         return log
 
     # ------------------------------------------------------------ fechar lição de teste pela reexecução no main
+    def _com_teste(self) -> list[dict]:
+        return [lic for lic in map(dict, self.s.q("SELECT * FROM licoes WHERE status!='unida' ORDER BY id")) if alvo_de(lic)]
+
     def testes_a_checar(self) -> list[str]:
-        return [r["node_id"] for r in self.s.q("SELECT DISTINCT node_id FROM licoes WHERE node_id IS NOT NULL "
-                                                "AND status!='unida' ORDER BY node_id")]
+        return sorted({alvo_de(lic) for lic in self._com_teste()})
 
     def _a_rodar(self, sha: str) -> list[dict]:
         out = []
-        for lic in [dict(r) for r in self.s.q("SELECT * FROM licoes WHERE node_id IS NOT NULL AND status!='unida' ORDER BY id")]:
+        for lic in self._com_teste():
             checagens = json.loads(lic.get("checagens") or "[]")
-            # fechada: só um sha posterior ao já checado pode reabrir
-            if lic["status"] in ABERTAS or (checagens and checagens[-1]["sha"] != sha):
+            # fechada: só um sha posterior ao já checado pode reabrir (a do alias é vigiada desde a primeira checagem)
+            if lic["status"] in ABERTAS or (checagens[-1]["sha"] != sha if checagens else not lic["node_id"]):
                 out.append(lic)
         return out
 
@@ -340,42 +369,51 @@ class Licoes:
         """Giro ocioso: reexecuta no main os node ids das lições de teste e fecha, marca obsoleta ou reabre."""
         self.unir_duplicatas()
         sha = sha_do_main(repo)
-        nodes = [lic["node_id"] for lic in self._a_rodar(sha)]
+        nodes = sorted({alvo_de(lic) for lic in self._a_rodar(sha)})
         if not nodes:
             return []
         _, codigos = reexecutar_no_main(repo, nodes, sha)
-        return self.checar_testes(sha, codigos.get)
+        return self.checar_testes(sha, codigos.get, lambda node: impressao_no_main(repo, sha, node))
 
-    def checar_testes(self, sha: str, rodar) -> list[str]:
-        """`rodar(node_id)` devolve o exit code do pytest no main em `sha` (None = sem resultado)."""
+    def checar_testes(self, sha: str, rodar, impressao=None) -> list[str]:
+        """`rodar(node_id)` devolve o exit code do pytest no main em `sha` (None = sem resultado);
+        `impressao(node_id)`, a impressão do teste emprestado pelo alias (None = o teste não existe)."""
         tick, agora, log = self.s.tick, time.time(), []
         for lic in self._a_rodar(sha):
             checagens = json.loads(lic.get("checagens") or "[]")
             aberta = lic["status"] in ABERTAS
-            code = rodar(lic["node_id"])
+            node, alias = alvo_de(lic), not lic["node_id"]
+            code = rodar(node)
             if code is None:
                 continue
-            checagens = (checagens + [{"sha": sha, "exit": int(code), "tick": tick, "em": agora}])[-10:]
+            checagem = {"sha": sha, "exit": int(code), "tick": tick, "em": agora}
+            if alias:
+                checagem["teste"] = impressao(node) if impressao else None
+            mudou = alias and bool(checagens) and checagens[-1].get("teste") != checagem["teste"]
+            checagens = (checagens + [checagem])[-10:]
             self.s.x("UPDATE licoes SET checagens=?, updated_at=? WHERE id=?", (json.dumps(checagens), agora, lic["id"]))
-            if aberta and code in NAO_COLETADO:
+            ultimas = checagens[-VERDES_PARA_FECHAR:]
+            if aberta and code in NAO_COLETADO and not alias:
                 if lic["status"] != "obsoleta":
                     self.s.x("UPDATE licoes SET status='obsoleta' WHERE id=?", (lic["id"],))
                     log.append(f"lição #{lic['id']} obsoleta")
-            elif aberta and len(checagens) >= VERDES_PARA_FECHAR and all(c["exit"] == 0 for c in checagens[-VERDES_PARA_FECHAR:]):
+            elif aberta and len(ultimas) == VERDES_PARA_FECHAR and all(c["exit"] == 0 for c in ultimas) \
+                    and len({c.get("teste") for c in ultimas}) == 1:
                 self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=? WHERE id=?",
-                         (tick, f"Fechada: {lic['node_id']} passou no main (sha {sha[:12]}, exit 0 em {VERDES_PARA_FECHAR} "
-                                f"execuções seguidas); não repetir: {lic['descricao']}", lic["id"]))
+                         (tick, f"Fechada: {node} passou no main (sha {sha[:12]}, exit 0 em {VERDES_PARA_FECHAR} "
+                                f"execuções seguidas{', alias da causa' if alias else ''}); não repetir: {lic['descricao']}",
+                          lic["id"]))
                 log.append(f"lição #{lic['id']} fechada no sha {sha[:12]}")
-                self.reply(f"Lição #{lic['id']} fechada: {lic['node_id']} passou no main {sha[:12]} "
+                self.reply(f"Lição #{lic['id']} fechada: {node} passou no main {sha[:12]} "
                            f"{VERDES_PARA_FECHAR} vezes seguidas (exit 0).", "licao")
             elif aberta and code == 0 and lic["status"] == "obsoleta":
                 self.s.x("UPDATE licoes SET status='aberta' WHERE id=?", (lic["id"],))
-            elif not aberta and code != 0 and code not in NAO_COLETADO:
+            elif not aberta and (code != 0 and (alias or code not in NAO_COLETADO) or mudou):
                 self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ultima_tick=? WHERE id=?",
                          (tick, lic["id"]))
                 log.append(f"lição #{lic['id']} reaberta no sha {sha[:12]}")
-                self.reply(f"REINCIDÊNCIA da lição #{lic['id']}: {lic['node_id']} voltou a falhar no main {sha[:12]} "
-                           f"(exit {code}).", "saude")
+                self.reply(f"REINCIDÊNCIA da lição #{lic['id']}: {node} "
+                           f"{'mudou de corpo' if code == 0 else f'voltou a falhar (exit {code})'} no main {sha[:12]}.", "saude")
         return log
 
     # ------------------------------------------------------------ usar o que aprendeu

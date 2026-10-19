@@ -256,3 +256,66 @@ def test_reexecucao_roda_no_worktree_do_main_sem_checkout(tmp_path):
     assert codigos["tests/test_a.py::test_sumiu"] in (4, 5)
     assert git("branch", "--show-current") == "outra"                  # o clone principal não saiu do lugar
     assert len(git("worktree", "list").splitlines()) == 1               # o worktree descartável sumiu
+
+
+# ------------------------------------------------------------ lições sem node id: alias causa raiz → node id
+ALVO = "tests/test_reparo.py::test_constituicao_editada_pelo_agente_e_revertida_em_cada_rodada_e_o_pr_sai"
+CONST = "- constituição intacta: altera a constituição: .github/workflows/ci.yml, circulo/self_dev.py"
+
+
+def test_licao_11_sem_node_id_fecha_pelo_alias_e_reabre_se_o_teste_da_12_enfraquece_ou_some(circle):
+    """lição #11 (e #10): sem node id próprio, herda o teste da lição #12 pela causa e segue o ciclo dele."""
+    L = circle.licoes
+    L.verificar("developer:abrir_pr", False, motivo=CONST)
+    L.verificar("developer:reparo", False, motivo=CONST)
+    assert {r["node_id"] for r in circle.store.q("SELECT node_id FROM licoes")} == {None}
+    assert L.testes_a_checar() == [ALVO]
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert _abertas(circle) == 2                       # parar de acontecer não fecha: só a reexecução fecha
+
+    def rodar(code, impressao):
+        return lambda n: code if n == ALVO else None, lambda n: impressao if n == ALVO else None
+    L.checar_testes("aaa111", *rodar(0, "h1"))
+    assert _abertas(circle) == 2
+    L.checar_testes("aaa111", *rodar(0, "h1"))
+    assert _abertas(circle) == 0
+    assert all(ALVO in r["prevencao"] for r in circle.store.q("SELECT prevencao FROM licoes"))
+    L.verificar("developer:abrir_pr", False, motivo=CONST)      # o portão barrando de novo é a prevenção funcionando
+    assert _abertas(circle) == 0
+
+    L.checar_testes("bbb222", *rodar(0, "h2"))         # teste da #12 enfraquecido: passa, mas não é a mesma checagem
+    assert _abertas(circle) == 2
+    L.checar_testes("bbb222", *rodar(0, "h2"))
+    assert _abertas(circle) == 0                       # a checagem nova precisa passar 2x para fechar de novo
+    L.checar_testes("ccc333", *rodar(5, None))         # teste da #12 removido
+    r = circle.store.q("SELECT status, reincidencias FROM licoes")
+    assert [(x["status"], x["reincidencias"]) for x in r] == [("reincidente", 2)] * 2
+    L.checar_testes("ddd444", *rodar(0, "h2"))
+    L.checar_testes("ddd444", *rodar(0, "h2"))
+    assert _abertas(circle) == 0
+    L.checar_testes("eee555", *rodar(1, "h2"))         # teste da #12 falhando no main
+    assert _abertas(circle) == 2
+
+
+def test_impressao_do_teste_no_main_ignora_formato_e_muda_com_o_corpo(tmp_path):
+    """lição #11: a impressão do teste mapeado vem do sha do main e muda quando a checagem é enfraquecida."""
+    from circulo.licoes import impressao_no_main
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+    git("init", "-q", "-b", "main")
+    (tmp_path / "tests").mkdir()
+    arq = tmp_path / "tests" / "test_a.py"
+
+    def commit(texto):
+        arq.write_text(texto)
+        git("add", ".")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "x")
+        return git("rev-parse", "HEAD")
+    a = commit("def test_c():\n    assert 1 + 1 == 2\n")
+    b = commit("# comentário\ndef test_c():\n    assert 1 + 1 == 2  # idem\n")
+    c = commit("def test_c():\n    assert True\n")
+    d = commit("def test_outro():\n    assert True\n")
+    h = [impressao_no_main(tmp_path, s, "tests/test_a.py::test_c") for s in (a, b, c, d)]
+    assert h[0] and h[0] == h[1] and h[2] not in (None, h[0]) and h[3] is None
