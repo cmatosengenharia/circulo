@@ -26,6 +26,8 @@ INTERVALO = 1800
 FOLGA = 2                 # itens prontos ou a caminho na fila antes de o planejador parar de planejar
 EST_TOKENS = 3000
 MAX_TOKENS = 1500   # lição: com 700 a resposta (em português, detalhada) era cortada e o JSON ficava inválido
+PORTEIRO = "porteiro_planejador"   # kv: decisão do porteiro worth_spending.idle_evolution sobre a pergunta, a cada ciclo
+HISTORICO = 20
 
 SYSTEM = """Você é o Planejador do círculo autoevolutivo (repositório Python `circulo`, só stdlib, SQLite).
 O círculo é um loop 24/7 que recebe pedidos, transforma em missões, mede, aprende e corrige o próprio código por PR.
@@ -275,3 +277,19 @@ def _parse(texto: str) -> dict | None:
         return None
     item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado")}
     return item if item["titulo"] and item["detalhe"] else None
+
+
+def registrar_porteiro(store, pergunta_id: int | None, gate, now: float | None = None) -> dict:
+    """O que o porteiro do gasto decidiu sobre a pergunta neste ciclo, medido: quem lê a trava cita isto, não adivinha."""
+    if gate.allowed:
+        motivo = "acima_do_limiar"
+    else:
+        motivo = "orcamento_insuficiente" if gate.reason else "abaixo_do_limiar"
+    rec = {"em": now or time.time(), "pergunta_id": pergunta_id, "decisao": "aceitou" if gate.allowed else "recusou", "motivo": motivo,
+           "limiar": round(float(gate.threshold), 3), "valor": round(float(gate.decision.value), 3), "fonte": gate.decision.source}
+    reg = store.get(PORTEIRO) or {}
+    ant = reg.get("ultimo") or {}
+    mesmo = all(ant.get(k) == rec[k] for k in ("pergunta_id", "decisao", "motivo"))
+    rec["seguidas"] = int(ant.get("seguidas", 0)) + 1 if mesmo else 1
+    store.set(PORTEIRO, {"ultimo": rec, "historico": [*reg.get("historico", []), rec][-HISTORICO:]})
+    return rec
