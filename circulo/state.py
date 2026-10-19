@@ -477,6 +477,16 @@ CREATE TABLE IF NOT EXISTS elos (
 CREATE INDEX IF NOT EXISTS elos_de ON elos(de);
 CREATE INDEX IF NOT EXISTS elos_para ON elos(para);
 
+-- da pergunta validada ao item: cada sub-etapa com o id da pergunta (a espera de cada passagem tem dono)
+CREATE TABLE IF NOT EXISTS pergunta_etapas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pergunta_id INTEGER NOT NULL,
+  etapa TEXT NOT NULL CHECK(etapa IN ('validada','porteiro_decidiu','planejador_chamado','item_gravado')),
+  detalhe TEXT,
+  em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pergunta_etapas_p ON pergunta_etapas(pergunta_id, id);
+
 -- laboratório do Jev: a mesma pergunta em duas formulações, na mesma chamada, para adotar a melhor com evidência
 CREATE TABLE IF NOT EXISTS jev_lab (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
