@@ -113,8 +113,9 @@ class DeveloperComReparo(SelfDeveloper):
     # ------------------------------------------------------------ portão de abrir PR com 1 rodada de reparo
     def _ja_desistiu(self, sig: str) -> bool:
         """Essa falha já resistiu a uma rodada de reparo e a lição segue aberta: outra rodada não paga o custo."""
-        return self.s.one("SELECT 1 FROM licoes WHERE assinatura=? AND status IN ('aberta','em_correcao','reincidente')",
-                          (sig,)) is not None
+        from .licoes import licao_de
+        lic = licao_de(self.s, sig)
+        return lic is not None and lic["status"] in ("aberta", "em_correcao", "reincidente")
 
     def portao_pr(self, wt: Path, base: str, item_id: int | None, titulo: str) -> tuple[bool, str]:
         from .licoes import assinatura_de

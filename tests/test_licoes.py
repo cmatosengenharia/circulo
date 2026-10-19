@@ -1,4 +1,8 @@
 """Maturidade: todo ponto de verificação é monitorado; erro vira lição; o mesmo erro de estrutura só acontece uma vez."""
+import json
+import subprocess
+import time
+
 from circulo.licoes import EVID_GIROS, Licoes, assinatura_de, classificar
 
 
@@ -144,3 +148,111 @@ def test_reincidencia_sobe_de_camada(circle):
     L.verificar("execucao:meta", False, motivo="RuntimeError: boom")
     lic = circle.store.one("SELECT camada, status FROM licoes WHERE assinatura=?", (sig,))
     assert (lic["status"], lic["camada"]) == ("reincidente", "ci")
+
+
+# ------------------------------------------------------------ lições de teste: unir pelo node id, fechar por reexecução
+NODE = "tests/test_jev_replay.py::test_200_decisoes_do_worth_spending_saem_da_duvida_concordando_com_a_regra"
+
+
+def _abertas(circle):
+    return circle.store.one("SELECT COUNT(*) n FROM licoes WHERE status IN ('aberta','reincidente')")["n"]
+
+
+def test_licao_7_e_8_unem_pelo_node_id_e_guardam_as_origens(circle):
+    """lição #7 + lição #8: developer:testes e developer:abrir_pr falhando no mesmo node id são uma lição só."""
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - AssertionError")
+    L.verificar("developer:abrir_pr", False, motivo=f"FAILED {NODE} - AssertionError")
+    rows = circle.store.q("SELECT * FROM licoes WHERE status!='unida'")
+    assert len(rows) == 1 and rows[0]["node_id"] == NODE and rows[0]["ocorrencias"] == 2
+    assert json.loads(rows[0]["origens"]) == [f"developer:testes:teste:{NODE}", f"developer:abrir_pr:teste:{NODE}"]
+
+
+def test_licoes_duplicadas_antigas_viram_uma_e_causas_distintas_nao(circle):
+    """lição #7 + lição #8 já gravadas separadas (banco antigo): o giro une; ImportError e B905 ficam como estão."""
+    s, agora = circle.store, time.time()
+    for sig in (f"developer:testes:teste:{NODE}", f"developer:abrir_pr:teste:{NODE}", "developer:testes:ImportError",
+                "developer:lint:lint:B905"):
+        s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+            "ultima_tick,created_at,updated_at) VALUES(?,?,'trabalho','d','p','aberta',1,0,0,0,?,?)",
+            (sig, sig.split(":")[1], agora, agora))
+    assert _abertas(circle) == 4
+    circle.licoes.revisar()
+    assert _abertas(circle) == 3
+    unida = s.one("SELECT * FROM licoes WHERE node_id=? AND status!='unida'", (NODE,))
+    assert len(json.loads(unida["origens"])) == 2 and unida["ocorrencias"] == 2
+    assert circle.licoes.contexto().count(NODE) == 1
+
+
+def test_licao_7_fecha_so_com_verde_em_2_execucoes_registrando_sha(circle):
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - AssertionError")
+    L.checar_testes("aaa111", lambda n: 0)
+    assert _abertas(circle) == 1                       # um verde só não fecha
+    L.checar_testes("aaa111", lambda n: 0)
+    r = circle.store.one("SELECT * FROM licoes")
+    assert r["status"] == "validada" and _abertas(circle) == 0
+    assert [(c["sha"], c["exit"]) for c in json.loads(r["checagens"])] == [("aaa111", 0), ("aaa111", 0)]
+    assert "aaa111" in r["prevencao"]
+
+
+def test_verde_intercalado_com_falha_nao_fecha(circle):
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - x")
+    for code in (0, 1, 0):
+        L.checar_testes("aaa111", lambda n, code=code: code)
+    assert _abertas(circle) == 1
+
+
+def test_licao_7_nao_fecha_quando_o_teste_some(circle):
+    """Exit 4/5 (node id não coletado): obsoleta/indeterminada, nunca fechada."""
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - x")
+    for code in (5, 4, 5):
+        L.checar_testes("aaa111", lambda n, code=code: code)
+    r = circle.store.one("SELECT * FROM licoes")
+    assert r["status"] == "obsoleta" and r["corrigida_tick"] is None
+
+
+def test_licao_de_teste_parada_so_fecha_por_reexecucao(circle):
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - x")
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert _abertas(circle) == 1
+
+
+def test_licao_7_reabre_so_na_falha_em_sha_posterior(circle):
+    L = circle.licoes
+    L.verificar("developer:testes", False, motivo=f"FAILED {NODE} - x")
+    L.checar_testes("aaa111", lambda n: 0)
+    L.checar_testes("aaa111", lambda n: 0)
+    # falhar no worktree de um Developer não é falhar na main: não reabre
+    L.verificar("developer:abrir_pr", False, motivo=f"FAILED {NODE} - x")
+    rodou = []
+    L.checar_testes("aaa111", lambda n: rodou.append(n) or 1)    # mesmo sha do fechamento: nem roda
+    assert rodou == [] and circle.store.one("SELECT status FROM licoes")["status"] == "validada"
+    L.checar_testes("bbb222", lambda n: 1)
+    r = circle.store.one("SELECT status, reincidencias FROM licoes")
+    assert (r["status"], r["reincidencias"]) == ("reincidente", 1)
+
+
+def test_reexecucao_roda_no_worktree_do_main_sem_checkout(tmp_path):
+    """Lição #1: nada de git checkout no clone principal; o pytest roda num worktree descartável do main."""
+    from circulo.licoes import reexecutar_no_main
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+    git("init", "-q", "-b", "main")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("def test_ok():\n    assert True\n\n\ndef test_ruim():\n    assert False\n")
+    git("add", ".")
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "x")
+    git("checkout", "-q", "-b", "outra")
+    sha, codigos = reexecutar_no_main(tmp_path, ["tests/test_a.py::test_ok", "tests/test_a.py::test_ruim",
+                                                 "tests/test_a.py::test_sumiu"])
+    assert sha == git("rev-parse", "main")
+    assert codigos["tests/test_a.py::test_ok"] == 0 and codigos["tests/test_a.py::test_ruim"] == 1
+    assert codigos["tests/test_a.py::test_sumiu"] in (4, 5)
+    assert git("branch", "--show-current") == "outra"                  # o clone principal não saiu do lugar
+    assert len(git("worktree", "list").splitlines()) == 1               # o worktree descartável sumiu

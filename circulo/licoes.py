@@ -17,15 +17,31 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    contagem fica no painel. Zero reincidências é o indicador de maturidade.
 5. Com lição estrutural aberta, o loop não se autoevolui (planejador e evolução do círculo esperam): primeiro corrige.
 6. Toda lição validada entra no contexto do Developer e do planejador como "erros que você já cometeu".
+7. Lição de teste (assinatura com `teste:<node id>`): a impressão digital é o node id. Falhas do mesmo node id em
+   pontos diferentes (developer:testes, developer:abrir_pr…) são uma lição só, com a lista de origens. Ela fecha
+   só pela reexecução do node id num worktree descartável do main: exit 0 em 2 execuções seguidas (sha e exit
+   ficam registrados). Exit 4/5 (não coletado) vira `obsoleta` e não fecha. Reabre só se o node id falhar no main
+   em um sha posterior ao do fechamento; falhar no worktree de um Developer não é falhar no main.
 """
 from __future__ import annotations
 
+import json
+import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import time
+from pathlib import Path
 
 EVID_GIROS = 200            # sem reaparecer por tantos giros depois de corrigida = evidenciada
 AMBIENTE_RECORRENTE = 5     # ocorrências de erro de ambiente em 24h que pedem código mais resiliente
 MAX_VERIFICACOES = 20_000   # janela do monitoramento
+VERDES_PARA_FECHAR = 2      # execuções seguidas com exit 0 no main
+NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
+ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
+NODE_ID = re.compile(r"teste:(tests/[\w./-]+\.py::\S+)")
 
 AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit your [a-z ]{0,20}limit|timed? ?out|"
                       r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http 5\d\d|"
@@ -59,6 +75,55 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     if erro and not AMBIENTE.search(m):
         return f"{ponto}:{erro.group(1)}"
     return f"{ponto}:{normalizar(m, 50)}"
+
+
+def node_id_de(assinatura: str | None) -> str | None:
+    m = NODE_ID.search(assinatura or "")
+    return m.group(1) if m else None
+
+
+def licao_de(store, assinatura: str):
+    """A lição da assinatura: lição de teste é achada pelo node id, as outras pela assinatura exata."""
+    node = node_id_de(assinatura)
+    if node:
+        return store.one("SELECT * FROM licoes WHERE node_id=? AND status!='unida' ORDER BY id LIMIT 1", (node,))
+    return store.one("SELECT * FROM licoes WHERE assinatura=?", (assinatura,))
+
+
+def _git(repo: Path, *a, check=True) -> str:
+    p = subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True)
+    if check and p.returncode != 0:
+        raise RuntimeError(f"git {' '.join(a)}: {p.stderr.strip()[:300]}")
+    return p.stdout.strip()
+
+
+def sha_do_main(repo: str | Path) -> str:
+    repo = Path(repo)
+    _git(repo, "fetch", "-q", "origin", "main", check=False)
+    return _git(repo, "rev-parse", "--verify", "-q", "origin/main", check=False) or _git(repo, "rev-parse", "main")
+
+
+def reexecutar_no_main(repo: str | Path, node_ids: list[str], sha: str | None = None, python: str | None = None,
+                       timeout: int = 600) -> tuple[str, dict[str, int]]:
+    """(sha do main, {node id: exit code}). Roda num worktree descartável: o clone principal não troca de branch."""
+    repo = Path(repo)
+    sha = sha or sha_do_main(repo)
+    tmp = Path(tempfile.mkdtemp(prefix="circulo-licao-"))
+    wt = tmp / "main"
+    codigos = {}
+    try:
+        _git(repo, "worktree", "add", "--detach", "-q", str(wt), sha)
+        amb = {**os.environ, "PYTHONPATH": str(wt), "PYTHONDONTWRITEBYTECODE": "1"}
+        for node in node_ids:
+            try:
+                codigos[node] = subprocess.run([python or sys.executable, "-m", "pytest", "-q", node, "-p", "no:cacheprovider"],
+                                               cwd=wt, capture_output=True, text=True, timeout=timeout, env=amb).returncode
+            except subprocess.TimeoutExpired:
+                pass                      # sem exit code não há prova nem para fechar nem para reabrir
+    finally:
+        _git(repo, "worktree", "remove", "--force", str(wt), check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
+    return sha, codigos
 
 
 def classificar(ponto: str, motivo: str) -> str:
@@ -112,19 +177,26 @@ class Licoes:
     # ------------------------------------------------------------ aprender
     def _aprender(self, ponto, sig, classe, motivo, sujeito, detalhe_item, titulo="") -> dict:
         tick, agora = self.s.tick, time.time()
-        row = self.s.one("SELECT * FROM licoes WHERE assinatura=?", (sig,))
+        row = licao_de(self.s, sig)
         descricao = _descricao(ponto, motivo)
+        node = node_id_de(sig)
         if row is None:
             lid = self.s.x("""INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,
-                              primeira_tick,ultima_tick,created_at,updated_at,camada) VALUES(?,?,?,?,?,'aberta',1,0,?,?,?,?,'regra')""",
-                           (sig, ponto, classe, descricao, f"Não repetir: {descricao}", tick, tick, agora, agora))
+                              primeira_tick,ultima_tick,created_at,updated_at,camada,node_id,origens)
+                              VALUES(?,?,?,?,?,'aberta',1,0,?,?,?,?,'regra',?,?)""",
+                           (sig, ponto, classe, descricao, f"Não repetir: {descricao}", tick, tick, agora, agora,
+                            node, json.dumps([sig])))
             lic = dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lid,)))
             self.reply(f"Erro novo registrado como lição #{lid} ({classe}): {descricao[:160]}", "licao")
             if classe == "estrutural":
                 self._abrir_item(lic, motivo, detalhe_item, titulo=titulo)
             return self._neurogenese(lid)
         lic = dict(row)
-        reincidiu = lic["status"] in ("validada", "evidenciada")
+        origens = json.loads(lic.get("origens") or "[]") or [lic["assinatura"]]
+        if sig not in origens:
+            self.s.x("UPDATE licoes SET origens=? WHERE id=?", (json.dumps(origens + [sig]), lic["id"]))
+        # lição de teste só reincide pela reexecução no main (checar_testes), não pelo worktree de um Developer
+        reincidiu = lic["status"] in ("validada", "evidenciada") and not node
         if reincidiu:
             self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ocorrencias=ocorrencias+1, "
                      "ultima_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
@@ -195,7 +267,8 @@ class Licoes:
     # ------------------------------------------------------------ corrigir → validar → evidenciar
     def revisar(self) -> list[str]:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
-        tick, agora, log = self.s.tick, time.time(), []
+        log = self.unir_duplicatas()
+        tick, agora = self.s.tick, time.time()
         for lic in self.s.q("""SELECT l.*, r.status item_status, r.evidencia item_evidencia FROM licoes l
                                LEFT JOIN roadmap r ON r.id=l.item_id WHERE l.status IN ('aberta','em_correcao','reincidente')
                                AND l.item_id IS NOT NULL"""):
@@ -210,14 +283,99 @@ class Licoes:
                 self.reply(f"Lição #{lic['id']} validada: a correção entrou ({lic['item_evidencia']}). "
                            f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer.", "licao")
         # lição de trabalho/ambiente sem item: vale como aprendida quando para de acontecer
-        for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','reincidente') AND item_id IS NULL AND ultima_tick < ?",
-                            (tick - EVID_GIROS,)):
+        for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','reincidente') AND item_id IS NULL AND node_id IS NULL "
+                            "AND ultima_tick < ?", (tick - EVID_GIROS,)):
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
             self.s.x("UPDATE licoes SET status='evidenciada', evidenciada_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
             log.append(f"lição #{lic['id']} evidenciada")
             self.reply(f"Lição #{lic['id']} evidenciada: {EVID_GIROS} giros sem o erro voltar. Aprendido.", "licao")
+        return log
+
+    def unir_duplicatas(self) -> list[str]:
+        """Lições gravadas antes da impressão digital por node id: o mesmo node id vira uma lição só (a mais antiga)."""
+        for r in self.s.q("SELECT id, assinatura FROM licoes WHERE origens IS NULL"):
+            self.s.x("UPDATE licoes SET node_id=?, origens=? WHERE id=?",
+                     (node_id_de(r["assinatura"]), json.dumps([r["assinatura"]]), r["id"]))
+        log, agora = [], time.time()
+        for g in self.s.q("SELECT node_id FROM licoes WHERE node_id IS NOT NULL AND status!='unida' "
+                          "GROUP BY node_id HAVING COUNT(*) > 1"):
+            fica, *outras = [dict(r) for r in self.s.q("SELECT * FROM licoes WHERE node_id=? AND status!='unida' ORDER BY id",
+                                                        (g["node_id"],))]
+            origens = json.loads(fica["origens"])
+            status = fica["status"]
+            for o in outras:
+                origens += [x for x in json.loads(o["origens"]) if x not in origens]
+                if o["status"] in ABERTAS and status not in ABERTAS:
+                    status = "aberta"
+                self.s.x("UPDATE licoes SET status='unida', prevencao=?, updated_at=? WHERE id=?",
+                         (f"Unida à lição #{fica['id']} (mesmo node id {g['node_id']})", agora, o["id"]))
+            self.s.x("UPDATE licoes SET origens=?, status=?, ocorrencias=?, reincidencias=?, primeira_tick=?, ultima_tick=?, "
+                     "updated_at=? WHERE id=?",
+                     (json.dumps(origens), status, sum(x["ocorrencias"] for x in [fica, *outras]),
+                      sum(x["reincidencias"] for x in [fica, *outras]),
+                      min(x["primeira_tick"] or 0 for x in [fica, *outras]), max(x["ultima_tick"] or 0 for x in [fica, *outras]),
+                      agora, fica["id"]))
+            ids = ", ".join(f"#{o['id']}" for o in outras)
+            log.append(f"lição #{fica['id']} unida a {ids}")
+            self.reply(f"Lição #{fica['id']} absorveu {ids}: mesmo teste ({g['node_id']}), uma causa só.", "licao")
+        return log
+
+    # ------------------------------------------------------------ fechar lição de teste pela reexecução no main
+    def testes_a_checar(self) -> list[str]:
+        return [r["node_id"] for r in self.s.q("SELECT DISTINCT node_id FROM licoes WHERE node_id IS NOT NULL "
+                                                "AND status!='unida' ORDER BY node_id")]
+
+    def _a_rodar(self, sha: str) -> list[dict]:
+        out = []
+        for lic in [dict(r) for r in self.s.q("SELECT * FROM licoes WHERE node_id IS NOT NULL AND status!='unida' ORDER BY id")]:
+            checagens = json.loads(lic.get("checagens") or "[]")
+            # fechada: só um sha posterior ao já checado pode reabrir
+            if lic["status"] in ABERTAS or (checagens and checagens[-1]["sha"] != sha):
+                out.append(lic)
+        return out
+
+    def checar_no_main(self, repo: str | Path) -> list[str]:
+        """Giro ocioso: reexecuta no main os node ids das lições de teste e fecha, marca obsoleta ou reabre."""
+        self.unir_duplicatas()
+        sha = sha_do_main(repo)
+        nodes = [lic["node_id"] for lic in self._a_rodar(sha)]
+        if not nodes:
+            return []
+        _, codigos = reexecutar_no_main(repo, nodes, sha)
+        return self.checar_testes(sha, codigos.get)
+
+    def checar_testes(self, sha: str, rodar) -> list[str]:
+        """`rodar(node_id)` devolve o exit code do pytest no main em `sha` (None = sem resultado)."""
+        tick, agora, log = self.s.tick, time.time(), []
+        for lic in self._a_rodar(sha):
+            checagens = json.loads(lic.get("checagens") or "[]")
+            aberta = lic["status"] in ABERTAS
+            code = rodar(lic["node_id"])
+            if code is None:
+                continue
+            checagens = (checagens + [{"sha": sha, "exit": int(code), "tick": tick, "em": agora}])[-10:]
+            self.s.x("UPDATE licoes SET checagens=?, updated_at=? WHERE id=?", (json.dumps(checagens), agora, lic["id"]))
+            if aberta and code in NAO_COLETADO:
+                if lic["status"] != "obsoleta":
+                    self.s.x("UPDATE licoes SET status='obsoleta' WHERE id=?", (lic["id"],))
+                    log.append(f"lição #{lic['id']} obsoleta")
+            elif aberta and len(checagens) >= VERDES_PARA_FECHAR and all(c["exit"] == 0 for c in checagens[-VERDES_PARA_FECHAR:]):
+                self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=? WHERE id=?",
+                         (tick, f"Fechada: {lic['node_id']} passou no main (sha {sha[:12]}, exit 0 em {VERDES_PARA_FECHAR} "
+                                f"execuções seguidas); não repetir: {lic['descricao']}", lic["id"]))
+                log.append(f"lição #{lic['id']} fechada no sha {sha[:12]}")
+                self.reply(f"Lição #{lic['id']} fechada: {lic['node_id']} passou no main {sha[:12]} "
+                           f"{VERDES_PARA_FECHAR} vezes seguidas (exit 0).", "licao")
+            elif aberta and code == 0 and lic["status"] == "obsoleta":
+                self.s.x("UPDATE licoes SET status='aberta' WHERE id=?", (lic["id"],))
+            elif not aberta and code != 0 and code not in NAO_COLETADO:
+                self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ultima_tick=? WHERE id=?",
+                         (tick, lic["id"]))
+                log.append(f"lição #{lic['id']} reaberta no sha {sha[:12]}")
+                self.reply(f"REINCIDÊNCIA da lição #{lic['id']}: {lic['node_id']} voltou a falhar no main {sha[:12]} "
+                           f"(exit {code}).", "saude")
         return log
 
     # ------------------------------------------------------------ usar o que aprendeu
@@ -227,7 +385,7 @@ class Licoes:
                           "AND status IN ('aberta','em_correcao','reincidente')")["n"] > 0
 
     def contexto(self, limite: int = 15) -> str:
-        rows = self.s.q("SELECT id, status, assinatura, prevencao, reincidencias FROM licoes WHERE classe!='ambiente' "
+        rows = self.s.q("SELECT id, status, assinatura, prevencao, reincidencias FROM licoes WHERE classe!='ambiente' AND status!='unida' "
                         "ORDER BY reincidencias DESC, ocorrencias DESC, id DESC LIMIT ?", (limite,))
         if not rows:
             return ""
