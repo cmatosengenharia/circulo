@@ -407,6 +407,16 @@ CREATE TABLE IF NOT EXISTS frescor (
 );
 CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
 
+CREATE TABLE IF NOT EXISTS canarios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ponto TEXT NOT NULL,            -- ponto de verificação que nunca falhou; a falha foi injetada num estado temporário
+  ok INTEGER NOT NULL,            -- 1 = a falha injetada foi acusada e o controle sem falha passou
+  velho_falhou INTEGER NOT NULL,
+  fresco_passou INTEGER NOT NULL,
+  em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS canarios_ponto ON canarios(ponto, em);
+
 CREATE TABLE IF NOT EXISTS revisoes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pr INTEGER,
