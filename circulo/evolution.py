@@ -387,4 +387,6 @@ class HealthMonitor:
                 monitorar(self.ctx, "saude:rollback", False, sujeito=f"política v{version}",
                           motivo=f"evolução piorou a saúde: viol={len(violations)} correção={rate:.0%} antes={rate_before:.0%}",
                           assinatura=f"saude:rollback:v{version}", classe="trabalho")
+        from . import canario
+        m["canarios"] = canario.rodar(s, self.ctx.reply)
         return m

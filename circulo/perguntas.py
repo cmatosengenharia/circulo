@@ -152,12 +152,15 @@ def _arquiteto(s, agora) -> list[Pergunta]:
 def _auditor(s, agora) -> list[Pergunta]:
     out = []
     nunca = _um(s, "SELECT COUNT(*) FROM portoes WHERE ativo=1 AND bloqueios=0 AND created_at < ?", (agora - 86400,))
-    sem_falha = s.q("SELECT ponto FROM verificacoes GROUP BY ponto HAVING SUM(ok=0)=0 AND COUNT(*) > 50")
+    from .canario import com_canario
+    provados = com_canario(s, agora)       # ponto com canário verde já provou, com falha injetada, que ainda barra
+    sem_falha = [r["ponto"] for r in s.q("SELECT ponto FROM verificacoes GROUP BY ponto HAVING SUM(ok=0)=0 AND COUNT(*) > 50")
+                 if r["ponto"] not in provados]
     if nunca or sem_falha:
         out.append(Pergunta("auditor:guardrail_nao_exercitado", "auditor",
                             "Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funciona?",
                             min(1.0, 0.15 + 0.1 * nunca + 0.05 * len(sem_falha)),
-                            {"portoes_aprendidos_que_nunca_barraram": nunca, "pontos_que_nunca_falharam": [x["ponto"] for x in sem_falha][:8]}))
+                            {"portoes_aprendidos_que_nunca_barraram": nunca, "pontos_que_nunca_falharam": sem_falha[:8]}))
     return out
 
 
