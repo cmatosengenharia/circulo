@@ -506,7 +506,7 @@ class Store:
                   ("decisions", "probabilidades", "TEXT"), ("licoes", "node_id", "TEXT"), ("licoes", "origens", "TEXT"),
                   ("licoes", "checagens", "TEXT"),
                   ("perguntas", "eixo", "TEXT"), ("perguntas", "pertinencia", "REAL"), ("perguntas", "acionavel", "INTEGER"),
-                  ("perguntas", "classificacao", "TEXT"))
+                  ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
