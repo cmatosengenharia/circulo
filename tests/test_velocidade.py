@@ -85,3 +85,58 @@ def test_vigia_cita_o_motivo_medido_do_planejador_e_age_de_novo_se_a_trava_persi
     v = vigia.Vigia(circle.ctx)
     assert "pergunta_valida_parada" in v.rodar()["agiu"]               # trava antiga, ação antiga: age de novo
     assert "pergunta_valida_parada" not in v.rodar()["agiu"]           # e não repete na passagem seguinte
+
+
+# ------------------------------------------------------------------ 1.27.0: o que travou depois (medido no Mac, 19/10 à tarde)
+def test_502_do_github_e_erro_de_ambiente_e_nao_trava_a_evolucao(circle):
+    from circulo import licoes
+    assert licoes.classificar("execucao:idle:revisar_prs", "HTTPError: HTTP Error 502: Bad Gateway") == "ambiente"
+    assert licoes.classificar("execucao:idle:revisar_prs", "HTTPError: HTTP Error 503: Service Unavailable") == "ambiente"
+    assert licoes.classificar("execucao:idle:qualquer", "KeyError: 'x'") == "estrutural"
+    s = circle.store
+    agora = time.time()
+    item = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'erro','pendente','lição #99',1,?,?)",
+               ("Lição #99: Corrigir erro: HTTPError em idle:revisar_prs", "d", agora, agora))
+    s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,item_id,primeira_tick,ultima_tick,created_at,updated_at) "
+        "VALUES('x','execucao:idle:revisar_prs','estrutural','execucao:idle:revisar_prs: HTTPError: HTTP Error 502: Bad Gateway','p','aberta',1,0,?,1,1,?,?)",
+        (item, agora, agora))
+    lic = circle.ctx.licoes
+    assert lic.bloqueia_evolucao() is False                                 # reclassifica na hora: não trava
+    assert s.one("SELECT classe FROM licoes WHERE assinatura='x'")["classe"] == "ambiente"
+    assert s.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "descartado"   # o Developer não vai "consertar" o GitHub
+
+
+def test_indagador_nao_rejulga_pergunta_descartada_nem_insiste_na_inconclusa(circle):
+    s = circle.store
+    agora = time.time()
+    for chave, status, ha in (("a", "descartada", 3600), ("b", "inconclusa", 600), ("c", "inconclusa", 10 * 3600), ("d", "entregue", 7200),
+                              ("e", "inconclusa", 20 * 3600), ("e", "inconclusa", 8 * 3600), ("f", "descartada", 5 * 86400)):
+        s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,created_at,updated_at) VALUES(?,?,?,?,'loop',?,?)",
+            (chave, "x", "q?", status, agora - ha, agora - ha))
+    fora = indagador.ja_julgadas(s, "loop", agora)
+    assert {"a", "b", "d", "e"} <= fora                                      # descartada/entregue há pouco, inconclusa recente, inconclusa 2x
+    assert "c" not in fora and "f" not in fora                               # inconclusa há 10 h volta; descartada há 5 dias volta
+
+
+def test_funil_medido_vira_a_primeira_pergunta_do_loop(circle):
+    s = circle.store
+    agora = time.time()
+    assert indagador.candidatas_funil(s) == [] or all(c["chave"] == "funil:planejador_parado" for c in indagador.candidatas_funil(s))
+    for i in range(3):                                                       # 3 perguntas que levaram 60 min para virar item (alvo 15)
+        rid = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'loop','feito',?,?,?,?)",
+                  (f"i{i}", "d", f"PR #{900 + i} mergeado", 800 + i, agora - 3600, agora))
+        s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,item_id,created_at,updated_at) VALUES(?,?,?,?,'loop',?,?,?)",
+            (f"p{i}", "arquiteto", "q?", "entregue", rid, agora - 3600 - 3600, agora))
+        s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+            (900 + i, 1, "t", "b", "mergeado", agora - 3000, agora))
+        s.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(?,?,1,'ok','',?)", (900 + i, "abc", agora - 2400))
+    f = indagador.funil(s)
+    assert f["etapas"]["pergunta_para_item"]["mediana_min"] == 60 and f["etapas"]["pergunta_para_item"]["atraso"] == 4.0
+    assert f["etapas"]["item_para_pr"]["mediana_min"] == 10 and f["etapas"]["pr_para_merge"]["mediana_min"] == 10
+    c = indagador.candidatas_funil(s)
+    assert c and c[0]["chave"] == "funil:pergunta_para_item" and c[0]["evidencia"]["base"] == "medido" and "60 min" in c[0]["texto"]
+    assert indagador.candidatas(circle.ctx, None)[0]["chave"] == "funil:pergunta_para_item"   # é a primeira pergunta do loop
+    r = indagador.indagar(circle.ctx, None)
+    row = s.one("SELECT status, eixo FROM perguntas WHERE chave='funil:pergunta_para_item'")
+    assert row and row["status"] in ("valida", "inconclusa") and r["candidatas"] >= 1
+    assert indagador.resumo(s)["funil"]["etapas"]["pergunta_para_item"]["amostras"] == 3

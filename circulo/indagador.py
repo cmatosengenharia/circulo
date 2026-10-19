@@ -90,8 +90,11 @@ def candidatas(ctx, project: dict | None) -> list[dict]:
     s = ctx.store
     if project is None:
         from .perguntas import Conselho
-        return [{"chave": p.id, "persona": p.persona, "texto": p.texto, "relevancia": p.relevancia,
-                 "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()[:MAX_CANDIDATAS]]
+        # primeiro o funil da própria autoevolução (onde o tempo está indo), depois os sinais do conselho
+        out = candidatas_funil(s)
+        out += [{"chave": p.id, "persona": p.persona, "texto": p.texto, "relevancia": p.relevancia,
+                 "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()]
+        return out[:MAX_CANDIDATAS]
     from .perguntas import personas_da_missao
     c = contexto(s, project)
     ps = personas_da_missao(ctx, project["tipo"], project["pedido"])
@@ -155,6 +158,88 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
     return res
 
 
+# ------------------------------------------------------------------ não repete o que já foi julgado
+JULGADA_DIAS = 3              # chave válida, em uso, entregue ou descartada: não volta por 3 dias
+INCONCLUSA_HORAS = 6          # em dúvida: volta depois de 6 h, e no máximo 2 vezes em 3 dias
+INCONCLUSAS_MAX = 2
+
+
+def ja_julgadas(store, cerebro: str, agora: float | None = None) -> set[str]:
+    """Chaves que não devem voltar à classificação agora. Antes só a válida/em uso saía da fila; a descartada e a
+    inconclusa voltavam a cada passagem (no Mac a mesma pergunta foi julgada 3 vezes em 14 h, sempre com o mesmo veredito)."""
+    agora = agora or time.time()
+    fora = {r["chave"] for r in store.q("SELECT chave FROM perguntas WHERE cerebro=? AND status IN ('valida','feita','virou_item','entregue','descartada') "
+                                        "AND created_at>=?", (cerebro, agora - JULGADA_DIAS * 86400))}
+    for r in store.q("SELECT chave, COUNT(*) n, MAX(created_at) ultima FROM perguntas WHERE cerebro=? AND status='inconclusa' "
+                     "AND created_at>=? GROUP BY chave", (cerebro, agora - JULGADA_DIAS * 86400)):
+        if r["n"] >= INCONCLUSAS_MAX or agora - float(r["ultima"]) < INCONCLUSA_HORAS * 3600:
+            fora.add(r["chave"])
+    return fora
+
+
+# ------------------------------------------------------------------ o funil da autoevolução (medido)
+# Cada etapa tem um alvo em minutos; a mais atrasada vira a primeira pergunta do loop. É o que o especialista em
+# autoevolução olharia primeiro: onde, da pergunta ao merge, o tempo está indo.
+ALVO_MIN = {"pergunta_para_item": 15, "item_para_pr": 45, "pr_para_merge": 25}
+NOME_ETAPA = {"pergunta_para_item": "da pergunta validada ao item do roteiro (Planejador + porteiro)",
+              "item_para_pr": "do item ao PR aberto (Estudo + Developer)", "pr_para_merge": "do PR ao merge (CI + gate)"}
+
+
+def _mediana(xs: list[float]) -> float | None:
+    xs = sorted(xs)
+    return None if not xs else xs[len(xs) // 2]
+
+
+def funil(store, horas: int = 24) -> dict[str, Any]:
+    """Minutos por etapa nas últimas `horas` (mediana e pior), PRs sem merge, motivo atual de o planejador não planejar."""
+    desde = time.time() - horas * 3600
+    q1 = [(float(r["r_em"]) - float(r["p_em"])) / 60 for r in store.q(
+        "SELECT p.created_at p_em, r.created_at r_em FROM perguntas p JOIN roadmap r ON r.id=p.item_id "
+        "WHERE p.cerebro='loop' AND p.persona!='cassio' AND r.created_at>=?", (desde,))]
+    q2, q3 = [], []
+    for r in store.q("SELECT r.created_at r_em, pr.created_at pr_em, pr.number FROM roadmap r JOIN prs pr ON r.evidencia LIKE 'PR #' || pr.number || '%' "
+                     "WHERE r.origem IN ('loop','pedido_cassio','erro') AND pr.created_at>=?", (desde,)):
+        q2.append((float(r["pr_em"]) - float(r["r_em"])) / 60)
+        m = store.one("SELECT MIN(created_at) em FROM merges WHERE pr=? AND merged=1", (r["number"],))
+        if m and m["em"]:
+            q3.append((float(m["em"]) - float(r["pr_em"])) / 60)
+    prs = store.one("SELECT SUM(status='mergeado') ok, SUM(status='fechado') ruim FROM prs WHERE created_at>=?", (desde,))
+    gate = store.get("planejador_gate") or {}
+    etapas = {}
+    for k, xs in (("pergunta_para_item", q1), ("item_para_pr", q2), ("pr_para_merge", q3)):
+        med = _mediana(xs)
+        etapas[k] = {"amostras": len(xs), "mediana_min": round(med, 1) if med is not None else None,
+                     "pior_min": round(max(xs), 1) if xs else None, "alvo_min": ALVO_MIN[k],
+                     "atraso": round(med / ALVO_MIN[k], 2) if med is not None else None}
+    return {"horas": horas, "etapas": etapas, "prs_mergeados": int(prs["ok"] or 0), "prs_fechados": int(prs["ruim"] or 0),
+            "planejador_motivo": gate.get("motivo"), "base": "medido"}
+
+
+def candidatas_funil(store) -> list[dict]:
+    """Perguntas do loop sobre o próprio funil: só onde a medida passa do alvo."""
+    f = funil(store)
+    out = []
+    piores = sorted(((e["atraso"], k) for k, e in f["etapas"].items() if e["atraso"] and e["amostras"] >= 2), reverse=True)
+    if piores and piores[0][0] > 1.0:
+        atraso, k = piores[0]
+        e = f["etapas"][k]
+        out.append({"chave": f"funil:{k}", "persona": "operador", "relevancia": min(1.0, 0.5 + 0.25 * atraso),
+                    "texto": f"A etapa “{NOME_ETAPA[k]}” levou {e['mediana_min']:.0f} min na mediana (alvo {e['alvo_min']}, pior {e['pior_min']:.0f}) "
+                             f"em {e['amostras']} casos nas últimas 24 h: qual espera dessa etapa é desnecessária e que mudança pequena a corta?",
+                    "evidencia": {"etapa": k, **e, "base": "medido"}})
+    if f["prs_fechados"] >= 2 and f["prs_fechados"] >= f["prs_mergeados"]:
+        out.append({"chave": "funil:prs_fechados", "persona": "arquiteto", "relevancia": min(1.0, 0.4 + 0.15 * f["prs_fechados"]),
+                    "texto": f"{f['prs_fechados']} PR(s) do Developer fecharam sem merge contra {f['prs_mergeados']} mesclado(s) em 24 h: "
+                             "qual portão reprova mais e o que o Developer deveria checar antes de abrir o PR?",
+                    "evidencia": {"prs_fechados": f["prs_fechados"], "prs_mergeados": f["prs_mergeados"], "base": "medido"}})
+    motivo = f.get("planejador_motivo") or ""
+    if motivo and not motivo.startswith(("fila cheia", "intervalo")):
+        out.append({"chave": "funil:planejador_parado", "persona": "operador", "relevancia": 0.8,
+                    "texto": f"O Planejador não planeja porque “{motivo}”: essa trava é legítima agora, e o que a resolve sem esperar o humano?",
+                    "evidencia": {"planejador_motivo": motivo, "base": "medido"}})
+    return out
+
+
 # ------------------------------------------------------------------ uma passagem do agente
 def cerebro_de(project: dict | None) -> str:
     return "loop" if project is None else f"missao:{project['id']}"
@@ -164,9 +249,7 @@ def indagar(ctx, project: dict | None = None) -> dict:
     s, agora = ctx.store, time.time()
     cer = cerebro_de(project)
     cands = candidatas(ctx, project)
-    ja = {r["chave"] for r in s.q("SELECT chave FROM perguntas WHERE cerebro=? AND status IN ('valida','feita','virou_item') "
-                                  "AND created_at>=?", (cer, agora - 3 * 86400))}
-    cands = [c for c in cands if c["chave"] not in ja]
+    cands = [c for c in cands if c["chave"] not in ja_julgadas(s, cer, agora)]
     res = classificar(ctx, cands, contexto(s, project))
     ids = []
     for c in res:
@@ -261,7 +344,7 @@ def resumo(store, limite: int = 12) -> dict:
                     "SUM(status IN ('feita','virou_item','entregue')) u FROM perguntas WHERE eixo IS NOT NULL")
     por_eixo = {r["eixo"]: r["n"] for r in store.q("SELECT eixo, COUNT(*) n FROM perguntas WHERE eixo IS NOT NULL GROUP BY eixo")}
     return {"ultimas": rows, "total": tot["n"] or 0, "validas": tot["v"] or 0, "descartadas": tot["d"] or 0, "inconclusas": tot["i"] or 0,
-            "usadas": tot["u"] or 0, "por_eixo": por_eixo, "marcas": store.get("indagador") or {}, "eixos": EIXOS}
+            "usadas": tot["u"] or 0, "por_eixo": por_eixo, "marcas": store.get("indagador") or {}, "eixos": EIXOS, "funil": funil(store)}
 
 
 # ------------------------------------------------------------------ a regra (LocalJev) quando o Jev está em dúvida ou nos testes

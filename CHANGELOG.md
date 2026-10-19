@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.27.0 — 2026-10-19
+
+**O Indagador vira especialista no próprio funil, e um 502 do GitHub não trava mais a evolução.** Medido no Mac à tarde:
+com a 1.26.0 o ritmo subiu (3 PRs mesclados em 40 min), e então o planejador parou de novo por "lição estrutural
+aberta" — um `HTTP Error 502: Bad Gateway` do GitHub em `revisar_prs` classificado como erro do loop, que abriu item
+para o Developer "consertar" e criou portão. Em paralelo, o Indagador rejulgava a mesma pergunta a cada passagem
+(3 vezes em 14 h, mesmo veredito) e não olhava para a etapa mais lenta da evolução.
+
+- **Erro de ambiente é ambiente**: `HTTP Error 5xx`, `Bad Gateway`, `Service Unavailable`, `Gateway Timeout` entram na
+  regra; lição aberta como estrutural com esse texto é reclassificada na hora, o item que ela abriu é descartado e o
+  planejador não espera por ela.
+- **Funil da autoevolução medido** (`indagador.funil`): minutos da pergunta validada ao item, do item ao PR e do PR ao
+  merge (mediana, pior, alvo), PRs mesclados vs fechados e o motivo atual de o planejador não planejar. A etapa mais
+  atrasada vira a PRIMEIRA pergunta do loop, com a evidência medida; aparece no card do Indagador e em `/api/indagador`.
+- **Indagador não repete**: chave descartada ou entregue não volta por 3 dias; inconclusa volta só depois de 6 h e no
+  máximo 2 vezes — cada passagem classifica perguntas novas, não as mesmas.
+
 ## 1.26.0 — 2026-10-19
 
 **Velocidade e continuidade da autoevolução.** Medido no Mac: depois do PR #16 (01:12) o loop ficou ~10 h sem item novo,
