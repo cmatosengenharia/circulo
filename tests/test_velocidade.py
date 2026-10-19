@@ -205,3 +205,51 @@ def test_indagar_e_trabalho_real_roda_assim_que_precisa(circle):
     r = circle.tick()
     assert r.idle_task == "indagar"
     assert time.time() - float((s.get("indagador") or {}).get("loop", 0)) < 60
+
+
+def test_jev_nao_com_confianca_media_nao_para_a_esteira(circle):
+    """Mac, 19/10 à noite: 4 h sem evolução porque o Jev recusava o estudo (p≈0,3, confiança 0,3–0,4) com o Developer parado
+    e dois itens esperando estudo. Confiança média alerta, não age: a regra decide; confiança alta continua barrando."""
+    from circulo.decision import Decision
+    s = circle.store
+    agora = time.time()
+    s.x("UPDATE roadmap SET status='feito'")
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Canário de falha','d','loop','pendente','pergunta do conselho: auditor',1,?,?)", (agora, agora))
+
+    class JevRecusaFraco:
+        source, ultimo_modelo = "jev", "jev-1.13.0"
+
+        def __init__(self, conf):
+            self.conf = conf
+
+        def ask_many(self, state, qs):
+            out = {}
+            for qid, q in qs.items():
+                if qid == "worth_spending":
+                    out[qid] = Decision(qid, "noul", 0.3, self.conf, "jev")
+                elif q.kind == "noul":
+                    out[qid] = Decision(qid, "noul", 0.9, 0.8, "jev")
+                elif q.kind == "choice":
+                    out[qid] = Decision(qid, "choice", q.options()[0], 0.8, "jev")
+                else:
+                    out[qid] = Decision(qid, "score", 1.0, 0.8, "jev")
+            return out, 10
+
+    class Dev:
+        def pick(self): return None
+        def busy(self): return False
+        def em_espera(self): return False
+        def tem_trabalho(self): return False
+        def alvo(self): return None
+    circle.self_dev = Dev()
+    assert circle.estudo.precisa() and circle._tem_trabalho("estudar_pedido")
+    circle.ctx.dl.jev = JevRecusaFraco(0.38)
+    circle.idle()
+    assert s.one("SELECT estudo FROM roadmap WHERE titulo='Canário de falha'")["estudo"] is not None    # estudado: a regra autorizou
+    assert circle.store.one("SELECT COUNT(*) n FROM decisions WHERE question='worth_spending' AND source='jev'")["n"] >= 1   # o não do Jev ficou registrado
+    s.x("UPDATE roadmap SET estudo=NULL WHERE titulo='Canário de falha'")
+    s.set("progresso", {"sem": 0, "recusas": {}})
+    s.set("idle_last", {})
+    circle.ctx.dl.jev = JevRecusaFraco(0.85)                                   # confiança alta no não: continua barrando
+    circle.idle()
+    assert s.one("SELECT estudo FROM roadmap WHERE titulo='Canário de falha'")["estudo"] is None

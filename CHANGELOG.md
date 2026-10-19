@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.31.1 — 2026-10-19
+
+**O loop parou de evoluir por 4 h: o Jev recusava o estudo com confiança média.** Medido no Mac (17:24 → 21:30): dois
+itens planejados esperando estudo, Developer parado, e o porteiro do gasto respondendo p≈0,3 com confiança 0,3–0,4 ao
+"vale gastar ~30 mil tokens no estudo?", a cada giro. O Jev dizia "não" sem evidência do que o estudo destravava, e o
+loop obedecia para sempre.
+
+- **Evidência para o porteiro do estudo**: o item esperando, a origem, quantos esperam, a fila do Developer e
+  `desbloqueia_fila` (o estudo é o que separa o loop do trabalho); valor 0,95 quando o Developer está parado. O critério
+  do Jev (PT e EN do laboratório) e a regra passam a cobrir "item esperando estudo", como já cobriam a pergunta validada.
+- **Roteirização por confiança no porteiro**: um "não" do Jev com confiança abaixo de 0,5 numa tarefa que destrava a
+  fila não age — a regra determinística decide, e a resposta do Jev fica registrada para o aprendiz. "Não" com
+  confiança alta continua barrando.
+
 ## 1.31.0 — 2026-10-19
 
 **Equipe ao vivo: os agentes como um time de engenharia, conversando e entregando em tempo real.** E um menu único no

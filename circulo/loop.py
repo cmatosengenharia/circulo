@@ -16,7 +16,7 @@ from typing import Callable
 from . import finance, intencoes, jobs, parada, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
-from .decision import DecisionLayer, JevClient, LLMClient, Question, build_jev
+from .decision import SN, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
@@ -39,6 +39,7 @@ TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_co
 # indagar entrou no TRABALHO em 1.30: era manutenção em rodízio com outras 8 e rodou 3 vezes em 3 h; as perguntas são o
 # começo da autoevolução, então rodam a cada giro em que o Indagador tem o que perguntar (ele mesmo dosa o intervalo).
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
+CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
 # Medido no Mac (19/10, 3 h): 121 de 180 min eram descanso de 5 min enquanto um PR esperava o CI ou o Developer esperava
 # os 2 giros de espaçamento. Em voo, o giro volta em 45 s; o descanso longo fica só para quando não há nada a caminho.
@@ -480,7 +481,26 @@ class Circle:
                     item = self.self_dev.alvo()
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
                         contexto.update({"item": item["titulo"], "origem": item["origem"]})
+                if pick == "estudar_pedido":
+                    # o Jev vê o item e o que o estudo destrava (no Mac ele recusou o estudo por 4 h com p≈0,3 e o Developer parado)
+                    it = self.estudo.pendente() or {}
+                    fila = 0 if self.self_dev is None or self.self_dev.pick() is None else 1
+                    contexto.update({"item_esperando_estudo": (it.get("titulo") or "")[:160], "origem": it.get("origem"), "fila_do_developer": fila,
+                                     "itens_esperando_estudo": s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND estudo IS NULL "
+                                                                     "AND origem IN ('loop','pedido_cassio') AND COALESCE(desativado,0)=0")["n"],
+                                     "desbloqueia_fila": fila == 0, "value_signal": max(VALOR.get(pick, 0.6), 0.95 if fila == 0 else 0.85)})
+                if pick == "planejar_roteiro":
+                    contexto.setdefault("desbloqueia_fila", contexto.get("fila_do_developer") == 0 and not self.estudo.precisa())
                 gate = ctx.dl.worth_spending("idle_evolution", contexto)
+                d0 = gate.decision
+                if not gate.allowed and contexto.get("desbloqueia_fila") and d0.source == "jev" and float(d0.confidence) < CONF_PARA_BARRAR:
+                    # Confiança média do Jev num "não" que para a esteira: pela roteirização por confiança, confiança média
+                    # alerta, não age. A regra determinística decide (como quando o Jev está em dúvida), e a resposta dele fica
+                    # registrada para o aprendiz. Confiança alta no "não" continua valendo.
+                    estado = {"action": "idle_evolution", **contexto, "budget_left_ratio": round(ctx.budget.left_ratio(), 3)}
+                    r = ctx.dl.local.ask_many(estado, {"worth_spending": Question("noul", "vale gastar agora?", SN("sim", "não"))})[0]["worth_spending"]
+                    gate = Gate(float(r.value) >= gate.threshold, r, gate.threshold)
+                    regra += f"; Jev disse não com confiança média ({float(d0.confidence):.2f}) numa tarefa que destrava a fila: a regra decidiu ({float(r.value):.2f})"
                 if pick == "planejar_roteiro":
                     from .planejador import registrar_porteiro
                     registrar_porteiro(s, pv["id"] if pv else None, gate)
