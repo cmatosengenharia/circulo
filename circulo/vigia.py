@@ -24,9 +24,11 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
+from .planejador import PORTEIRO
 
 INTERVALO = 60                   # segundos entre passagens da thread
 ESPERA_PERGUNTA = 30 * 60        # pergunta validada esperando mais que isso = trava
+RECUSAS_PORTEIRO = 3             # a mesma pergunta recusada tantas vezes seguidas pelo mesmo motivo sai da fila
 DEV_PARADO = 45 * 60
 PR_PRESO = 60 * 60
 CORPO_ATRASADO = 40 * 60
@@ -48,15 +50,25 @@ def _kv(s, k, default=None):
 
 
 # ------------------------------------------------------------------ sondas (cada uma devolve um achado ou None)
+def _causa_porteiro(u: dict) -> str:
+    """A causa medida no registro do porteiro (planejador.registrar_porteiro); sem registro, nenhuma causa é sugerida."""
+    if not u:
+        return "sem registro do porteiro worth_spending.idle_evolution sobre o planejador: causa não medida, inspecionar"
+    return (f"porteiro worth_spending.idle_evolution {u['decisao']} a pergunta #{u['pergunta_id']} {u['seguidas']}x seguida(s): "
+            f"{u['motivo']} (medido {u['valor']:.2f}, limiar {u['limiar']:.2f}, fonte {u['fonte']})")
+
+
 def s_pergunta_valida_parada(s, now):
     r = s.one("SELECT COUNT(*) n, MIN(created_at) em FROM perguntas WHERE status='valida'")
-    if not r["n"] or now - float(r["em"] or now) < ESPERA_PERGUNTA:
+    # a idade só cresce: acima do limite agora e na verificação anterior (INTERVALO atrás) = 2 verificações seguidas
+    if not r["n"] or now - float(r["em"] or now) < ESPERA_PERGUNTA + INTERVALO:
         return None
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
+    u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
     return {"chave": "pergunta_valida_parada", "titulo": f"{r['n']} pergunta(s) validada(s) pelo Jev esperando há {int((now - r['em']) / 60)} min sem virar item",
-            "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None},
-            "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)),
-            "sugestao": "o planejador não está rodando ou o porteiro do gasto o recusa: ver recusas e o limiar worth_spending.idle_evolution"}
+            "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None,
+                          "porteiro": u or None},
+            "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)), "sugestao": _causa_porteiro(u)}
 
 
 def s_porteiro_recusa(s, now):
@@ -275,6 +287,7 @@ class Vigia:
     # --- uma passagem
     def rodar(self, now: float | None = None) -> dict:
         now = now or time.time()
+        self._recusada_pelo_porteiro(now)
         achados = sondar(self.s, now)
         abertas = {r["chave"]: dict(r) for r in self.s.q("SELECT * FROM vigia WHERE status='aberta'")}
         novos = [a for a in achados if a["chave"] not in abertas or abertas[a["chave"]]["veredito"] == "em_duvida"]
@@ -299,6 +312,23 @@ class Vigia:
                     self.ctx.reply(f"Vigia: resolvido — {r['titulo']} (durou {int((now - r['primeira_em']) / 60)} min).", "saude")
         self.s.set("vigia_ultima", {"em": now, "achados": len(achados), "abertas": len([a for a in achados]), "agiu": agiu})
         return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas}
+
+    def _recusada_pelo_porteiro(self, now: float) -> None:
+        """A mesma pergunta recusada RECUSAS_PORTEIRO vezes seguidas pelo mesmo motivo sai da fila (não trava as outras
+        nem repete o alerta) e vira um item de revisão do limiar, com o registro medido."""
+        u = (self.s.get(PORTEIRO) or {}).get("ultimo") or {}
+        if u.get("decisao") != "recusou" or not u.get("pergunta_id") or int(u.get("seguidas", 0)) < RECUSAS_PORTEIRO:
+            return
+        if not self.s.run("UPDATE perguntas SET status='recusada_porteiro', updated_at=? WHERE id=? AND status='valida'", (now, u["pergunta_id"])):
+            return
+        causa = _causa_porteiro(u)
+        titulo = f"Vigia: revisar o limiar worth_spending.idle_evolution: pergunta #{u['pergunta_id']} recusada {u['seguidas']}x ({u['motivo']})"
+        if not self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE 'Vigia: revisar o limiar%'"):
+            ordem = (self.s.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
+            detalhe = f"A pergunta saiu da fila como 'recusada pelo porteiro'.\nEvidência (medida): {json.dumps(u, ensure_ascii=False, default=str)}\nCausa: {causa}"
+            self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                     (titulo[:200], detalhe[:2000], "loop", "pendente", f"Vigia (medido): porteiro_recusa_pergunta:{u['pergunta_id']}", ordem, now, now))
+        self.ctx.reply(f"Vigia: pergunta #{u['pergunta_id']} recusada pelo porteiro. {causa[:160]}", "saude")
 
     def _registrar(self, c: dict, antes: dict | None, now: float) -> None:
         ev = json.dumps(c["evidencia"], ensure_ascii=False, default=str)

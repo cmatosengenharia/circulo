@@ -472,12 +472,16 @@ class Circle:
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
                         contexto.update({"item": item["titulo"], "origem": item["origem"]})
                 gate = ctx.dl.worth_spending("idle_evolution", contexto)
+                if pick == "planejar_roteiro":
+                    from .planejador import registrar_porteiro
+                    registrar_porteiro(s, pv["id"] if pv else None, gate)
                 d = gate.decision
                 regra += f"; gasto autorizado por {d.source} ({float(d.value):.2f} ≥ {gate.threshold:.2f})"
                 if not gate.allowed:
                     last[pick] = s.tick           # recusado agora: volta para o fim da fila
                     pg = s.get("progresso") or {"sem": 0}
-                    pg.setdefault("recusas", {})[pick] = int(pg["recusas"].get(pick, 0)) + 1
+                    recusas = pg.setdefault("recusas", {})   # antes de ler: o lado direito da atribuição roda primeiro
+                    recusas[pick] = int(recusas.get(pick, 0)) + 1
                     s.set("progresso", pg)
                     continue
             if pick not in ("corrigir_codigo", "evoluir_projeto"):
