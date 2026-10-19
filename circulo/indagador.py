@@ -40,7 +40,8 @@ ACAO = ("a pergunta é tão ampla ou vaga que nenhum item pequeno a responde (ex
         "a pergunta cabe num item pequeno e medível: dá para dizer o que muda, onde, e como se mede que respondeu")
 PERTINENTE_MIN = 0.6
 ACAO_MIN = 1
-INTERVALO = 6 * 3600          # cada cérebro (loop ou missão) é indagado no máximo a cada 6 h
+INTERVALO = 6 * 3600          # cada cérebro (loop ou missão) é indagado no máximo a cada 6 h...
+INTERVALO_FOME = 1800         # ...ou a cada 30 min quando não tem nenhuma pergunta válida esperando (a evolução não seca)
 MAX_VALIDAS = 3               # com 3 perguntas válidas esperando, não faz mais até consumirem
 MAX_CANDIDATAS = 5
 
@@ -202,9 +203,10 @@ def proximo_cerebro(store, engine=None) -> dict | None:
     for p in opcoes:
         cer = cerebro_de(p)
         em = float(marcas.get(cer, 0))
-        if agora - em < INTERVALO:
+        validas = _um(store, "SELECT COUNT(*) FROM perguntas WHERE cerebro=? AND status='valida'", (cer,))
+        if agora - em < (INTERVALO_FOME if validas == 0 else INTERVALO):
             continue
-        if _um(store, "SELECT COUNT(*) FROM perguntas WHERE cerebro=? AND status='valida'", (cer,)) >= MAX_VALIDAS:
+        if validas >= MAX_VALIDAS:
             continue
         if pior_em is None or em < pior_em:
             pior, pior_em = {"project": p}, em

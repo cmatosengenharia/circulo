@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.26.0 — 2026-10-19
+
+**Velocidade e continuidade da autoevolução.** Medido no Mac: depois do PR #16 (01:12) o loop ficou ~10 h sem item novo,
+com 3 perguntas validadas pelo Jev esperando e o Developer parado. A causa era o teto fixo de 6 itens por dia do
+planejador (atingido à 01:31); o Vigia via a trava, mas já a dava por tratada e não agiu de novo em 777 passagens.
+
+- **Planejador sem teto que trava**: até 24 itens em 24 h enquanto os PRs passam; volta a 6 só quando a maioria dos
+  últimos PRs fecha sem merge (velocidade sem qualidade vira retrabalho). Com a fila vazia replaneja em 2 min (antes
+  30); com um item na fila, em 15 min.
+- **Motivo medido**: cada decisão de não planejar grava o porquê (`planejador_gate`: fila cheia, Claude Code no limite,
+  lição estrutural, intervalo, teto). O Vigia cita essa causa na trava "pergunta validada parada", em vez de adivinhar.
+- **Vigia não fica mudo**: trava que continua aberta 2 h depois da ação, sem item em andamento, gera nova ação com a
+  evidência atual.
+- **Indagador não seca**: sem nenhuma pergunta válida esperando, volta a indagar em 30 min (antes, só a cada 6 h).
+- Resposta "sem item novo" do planejador deixa de ser registrada como falha de JSON.
+
 ## 1.25.0 — 2026-10-18
 
 **Cores, legendas e botões legíveis em todas as telas.** As cores estavam difíceis de ver: no modo claro o verde (3,96:1)

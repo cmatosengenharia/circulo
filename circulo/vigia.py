@@ -24,10 +24,11 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
-from .planejador import PORTEIRO
+from .planejador import GATE, PORTEIRO
 
 INTERVALO = 60                   # segundos entre passagens da thread
 ESPERA_PERGUNTA = 30 * 60        # pergunta validada esperando mais que isso = trava
+REAGIR = 2 * 3600                # trava que continua aberta tanto tempo depois da ação: age de novo (não fica muda)
 RECUSAS_PORTEIRO = 3             # a mesma pergunta recusada tantas vezes seguidas pelo mesmo motivo sai da fila
 DEV_PARADO = 45 * 60
 PR_PRESO = 60 * 60
@@ -65,10 +66,13 @@ def s_pergunta_valida_parada(s, now):
         return None
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
     u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
+    gate = _kv(s, GATE, {}) or {}
+    motivo = gate.get("motivo") if now - float(gate.get("em", 0) or 0) < 30 * 60 else None
+    causa = f"o planejador não planeja: {motivo}" if motivo else _causa_porteiro(u)
     return {"chave": "pergunta_valida_parada", "titulo": f"{r['n']} pergunta(s) validada(s) pelo Jev esperando há {int((now - r['em']) / 60)} min sem virar item",
             "evidencia": {"perguntas_validas": r["n"], "esperando_min": int((now - r["em"]) / 60), "planejador_rodou_ha_min": int((now - plan) / 60) if plan else None,
-                          "porteiro": u or None},
-            "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)), "sugestao": _causa_porteiro(u)}
+                          "porteiro": u or None, "planejador_motivo": motivo},
+            "gravidade": min(1.0, 0.5 + (now - r["em"]) / (4 * ESPERA_PERGUNTA)), "sugestao": causa}
 
 
 def s_porteiro_recusa(s, now):
@@ -296,11 +300,28 @@ class Vigia:
         except Exception as exc:  # noqa: BLE001 — sem Jev, registra como dúvida e segue
             classificados = [{**a, "veredito": "em_duvida", "acao": "observar", "conf": 0.0, "p_trava": None, "classificacao": {"erro": str(exc)[:200]}} for a in novos]
         agiu, resolvidas = [], []
+        marcas = self.s.get("vigia_agiu") or {}
         for c in classificados:
             self._registrar(c, abertas.get(c["chave"]), now)
             if c["acao"] in ("abrir_item", "alertar") and (abertas.get(c["chave"]) or {}).get("acao") not in ("abrir_item", "alertar"):
                 self._agir(c, now)
                 agiu.append(c["chave"])
+                marcas[c["chave"]] = now
+        # trava que segue aberta REAGIR depois da ação, sem item em andamento: age de novo com a evidência de agora
+        # (no Mac uma trava ficou 13 h aberta, 777 passagens, sem nova ação: o item que abrira já estava feito)
+        por_chave = {a["chave"]: a for a in achados}
+        for chave, r in abertas.items():
+            if chave in agiu or chave not in por_chave or r["acao"] not in ("abrir_item", "alertar"):
+                continue
+            if now - float(marcas.get(chave, r["primeira_em"])) < REAGIR:
+                continue
+            if r["item_id"] and self.s.one("SELECT 1 FROM roadmap WHERE id=? AND status IN ('pendente','em_andamento')", (r["item_id"],)):
+                continue
+            self._agir({**r, **por_chave[chave], "acao": r["acao"], "conf": float(r["conf"] or 0)}, now)
+            agiu.append(chave)
+            marcas[chave] = now
+        if agiu:
+            self.s.set("vigia_agiu", marcas)
         vistos = {a["chave"] for a in achados}
         for chave, r in abertas.items():
             if chave in vistos:

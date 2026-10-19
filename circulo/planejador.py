@@ -7,7 +7,10 @@ worktree → Claude Code → lint e testes → PR → CI → gate.
 
 Limites:
 - só planeja com o roteiro vazio para o Developer e nenhum PR dele aberto;
-- no máximo MAX_POR_DIA itens por dia, e uma tentativa a cada INTERVALO segundos;
+- no máximo MAX_POR_DIA itens em 24 h (FREIO_POR_DIA quando a maioria dos últimos PRs não foi mesclada: velocidade
+  sem qualidade só gera retrabalho), e uma tentativa a cada INTERVALO_RAPIDO s com a fila vazia (o Developer ia ficar
+  parado) ou INTERVALO s com um item já na fila;
+- o motivo de não planejar fica medido em kv 'planejador_gate' (o Vigia cita a causa real em vez de adivinhar);
 - o Jev decide antes se vale o gasto (worth_spending) e qual modelo usar (pick_model);
 - título repetido de item que já existe é descartado;
 - a constituição continua fora do alcance (o gate recusa).
@@ -21,8 +24,11 @@ import time
 from .agents import Ctx
 from .decision import Question, norm
 
-MAX_POR_DIA = 6
-INTERVALO = 1800
+MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
+FREIO_POR_DIA = 6           # teto quando a qualidade cai (maioria dos últimos PRs fechada sem merge)
+INTERVALO = 900             # com um item já na fila: planeja o próximo com calma
+INTERVALO_RAPIDO = 120      # fila vazia: o Developer vai ficar parado, planeja já
+GATE = "planejador_gate"    # kv: por que o planejador não planejou agora (medido)
 FOLGA = 2                 # itens prontos ou a caminho na fila antes de o planejador parar de planejar
 EST_TOKENS = 3000
 MAX_TOKENS = 1500   # lição: com 700 a resposta (em português, detalhada) era cortada e o JSON ficava inválido
@@ -61,23 +67,44 @@ class Planejador:
         dia0 = time.time() - 86400
         return self.s.one("SELECT COUNT(*) n FROM roadmap WHERE origem='loop' AND created_at>=?", (dia0,))["n"]
 
+    def teto(self) -> int:
+        """Itens do loop por 24 h: alto enquanto os PRs passam; freado quando a maioria dos últimos volta sem merge."""
+        ult = [r["status"] for r in self.s.q("SELECT status FROM prs WHERE status IN ('mergeado','fechado') ORDER BY updated_at DESC LIMIT 6")]
+        if len(ult) >= 3 and ult.count("mergeado") / len(ult) < 0.5:
+            return FREIO_POR_DIA
+        return MAX_POR_DIA
+
     def precisa(self) -> bool:
+        motivo = self.motivo()
+        try:
+            self.s.set(GATE, {"em": time.time(), "motivo": motivo})
+        except Exception:  # noqa: BLE001 — registrar o motivo nunca impede de decidir
+            pass
+        return motivo is None
+
+    def motivo(self) -> str | None:
+        """Por que NÃO planejar agora (None = planejar). Cada motivo é um fato medido, não um palpite."""
         if self.dev is None or self.ctx.dl.llm is None:
-            return False
+            return "sem LLM ou sem Developer"
         if self.dev.em_espera():
-            return False          # Claude Code no limite: planejar agora só acumula
+            return "Claude Code no limite de uso"     # planejar agora só acumula
         # fila com folga: o Developer trabalha num item enquanto o próximo já está planejado e estudado. Planeja quando
         # há menos de FOLGA itens prontos ou a caminho (pendentes do loop/seus, estudados ou esperando estudo).
         fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop') "
                           "AND evidencia NOT LIKE '%depende de você%'")["n"]
         if fila >= FOLGA:
-            return False
+            return f"fila cheia ({fila} itens)"
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
-            return False          # primeiro corrige os próprios erros, depois evolui
-        if time.time() - float((self.s.get("planejador") or {}).get("em", 0)) < INTERVALO:
-            return False
-        return self._hoje() < MAX_POR_DIA
+            return "lição estrutural aberta: primeiro corrige, depois evolui"
+        espera = INTERVALO_RAPIDO if fila == 0 else INTERVALO
+        desde = time.time() - float((self.s.get("planejador") or {}).get("em", 0))
+        if desde < espera:
+            return f"intervalo: última tentativa há {int(desde)} s (espera {espera} s)"
+        hoje, teto = self._hoje(), self.teto()
+        if hoje >= teto:
+            return f"teto diário: {hoje} itens em 24 h (teto {teto}{', freado por PRs sem merge' if teto < MAX_POR_DIA else ''})"
+        return None
 
     # ------------------------------------------------------------ evidência
     def evidencia(self) -> dict:
@@ -166,7 +193,7 @@ class Planejador:
             from .registro import registrar
             registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="planejador",
                       modelo=escolha["modelo"], escolha=escolha, tokens=tokens, duracao_ms=int((time.time() - t0) * 1000),
-                      ok=item is not None, erro=None if item else "resposta sem JSON válido", entrada="evidência do loop", saida=texto)
+                      ok=item is not None or bool(sem_item), erro=None if item or sem_item else "resposta sem JSON válido", entrada="evidência do loop", saida=texto)
         except Exception:  # noqa: BLE001 — registro nunca derruba o planejador
             pass
         if sem_item:
