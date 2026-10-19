@@ -27,8 +27,9 @@ REGRA_HIDDEN = "[hidden]{display:none!important}"
 
 # o mapa de funcionalidades: tela → arquivo e o que ela tem de mostrar
 TELAS = (
-    {"rota": "/", "arquivo": "home.html", "contem": ["Nova missão", "Fluxo ao vivo", "Rastros", "Integrações"]},
-    {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Visão geral", "Fluxo ao vivo", "Segurança"]},
+    {"rota": "/", "arquivo": "home.html", "contem": ["Nova missão", "Equipe ao vivo", "Rastros e SLOs", "Integrações"]},
+    {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Saúde e estado", "Equipe ao vivo", "Segurança e confiança"]},
+    {"rota": "/equipe", "arquivo": "equipe.html", "contem": ["Equipe ao vivo", "Conversa da equipe", "Quadro de entregas"]},
     {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Fluxo ao vivo", "Laboratório", "Agentes"]},
     {"rota": "/rastros", "arquivo": "rastros.html", "contem": ["Seguir o fio", "Objetivos de serviço", "Sinais de ouro"]},
     {"rota": "/integracoes", "arquivo": "integracoes.html", "contem": ["Integrações", "Cadastrar outra integração"]},
@@ -38,6 +39,7 @@ APIS = (
     ("/api/estado", ["loop", "orcamento"]),
     ("/api/confianca", ["veredito", "checks"]),
     ("/api/fluxo", ["agora", "agentes", "jev"]),
+    ("/api/equipe", ["membros", "quadro", "grupos"]),
     ("/api/observabilidade", ["sinais", "slos", "rastros"]),
     ("/api/loop", None),
 )

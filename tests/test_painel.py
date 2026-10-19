@@ -99,7 +99,7 @@ def test_home_e_cards(circle, painel):
         assert "Nova missão" in r.read().decode()
     for rota in ("/projeto/1", "/missao/1"):
         with urllib.request.urlopen(painel + rota, timeout=5) as r:
-            assert "Todas as missões" in r.read().decode()
+            assert 'id="navTopo"' in r.read().decode()          # o menu de cima leva às missões
     code, body = post(painel + "/api/projeto", {"pedido": "Crie um portal admin para fotógrafos"}, {"X-Circulo": "1"})
     assert code == 200
     circle.tick()

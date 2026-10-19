@@ -336,7 +336,7 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .com-abas [data-aba].fora-da-aba{display:none!important}
 .fluxo-embed{display:none}
 .com-abas .fluxo-embed{display:block;padding:0;overflow:hidden;margin:0 0 16px}
-.fluxo-embed iframe{display:block;width:100%;height:1500px;border:0}
+.fluxo-embed iframe{display:block;width:100%;height:2200px;border:0}
 .fluxo-embed .sub{padding:8px 16px;margin:0}
 /* ---------- pausa por missão ---------- */
 .pausa-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:var(--llm-soft);color:var(--ink);border:1px solid var(--llm);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:14px}
@@ -384,6 +384,16 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /*TEMA:ini*/
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.topo{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--surface);border-bottom:1.5px solid var(--line);margin:0 0 14px}
+.topo .marca{font-weight:800;letter-spacing:.2px;color:var(--ink);text-decoration:none;font-size:17px;padding:6px 8px 6px 0}
+.topo .marca::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-right:8px;vertical-align:-1px}
+.topo-links{display:flex;flex-wrap:wrap;gap:2px}
+.topo-links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 11px;border-radius:8px;border:1.5px solid transparent}
+.topo-links a:hover{background:var(--hover);color:var(--ink)}
+.topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
+.topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+a.back{display:none !important}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -416,8 +426,8 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
 </style>
 </head>
 <body>
+<!--NAV:ini--><nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links"><a href="/" title="As missões suas e a do próprio loop">Missões</a><a href="/equipe" title="Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas">Equipe ao vivo</a><a href="/loop" title="Saúde, decisões, evolução e segurança do loop">Gestão do loop</a><a href="/fluxo" title="O giro passo a passo: raias, obras e cada verificação">Bastidores do giro</a><a href="/rastros" title="Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs">Rastros e SLOs</a><a href="/integracoes" title="Chaves do Jev, da LLM e do GitHub no cofre do sistema">Integrações</a></div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav><script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});})();</script><!--NAV:fim-->
 <div class="wrap" id="app">
-  <a class="back" href="/">Todas as missões</a>
   <header>
     <h1 id="pname">Missão</h1>
     <div class="state" id="state" data-s="parado"><span class="dot"></span><span id="stateText">Conectando ao loop…</span></div>
@@ -431,15 +441,15 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
   </header>
   <div class="pausa-banner" id="pausaBanner" hidden role="status" aria-live="polite"></div>
   <nav class="abas" id="abas" hidden aria-label="Partes do painel do loop">
-    <button type="button" data-aba="geral" aria-pressed="true">Visão geral</button>
-    <button type="button" data-aba="fluxo" aria-pressed="false">Fluxo ao vivo</button>
-    <button type="button" data-aba="jev" aria-pressed="false">Decisões e Jev</button>
-    <button type="button" data-aba="evolucao" aria-pressed="false">Evolução</button>
-    <button type="button" data-aba="seguranca" aria-pressed="false">Segurança</button>
-    <button type="button" data-aba="detalhes" aria-pressed="false">Detalhes</button>
+    <button type="button" data-aba="geral" aria-pressed="true" title="Está rodando? Está travado? O que cada etapa fez">Saúde e estado</button>
+    <button type="button" data-aba="fluxo" aria-pressed="false" title="A equipe de agentes conversando e entregando, em tempo real">Equipe ao vivo</button>
+    <button type="button" data-aba="jev" aria-pressed="false" title="Toda pergunta que o loop faz antes de gastar ou mudar algo">Decisões (Jev First)</button>
+    <button type="button" data-aba="evolucao" aria-pressed="false" title="Perguntas, roteiro, PRs, revisões e lições: como o loop evolui a si mesmo">Autoevolução</button>
+    <button type="button" data-aba="seguranca" aria-pressed="false" title="Constituição, guardrails, orçamento e o botão de parada">Segurança e confiança</button>
+    <button type="button" data-aba="detalhes" aria-pressed="false" title="Tabelas e registros completos">Mais detalhes</button>
   </nav>
-  <section class="panel fluxo-embed" data-aba="fluxo" id="fluxoEmbed"><iframe title="Fluxo dos agentes ao vivo" data-src="/fluxo?embed=1" loading="lazy"></iframe>
-    <p class="sub"><a href="/fluxo" target="_blank" rel="noopener">Abrir o fluxo em tela cheia ↗</a></p></section>
+  <section class="panel fluxo-embed" data-aba="fluxo" id="fluxoEmbed"><iframe title="Equipe de agentes ao vivo" data-src="/equipe?embed=1" loading="lazy"></iframe>
+    <p class="sub"><a href="/equipe" target="_blank" rel="noopener">Abrir a equipe em tela cheia ↗</a> · <a href="/fluxo" target="_blank" rel="noopener">bastidores do giro (raias e obras) ↗</a></p></section>
 
   <section data-aba="geral" class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
     <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>

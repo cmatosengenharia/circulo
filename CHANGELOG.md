@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.31.0 — 2026-10-19
+
+**Equipe ao vivo: os agentes como um time de engenharia, conversando e entregando em tempo real.** E um menu único no
+alto de todas as telas, com nomes que dizem o que cada tela é.
+
+- **Tela nova `/equipe`** (`equipe.py` + `equipe.html`): a sala com cada integrante e seu cargo (Indagador = product
+  owner, Jev = decisor, Planejador = gerente de produto, Estudo = arquiteto, Developer, Revisor, Gate = QA/release,
+  Corpo = DevOps, Vigia = SRE, Curador = qualidade, Aprendiz, Rotinas, LLM e GitHub como parceiros), quem está com a
+  bola (cartão pulsando), a carga de cada um (perguntas válidas, itens prontos, PRs nas vagas, travas, lições) e o
+  balão com a mensagem que acabou de chegar.
+- **Conversa da equipe**: cada mensagem nasce de um registro real (perguntas, roteiro, PRs, gate, revisões, Vigia,
+  lições, alertas) e tem tom: pergunta, resposta, tarefa, entrega, devolução, alerta, status. A mensagem voa do remetente
+  ao destinatário (forma por tom, igual à legenda) e fica no registro à direita. "Só o que importa" esconde o rotineiro;
+  "tudo" mostra cada pergunta ao Jev e chamada de LLM. Velocidade tempo real / 3× / pausar.
+- **Quadro de entregas**: Perguntas válidas → Planejado → Estudado, pronto → Em desenvolvimento → Em revisão/CI →
+  Em produção (24 h) → Devolvidos/esperando, com o dono de cada cartão; o cartão anima de uma coluna à outra quando o
+  estado muda.
+- **Menu de cima em todas as telas** (gerado por `tema.py`): Missões · Equipe ao vivo · Gestão do loop (`/loop`) ·
+  Bastidores do giro · Rastros e SLOs · Integrações. Abas da gestão do loop renomeadas: Saúde e estado, Equipe ao
+  vivo (embutida), Decisões (Jev First), Autoevolução, Segurança e confiança, Mais detalhes.
+- O SSE do fluxo passa a levar também as mensagens da equipe (`event: mensagem`), com `?minutos=` para abrir já com a
+  conversa recente; `/api/equipe` dá o retrato (membros, carga, quadro).
+- Decisões de desenho (críticas): sem escritório em pixel art nem framework CSS externo — o painel roda offline em
+  Python puro, e o que diferencia esta tela é que cada balão cita um dado medido (confiança do Jev, motivo do gate,
+  arquivo que cruzou), não uma animação. Um só agente trabalha por vez no giro (desenho do loop); a tela diz isso.
+
 ## 1.30.0 — 2026-10-19
 
 **O Indagador vira um dos agentes mais atuantes.** Medido no Mac (3 h, 62 giros): rodou 3 vezes, 0,0 min — embora TODOS

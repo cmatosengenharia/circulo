@@ -255,9 +255,15 @@ def make_handler(db_path: str):
             m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
                 return self._entrega(int(m.group(1)), q.get("v", [None])[0])
-            if u.path in ("/", "/integracoes", "/rastros", "/fluxo") or u.path.startswith(("/projeto/", "/missao/")):
+            if u.path == "/loop":
+                from .projects import kit_project_id
+                self.send_response(302)
+                self.send_header("Location", f"/missao/{kit_project_id(self._store(), 'circulo')}")
+                self.end_headers()
+                return
+            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe") or u.path.startswith(("/projeto/", "/missao/")):
                 body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html",
-                              "/fluxo": "fluxo.html"}.get(u.path, "painel.html"))
+                              "/fluxo": "fluxo.html", "/equipe": "equipe.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -276,7 +282,11 @@ def make_handler(db_path: str):
                 self._json(fluxo_visao(self._store()))
             elif u.path == "/api/fluxo/eventos":
                 v = q.get("voltar", ["0"])[0]
-                self._sse_fluxo(int(v) if v.isdigit() else 0)
+                m = q.get("minutos", ["0"])[0]
+                self._sse_fluxo(int(v) if v.isdigit() else 0, int(m) if m.isdigit() else 0)
+            elif u.path == "/api/equipe":
+                from .equipe import retrato
+                self._json(retrato(self._store()))
             elif u.path == "/metrics":
                 from .observabilidade import prometheus
                 body = prometheus(self._store()).encode()
@@ -374,9 +384,10 @@ def make_handler(db_path: str):
             self.end_headers()
             self.wfile.write(body)
 
-        def _sse_fluxo(self, voltar: int = 0):
+        def _sse_fluxo(self, voltar: int = 0, minutos: int = 0):
             """Fluxo dos agentes ao vivo: cada evento novo (etapa, pergunta ao Jev, LLM, verificação, erro) assim que
-            entra no banco, e o 'agora' do loop a cada segundo."""
+            entra no banco, as mensagens da equipe (tarefa, entrega, devolução…) e o 'agora' do loop a cada segundo."""
+            from .equipe import cursor_inicial as cursor_equipe, mensagens
             from .fluxo import agora, cursor_inicial, eventos
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -384,12 +395,14 @@ def make_handler(db_path: str):
             self.end_headers()
             store = self._store()
             cur = cursor_inicial(store, min(voltar, 400))
+            cur_eq = cursor_equipe(store, min(minutos, 24 * 60) * 60)
             ultimo_agora = 0.0
             try:
                 while True:
                     evs, cur = eventos(store, cur)
-                    for e in evs:
-                        self.wfile.write(f"event: fluxo\ndata: {json.dumps(e, ensure_ascii=False)}\n\n".encode())
+                    msgs, cur_eq = mensagens(store, cur_eq)
+                    for e in sorted(evs + msgs, key=lambda x: x["em"]):
+                        self.wfile.write(f"event: {'mensagem' if e['tipo'] == 'mensagem' else 'fluxo'}\ndata: {json.dumps(e, ensure_ascii=False)}\n\n".encode())
                     if time.time() - ultimo_agora >= 1.0:
                         ultimo_agora = time.time()
                         self.wfile.write(f"event: agora\ndata: {json.dumps(agora(store), ensure_ascii=False)}\n\n".encode())

@@ -37,6 +37,20 @@ MARCA = [("--border", "--surface"), ("--border", "--bg"), ("--idle", "--surface"
          ("--ok", "--surface"), ("--bad", "--surface")]
 
 INI, FIM = "/*TEMA:ini*/", "/*TEMA:fim*/"
+NAV_INI, NAV_FIM = "<!--NAV:ini-->", "<!--NAV:fim-->"
+# o menu de cima, igual em todas as telas (1.31): nomes dizem o que a tela é, não como foi feita
+MENU = (("/", "Missões", "As missões suas e a do próprio loop"),
+        ("/equipe", "Equipe ao vivo", "Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas"),
+        ("/loop", "Gestão do loop", "Saúde, decisões, evolução e segurança do loop"),
+        ("/fluxo", "Bastidores do giro", "O giro passo a passo: raias, obras e cada verificação"),
+        ("/rastros", "Rastros e SLOs", "Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs"),
+        ("/integracoes", "Integrações", "Chaves do Jev, da LLM e do GitHub no cofre do sistema"))
+NAV = (f'{NAV_INI}<nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links">'
+       + "".join(f'<a href="{h}" title="{t}">{n}</a>' for h, n, t in MENU)
+       + '</div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav>'
+       '<script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}'
+       'var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});})();</script>'
+       f'{NAV_FIM}\n')
 
 
 def _vars(d: dict) -> str:
@@ -49,6 +63,16 @@ TOKENS = (f":root{{{_vars(CLARO)}}}\n"
 # Componentes: vêm DEPOIS das regras da página para valerem sobre elas (mesma especificidade, última ganha).
 COMPONENTES = """
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.topo{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--surface);border-bottom:1.5px solid var(--line);margin:0 0 14px}
+.topo .marca{font-weight:800;letter-spacing:.2px;color:var(--ink);text-decoration:none;font-size:17px;padding:6px 8px 6px 0}
+.topo .marca::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-right:8px;vertical-align:-1px}
+.topo-links{display:flex;flex-wrap:wrap;gap:2px}
+.topo-links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 11px;border-radius:8px;border:1.5px solid transparent}
+.topo-links a:hover{background:var(--hover);color:var(--ink)}
+.topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
+.topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+a.back{display:none !important}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -93,8 +117,11 @@ def glifos(css: str) -> str:
 
 
 def aplicar(html: str) -> str:
-    """Troca os tokens da página pelos canônicos e (re)escreve o bloco de componentes no fim do <style>. Idempotente."""
+    """Troca os tokens da página pelos canônicos, (re)escreve o bloco de componentes no fim do <style> e o menu de cima
+    logo depois do <body>. Idempotente."""
     corpo = re.sub(re.escape(INI) + r".*?" + re.escape(FIM) + r"\n?", "", html, flags=re.S)
+    corpo = re.sub(re.escape(NAV_INI) + r".*?" + re.escape(NAV_FIM) + r"\n?", "", corpo, flags=re.S)
+    corpo = re.sub(r"(<body[^>]*>\n?)", lambda m: m.group(1) + NAV, corpo, count=1)
     # tokens: o primeiro :root{...} e o primeiro @media dark :root{...} da página (os da paleta antiga)
     antigo = re.search(r":root\{[^}]*--bg:[^}]*\}\s*@media \(prefers-color-scheme:dark\)\{:root\{[^}]*\}\}", corpo, flags=re.S)
     if antigo is None:
@@ -107,7 +134,7 @@ def aplicar(html: str) -> str:
     return corpo.replace("</style>", bloco + "</style>", 1)
 
 
-PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html")
+PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html")
 
 
 def reescrever(pasta: Path | None = None) -> list[str]:

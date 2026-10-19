@@ -23,6 +23,7 @@ def test_pagina_ja_esta_no_tema_e_o_tema_e_idempotente(nome):
     assert tema.aplicar(html) == html                              # rodar `python -m circulo.tema` não muda nada
     assert tema.TOKENS.split("\n")[0].split("{", 1)[1][:40] in html
     assert html.count(tema.INI) == 1 and "--border:#7B8794" in html
+    assert html.count(tema.NAV_INI) == 1 and 'id="navTopo"' in html          # o menu de cima, igual em todas
 
 
 @pytest.mark.parametrize("nome", tema.PAGINAS)
