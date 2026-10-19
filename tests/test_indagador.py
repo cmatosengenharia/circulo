@@ -130,3 +130,18 @@ def test_planejador_mantem_fila_com_folga(circle):
     assert not p.precisa()                                # fila cheia: não planeja
     s.x("UPDATE roadmap SET status='feito'")
     assert p.precisa() or p.dev.em_espera()               # fila vazia: planeja (salvo Claude Code no limite)
+
+
+def test_pergunta_validada_destrava_o_planejador_no_porteiro_do_gasto(circle):
+    """No Mac o Jev barrava o planejador (0,33 < 0,40) sem saber que havia pergunta validada esperando e o Developer parado."""
+    dl = circle.ctx.dl
+    base = {"est_tokens": 6000, "value_signal": 0.8}
+    sem = dl.worth_spending("idle_evolution", {**base, "task": "planejar_roteiro"})
+    com = dl.worth_spending("idle_evolution", {**base, "task": "planejar_roteiro", "pergunta_validada": "Qual parte do código mais faz o Developer errar?",
+                                               "eixo": "arquitetura", "pertinencia": 0.86, "fila_do_developer": 0})
+    assert float(com.decision.value) >= float(sem.decision.value) and com.allowed
+    assert indagador.espiar(circle.store, "loop") is None
+    p = _missao(circle)
+    indagador.indagar(circle.ctx, p)
+    v = indagador.espiar(circle.store, f"missao:{p['id']}")
+    assert v and circle.store.one("SELECT status FROM perguntas WHERE id=?", (v["id"],))["status"] == "valida"   # espiar não consome

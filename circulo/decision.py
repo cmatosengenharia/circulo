@@ -239,8 +239,10 @@ class LocalJev:
         value = float(s.get("value_signal", 0.5))
         left = float(s.get("budget_left_ratio", 1.0))
         tokens = int(s.get("est_tokens", 0))
-        size = 1.0 / (1.0 + tokens / 50_000)
-        return self._noul("worth_spending", value * (0.4 + 0.6 * left) * size + 0.1 * value)
+        p = value * (0.4 + 0.6 * left) / (1.0 + tokens / 50_000) + 0.1 * value
+        if s.get("pergunta_validada") and int(s.get("fila_do_developer", 1)) == 0 and left > 0.1:
+            p = max(p, 0.7)          # pergunta já validada pelo Jev e Developer parado: parar aqui trava a evolução
+        return self._noul("worth_spending", p)
 
     def _q_should_evolve(self, q, s):
         n = int(s.get("occurrences", 0))
@@ -804,7 +806,9 @@ class DecisionLayer:
                  **{k: v for k, v in context.items() if k not in ("est_tokens", "value_signal")}}
         d = self.ask("worth_spending", Question(
             "noul", f"Vale a pena gastar ~{est} tokens agora na ação '{action}', dado o valor esperado e o orçamento restante?",
-            SN("a ação tem valor claro (`value_signal` alto) e o orçamento que sobra (`budget_left_ratio`) cobre o gasto com folga",
+            SN("a ação tem valor claro (`value_signal` alto) e o orçamento que sobra (`budget_left_ratio`) cobre o gasto com folga; "
+               "ou existe uma pergunta já validada pelo Jev (`pergunta_validada`) esperando virar trabalho com a fila do Developer "
+               "vazia (`fila_do_developer` = 0) e o orçamento cobre o gasto",
                "o valor esperado é baixo, ou o orçamento restante está apertado para o que a ação custa")), state)
         if est > 0 and not self.budget.can_spend(est):
             return Gate(False, d, thr, "orçamento insuficiente (hard limit)")

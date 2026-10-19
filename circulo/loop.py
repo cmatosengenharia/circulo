@@ -457,6 +457,14 @@ class Circle:
                      "regra: rodízio de manutenção, a mais esquecida primeiro")
             if est > 0:   # só pergunta ao Jev quando há gasto
                 contexto.update({"est_tokens": est, "value_signal": VALOR.get(pick, 0.6)})
+                if pick == "planejar_roteiro":
+                    from . import indagador
+                    pv = indagador.espiar(s, "loop")
+                    if pv:   # a pergunta já passou pelo Jev: o gasto é para respondê-la, e o valor vem da classificação dela
+                        contexto.update({"pergunta_validada": pv["texto"][:200], "eixo": pv["eixo"],
+                                         "pertinencia": pv["pertinencia"], "fila_do_developer": 0 if self.self_dev is None or
+                                         self.self_dev.pick() is None else 1,
+                                         "value_signal": max(VALOR.get(pick, 0.6), round(0.6 + 0.35 * float(pv["pertinencia"] or 0), 3))})
                 if pick == "corrigir_codigo" and self.self_dev is not None:
                     item = self.self_dev.alvo()
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente

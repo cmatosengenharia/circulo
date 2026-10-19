@@ -217,6 +217,13 @@ def rodar(ctx, engine=None) -> dict | None:
 
 
 # ------------------------------------------------------------------ consumo: quem parte da pergunta válida
+def espiar(store, cerebro: str) -> dict | None:
+    """A melhor pergunta válida esperando, sem consumir (o porteiro do gasto vê o que o gasto vai responder)."""
+    r = store.one("SELECT id, texto, eixo, pertinencia, acionavel, created_at FROM perguntas WHERE cerebro=? AND status='valida' "
+                  "ORDER BY score DESC, id LIMIT 1", (cerebro,))
+    return dict(r) if r else None
+
+
 def proxima(store, cerebro: str) -> dict | None:
     """A melhor pergunta validada pelo Jev para este cérebro, marcada como 'feita' (quem consome liga ao item)."""
     r = store.one("SELECT * FROM perguntas WHERE cerebro=? AND status='valida' ORDER BY score DESC, id LIMIT 1", (cerebro,))

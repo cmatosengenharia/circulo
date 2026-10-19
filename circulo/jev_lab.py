@@ -36,7 +36,9 @@ def _worth(q, state: Mapping[str, Any]):
     return Question("noul", "The autonomous loop wants to run `action` now, costing about `est_tokens` tokens. `value_signal` is the "
                             "expected value of this task (0 to 1) and `budget_left_ratio` is the share of today's token budget still "
                             "available. Is running it now worth it?",
-                    {"true": "the task has clear value (`value_signal` high) and the remaining budget comfortably covers its cost",
+                    {"true": "the task has clear value (`value_signal` high) and the remaining budget comfortably covers its cost; or a "
+                             "question already validated by the Jev (`pergunta_validada`) is waiting to become work while the "
+                             "developer queue is empty (`fila_do_developer` = 0) and the budget covers the cost",
                      "false": "the expected value is low, or the remaining budget is tight for what the task costs"})
 
 

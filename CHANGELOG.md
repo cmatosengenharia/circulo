@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.23.1 — 2026-10-18
+
+- **Pergunta validada pelo Jev agora vira trabalho.** No Mac, 3 perguntas válidas do Indagador ficaram paradas: o
+  planejador (quem as transforma em item) era escolhido, mas o porteiro do gasto o barrava (Jev 0,32–0,37 < 0,40)
+  sem saber que havia pergunta validada esperando e o Developer sem fila. Agora o porteiro recebe `pergunta_validada`,
+  `eixo`, `pertinencia` e `fila_do_developer`; o valor vem da pertinência que o próprio Jev deu; o critério do "sim"
+  descreve essa situação (também na variante em inglês do laboratório); a regra local, quando decide, não trava o
+  planejador nesse caso. `indagador.espiar` mostra a pergunta sem consumi-la.
+
 ## 1.23.0 — 2026-10-18
 
 **Fluxo ao vivo no padrão do mercado (grafo + raias + obras) e a fila do Developer com folga.**
