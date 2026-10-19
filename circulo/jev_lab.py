@@ -186,9 +186,10 @@ def resumo(store, now: float | None = None) -> dict:
     now = now or time.time()
     try:
         perguntas = [dict(r) for r in store.q(
-            "SELECT question pergunta, COUNT(*) n, SUM(source='jev') jev, SUM(source='local') regra, SUM(source='llm') llm, "
-            "ROUND(AVG(CASE WHEN source='jev' THEN confidence END), 3) conf_jev FROM decisions WHERE created_at>=? "
-            "GROUP BY question ORDER BY n DESC LIMIT 12", (now - 86400,))]
+            "SELECT pergunta, COUNT(*) n, SUM(source='jev') jev, SUM(source='local') regra, SUM(source='llm') llm, "
+            "ROUND(AVG(CASE WHEN source='jev' THEN confidence END), 3) conf_jev FROM (SELECT CASE WHEN question LIKE 'indaga_%' "
+            "THEN substr(question, 1, length(question) - length(substr(question, instr(substr(question, 8), '_') + 7))) ELSE question END pergunta, "
+            "source, confidence FROM decisions WHERE created_at>=?) GROUP BY pergunta ORDER BY n DESC LIMIT 12", (now - 86400,))]
     except Exception:  # noqa: BLE001
         perguntas = []
     at = ativas(store)

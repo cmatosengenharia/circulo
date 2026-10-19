@@ -102,6 +102,32 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .nota{font-size:12.5px;color:var(--muted);margin-top:8px}
 .embed .back,.embed .cab{display:none}
 .embed .wrap{padding-top:4px}
+.raias{padding:12px 14px}
+.raias .cab2{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.raias .tot{font-size:12.5px;color:var(--muted)}
+.giros{display:flex;flex-wrap:wrap;gap:6px}
+.giros button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;cursor:pointer;color:var(--ink);font:inherit;font-size:12px;font-weight:600}
+.giros button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+.giros button.bad{border-color:var(--bad);color:var(--bad)}
+.raias svg{display:block;width:100%;height:auto}
+.raias .rot{font-size:12px;font-weight:600;fill:var(--muted)}
+.raias .eixo{stroke:var(--line);stroke-width:1}
+.raias .eixo-t{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.raias .lane{stroke:var(--line);stroke-dasharray:2 6;stroke-width:1}
+.raias .span{fill:var(--ok-soft);stroke:var(--ok);stroke-width:1.5;cursor:pointer}
+.raias .span.bad{fill:var(--bad-soft);stroke:var(--bad)}
+.raias .span.aberto{stroke-dasharray:4 3}
+.raias .span:hover,.raias .span.sel{stroke-width:3}
+.raias .mk{fill:var(--jev)} .raias .mk.duvida{fill:var(--idle)} .raias .mk.llm{fill:var(--llm)}
+.raias .passo{font-size:11px;fill:var(--ink);pointer-events:none}
+.detalhe{font-size:13px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);min-height:20px}
+.detalhe b{font-weight:700}
+.obras{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+.obra{padding:12px 14px}
+.obra .q{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.obra .t{font-weight:700;margin:4px 0 2px;line-height:1.3}
+.obra .e{font-size:12.5px;color:var(--muted)}
+.obra a{font-size:12.5px;font-weight:600}
 @media (max-width:600px){.no text.rot{display:none}.no.ativo text.rot{display:block;font-size:22px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -144,6 +170,16 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
     </div>
   </div>
 
+  <h2>Raias do giro <span style="text-transform:none;letter-spacing:0;font-weight:500">(quem trabalhou, quanto tempo, e o que passou pelo Jev e pela LLM em cada trecho)</span></h2>
+  <div class="card raias" id="raias">
+    <div class="cab2"><div class="giros" id="giros" role="group" aria-label="Giros recentes"></div><div class="tot" id="raiasTot"></div></div>
+    <svg id="raiasSvg" role="img" aria-label="Linha do tempo do giro, uma raia por agente"></svg>
+    <div class="detalhe" id="raiasDet">Clique num trecho para ver o que o agente fez ali.</div>
+  </div>
+
+  <h2>O que cada agente construiu <span style="text-transform:none;letter-spacing:0;font-weight:500">(a última obra concreta de cada um, com o link quando existe)</span></h2>
+  <div class="obras" id="obras"></div>
+
   <h2>Agentes <span style="text-transform:none;letter-spacing:0;font-weight:500">(o que cada um faz e como está indo nas últimas 24 h)</span></h2>
   <div class="agentes" id="agentes"></div>
 
@@ -159,10 +195,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const NS = "http://www.w3.org/2000/svg";
 const C = {x: 400, y: 318, r: 262};
 const EXT_POS = {jev: [400, 300], llm: [300, 430], github: [500, 430]};
-const ORDEM = ["orquestrador", "pedido", "decisao", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
+const ORDEM = ["orquestrador", "pedido", "decisao", "indagar", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
                "revisar_prs", "evoluir_projeto", "conectar_missoes", "analisar_padroes", "revisar_baixa_confianca", "rodar_regressao",
                "resumo", "propor_feature", "evoluir_harness", "jardinagem", "meta_learner", "shadow", "licoes", "saude"];
-const ICONE = {orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
+const ICONE = {indagar: "¿", orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
   corrigir_codigo: "</>", revisar_prs: "✓", evoluir_projeto: "★", conectar_missoes: "⇄", analisar_padroes: "≋", revisar_baixa_confianca: "↺",
   rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", jardinagem: "✿", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
   jev: "Jev", llm: "LLM", github: "Git"};
@@ -310,7 +346,7 @@ function renderAgentes(lista) {
 
 function renderJev(j) {
   const PERG = {worth_spending: "Vale gastar agora?", idle_task: "Qual tarefa agora?", should_evolve: "A evidência justifica evoluir?",
-    pick_model: "Qual modelo basta?", review_code: "O PR pode entrar?", should_run_idle: "Vale rodar a manutenção?", evidencia_sustenta: "A evidência sustenta?"};
+    pick_model: "Qual modelo basta?", review_code: "O PR pode entrar?", should_run_idle: "Vale rodar a manutenção?", evidencia_sustenta: "A evidência sustenta?", indaga_pert: "Indagador: a pergunta é pertinente?", indaga_eixo: "Indagador: que eixo evolui?", indaga_acao: "Indagador: dá para agir?", pergunta_evolucao: "Qual pergunta do conselho?", dado_na_evidencia: "O dado está na evidência?"};
   const linhas = (j.perguntas || []).map(p => `<div class="lin"><span title="${esc(p.pergunta)}">${esc(PERG[p.pergunta] || p.pergunta.replace(/_/g, " "))}
       <span style="color:var(--muted);font-size:12px">· Jev ${p.jev || 0} · regra ${p.regra || 0}${p.llm ? " · LLM " + p.llm : ""}</span></span>
       <span class="barra" title="confiança média do Jev"><b style="width:${Math.round((p.conf_jev || 0) * 100)}%"></b></span>
@@ -334,6 +370,73 @@ function renderJev(j) {
       citam campos do estado ${Math.round(cob.por_regra.referencia_estado * 100)}%${cob.faltam.filter(f => f.falta.includes("criterios")).length ? ` · sem critérios: ${cob.faltam.filter(f => f.falta.includes("criterios")).map(f => esc(f.onde)).join(", ")}` : ""}</div>` : "";
   $("#jevLab").innerHTML = cobHtml + `<b>Laboratório: melhores formas de perguntar</b>
     <div class="nota">A doc do Jev recomenda inglês e a condição explícita. Cada pergunta abaixo vai em dobro na mesma chamada (custo quase zero): a atual e a variante. Com ${j.min_n} pares e ganho de ${Math.round(j.ganho_min * 100)} pontos de confiança, a variante vira a oficial sozinha; se o ganho sumir, volta.</div>${labs}`;
+}
+
+// ---------------------------------------------------------------- raias do giro
+let giroSel = null, seguirVivo = true, giroAtual = null;
+function fmtRel(ms) { return ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : `${(ms / 60000).toFixed(1).replace(".", ",")} min`; }
+function renderGiros(rec) {
+  $("#giros").innerHTML = `<button type="button" data-run="" aria-pressed="${seguirVivo}">ao vivo</button>` +
+    rec.map(g => `<button type="button" data-run="${esc(g.run_id)}" aria-pressed="${!seguirVivo && giroSel === g.run_id}" class="${g.falhas ? "bad" : ""}" title="${g.passos} passos · ${fmtRel(g.duracao_ms)}${g.tarefas.length ? " · " + g.tarefas.join(", ") : ""}">giro ${g.tick}</button>`).join("");
+  document.querySelectorAll("#giros button").forEach(b => b.onclick = () => { seguirVivo = !b.dataset.run; giroSel = b.dataset.run || null; carregarGiro(); });
+}
+function renderRaias(g) {
+  giroAtual = g;
+  const svg = $("#raiasSvg"); svg.innerHTML = "";
+  if (!g || !g.intervalos.length) { svg.setAttribute("viewBox", "0 0 800 40"); $("#raiasTot").textContent = "Nenhum giro registrado ainda."; return; }
+  const L = 150, W = 900, H0 = 26, LH = 30, lanes = g.raias.map(r => r.id), H = H0 + lanes.length * LH + 8;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const t0 = g.inicio, dur = Math.max(0.05, g.fim - g.inicio), X = t => L + (t - t0) / dur * (W - L - 12);
+  // eixo do tempo
+  const ticks = 5;
+  for (let i = 0; i <= ticks; i++) { const x = L + i * (W - L - 12) / ticks; el("line", {x1: x, y1: H0 - 6, x2: x, y2: H, class: "eixo"}, svg);
+    const t = el("text", {x, y: 12, class: "eixo-t", "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle"}, svg); t.textContent = fmtRel(dur * 1000 * i / ticks); }
+  lanes.forEach((k, i) => {
+    const y = H0 + i * LH + LH / 2;
+    el("line", {x1: L, y1: y, x2: W - 12, y2: y, class: "lane"}, svg);
+    const r = el("text", {x: L - 10, y: y + 4, class: "rot", "text-anchor": "end"}, svg); r.textContent = `${ICONE[k] || "•"} ${nome(k)}`;
+  });
+  g.intervalos.forEach((s, idx) => {
+    const i = lanes.indexOf(s.agente), y = H0 + i * LH + 5, x1 = X(s.inicio), x2 = Math.max(x1 + 3, X(s.fim));
+    const ruim = s.falhas.length || s.erros.length;
+    const rc = el("rect", {x: x1, y, width: x2 - x1, height: LH - 10, rx: 6, class: `span ${ruim ? "bad" : ""} ${s.aberto ? "aberto" : ""}`, tabindex: 0, role: "button",
+      "aria-label": `${s.nome}: ${s.texto} (${fmtRel(s.ms)})`}, svg);
+    rc.addEventListener("click", () => detalhar(idx, rc)); rc.addEventListener("keydown", e => { if (e.key === "Enter") detalhar(idx, rc); });
+    // marcas: perguntas ao Jev (roxo; cinza quando a regra decidiu) e LLM (âmbar), distribuídas no trecho
+    const n = s.jev + s.llm; let m = 0;
+    for (let j = 0; j < s.jev; j++, m++) el("circle", {cx: x1 + (m + 1) * (x2 - x1) / (n + 1), cy: y + LH - 10 - 4, r: 2.5, class: `mk ${j < s.jev_duvida ? "duvida" : ""}`}, svg);
+    for (let j = 0; j < s.llm; j++, m++) el("circle", {cx: x1 + (m + 1) * (x2 - x1) / (n + 1), cy: y + LH - 10 - 4, r: 3, class: "mk llm"}, svg);
+    if (x2 - x1 > 60) { const t = el("text", {x: x1 + 6, y: y + 13, class: "passo"}, svg); t.textContent = (s.texto || "").slice(0, Math.floor((x2 - x1) / 6.5)); }
+    // passagem de bastão: traço vertical até a raia seguinte
+    const nx = g.intervalos[idx + 1]; if (nx) { const j = lanes.indexOf(nx.agente); if (j !== i) el("line", {x1: x2, y1: y + (LH - 10) / 2, x2: x2, y2: H0 + j * LH + LH / 2, class: "eixo"}, svg); }
+  });
+  const t = g.totais;
+  $("#raiasTot").textContent = `giro ${g.tick}${g.aberto ? " (em andamento)" : ""} · ${fmtRel(g.duracao_ms)} · ${g.intervalos.length} passagens · ${t.jev} pergunta(s) ao Jev${t.jev_duvida ? ` (${t.jev_duvida} em dúvida)` : ""} · ${t.llm_tokens ? t.llm_tokens.toLocaleString("pt-BR") + " tokens de LLM" : "sem LLM"}${t.falhas ? ` · ${t.falhas} falha(s)` : ""}${t.erros ? ` · ${t.erros} erro(s)` : ""}`;
+}
+function detalhar(idx, rc) {
+  document.querySelectorAll(".span.sel").forEach(x => x.classList.remove("sel")); rc.classList.add("sel");
+  const s = giroAtual.intervalos[idx];
+  const partes = [`<b>${esc(s.nome)}</b> · ${fmtRel(s.ms)} · ${new Date(s.inicio * 1000).toLocaleTimeString("pt-BR")}`, esc(s.texto)];
+  if (s.jev) partes.push(`${s.jev} pergunta(s) ao Jev${s.jev_duvida ? `, ${s.jev_duvida} em dúvida (a regra decidiu)` : ""}`);
+  if (s.llm) partes.push(`${s.llm} chamada(s) de LLM, ${s.llm_tokens.toLocaleString("pt-BR")} tokens`);
+  if (s.verificacoes) partes.push(`${s.verificacoes} verificação(ões)${s.falhas.length ? `; reprovadas: ${s.falhas.map(esc).join(" · ")}` : ", todas aprovadas"}`);
+  if (s.erros.length) partes.push(`<span style="color:var(--bad)">erro: ${s.erros.map(esc).join(" · ")}</span>`);
+  $("#raiasDet").innerHTML = partes.join("<br>");
+}
+async function carregarGiro() {
+  try {
+    const r = await fetch("/api/fluxo/giro" + (seguirVivo || !giroSel ? "" : "?run=" + encodeURIComponent(giroSel))), j = await r.json();
+    renderGiros(j.recentes || []); renderRaias(j.giro);
+  } catch (e) { /* tenta de novo */ }
+}
+function renderObras(lista) {
+  $("#obras").innerHTML = lista.map(o => `<div class="card obra"><div class="q">${esc(ICONE[o.agente] || "•")} ${esc(o.nome)}</div>
+    <div class="t">${esc(o.titulo)}</div>${o.estado ? `<div class="e">${esc(o.estado)}</div>` : ""}
+    <div class="e">${o.em ? ha(o.em) : ""}${o.link ? ` · <a href="${esc(o.link)}" target="_blank" rel="noopener">abrir</a>` : ""}</div></div>`).join("") ||
+    `<div class="card obra"><div class="e">Nada construído ainda.</div></div>`;
+}
+async function carregarObras() {
+  try { const j = await (await fetch("/api/fluxo/obras")).json(); renderObras(j.obras || []); } catch (e) { /* tenta de novo */ }
 }
 
 async function carregar() {
@@ -365,6 +468,8 @@ document.querySelectorAll(".vel button").forEach(b => b.onclick = () => {
 if (new URLSearchParams(location.search).get("embed")) document.body.classList.add("embed");
 carregar().then(conectar);
 setInterval(carregar, 10000);
+carregarGiro(); setInterval(carregarGiro, 4000);
+carregarObras(); setInterval(carregarObras, 20000);
 fetch("/api/projetos").then(r => r.json()).then(j => { const z = (j.projetos || []).find(p => p.kit === "circulo"); if (z) $("#linkLoop").href = "/missao/" + z.id; }).catch(() => {});
 </script>
 </body>

@@ -113,3 +113,20 @@ def test_painel_mostra_o_indagador(circle, painel):  # noqa: F811
     from circulo.projects import kit_project_id
     with urllib.request.urlopen(painel + f"/missao/{kit_project_id(circle.store, 'circulo')}", timeout=5) as r:
         assert 'id="indag"' in r.read().decode()
+
+
+def test_planejador_mantem_fila_com_folga(circle):
+    """O Developer nunca espera: com menos de FOLGA itens na fila, o planejador pode planejar mesmo com o Developer ocupado."""
+    from circulo import planejador as pl
+    s = circle.store
+    agora = time.time()
+    p = circle.planejador
+    if p.dev is None or circle.ctx.dl.llm is None:
+        return                                            # sem LLM/Developer o planejador não roda de qualquer jeito
+    s.set("planejador", {"em": 0})
+    for i in range(pl.FOLGA):
+        s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+            (f"item {i}", "d", "loop", "pendente", "e", i, agora, agora))
+    assert not p.precisa()                                # fila cheia: não planeja
+    s.x("UPDATE roadmap SET status='feito'")
+    assert p.precisa() or p.dev.em_espera()               # fila vazia: planeja (salvo Claude Code no limite)

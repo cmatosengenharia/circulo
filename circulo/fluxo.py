@@ -266,3 +266,118 @@ def agora(store: Store) -> dict:
 def visao(store: Store) -> dict:
     from .jev_lab import resumo as jev_resumo
     return {"agora": agora(store), "agentes": agentes(store), "jev": jev_resumo(store), "gerado_em": time.time()}
+
+
+# ------------------------------------------------------------------ raias do giro (o padrão do mercado para "quem fez o quê, quando")
+# Honeycomb (Agent Timeline), Langfuse e LayerLens mostram o mesmo trio: grafo da topologia, raias por agente com os
+# intervalos em escala de tempo (passagens de bastão visíveis) e um painel do que cada passo produziu. O círculo com a
+# bolinha é o grafo; isto são as raias; `obras` é o que cada um construiu.
+
+def giros_recentes(store: Store, n: int = 12) -> list[dict]:
+    rows = store.q("SELECT run_id, MIN(tick) tick, MIN(em) ini, MAX(em) fim, COUNT(*) passos FROM trail WHERE run_id IS NOT NULL "
+                   "GROUP BY run_id ORDER BY ini DESC LIMIT ?", (n,))
+    out = []
+    for r in rows:
+        falhas = store.one("SELECT COUNT(*) n FROM verificacoes WHERE ok=0 AND created_at BETWEEN ? AND ?", (r["ini"], r["fim"] + 1))["n"]
+        tarefas = [t["tarefa"] for t in store.q("SELECT DISTINCT tarefa FROM trail WHERE run_id=? AND tarefa IS NOT NULL", (r["run_id"],))]
+        out.append({"run_id": r["run_id"], "tick": r["tick"], "inicio": r["ini"], "fim": r["fim"], "duracao_ms": round((r["fim"] - r["ini"]) * 1000),
+                    "passos": r["passos"], "falhas": falhas, "tarefas": tarefas})
+    return out
+
+
+def giro(store: Store, run_id: str | None = None) -> dict:
+    """As raias de um giro: um intervalo por passagem de agente, com o que ele fez, as perguntas ao Jev, as chamadas
+    de LLM, as verificações e os erros dentro do intervalo. Sem run_id: o giro mais recente."""
+    if run_id is None:
+        r = store.one("SELECT run_id FROM trail WHERE run_id IS NOT NULL ORDER BY seq DESC LIMIT 1")
+        run_id = r["run_id"] if r else None
+    if not run_id:
+        return {"run_id": None, "raias": [], "intervalos": []}
+    rows = store.q("SELECT seq, tick, etapa, tarefa, detalhe, project_id, em FROM trail WHERE run_id=? ORDER BY seq", (run_id,))
+    if not rows:
+        return {"run_id": run_id, "raias": [], "intervalos": []}
+    ini, fim = rows[0]["em"], rows[-1]["em"]
+    agora = time.time()
+    aberto = (agora - fim) < 120 and rows[-1]["etapa"] not in ("descanso", "pausado")
+    fim_real = agora if aberto else fim
+    decs = store.q("SELECT question, source, confidence, created_at FROM decisions WHERE created_at BETWEEN ? AND ? ORDER BY id", (ini - 0.01, fim_real + 1))
+    llms = store.q("SELECT papel, tokens, ok, created_at FROM llm_calls WHERE created_at BETWEEN ? AND ?", (ini - 0.01, fim_real + 1))
+    vers = store.q("SELECT ponto, ok, motivo, created_at FROM verificacoes WHERE created_at BETWEEN ? AND ?", (ini - 0.01, fim_real + 1))
+    errs = store.q("SELECT stage etapa, message erro, em FROM run_errors WHERE run_id=?", (run_id,))
+    intervalos, raias = [], []
+    for i, t in enumerate(rows):
+        ag = _agente_da_trilha(t["etapa"], t["tarefa"])
+        if ag in (None, "descanso", "pausado"):
+            continue
+        a, b = t["em"], (rows[i + 1]["em"] if i + 1 < len(rows) else fim_real)
+        b_fim = b + (0.5 if i + 1 >= len(rows) else 0)
+        d_in = [d for d in decs if a <= d["created_at"] < b_fim]
+        l_in = [x for x in llms if a <= x["created_at"] < b_fim]
+        v_in = [v for v in vers if a <= v["created_at"] < b_fim]
+        e_in = [e for e in errs if a <= e["em"] < b_fim]
+        if ag not in raias:
+            raias.append(ag)
+        intervalos.append({"agente": ag, "nome": nome_do_agente(ag), "inicio": a, "fim": b, "ms": round((b - a) * 1000),
+                           "texto": t["detalhe"] or FAZ.get(ag, ""), "projeto": t["project_id"],
+                           "jev": len(d_in), "jev_duvida": sum(1 for d in d_in if d["source"] == "local"),
+                           "llm_tokens": sum(int(x["tokens"] or 0) for x in l_in), "llm": len(l_in),
+                           "falhas": [v["ponto"] + (": " + v["motivo"][:80] if v["motivo"] else "") for v in v_in if not v["ok"]],
+                           "verificacoes": len(v_in), "erros": [str(e["erro"])[:120] for e in e_in],
+                           "aberto": aberto and i + 1 >= len(rows)})
+    return {"run_id": run_id, "tick": rows[0]["tick"], "inicio": ini, "fim": fim_real, "aberto": aberto, "duracao_ms": round((fim_real - ini) * 1000),
+            "raias": [{"id": k, "nome": nome_do_agente(k)} for k in raias], "intervalos": intervalos,
+            "totais": {"jev": len(decs), "jev_duvida": sum(1 for d in decs if d["source"] == "local"), "llm_tokens": sum(int(x["tokens"] or 0) for x in llms),
+                       "falhas": sum(1 for v in vers if not v["ok"]), "erros": len(errs)}}
+
+
+# ------------------------------------------------------------------ o que cada agente construiu
+def obras(store: Store) -> list[dict]:
+    """A última coisa concreta que cada agente produziu, com link quando existe (PR, item, lição, versão)."""
+    import os
+    repo = os.environ.get("CIRCULO_REPO", "")
+    gh = f"https://github.com/{repo}" if repo else None
+    out = []
+
+    def add(ag, titulo, estado=None, em=None, link=None, detalhe=None):
+        out.append({"agente": ag, "nome": nome_do_agente(ag), "titulo": titulo, "estado": estado, "em": em, "link": link, "detalhe": detalhe})
+
+    pr = store.one("SELECT number, titulo, status, updated_at FROM prs ORDER BY updated_at DESC LIMIT 1")
+    if pr:
+        add("corrigir_codigo", f"PR #{pr['number']}: {pr['titulo']}", pr["status"], pr["updated_at"], f"{gh}/pull/{pr['number']}" if gh else None)
+    m = store.one("SELECT pr, merged, reason, created_at FROM merges ORDER BY id DESC LIMIT 1")
+    if m:
+        add("revisar_prs", f"PR #{m['pr']}: {'mergeado' if m['merged'] else 'devolvido'}", m["reason"][:120], m["created_at"],
+            f"{gh}/pull/{m['pr']}" if gh else None)
+    it = store.one("SELECT id, titulo, status, updated_at FROM roadmap WHERE origem='loop' ORDER BY id DESC LIMIT 1")
+    if it:
+        add("planejar_roteiro", f"Item #{it['id']}: {it['titulo']}", it["status"], it["updated_at"])
+    es = store.one("SELECT id, titulo, estudo, updated_at FROM roadmap WHERE estudo IS NOT NULL ORDER BY updated_at DESC LIMIT 1")
+    if es:
+        try:
+            ver = json.loads(es["estudo"]).get("veredito")
+        except (TypeError, ValueError):
+            ver = None
+        add("estudar_pedido", f"Item #{es['id']}: {es['titulo']}", f"veredito: {ver}" if ver else "estudado", es["updated_at"])
+    corpo = store.get("corpo") or {}
+    if corpo.get("sha"):
+        add("atualizar_corpo", f"Rodando {corpo['sha'][:7]}", f"{corpo.get('estado')} · {corpo.get('giros_ok', 0)} giro(s) sem erro",
+            corpo.get("checado_em"), f"{gh}/commit/{corpo['sha']}" if gh else None)
+    pq = store.one("SELECT texto, status, eixo, created_at FROM perguntas WHERE eixo IS NOT NULL ORDER BY id DESC LIMIT 1")
+    if pq:
+        add("indagar", pq["texto"][:140], f"{pq['status']} · eixo {pq['eixo']}", pq["created_at"])
+    li = store.one("SELECT id, descricao, status, classe, updated_at FROM licoes ORDER BY id DESC LIMIT 1")
+    if li:
+        add("licoes", f"Lição #{li['id']}: {li['descricao'][:120]}", f"{li['status']} · {li['classe']}", li["updated_at"])
+    cy = store.one("SELECT c.project_id, c.aceita, c.ganho, c.created_at, p.nome FROM cycles c JOIN projects p ON p.id=c.project_id ORDER BY c.id DESC LIMIT 1")
+    if cy:
+        add("evoluir_projeto", f"{cy['nome']}: ciclo {'aceito' if cy['aceita'] else 'rejeitado'}", f"ganho {float(cy['ganho'] or 0):+.3f}", cy["created_at"],
+            f"/missao/{cy['project_id']}")
+    pres = store.one("SELECT id, status, created_at FROM proposals ORDER BY id DESC LIMIT 1")
+    if pres:
+        add("meta_learner", f"Proposta #{pres['id']}", pres["status"], pres["created_at"])
+    feitos = {o["agente"] for o in out}
+    for a in agentes(store):
+        if a.get("externo") or a["id"] in feitos or not a.get("ultimo"):
+            continue
+        add(a["id"], a["ultimo"]["texto"] or a["faz"], None, a["ultimo"]["em"])
+    return out

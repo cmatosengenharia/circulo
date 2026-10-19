@@ -23,6 +23,7 @@ from .decision import Question, norm
 
 MAX_POR_DIA = 6
 INTERVALO = 1800
+FOLGA = 2                 # itens prontos ou a caminho na fila antes de o planejador parar de planejar
 EST_TOKENS = 3000
 MAX_TOKENS = 1500   # lição: com 700 a resposta (em português, detalhada) era cortada e o JSON ficava inválido
 
@@ -61,11 +62,14 @@ class Planejador:
     def precisa(self) -> bool:
         if self.dev is None or self.ctx.dl.llm is None:
             return False
-        if self.dev.busy() or self.dev.em_espera() or self.dev.pick() is not None:
+        if self.dev.em_espera():
+            return False          # Claude Code no limite: planejar agora só acumula
+        # fila com folga: o Developer trabalha num item enquanto o próximo já está planejado e estudado. Planeja quando
+        # há menos de FOLGA itens prontos ou a caminho (pendentes do loop/seus, estudados ou esperando estudo).
+        fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop') "
+                          "AND evidencia NOT LIKE '%depende de você%'")["n"]
+        if fila >= FOLGA:
             return False
-        est = getattr(self, "estudo", None)
-        if est is not None and est.precisa():
-            return False          # há item esperando estudo: ainda não falta trabalho
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
             return False          # primeiro corrige os próprios erros, depois evolui

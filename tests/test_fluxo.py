@@ -134,3 +134,34 @@ def test_jardineiro_transforma_crescimento_em_item(circle, tmp_path):
     assert item["origem"] == "loop"
     jardineiro.podar(circle.store, pasta=pasta, now=agora + 7 * 86400 + 1)
     assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE titulo LIKE 'Jardineiro:%'")["n"] == 1   # sem duplicar
+
+
+def test_raias_do_giro_mostram_quem_fez_o_que_e_quando(circle, painel):  # noqa: F811
+    circle.tick()
+    g = fluxo.giro(circle.store)
+    assert g["run_id"] and g["intervalos"] and g["raias"][0]["id"] == "orquestrador"
+    assert all(s["fim"] >= s["inicio"] for s in g["intervalos"])
+    assert all(a["inicio"] <= b["inicio"] for a, b in zip(g["intervalos"], g["intervalos"][1:], strict=False))  # em ordem de tempo
+    assert any(s["jev"] for s in g["intervalos"]) and g["totais"]["jev"] >= 1                                   # o Jev aparece no trecho certo
+    rec = fluxo.giros_recentes(circle.store)
+    assert rec and rec[0]["run_id"] == g["run_id"] and "duracao_ms" in rec[0]
+    with urllib.request.urlopen(painel + "/api/fluxo/giro?run=" + g["run_id"], timeout=5) as r:
+        d = json.loads(r.read())
+    assert d["giro"]["run_id"] == g["run_id"] and d["recentes"]
+    with urllib.request.urlopen(painel + "/fluxo", timeout=5) as r:
+        html = r.read().decode()
+    assert 'id="raiasSvg"' in html and 'id="obras"' in html
+
+
+def test_obras_dizem_o_que_cada_agente_construiu(circle, painel):  # noqa: F811
+    s = circle.store
+    agora = __import__("time").time()
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", (7, None, "Teste novo no gate", "b", "mergeado", agora, agora))
+    s.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(?,?,?,?,?,?)", (7, "abc", 1, "todos os gates passaram", "{}", agora))
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,estudo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        ("Item do loop", "d", "loop", "pendente", "e", 1, json.dumps({"veredito": "adaptar"}), agora, agora))
+    obras = {o["agente"]: o for o in fluxo.obras(s)}
+    assert obras["corrigir_codigo"]["titulo"].startswith("PR #7") and obras["revisar_prs"]["titulo"].endswith("mergeado")
+    assert obras["planejar_roteiro"]["titulo"].startswith("Item #") and "adaptar" in obras["estudar_pedido"]["estado"]
+    with urllib.request.urlopen(painel + "/api/fluxo/obras", timeout=5) as r:
+        assert json.loads(r.read())["obras"]

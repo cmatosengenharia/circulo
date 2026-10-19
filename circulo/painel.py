@@ -315,6 +315,13 @@ def make_handler(db_path: str):
                 c = _C()
                 c.store = self._store()
                 self._json(Conselho(c).resumo())
+            elif u.path == "/api/fluxo/giro":
+                from .fluxo import giro, giros_recentes
+                st = self._store()
+                self._json({"giro": giro(st, (q.get("run") or [None])[0]), "recentes": giros_recentes(st)})
+            elif u.path == "/api/fluxo/obras":
+                from .fluxo import obras
+                self._json({"obras": obras(self._store()), "agora": time.time()})
             elif u.path == "/api/indagador":
                 from .indagador import resumo as indag
                 self._json(indag(self._store()))

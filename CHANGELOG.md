@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.23.0 — 2026-10-18
+
+**Fluxo ao vivo no padrão do mercado (grafo + raias + obras) e a fila do Developer com folga.**
+
+A validação nos dados do Mac (277 giros/24 h) mostrou a autoevolução funcionando de ponta a ponta (pergunta → item →
+estudo → Developer → PR → gate → merge → corpo), mas com o pipeline em fila única: o planejador só planejava quando a
+fila estava vazia, então a cada item o Developer esperava planejamento + estudo (~10 min).
+
+- **Fila com folga** (`planejador.FOLGA = 2`): o planejador planeja enquanto há menos de 2 itens prontos ou a caminho,
+  mesmo com o Developer ocupado; só não planeja com o Claude Code no limite ou com lição bloqueando.
+- **Raias do giro** (`/api/fluxo/giro`, `fluxo.giro`/`giros_recentes`): uma raia por agente, intervalos em escala de
+  tempo com as passagens de bastão, marcas das perguntas ao Jev (cinza quando a regra decidiu) e das chamadas de LLM,
+  falhas em vermelho, giro em andamento tracejado; seletor dos giros recentes ou "ao vivo"; clique no trecho abre o
+  detalhe. É o trio que Honeycomb (Agent Timeline), Langfuse (graph view) e LayerLens (AgentGraph) usam: grafo da
+  topologia, swimlanes e detalhe por passo.
+- **O que cada agente construiu** (`/api/fluxo/obras`): a última obra concreta de cada agente com link quando existe
+  (PR, merge, item, estudo e veredito, versão rodando, pergunta do Indagador, lição, ciclo da missão, proposta).
+- Indagador entra no círculo com o próprio ícone.
+- Testes: raias (ordem, Jev no trecho certo, API, HTML), obras, fila com folga.
+
 ## 1.22.0 — 2026-10-18
 
 **Indagador: o agente da autoevolução. As perguntas são o ponto de partida, e o Jev classifica cada uma.**
