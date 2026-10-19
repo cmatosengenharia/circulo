@@ -7,16 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#E9EDF1; --surface:#F7F9FB; --line:#D3DAE1; --ink:#17212B; --muted:#5E6B78;
-  --jev:#4B3FD1; --jev-soft:#E3E0FB; --llm:#B7791F; --llm-soft:#F6E8D2; --gh:#2B3440;
-  --ok:#1C8C6E; --ok-soft:#D7EEE7; --bad:#C0392B; --bad-soft:#F6DCD8; --idle:#AEB8C2; --node:#FFFFFF;
-}
-@media (prefers-color-scheme:dark){:root{
-  --bg:#10161D; --surface:#18212B; --line:#2A3542; --ink:#E6ECF2; --muted:#8A98A6;
-  --jev:#8E84FF; --jev-soft:#262249; --llm:#E0A53F; --llm-soft:#3A2C14; --gh:#C9D3DD;
-  --ok:#3FBF98; --ok-soft:#16352C; --bad:#F06A5B; --bad-soft:#3E1C19; --idle:#4A5765; --node:#1F2A36;
-}}
+:root{--bg:#E9EDF1;--surface:#F7F9FB;--line:#D3DAE1;--border:#7B8794;--hover:#E1E7ED;--ink:#17212B;--muted:#556270;--jev:#4B3FD1;--jev-soft:#E3E0FB;--llm:#8A5608;--llm-soft:#F6E6CC;--ok:#146B53;--ok-soft:#D3EDE4;--bad:#B02A1C;--bad-soft:#F8DBD6;--idle:#76828F;--gh:#2B3440;--node:#FFFFFF;--accent:#4B3FD1;--on-accent:#FFFFFF;}
+@media (prefers-color-scheme:dark){:root{--bg:#10161D;--surface:#18212B;--line:#2A3542;--border:#617080;--hover:#233140;--ink:#E6ECF2;--muted:#9AA8B5;--jev:#8E84FF;--jev-soft:#262249;--llm:#E0A53F;--llm-soft:#3A2C14;--ok:#3FBF98;--ok-soft:#16352C;--bad:#F06A5B;--bad-soft:#3E1C19;--idle:#7F8C9B;--gh:#C9D3DD;--node:#1F2A36;--accent:#8E84FF;--on-accent:#10161D;}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
@@ -74,7 +66,7 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .log li.llm .a::after{content:" → LLM";color:var(--llm);font-weight:600}
 .log li.erro .t,.log li.falha .t{color:var(--bad)}
 .legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);padding:2px 12px 10px}
-.legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.legenda b{color:var(--ink);font-weight:600}
 .vel{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);padding:10px 14px 0}
 .vel button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--ink);font:inherit;font-size:12px;font-weight:600}
 .vel button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
@@ -130,6 +122,37 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .obra a{font-size:12.5px;font-weight:600}
 @media (max-width:600px){.no text.rot{display:none}.no.ativo text.rot{display:block;font-size:22px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/*TEMA:ini*/
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
+.btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
+.btn:hover{background:var(--hover);border-color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent);filter:brightness(1.08);border-color:var(--ink)}
+.btn.perigo:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.btn:disabled,.btn[aria-disabled=true]{opacity:1;background:var(--bg);color:var(--muted);border:1.5px dashed var(--border);cursor:not-allowed;filter:none}
+.abas button,.vel button,.giros button,.seg button,.sugestoes button{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+.abas button{color:var(--muted)}
+.abas button:hover,.vel button:hover,.giros button:hover,.seg button:hover,.sugestoes button:hover{background:var(--hover);border-color:var(--ink);color:var(--ink)}
+.abas button[aria-pressed=true],.vel button[aria-pressed=true],.giros button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.giros button.bad{border-color:var(--bad);color:var(--bad)}
+.giros button.bad[aria-pressed=true]{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+input,select,textarea{border-color:var(--border)}
+form.ask input,.orc-form input,.ligar select,.paralelo select,.linha input,.campos input,form.busca input{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:focus,.linha input:focus,.campos input:focus,form.busca input:focus{border-color:var(--accent);outline:3px solid var(--accent);outline-offset:0}
+::placeholder{color:var(--muted);opacity:1}
+.chip{border:1px solid transparent}
+.legenda,.legend{color:var(--ink);font-size:13px;gap:8px 18px}
+.legenda span,.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:12px;height:12px;flex:none}
+.lg.c{border-radius:50%}.lg.d{transform:rotate(45deg) scale(.8)}.lg.q{border-radius:3px}.lg.a{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid currentColor}
+.lg.o{border-radius:50%;border:2px solid currentColor;background:transparent}.lg.t{border-radius:50%;border:2px dashed currentColor;background:transparent}
+.chip.ok::before{content:"✓";margin-right:4px;font-weight:800}
+.chip.bad::before{content:"✕";margin-right:4px;font-weight:800}
+.chip.jev::before{content:"◆";margin-right:4px;font-weight:800}
+.chip.warn::before{content:"!";margin-right:4px;font-weight:800}
+/*TEMA:fim*/
 </style>
 </head>
 <body>
@@ -145,12 +168,12 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
     <div class="card cena" id="cena">
       <svg id="svg" viewBox="0 0 800 660" role="img" aria-label="Agentes do loop em círculo, com o Jev no centro"></svg>
       <div class="legenda" aria-hidden="true">
-        <span><i style="background:var(--ok)"></i>passagem entre agentes</span>
-        <span><i style="background:var(--jev)"></i>pergunta ao Jev</span>
-        <span><i style="background:var(--idle)"></i>Jev em dúvida → a regra decidiu</span>
-        <span><i style="background:var(--llm)"></i>LLM</span>
-        <span><i style="background:var(--bad)"></i>falha</span>
-        <span><i style="border:2px dashed var(--jev);width:12px;height:12px"></i>agente novo</span>
+        <span style="color:var(--ok)"><i class="lg c" style="background:currentColor"></i><b>passagem entre agentes</b></span>
+        <span style="color:var(--jev)"><i class="lg d" style="background:currentColor"></i><b>pergunta ao Jev</b></span>
+        <span style="color:var(--idle)"><i class="lg o"></i><b>Jev em dúvida → a regra decidiu</b></span>
+        <span style="color:var(--llm)"><i class="lg q" style="background:currentColor"></i><b>LLM</b></span>
+        <span style="color:var(--bad)"><i class="lg a"></i><b>falha</b></span>
+        <span style="color:var(--jev)"><i class="lg t"></i><b>agente novo (tracejado)</b></span>
       </div>
     </div>
     <div class="lado">
@@ -247,18 +270,20 @@ function ativar(k, pulsar = true, ruim = false) {
   if (pulsar && !reduz) { const p = n.querySelector(".pulso"); p.classList.remove("on", "bad"); void p.getBBox(); if (ruim) p.classList.add("bad"); p.classList.add("on"); }
 }
 
-function voar(de, para, cor, ms) {
+const FORMAS = {c: "M-8,0a8,8 0 1,0 16,0a8,8 0 1,0 -16,0", d: "M0,-10L10,0L0,10L-10,0Z", q: "M-7,-7H7V7H-7Z", a: "M0,-10L9,7H-9Z", o: "M-8,0a8,8 0 1,0 16,0a8,8 0 1,0 -16,0"};
+// forma + cor: a cor sozinha não basta (daltonismo); cada tipo de passagem tem a sua forma, igual à legenda
+function voar(de, para, cor, ms, forma = "c") {
   return new Promise(res => {
     const a = pos[de], b = pos[para];
     if (!a || !b || de === para || reduz || !velocidade) return res();
-    const bola = el("circle", {r: 8, class: "bola", fill: cor, style: `color:${cor}`}, $("#svg"));
+    const bola = el("path", {d: FORMAS[forma] || FORMAS.c, class: "bola", fill: forma === "o" ? "var(--node)" : cor, stroke: forma === "o" ? cor : "var(--node)", "stroke-width": forma === "o" ? 3 : 1.5, style: `color:${cor}`}, $("#svg"));
     const t0 = performance.now(), dur = ms / velocidade;
     // arco leve, para a bolinha não cortar o centro em linha reta
     const mx = (a[0] + b[0]) / 2 + (C.y - (a[1] + b[1]) / 2) * 0.12, my = (a[1] + b[1]) / 2 - (C.x - (a[0] + b[0]) / 2) * 0.12;
     (function passo(t) {
       const u = Math.min(1, (t - t0) / dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
       const x = (1 - e) ** 2 * a[0] + 2 * (1 - e) * e * mx + e * e * b[0], y = (1 - e) ** 2 * a[1] + 2 * (1 - e) * e * my + e * e * b[1];
-      bola.setAttribute("cx", x); bola.setAttribute("cy", y);
+      bola.setAttribute("transform", `translate(${x},${y})`);
       if (u < 1) requestAnimationFrame(passo); else { bola.remove(); res(); }
     })(t0);
   });
@@ -288,18 +313,18 @@ async function tocar(e) {
     await espera(220);
   } else if (e.tipo === "decisao") {
     const de = atual && pos[atual] ? atual : e.agente;
-    await voar(de, "jev", css("--jev"), 380);
+    await voar(de, "jev", css("--jev"), 380, "d");
     ativar("jev");
     await espera(160);
-    await voar("jev", de, e.decidiu === "jev" ? css("--jev") : e.decidiu === "llm" ? css("--llm") : css("--idle"), 380);
+    await voar("jev", de, e.decidiu === "jev" ? css("--jev") : e.decidiu === "llm" ? css("--llm") : css("--idle"), 380, e.decidiu === "jev" ? "d" : e.decidiu === "llm" ? "q" : "o");
     ativar(de, false);
   } else if (e.tipo === "llm") {
     const de = e.agente && pos[e.agente] ? e.agente : atual;
-    await voar(de, "llm", css("--llm"), 420); ativar("llm", true, e.ok === false);
-    await voar("llm", de, e.ok === false ? css("--bad") : css("--llm"), 420); ativar(de, false);
+    await voar(de, "llm", css("--llm"), 420, "q"); ativar("llm", true, e.ok === false);
+    await voar("llm", de, e.ok === false ? css("--bad") : css("--llm"), 420, e.ok === false ? "a" : "q"); ativar(de, false);
   } else if (e.tipo === "verificacao") {
     const k = pos[e.agente] ? e.agente : atual;
-    if (e.para === "github") { await voar(k, "github", css("--gh"), 360); await voar("github", k, e.ok ? css("--ok") : css("--bad"), 360); }
+    if (e.para === "github") { await voar(k, "github", css("--gh"), 360); await voar("github", k, e.ok ? css("--ok") : css("--bad"), 360, e.ok ? "c" : "a"); }
     ativar(k, true, !e.ok);
     await espera(160);
   } else if (e.tipo === "erro") {

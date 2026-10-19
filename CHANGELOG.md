@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.25.0 — 2026-10-18
+
+**Cores, legendas e botões legíveis em todas as telas.** As cores estavam difíceis de ver: no modo claro o verde (3,96:1)
+e o âmbar (3,45:1) de texto ficavam abaixo do mínimo, o cinza de "inativo" (1,9:1) sumia e a borda dos botões (1,3:1)
+quase não aparecia.
+
+- **Um tema só** (`tema.py`): os mesmos tokens nas cinco telas (painel, home, fluxo, rastros, integrações), nos dois
+  modos. Texto e status ≥ 4,5:1; bordas, marcas e cores de legenda ≥ 3:1 (conferido por `tema.conferir()` e pelo teste).
+  `python -m circulo.tema` reescreve as páginas e é idempotente.
+- **Botões**: borda visível, hover, pressionado, desativado tracejado, botão principal com a cor de destaque, abas e
+  seletores com o estado ativo em tinta cheia, campos com borda e foco de 3 px (anel visível no teclado).
+- **Cor nunca é a única pista**: chips ganham glifo (✓ ✕ ! ◆); a legenda do fluxo usa formas (círculo, losango,
+  quadrado, triângulo, anel, tracejado) com texto em tinta, e a bolinha que viaja entre agentes usa a mesma forma da
+  legenda (passagem ●, Jev ◆, LLM ■, falha ▲, regra decidiu ○).
+- Cores fixas antigas do Vigia e das etapas do giro trocadas por tokens.
+
 ## 1.24.0 — 2026-10-18
 
 **Vigia: o validador paralelo das travas da autoevolução.** Para você não precisar perguntar no chat se o loop está
