@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.29.0 — 2026-10-19
+
+**Vários PRs do Developer em paralelo, com o Revisor validando cada um dentro do ecossistema.** (Mudança na constituição
+pedida por você.) Até aqui um PR por vez: medido no Mac, cada item esperava 60 a 90 min pela vaga enquanto um PR
+emperrava no CI. Agora o Developer abre até 3 PRs ao mesmo tempo e um agente novo garante que a paralelização não traz
+conflito nem quebra.
+
+- **Revisor** (`revisor.py`, agente novo, Jev First): antes de empurrar cada PR, no worktree, traz a main de agora para a
+  branch (conflito = rejeita), roda lint e testes de novo sobre ela (quebra = rejeita), compara os arquivos mudados com
+  os dos outros PRs abertos (arquivo compartilhado = rejeita; o mais antigo tem prioridade) e simula o merge com cada
+  branch aberta (`git merge-tree`). No gate, confere de novo o cruzamento com PRs mais antigos. O Jev classifica cada
+  revisão (`revisor_seguro`) com a evidência medida e decide o risco residual quando nada foi medido.
+- **Rejeitado = volta para a fila**: o PR não abre (ou é fechado, a branch fica) e o item volta a 'pendente' com o
+  motivo; se cruza com um PR aberto, só volta à fila do Developer depois que aquele PR fechar, e é refeito sobre a main
+  nova. Nada de conserto por cima de conflito.
+- **Estado por PR** na tabela `prs` (item, arquivos, conserto, consertos): o conserto de um PR reprovado no CI não
+  bloqueia os outros; o gate libera cada vaga ao mesclar. `self_dev_aberto` vira retrato (último PR + vagas) para
+  painel, Vigia e fluxo. Tabela `revisoes` guarda cada revisão.
+- Painel: card "Revisor: vários PRs em paralelo" (vagas em uso, PRs abertos com seus arquivos, últimas revisões) e
+  `/api/revisor`; o Revisor entra no fluxo ao vivo e nas obras.
+
 ## 1.28.0 — 2026-10-19
 
 **O loop não dorme 5 min com trabalho a caminho.** Varredura medida no Mac (3 h, 62 giros, 6 PRs mesclados): 121 dos

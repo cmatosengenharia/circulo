@@ -17,9 +17,9 @@ CONSTITUICAO = {"merge_gate", "policy", "budget", "guardrails", "self_dev", "cor
 # o que a constituição importa hoje de fora dela; crescer exige você mudar esta lista (e a constituição) de propósito
 CONSTITUICAO_PODE_IMPORTAR = {
     "budget": {"state"}, "guardrails": {"state"}, "policy": {"state"},
-    "merge_gate": {"agents", "licoes", "projects"},
+    "merge_gate": {"agents", "licoes", "projects", "revisor"},
     "corpo": {"licoes", "rastro"},
-    "self_dev": {"agents", "licoes", "neuronios", "projects", "rastro", "registro", "reproducao"},
+    "self_dev": {"agents", "licoes", "neuronios", "projects", "rastro", "registro", "reproducao", "revisor"},
 }
 ATUADORES = {"self_dev", "merge_gate", "corpo", "loop"}
 SOBEM_O_LOOP = {"cli", "demo", "confianca"}       # confianca só lê uma constante (ESTAGNADO)

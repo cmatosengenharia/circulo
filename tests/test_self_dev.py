@@ -74,7 +74,7 @@ def test_developer_corrige_erro_recorrente_e_abre_pr(circle, repo):
     assert branch.startswith("circulo/fix-") and gh.prs[0][1] == "main"
     assert "return a + b" in git(repo.parent / "origin.git", "show", f"{branch}:app.py")   # empurrado ao remoto
     assert circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"] == "PR #42"
-    assert dev.busy() and dev.run_once().status == "ocupado"                              # um PR por vez
+    assert not dev.busy() and len(dev.abertos()) == 1 and dev.run_once().status == "nada"   # vaga livre, mas fila vazia
     assert not (repo.parent / f".circulo-wt-{item['id']}").exists()                        # worktree limpo
     # Claude Code roda na assinatura: contado à parte, fora do orçamento de tokens da API (1.11.0)
     assert circle.ctx.budget.snapshot()["chamadas_llm"] == 0
@@ -300,7 +300,7 @@ def test_pr_reprovado_no_ci_volta_para_o_developer_consertar_e_entra(circle, rep
     assert dev.run_once().status == "proposto"
     [v] = gate.run()
     assert not v.merge and "falhando" in v.reason
-    assert dev.busy() and dev.tem_trabalho() and dev.alvo()["id"] == item["id"]
+    assert len(dev.abertos()) == 1 and dev.tem_trabalho() and dev.alvo()["id"] == item["id"]
     gate.run()                                                         # mesma versão: não devolve duas vezes
     r = dev.run_once()
     assert r.status == "consertado" and r.pr == 42
@@ -308,7 +308,7 @@ def test_pr_reprovado_no_ci_volta_para_o_developer_consertar_e_entra(circle, rep
     assert git(repo.parent / "origin.git", "show", f"{gh.branch}:CONSERTO.txt") == "lint corrigido"   # mesma branch
     assert not dev.tem_trabalho()                                      # agora espera o CI
     [v] = gate.run()
-    assert v.merge and not dev.busy()
+    assert v.merge and dev.abertos() == []
     assert circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))["evidencia"] == "PR #42 mergeado"
 
 
@@ -322,7 +322,7 @@ def test_pr_do_developer_sem_teste_volta_para_conserto(circle, repo):
                                  for i, n in enumerate(__import__("circulo.merge_gate", fromlist=["x"]).REQUIRED_CHECKS)]
     [v] = MergeGate(circle.ctx, gh, "cmatosengenharia").run()
     assert not v.merge and "sem teste" in v.reason
-    assert circle.store.get("self_dev_aberto")["conserto"]["motivo"] == v.reason
+    assert dev.abertos()[0]["conserto"]["motivo"] == v.reason
 
 
 def test_depois_de_max_consertos_o_pr_e_fechado_e_o_item_volta(circle, repo):
@@ -331,11 +331,10 @@ def test_depois_de_max_consertos_o_pr_e_fechado_e_o_item_volta(circle, repo):
     gh = GateGH(repo.parent / "origin.git")
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
     dev.run_once()
-    st = circle.store.get("self_dev_aberto")
-    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": gh._sha(), "motivo": "checks falhando"}})
+    dev._salvar_pr(42, consertos=MAX_CONSERTOS, conserto={"sha": gh._sha(), "motivo": "checks falhando"})
     r = dev.run_once()
     assert r.status == "abandonado" and gh.closed and gh.closed[0][0] == 42
-    assert not dev.busy()
+    assert not dev.busy() and dev.abertos() == []
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
 
 
@@ -345,11 +344,10 @@ def test_pr_que_mudou_depois_da_reprovacao_nao_e_consertado_nem_fechado(circle, 
     gh = GateGH(repo.parent / "origin.git")
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
     dev.run_once()
-    st = circle.store.get("self_dev_aberto")
     # reprovado num sha antigo; depois disso a branch andou (ex.: main atualizada no PR)
-    circle.store.set("self_dev_aberto", {**st, "consertos": MAX_CONSERTOS, "conserto": {"sha": "0" * 40, "motivo": "checks falhando"}})
+    dev._salvar_pr(42, consertos=MAX_CONSERTOS, conserto={"sha": "0" * 40, "motivo": "checks falhando"})
     r = dev.run_once()
-    assert r.status == "aguardando_ci" and gh.closed == [] and dev.busy() and not dev.tem_trabalho()
+    assert r.status == "aguardando_ci" and gh.closed == [] and len(dev.abertos()) == 1 and not dev.tem_trabalho()
 
 
 def test_erro_sem_mudanca_fica_em_observacao_e_sai_da_fila(circle, repo):
@@ -396,11 +394,11 @@ def test_pr_fechado_fora_do_gate_libera_o_developer(circle, repo):
     gh = GateGH(repo.parent / "origin.git")
     dev = SelfDeveloper(circle.ctx, repo, FixAgent(), gh, test_cmd=TEST_CMD)
     dev.run_once()
-    assert dev.busy()
+    assert len(dev.abertos()) == 1
     gh.closed.append((42, "fechado por você"))                 # some da lista de abertos
     gh.pr_state = lambda n: {"state": "closed", "merged": False, "mergeable": None}
     MergeGate(circle.ctx, gh, "cmatosengenharia").run()
-    assert not dev.busy()
+    assert dev.abertos() == []
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
 
 

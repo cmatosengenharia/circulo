@@ -130,6 +130,12 @@ class MergeGate:
         if const:   # recusa definitiva: não espera ninguém, não tenta de novo
             return Verdict(n, sha, False, f"fora do alcance: PR de agente altera a constituição ({', '.join(const)})",
                            {"constituicao": const, "fora_do_alcance": True})
+        # Revisor: PR do Developer que cruza arquivos com um PR mais antigo ainda aberto é rejeitado (o item volta à fila)
+        from . import revisor
+        row = self.ctx.store.one("SELECT item_id FROM prs WHERE number=?", (n,))
+        rev = revisor.no_gate(self.ctx.store, self.ctx.dl, n, row["item_id"] if row else None, names)
+        if rev:
+            return Verdict(n, sha, False, f"Revisor: {rev['motivo']}", {"revisor": True, "aguarda_pr": rev["aguarda_pr"], "fora_do_alcance": True})
 
         atras = getattr(self.gh, "atras_da_main", None)
         if atras is not None:
@@ -215,26 +221,35 @@ class MergeGate:
         """PR do Developer fechado ou mergeado fora do gate (por você, no GitHub): o Developer não fica esperando
         para sempre um PR que não existe mais."""
         s = self.ctx.store
-        dev = s.get("self_dev_aberto") or {}
-        if not dev.get("pr") or dev.get("fechado") or dev["pr"] in abertos:
-            return
         estado = getattr(self.gh, "pr_state", None)
-        info = {}
-        if estado is not None:
-            try:
-                info = estado(dev["pr"])
-            except Exception:  # noqa: BLE001
-                return
-        merged = bool(info.get("merged"))
-        s.set("self_dev_aberto", {**dev, "fechado": True, "merged": merged})
-        s.x("UPDATE prs SET status=?, updated_at=? WHERE number=?", ("mergeado" if merged else "fechado", time.time(), dev["pr"]))
+        for dev in [dict(r) for r in s.q("SELECT number, item_id FROM prs WHERE status='aberto' AND item_id IS NOT NULL")]:
+            if dev["number"] in abertos:
+                continue
+            info = {}
+            if estado is not None:
+                try:
+                    info = estado(dev["number"])
+                except Exception:  # noqa: BLE001
+                    continue
+            merged = bool(info.get("merged"))
+            self._fechar(dev["number"], merged)
+            if not merged:
+                s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE id=? AND status='em_andamento'",
+                    (f"PR #{dev['number']} fechado sem merge fora do gate", time.time(), dev["item_id"]))
+                self.ctx.reply(f"PR #{dev['number']} foi fechado sem merge fora do gate; o item volta para a fila e o Developer segue.", "merge")
+
+    def _fechar(self, pr: int, merged: bool) -> None:
+        """PR saiu (mergeado ou fechado): tabela prs, item do roteiro e retrato do Developer."""
+        s = self.ctx.store
+        s.x("UPDATE prs SET status=?, conserto=NULL, updated_at=? WHERE number=?", ("mergeado" if merged else "fechado", time.time(), pr))
         if merged:
             from .self_dev import concluir_mergeados
             concluir_mergeados(s)
-        else:
-            s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE id=? AND status='em_andamento'",
-                (f"PR #{dev['pr']} fechado sem merge fora do gate", time.time(), dev.get("item")))
-            self.ctx.reply(f"PR #{dev['pr']} foi fechado sem merge fora do gate; o item volta para a fila e o Developer segue.", "merge")
+        dev = s.get("self_dev_aberto") or {}
+        ab = [r["number"] for r in s.q("SELECT number FROM prs WHERE status='aberto' AND item_id IS NOT NULL")]
+        if dev.get("pr") == pr:
+            dev.update({"fechado": True, "merged": merged})
+        s.set("self_dev_aberto", {**dev, "abertos": ab})
 
     def _log(self, v: Verdict) -> None:
         s = self.ctx.store
@@ -242,9 +257,13 @@ class MergeGate:
         from .projects import kit_project_id
         s.x("INSERT OR IGNORE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'aberto',?,?)",
             (v.number, kit_project_id(s, "circulo"), f"PR #{v.number}", None, time.time(), time.time()))
-        dev = s.get("self_dev_aberto") or {}
-        if v.details.get("conserto") and dev.get("pr") == v.number and not dev.get("fechado") \
-                and (dev.get("conserto") or {}).get("sha") != v.sha and dev.get("conserto_sha") != v.sha:
+        dev = s.one("SELECT number, item_id, conserto, conserto_sha FROM prs WHERE number=? AND status='aberto' AND item_id IS NOT NULL", (v.number,))
+        dev = dict(dev) if dev else {}
+        try:
+            cons = json.loads(dev.get("conserto") or "null") or {}
+        except ValueError:
+            cons = {}
+        if v.details.get("conserto") and dev and cons.get("sha") != v.sha and dev.get("conserto_sha") != v.sha:
             # devolve ao Developer uma vez por versão do PR, com o que o CI disse
             log = ""
             if not v.details.get("sem_teste") and hasattr(self.gh, "falhas_ci"):
@@ -252,8 +271,8 @@ class MergeGate:
                     log = self.gh.falhas_ci(v.sha)
                 except Exception:  # noqa: BLE001 — sem o log o Developer ainda reproduz localmente
                     log = ""
-            s.set("self_dev_aberto", {**dev, "conserto": {"sha": v.sha, "motivo": v.reason, "log": log[-4000:]},
-                                      "conserto_sha": v.sha})
+            s.x("UPDATE prs SET conserto=?, conserto_sha=?, updated_at=? WHERE number=?",
+                (json.dumps({"sha": v.sha, "motivo": v.reason, "log": log[-4000:]}, ensure_ascii=False), v.sha, time.time(), v.number))
             # toda reprovação é uma verificação que falhou: vira lição (prevenção para o Developer não repetir)
             from .licoes import registrar as monitorar
             const = "Constituição" in v.reason
@@ -274,17 +293,24 @@ class MergeGate:
             s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,'mergeado',?,?) "
                 "ON CONFLICT(number) DO UPDATE SET status='mergeado', updated_at=excluded.updated_at",
                 (v.number, kit_project_id(s, "circulo"), f"PR #{v.number}", None, time.time(), time.time()))
-            dev = s.get("self_dev_aberto") or {}
-            if dev.get("pr") == v.number:     # PR do Developer entrou: libera o próximo
-                s.set("self_dev_aberto", {**dev, "fechado": True, "merged": True})
-            from .self_dev import concluir_mergeados
-            concluir_mergeados(s)              # o item do roteiro desse PR vira "feito"
+            self._fechar(v.number, True)       # libera a vaga; o item do roteiro desse PR vira "feito"
+        elif v.details.get("revisor"):
+            # rejeitado pelo Revisor: fecha o PR (a branch fica) e o item volta para a fila, esperando o PR que ele cruza
+            fechar = getattr(self.gh, "close_pr", None)
+            if fechar:
+                try:
+                    fechar(v.number, f"Fechado pelo Revisor do círculo: {v.reason}. O item volta para a fila e será refeito sobre a main nova.")
+                except Exception:  # noqa: BLE001 — fechar no GitHub é cortesia; o estado local é o que manda
+                    pass
+            self._fechar(v.number, False)
+            s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE status='em_andamento' AND evidencia=?",
+                (f"aguarda PR #{v.details.get('aguarda_pr')}: {v.reason[:200]}", time.time(), f"PR #{v.number}"))
+            self.ctx.reply(f"Revisor rejeitou o PR #{v.number}: {v.reason[:160]}. O item volta para a fila.", "saude")
         elif v.details.get("fora_do_alcance"):
             self.ctx.reply(f"PR #{v.number} recusado: {v.reason}. A missão segue por outro caminho.", "fora_alcance")
-            s.x("UPDATE prs SET status='fechado', updated_at=? WHERE number=?", (time.time(), v.number))
-            dev = s.get("self_dev_aberto") or {}
-            if dev.get("pr") == v.number:
-                s.set("self_dev_aberto", {**dev, "fechado": True, "merged": False})
+            self._fechar(v.number, False)
+            s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE status='em_andamento' AND evidencia=?",
+                (f"PR #{v.number} recusado: {v.reason[:200]}", time.time(), f"PR #{v.number}"))
 
 
 # ------------------------------------------------------------------ cliente REST real

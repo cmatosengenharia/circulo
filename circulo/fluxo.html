@@ -218,10 +218,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const NS = "http://www.w3.org/2000/svg";
 const C = {x: 400, y: 318, r: 262};
 const EXT_POS = {jev: [400, 300], llm: [300, 430], github: [500, 430]};
-const ORDEM = ["orquestrador", "pedido", "decisao", "indagar", "vigia", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
+const ORDEM = ["orquestrador", "pedido", "decisao", "indagar", "vigia", "revisor", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
                "revisar_prs", "evoluir_projeto", "conectar_missoes", "analisar_padroes", "revisar_baixa_confianca", "rodar_regressao",
                "resumo", "propor_feature", "evoluir_harness", "jardinagem", "meta_learner", "shadow", "licoes", "saude"];
-const ICONE = {vigia: "👁", indagar: "¿", orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
+const ICONE = {vigia: "👁", revisor: "⇄", indagar: "¿", orquestrador: "◎", pedido: "✉", decisao: "?", atualizar_corpo: "⟳", estudar_pedido: "⌕", planejar_roteiro: "✎",
   corrigir_codigo: "</>", revisar_prs: "✓", evoluir_projeto: "★", conectar_missoes: "⇄", analisar_padroes: "≋", revisar_baixa_confianca: "↺",
   rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", jardinagem: "✿", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
   jev: "Jev", llm: "LLM", github: "Git"};

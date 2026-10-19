@@ -66,6 +66,14 @@ def _causa_tentativa(t: dict, now: float) -> str:
             f"(tentativa {t['tentativas']}/{MAX_TENTATIVAS}): {falha}: {t['motivo']}")
 
 
+def _dev_sem_vaga(s) -> bool:
+    """Developer sem vaga: todos os MAX_PRS_ABERTOS PRs em uso (1.29); retrato antigo = um PR aberto."""
+    aberto = _kv(s, "self_dev_aberto", {}) or {}
+    if "abertos" in aberto:
+        return len(aberto.get("abertos") or []) >= int(aberto.get("max") or 1)
+    return bool(aberto.get("pr") and not aberto.get("fechado"))
+
+
 def s_pergunta_valida_parada(s, now):
     desde = {p["id"]: float(p["created_at"]) for p in s.q("SELECT id, created_at FROM perguntas WHERE status='valida'")}
     u = (_kv(s, PORTEIRO, {}) or {}).get("ultimo") or {}
@@ -111,8 +119,7 @@ def s_developer_parado(s, now):
     espera = float((_kv(s, "self_dev_espera", {}) or {}).get("ate", 0))
     if espera > now:
         return None
-    aberto = _kv(s, "self_dev_aberto", {}) or {}
-    if aberto.get("pr") and not aberto.get("fechado"):
+    if _dev_sem_vaga(s):
         return None
     item = s.one("SELECT id, titulo FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND estudo IS NOT NULL "
                  "AND evidencia NOT LIKE '%depende de você%' AND origem IN ('pedido_cassio','loop','erro') ORDER BY ordem LIMIT 1")
@@ -130,8 +137,7 @@ def s_fila_seca(s, now):
     pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop','erro')")
     val = _um(s, "SELECT COUNT(*) FROM perguntas WHERE status='valida'")
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
-    aberto = _kv(s, "self_dev_aberto", {}) or {}
-    ocupado = bool(aberto.get("pr") and not aberto.get("fechado"))
+    ocupado = _dev_sem_vaga(s)
     if pend or val or ocupado or (plan and now - plan < 2 * 3600):
         return None
     return {"chave": "fila_seca", "titulo": "Nada na fila: sem item pendente, sem pergunta validada e o planejador não roda há mais de 2 h",

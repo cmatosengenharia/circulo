@@ -7,7 +7,9 @@ Fecha o ciclo "registra o erro → aprende → se autocorrige":
   → quando o incidente para de acontecer, o item do roteiro vira "feito" sozinho.
 
 Limites duros:
-- um PR do Developer aberto por vez;
+- até MAX_PRS_ABERTOS PRs do Developer abertos ao mesmo tempo (1.29: antes era um), cada um revisado pelo Revisor
+  antes de abrir (main atual trazida + testes, arquivos e merge simulado contra os outros PRs abertos) e no gate;
+  rejeitado pelo Revisor, o PR não abre (ou é fechado) e o item volta para a fila;
 - a constituição nunca é alterada: o gate recusa o PR na hora;
 - se a verificação local (lint + testes, igual ao CI) falhar, nada é empurrado; o item volta para pendente;
 - se o agente terminar com erro (limite da conta, máximo de passos), o trabalho parcial é descartado; no limite da
@@ -33,8 +35,11 @@ from typing import Protocol
 from .agents import Ctx
 from .budget import TZ
 from .merge_gate import CONSTITUICAO
+from .revisor import MAX_PRS_ABERTOS
 
 EST_TOKENS = 40_000
+# item rejeitado pelo Revisor por cruzar com um PR aberto espera aquele PR fechar antes de voltar à fila do Developer
+ESPERA_PR = (" AND NOT EXISTS (SELECT 1 FROM prs WHERE prs.status='aberto' AND roadmap.evidencia LIKE 'aguarda PR #' || prs.number || ':%')")
 MAX_CONSERTOS = 2
 MAX_CORRECOES_LOCAIS = 1
 MAX_SESSOES = 4             # sessões interrompidas no mesmo item antes de registrar "grande demais" (lição de trabalho)    # barrado antes do PR: o Developer corrige no mesmo worktree antes de desistir
@@ -227,45 +232,76 @@ class SelfDeveloper:
         else:
             # primeiro erros recorrentes; depois pedidos do roteiro que não dependem de algo fora do código
             # item desativado por você no painel nunca é pego
-            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0 ORDER BY ordem LIMIT 1")
+            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
                  # pedido é hipótese: só entra depois de estudado (pesquisa em fontes confiáveis + veredito)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
-                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1")
+                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
                  # por último, o que o próprio loop planejou a partir da evidência (também estudado)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='loop' AND status='pendente' AND COALESCE(desativado,0)=0 "
-                               "AND estudo IS NOT NULL ORDER BY ordem LIMIT 1"))
+                               "AND estudo IS NOT NULL" + ESPERA_PR + " ORDER BY ordem LIMIT 1"))
         return dict(r) if r else None
+
+    # ------------------------------------------------------------ PRs abertos (vários)
+    def abertos(self) -> list[dict]:
+        """PRs do Developer ainda abertos, do mais antigo ao mais novo (a tabela prs é a fonte; o kv é só retrato)."""
+        out = []
+        for r in self.s.q("SELECT * FROM prs WHERE status='aberto' AND item_id IS NOT NULL ORDER BY created_at, number"):
+            d = dict(r)
+            d["conserto"] = json.loads(d["conserto"]) if d.get("conserto") else None
+            out.append(d)
+        return out
+
+    def _salvar_pr(self, pr: int, **campos) -> None:
+        if "conserto" in campos and isinstance(campos["conserto"], dict):
+            campos["conserto"] = json.dumps(campos["conserto"], ensure_ascii=False)
+        sets = ", ".join(f"{k}=?" for k in campos)
+        self.s.x(f"UPDATE prs SET {sets}, updated_at=? WHERE number=?", (*campos.values(), time.time(), pr))
+        self._retrato()
+
+    def _retrato(self) -> None:
+        """kv `self_dev_aberto`: o PR mais recente + a lista dos abertos (painel, Vigia e fluxo leem daqui)."""
+        ab = self.abertos()
+        ult = self.s.one("SELECT * FROM prs WHERE item_id IS NOT NULL ORDER BY created_at DESC, number DESC LIMIT 1")
+        st = dict(self.s.get("self_dev_aberto") or {})
+        if ult:
+            st.update({"item": ult["item_id"], "branch": ult["branch"], "pr": ult["number"], "em": ult["created_at"],
+                       "fechado": ult["status"] != "aberto", "merged": ult["status"] == "mergeado"})
+        st.update({"abertos": [a["number"] for a in ab], "max": MAX_PRS_ABERTOS})
+        self.s.set("self_dev_aberto", st)
 
     def recuperar(self) -> int:
         """Execução interrompida (loop reiniciado no meio do trabalho): o item volta para a fila em vez de ficar
         preso em "em andamento" sem PR."""
-        st = self.s.get("self_dev_aberto") or {}
-        aberto = st.get("item") if st.get("pr") and not st.get("fechado") else None
+        abertos = ",".join(str(int(a["item_id"])) for a in self.abertos()) or "-1"
         return self.s.run("UPDATE roadmap SET status='pendente', evidencia='retomado: a execução anterior foi interrompida', "
-                          "updated_at=? WHERE status='em_andamento' AND evidencia LIKE 'branch %' AND id IS NOT ?",
-                          (time.time(), aberto))
+                          "updated_at=? WHERE status='em_andamento' AND evidencia LIKE 'branch %' AND id NOT IN (" + abertos + ")",
+                          (time.time(),))
 
     def concluir_mergeados(self) -> int:
         """Item do roteiro cujo PR já entrou na main vira "feito" (o merge é a evidência)."""
         return concluir_mergeados(self.s)
 
     def busy(self) -> bool:
-        st = self.s.get("self_dev_aberto")
-        return bool(st and st.get("pr") and not st.get("fechado"))
+        """Sem vaga: já há MAX_PRS_ABERTOS PRs do Developer abertos."""
+        return len(self.abertos()) >= MAX_PRS_ABERTOS
 
     def em_espera(self) -> bool:
         return float((self.s.get("self_dev_espera") or {}).get("ate", 0)) > time.time()
 
     def _conserto(self) -> dict | None:
-        st = self.s.get("self_dev_aberto") or {}
-        return st if self.busy() and st.get("conserto") else None
+        """O PR aberto mais antigo que o gate devolveu para conserto (mesma forma do estado antigo: item, pr, branch, conserto, consertos)."""
+        for a in self.abertos():
+            if a["conserto"]:
+                return {"item": a["item_id"], "pr": a["number"], "branch": a["branch"], "conserto": a["conserto"],
+                        "consertos": int(a.get("consertos") or 0), "conserto_sha": a.get("conserto_sha")}
+        return None
 
     def tem_trabalho(self) -> bool:
         if self.em_espera():
             return False
-        if self.busy():
-            return self._conserto() is not None
-        return self.pick() is not None
+        if self._conserto() is not None:
+            return True                       # conserto de PR reprovado vem antes de item novo
+        return not self.busy() and self.pick() is not None
 
     def alvo(self) -> dict | None:
         """O item em que o Developer vai trabalhar no próximo ciclo (conserto do PR aberto ou o próximo da fila)."""
@@ -395,7 +431,7 @@ class SelfDeveloper:
         if self._conserto() is not None:
             return self.consertar()
         if self.busy():
-            return DevResult(None, "ocupado", "já existe um PR do Developer aberto")
+            return DevResult(None, "ocupado", f"já há {MAX_PRS_ABERTOS} PRs do Developer abertos")
         item = self.pick(item_id)
         if not item:
             return DevResult(None, "nada", "nenhum erro recorrente pendente no roteiro")
@@ -471,6 +507,26 @@ class SelfDeveloper:
                 self._set_item(item["id"], "pendente", "barrado nos portões antes do PR (lint, testes, constituição, tamanho, teste novo, portões aprendidos)")
                 self.ctx.reply(f"Developer: “{item['titulo']}” foi barrado nos portões antes do PR; nada foi enviado.", "saude")
                 return DevResult(item["id"], "testes_falharam", falha[-800:])
+            if has_remote:
+                # Revisor: a mudança vai entrar junto com outros PRs? Antes de empurrar, com a main de agora.
+                _git(["add", "-A"], wt)
+                _git(["-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}", "commit", "-q", "-m", "wip"], wt)
+                from . import revisor
+                rev = revisor.antes_do_pr(self.ctx, wt, item, _git(["diff", "--name-only", f"{base}..HEAD"], wt).splitlines(),
+                                          self.author, self.verificar)
+                if not rev["ok"]:
+                    # rejeitado: nada é empurrado; o item volta para a fila (esperando o PR que ele cruza, se houver)
+                    ev = f"aguarda PR #{rev['aguarda_pr']}: {rev['motivo']}" if rev.get("aguarda_pr") else f"revisor: {rev['motivo']}"
+                    self._set_item(item["id"], "pendente", ev[:300])
+                    self.ctx.reply(f"Revisor rejeitou “{item['titulo'][:90]}” antes do PR: {rev['motivo'][:160]}. O item volta para a fila.", "saude")
+                    _git(["worktree", "remove", "--force", str(wt)], self.repo, check=False)
+                    _git(["branch", "-D", branch], self.repo, check=False)          # será refeito sobre a main nova
+                    todos = self.s.get("self_dev_wip") or {}
+                    if todos.pop(str(item["id"]), None) is not None:
+                        self.s.set("self_dev_wip", todos)
+                    return DevResult(item["id"], "revisor_rejeitou", rev["motivo"][-800:])
+                base = _git(["rev-parse", "origin/main"], wt, check=False) or base   # a main de agora é a base do PR
+                _git(["reset", "--soft", base], wt)                                   # um commit só, limpo, sobre ela
             _git(["add", "-A"], wt)
             from .rastro import trace_id
             fio = trace_id("item:%d" % item["id"])
@@ -488,7 +544,6 @@ class SelfDeveloper:
                                        f"Rastro de ponta a ponta: item #{item['id']} · trace `{fio}`\n\n"
                                        "Evidência (medida antes de abrir o PR): portões natos, lint e testes iguais ao CI, "
                                        f"portões aprendidos — todos ok. Reprodução: {getattr(self, 'evidencia_pr', '') or 'n/a'}.")
-            self.s.set("self_dev_aberto", {"item": item["id"], "branch": branch, "pr": pr, "em": time.time(), "fechado": False})
             todos = self.s.get("self_dev_wip") or {}
             if todos.pop(str(item["id"]), None) is not None:
                 self.s.set("self_dev_wip", todos)        # terminou: o parcial virou PR
@@ -496,8 +551,11 @@ class SelfDeveloper:
                 from .rastro import elo
                 elo(self.s, f"item:{item['id']}", f"pr:{pr}", "abriu_pr")
                 from .projects import kit_project_id
-                self.s.x("INSERT OR REPLACE INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
-                         (pr, kit_project_id(self.s, "circulo"), item["titulo"], branch, "aberto", time.time(), time.time()))
+                self.s.x("INSERT OR REPLACE INTO prs(number,project_id,titulo,branch,status,item_id,arquivos,consertos,created_at,updated_at) "
+                         "VALUES(?,?,?,?,?,?,?,0,?,?)",
+                         (pr, kit_project_id(self.s, "circulo"), item["titulo"], branch, "aberto", item["id"],
+                          json.dumps(changed), time.time(), time.time()))
+            self._retrato()
             self._set_item(item["id"], "em_andamento", f"PR #{pr}" if pr else f"commit na branch {branch} (sem remoto)")
             self.ctx.reply(f"Developer abriu correção para “{item['titulo']}”" + (f" (PR #{pr})." if pr else "."), "merge")
             return DevResult(item["id"], "proposto", ", ".join(changed), pr)
@@ -517,8 +575,7 @@ class SelfDeveloper:
         atual = _git(["rev-parse", f"origin/{branch}"], self.repo, check=False)
         if atual and st["conserto"].get("sha") and atual != st["conserto"]["sha"]:
             # o PR mudou depois da reprovação (outro commit, main atualizada): o CI vai rodar de novo; espera o gate
-            st["conserto"] = None
-            self.s.set("self_dev_aberto", st)
+            self._salvar_pr(pr, conserto=None)
             return DevResult(item_id, "aguardando_ci", f"o PR #{pr} mudou desde a reprovação; o gate avalia de novo", pr)
         if int(st.get("consertos", 0)) >= MAX_CONSERTOS:
             return self._abandonar(st, titulo, motivo)
@@ -541,7 +598,7 @@ class SelfDeveloper:
             task = CONSERTO_TEMPLATE.format(pr=pr, titulo=titulo, motivo=motivo, log=detalhe, regras="Regras:" + regras)
             out = self._agente(task, wt, f"conserto do PR #{pr}: {titulo}")
             st["consertos"] = int(st.get("consertos", 0)) + (0 if not out.get("ok") and limite_ate(str(out.get("log", "")), time.time()) else 1)
-            self.s.set("self_dev_aberto", st)
+            self._salvar_pr(pr, consertos=st["consertos"])
             if not out.get("ok"):
                 hora = self._limite(out)
                 if hora:
@@ -560,8 +617,7 @@ class SelfDeveloper:
                 _git(["-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}", "commit", "-q", "-m",
                       f"Conserto: {motivo[:120]}\n\nDeveloper do círculo (roteiro #{item_id}, PR #{pr})."], wt)
             _git(["push", "origin", f"HEAD:{branch}"], wt)
-            st["conserto"] = None
-            self.s.set("self_dev_aberto", st)
+            self._salvar_pr(pr, conserto=None)
             self.ctx.reply(f"Developer consertou o PR #{pr} (“{titulo}”): {motivo[:120]}. O CI roda de novo.", "merge")
             return DevResult(item_id, "consertado", motivo[:200], pr)
         finally:
@@ -573,8 +629,7 @@ class SelfDeveloper:
         if fechar:
             fechar(pr, f"Fechado pelo Developer do círculo: {MAX_CONSERTOS} consertos sem passar no gate ({motivo}). "
                        "A branch fica; o item volta para a fila.")
-        self.s.set("self_dev_aberto", {**st, "fechado": True, "merged": False})
-        self.s.x("UPDATE prs SET status='fechado', updated_at=? WHERE number=?", (time.time(), pr))
+        self._salvar_pr(pr, status="fechado", conserto=None)
         self._set_item(item_id, "pendente", f"PR #{pr} fechado após {MAX_CONSERTOS} consertos: {motivo[:120]}")
         self.ctx.reply(f"Developer fechou o PR #{pr} (“{titulo}”) depois de {MAX_CONSERTOS} consertos; o item volta para a fila.", "saude")
         return DevResult(item_id, "abandonado", motivo[:200], pr)
@@ -600,12 +655,8 @@ class SelfDeveloper:
     def _set_item(self, item_id: int, status: str, evidencia: str) -> None:
         self.s.x("UPDATE roadmap SET status=?, evidencia=?, updated_at=? WHERE id=?", (status, evidencia, time.time(), item_id))
 
-    def pr_closed(self, merged: bool) -> None:
-        st = self.s.get("self_dev_aberto") or {}
-        if st:
-            st["fechado"] = True
-            st["merged"] = merged
-            self.s.set("self_dev_aberto", st)
+    def pr_closed(self, pr: int, merged: bool) -> None:
+        self._salvar_pr(pr, status="mergeado" if merged else "fechado", conserto=None)
 
 
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",

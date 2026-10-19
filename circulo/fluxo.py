@@ -41,6 +41,7 @@ FAZ = {
     "conectar_missoes": "Liga missões que se complementam para trocarem contexto e lições.",
     "jardinagem": "O jardineiro: mede padrões ruins se espalhando no código e abre item para podar o que cresce.",
     "vigia": "O Vigia: em paralelo ao giro, mede as travas da autoevolução, o Jev classifica e ele abre item, alerta ou observa.",
+    "revisor": "O Revisor: valida cada PR do Developer dentro do ecossistema (main atual, arquivos e merge simulado contra os outros PRs abertos); rejeitado, o item volta para a fila.",
     "indagar": "O Indagador: levanta as perguntas pertinentes de cada missão e o Jev classifica (pertinente, eixo, acionável).",
     "jev": "Decide por tipos (sim/não, escolha, nota) antes de qualquer LLM; quando fica em dúvida, a regra decide.",
     "llm": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens).",
@@ -73,7 +74,7 @@ CURTO = {"orquestrador": "Orquestrador", "pedido": "Pedido seu", "decisao": "Esc
          "evoluir_projeto": "Missões", "meta_learner": "Aprendiz", "shadow": "Shadow", "licoes": "Lições", "saude": "Saúde",
          "analisar_padroes": "Padrões", "revisar_baixa_confianca": "Revisão", "rodar_regressao": "Regressão", "resumo": "Resumo",
          "propor_feature": "Melhorias", "evoluir_harness": "Prompts A/B", "conectar_missoes": "Conexões",
-         "jardinagem": "Jardineiro", "indagar": "Indagador", "vigia": "Vigia"}
+         "jardinagem": "Jardineiro", "indagar": "Indagador", "vigia": "Vigia", "revisor": "Revisor"}
 
 
 def nome_do_agente(chave: str) -> str:
@@ -370,6 +371,11 @@ def obras(store: Store) -> list[dict]:
         ult = store.get("vigia_ultima") or {}
         if ult:
             add("vigia", "Nenhuma trava na autoevolução", f"{ult.get('achados', 0)} achado(s) na última passagem", ult.get("em"))
+    rv = store.one("SELECT pr, item_id, momento, veredito, motivo, created_at FROM revisoes ORDER BY id DESC LIMIT 1")
+    if rv:
+        add("revisor", f"{'PR #' + str(rv['pr']) if rv['pr'] else 'item #' + str(rv['item_id'])}: {rv['veredito']}",
+            f"{rv['momento'].replace('_', ' ')} · {(rv['motivo'] or '')[:100]}", rv["created_at"],
+            f"{gh}/pull/{rv['pr']}" if gh and rv["pr"] else None)
     pq = store.one("SELECT texto, status, eixo, created_at FROM perguntas WHERE eixo IS NOT NULL ORDER BY id DESC LIMIT 1")
     if pq:
         add("indagar", pq["texto"][:140], f"{pq['status']} · eixo {pq['eixo']}", pq["created_at"])

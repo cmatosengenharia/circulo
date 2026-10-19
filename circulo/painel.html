@@ -525,6 +525,14 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <ul class="tl" id="tl"></ul>
     </section>
 
+    <section data-aba="evolucao" class="panel c12" aria-label="Revisor">
+      <h2>Revisor: vários PRs em paralelo, sem conflito</h2>
+      <p class="sub" style="margin:-6px 0 8px">O Developer abre até <span id="revMax">3</span> PRs ao mesmo tempo. Antes de cada um, o Revisor traz a main de agora para a branch e roda os testes, compara os arquivos com os outros PRs abertos e simula o merge entre eles; no gate, confere de novo. O Jev classifica cada revisão. Rejeitado, o PR não entra (ou é fechado) e o item volta para a fila, esperando o PR que ele cruza.</p>
+      <div class="indag-tot" id="revTot"></div>
+      <ul class="list" id="revAbertos"></ul>
+      <ul class="list" id="revLista"></ul>
+    </section>
+
     <section data-aba="evolucao" class="panel c12" aria-label="Indagador">
       <h2>Indagador: as perguntas de onde a evolução parte</h2>
       <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
@@ -1338,6 +1346,18 @@ async function refreshVigia() {
   } catch {}
 }
 setInterval(refreshVigia, 15000); refreshVigia();
+async function refreshRevisor() {
+  try {
+    const j = await (await fetch("/api/revisor")).json();
+    const t = $("#revTot"), ab = $("#revAbertos"), ul = $("#revLista");
+    if (!t || !ab || !ul) return;
+    $("#revMax").textContent = j.max_abertos;
+    t.textContent = `${(j.abertos || []).length} de ${j.max_abertos} vagas em uso · ${j.total} revisões · ${j.rejeitadas} rejeitadas · ${j.antes_do_pr} antes do PR`;
+    ab.innerHTML = (j.abertos || []).map(p => `<li><span class="tag">PR #${p.number}</span> item #${p.item_id} · <code>${esc(p.branch || "")}</code> · ${(p.arquivos || []).length} arquivo(s): ${esc((p.arquivos || []).slice(0, 5).join(", "))}</li>`).join("") || "<li>Nenhum PR do Developer aberto agora.</li>";
+    ul.innerHTML = (j.ultimas || []).map(r => `<li><b class="${r.veredito === "rejeitado" ? "bad" : "ok"}">${esc(r.veredito)}</b> · ${esc(r.momento.replace("_", " "))} · ${r.pr ? "PR #" + r.pr : "item #" + r.item_id} · Jev ${r.conf == null ? "—" : Math.round(r.conf * 100) + "%"} (${esc(r.fonte || "")})<br>${esc(r.motivo || "")}</li>`).join("") || "<li>Nenhuma revisão ainda.</li>";
+  } catch {}
+}
+setInterval(refreshRevisor, 15000); refreshRevisor();
 async function refreshIndagador() {
   try {
     const j = await (await fetch("/api/indagador")).json();

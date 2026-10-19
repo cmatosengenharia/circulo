@@ -325,6 +325,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/vigia":
                 from .vigia import resumo as vig
                 self._json(vig(self._store()))
+            elif u.path == "/api/revisor":
+                from .revisor import resumo as revis
+                self._json(revis(self._store()))
             elif u.path == "/api/indagador":
                 from .indagador import resumo as indag
                 self._json(indag(self._store()))

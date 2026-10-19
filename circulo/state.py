@@ -407,6 +407,20 @@ CREATE TABLE IF NOT EXISTS frescor (
 );
 CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
 
+CREATE TABLE IF NOT EXISTS revisoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pr INTEGER,
+  item_id INTEGER,
+  momento TEXT NOT NULL,
+  veredito TEXT NOT NULL,
+  motivo TEXT,
+  evidencia TEXT,
+  conf REAL,
+  fonte TEXT,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS revisoes_pr ON revisoes(pr);
+
 CREATE TABLE IF NOT EXISTS vigia (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   chave TEXT NOT NULL,
@@ -509,7 +523,9 @@ class Store:
                   ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"), ("perguntas", "motivo", "TEXT"),
                   ("verificacoes", "item_id", "INTEGER"), ("verificacoes", "item_titulo", "TEXT"),
                   ("events", "job", "TEXT"), ("events", "job_fonte", "TEXT"), ("events", "job_conf", "REAL"),
-                  ("events", "job_margem", "REAL"))
+                  ("events", "job_margem", "REAL"),
+                  ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
+                  ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
