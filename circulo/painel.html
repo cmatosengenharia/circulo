@@ -529,6 +529,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <h2>Indagador: as perguntas de onde a evolução parte</h2>
       <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
       <div class="indag-tot" id="indagTot"></div>
+      <div class="indag-tot" id="indagFunil" aria-label="Funil da autoevolução"></div>
       <ul class="list" id="indag"></ul>
     </section>
     <section data-aba="evolucao" class="panel c7 zero-only" hidden>
@@ -1343,6 +1344,14 @@ async function refreshIndagador() {
     const t = $("#indagTot"), ul = $("#indag");
     if (!t || !ul) return;
     t.textContent = j.total ? `${j.total} classificadas · ${j.validas} válidas esperando · ${j.usadas} viraram ponto de partida · ${j.descartadas} descartadas pelo Jev · ${j.inconclusas} em dúvida` : "O Indagador ainda não passou por nenhuma missão.";
+    const f = j.funil, fu = $("#indagFunil");
+    if (f && fu) {
+      const nome = {pergunta_para_item: "pergunta → item", item_para_pr: "item → PR", pr_para_merge: "PR → merge"};
+      const partes = Object.entries(f.etapas || {}).map(([k, e]) => e.mediana_min == null ? `${nome[k]}: sem medida` :
+        `${nome[k]}: <b${e.atraso > 1 ? ' style="color:var(--bad)"' : ''}>${Math.round(e.mediana_min)} min</b> (alvo ${e.alvo_min}, ${e.amostras} caso${e.amostras === 1 ? "" : "s"})`);
+      fu.innerHTML = `Funil 24 h (medido): ${partes.join(" · ")} · PRs ${f.prs_mergeados} mesclado(s) / ${f.prs_fechados} fechado(s)` +
+        (f.planejador_motivo ? ` · Planejador parado: <b>${esc(f.planejador_motivo)}</b>` : " · Planejador livre");
+    }
     const rot = {valida: "válida", feita: "em uso", virou_item: "virou item", entregue: "entregue", descartada: "descartada", inconclusa: "em dúvida", contestada: "contestada", repetida: "repetida"};
     ul.innerHTML = (j.ultimas || []).map(p => `<li><span class="tag">${esc(p.cerebro === "loop" ? "loop" : p.cerebro.replace("missao:", "missão #"))}</span> <b>${esc(rot[p.status] || p.status)}</b> · eixo ${esc(p.eixo)} · pertinência ${Math.round((p.pertinencia || 0) * 100)}% · acionável ${p.acionavel ?? "?"}/2<br>${esc(p.texto)}</li>`).join("") || "<li>Nenhuma pergunta ainda.</li>";
   } catch {}

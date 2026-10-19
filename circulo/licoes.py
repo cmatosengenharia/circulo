@@ -50,7 +50,8 @@ ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
 NODE_ID = re.compile(r"teste:(tests/[\w./-]+\.py::\S+)")
 
 AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit your [a-z ]{0,20}limit|timed? ?out|"
-                      r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http 5\d\d|"
+                      r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http(?: error:?)? ?5\d\d|bad gateway|"
+                      r"service unavailable|gateway time|"
                       r"remotedisconnected|name resolution|ssl", re.I)
 
 
@@ -417,8 +418,29 @@ class Licoes:
         return log
 
     # ------------------------------------------------------------ usar o que aprendeu
+    def reclassificar_ambiente(self) -> list[int]:
+        """Lição aberta como 'estrutural' cujo erro é de ambiente (GitHub 502, rede, limite) vira 'ambiente' e solta o
+        item que abriu. No Mac (19/10) um 'HTTP Error 502: Bad Gateway' travou o planejador por ser lido como erro do loop."""
+        ids = []
+        for r in self.s.q("SELECT id, descricao, item_id FROM licoes WHERE classe!='ambiente' AND status IN ('aberta','em_correcao','reincidente')"):
+            if not AMBIENTE.search(r["descricao"] or ""):
+                continue
+            agora = time.time()
+            self.s.x("UPDATE licoes SET classe='ambiente', prevencao=?, updated_at=? WHERE id=?",
+                     (f"Erro de ambiente (não é do loop): {r['descricao']}"[:500], agora, r["id"]))
+            if r["item_id"]:
+                self.s.x("UPDATE roadmap SET status='descartado', evidencia=?, updated_at=? WHERE id=? AND status='pendente'",
+                         ("lição reclassificada como ambiente: não é erro do loop", agora, r["item_id"]))
+            self.reply(f"Lição #{r['id']} reclassificada: era erro de ambiente, não do loop; não trava mais a evolução.", "licao")
+            ids.append(r["id"])
+        return ids
+
     def bloqueia_evolucao(self) -> bool:
         """Lição de estrutura ainda não corrigida: primeiro corrige, depois evolui."""
+        try:
+            self.reclassificar_ambiente()
+        except Exception:  # noqa: BLE001 — reclassificar nunca impede de decidir
+            pass
         return self.s.one("SELECT COUNT(*) n FROM licoes WHERE classe='estrutural' "
                           "AND status IN ('aberta','em_correcao','reincidente')")["n"] > 0
 
