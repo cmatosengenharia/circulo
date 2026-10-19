@@ -59,10 +59,6 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .pulso.bad{stroke:var(--bad)}
 @keyframes pulso{from{opacity:.9;r:24}to{opacity:0;r:46}}
 .bola{filter:drop-shadow(0 0 6px currentColor)}
-.balao{position:absolute;transform:translate(-50%,-100%);max-width:min(300px,70%);background:var(--ink);color:var(--surface);font-size:12.5px;
-  line-height:1.35;padding:6px 10px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity .25s;z-index:2}
-.balao.on{opacity:.96}
-.balao b{display:block;font-size:11.5px;opacity:.75;font-weight:600}
 .lado{display:flex;flex-direction:column;gap:14px;min-width:0}
 .agora{padding:14px 16px}
 .agora .quem{font-size:22px;font-weight:800;letter-spacing:-.01em}
@@ -215,14 +211,6 @@ function ativar(k, pulsar = true, ruim = false) {
   if (pulsar && !reduz) { const p = n.querySelector(".pulso"); p.classList.remove("on", "bad"); void p.getBBox(); if (ruim) p.classList.add("bad"); p.classList.add("on"); }
 }
 
-function balao(k, titulo, texto, ms) {
-  const p = pos[k] || pos.orquestrador, b = document.createElement("div");
-  b.className = "balao"; b.innerHTML = `<b>${esc(titulo)}</b>${esc(texto)}`;
-  b.style.left = (p[0] / 800 * 100) + "%"; b.style.top = ((p[1] - 30) / 660 * 100) + "%";
-  $("#cena").appendChild(b); requestAnimationFrame(() => b.classList.add("on"));
-  setTimeout(() => { b.classList.remove("on"); setTimeout(() => b.remove(), 300); }, ms);
-}
-
 function voar(de, para, cor, ms) {
   return new Promise(res => {
     const a = pos[de], b = pos[para];
@@ -260,30 +248,28 @@ async function tocar(e) {
     const de = e.de && pos[e.de] ? e.de : (atual || "orquestrador");
     await voar(de, e.agente, css("--ok"), 520);
     atual = e.agente; ativar(e.agente);
-    if (e.agente !== "descanso") balao(e.agente, nome(e.agente), e.texto, 1600 / Math.max(velocidade, 1));
     mostrarAgora(e);
     await espera(220);
   } else if (e.tipo === "decisao") {
     const de = atual && pos[atual] ? atual : e.agente;
     await voar(de, "jev", css("--jev"), 380);
-    ativar("jev"); balao("jev", nome(de) + " perguntou", e.texto, 1500 / Math.max(velocidade, 1));
+    ativar("jev");
     await espera(160);
     await voar("jev", de, e.decidiu === "jev" ? css("--jev") : e.decidiu === "llm" ? css("--llm") : css("--idle"), 380);
     ativar(de, false);
   } else if (e.tipo === "llm") {
     const de = e.agente && pos[e.agente] ? e.agente : atual;
     await voar(de, "llm", css("--llm"), 420); ativar("llm", true, e.ok === false);
-    balao("llm", nome(de), e.texto, 1400 / Math.max(velocidade, 1));
     await voar("llm", de, e.ok === false ? css("--bad") : css("--llm"), 420); ativar(de, false);
   } else if (e.tipo === "verificacao") {
     const k = pos[e.agente] ? e.agente : atual;
     if (e.para === "github") { await voar(k, "github", css("--gh"), 360); await voar("github", k, e.ok ? css("--ok") : css("--bad"), 360); }
-    ativar(k, true, !e.ok); balao(k, (e.ok ? "✓ " : "✗ ") + nome(k), e.texto, 1300 / Math.max(velocidade, 1));
+    ativar(k, true, !e.ok);
     await espera(160);
   } else if (e.tipo === "erro") {
     const k = pos[e.agente] ? e.agente : atual;
     const n = document.getElementById("no-" + k); if (n) { n.classList.add("falhou"); setTimeout(() => n.classList.remove("falhou"), 2500); }
-    ativar(k, true, true); balao(k, "erro", e.texto, 2200 / Math.max(velocidade, 1)); await espera(300);
+    ativar(k, true, true); await espera(300);
   }
 }
 

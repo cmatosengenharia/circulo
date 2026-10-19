@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.1 — 2026-10-18
+
+- **Fluxo ao vivo sem balões:** a bolinha passa de agente em agente sem o balão de texto por cima do desenho. O que cada
+  agente fez continua no cartão “Agora” e no registro ao lado. Teste: a página não traz mais o balão.
+
 ## 1.21.0 — 2026-10-18
 
 **O Jev explorado ao máximo, com o loop conferindo isso sozinho.**

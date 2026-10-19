@@ -53,6 +53,12 @@ def test_painel_do_fluxo(circle, painel):  # noqa: F811
     assert b"orquestrador" in linhas or b"event: fluxo" in linhas
 
 
+def test_fluxo_nao_cobre_o_desenho_com_baloes(circle, painel):  # noqa: F811
+    with urllib.request.urlopen(painel + "/fluxo", timeout=5) as r:
+        html = r.read().decode()
+    assert "balao" not in html and "mostrarAgora" in html     # o texto fica no cartão “Agora”, não sobre o desenho
+
+
 class JevFalso:
     """Responde como o Jev real: em dúvida na pergunta em português, seguro na variante em inglês."""
     source = "jev"
