@@ -442,10 +442,7 @@ class Licoes:
 
     def bloqueia_evolucao(self) -> bool:
         """Lição de estrutura ainda não corrigida: primeiro corrige, depois evolui."""
-        try:
-            self.reclassificar_ambiente()
-        except Exception:  # noqa: BLE001 — reclassificar nunca impede de decidir
-            pass
+        self.reclassificar_ambiente()
         return self.s.one("SELECT COUNT(*) n FROM licoes WHERE classe='estrutural' "
                           "AND status IN ('aberta','em_correcao','reincidente')")["n"] > 0
 

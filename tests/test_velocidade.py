@@ -140,3 +140,21 @@ def test_funil_medido_vira_a_primeira_pergunta_do_loop(circle):
     row = s.one("SELECT status, eixo FROM perguntas WHERE chave='funil:pergunta_para_item'")
     assert row and row["status"] in ("valida", "inconclusa") and r["candidatas"] >= 1
     assert indagador.resumo(s)["funil"]["etapas"]["pergunta_para_item"]["amostras"] == 3
+
+
+def test_trabalho_em_voo_nao_dorme_cinco_minutos(circle):
+    """Medido no Mac: 121 de 180 min eram descanso longo com um PR no CI. Em voo, o giro volta em segundos."""
+    from circulo import loop as lp
+    pol = circle.ctx.policy["loop"]
+    slept = []
+    circle.run_forever(max_ticks=2, sleep=slept.append)
+    assert sum(slept) == pol["idle_interval_seconds"] and circle.store.get("ritmo")["modo"] == "ocioso"
+    circle.store.x("INSERT INTO prs(number,titulo,status,created_at,updated_at) VALUES(7,'x','aberto',0,0)")
+    circle.store.set("idle_last", {"revisar_prs": circle.store.tick + 5})     # PR aberto, mas revisar_prs ainda no espaçamento
+    assert not circle.trabalho_pendente() and circle.em_voo()
+    slept.clear()
+    circle.run_forever(max_ticks=2, sleep=slept.append)
+    assert sum(slept) == lp.ESPERA_EM_VOO and circle.store.get("ritmo")["modo"] == "em_voo"
+    circle.store.x("DELETE FROM prs")
+    circle.store.set("corpo", {"estado": "validando"})
+    assert circle.em_voo()                                                    # código novo em prova: também é trabalho a caminho

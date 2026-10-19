@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.28.0 — 2026-10-19
+
+**O loop não dorme 5 min com trabalho a caminho.** Varredura medida no Mac (3 h, 62 giros, 6 PRs mesclados): 121 dos
+180 minutos eram "descanso" longo — o PR estava no CI, ou o Developer/gate esperava os 2 giros de espaçamento, e nada
+disso contava como "trabalho pendente", então o loop dormia 5 min por giro. O Developer trabalhou 39 min; estudo,
+planejador e Indagador somaram menos de 4.
+
+- **Ritmo em três níveis** (`loop.ritmo`): rápido (15 s) com trabalho pronto; **em voo (45 s)** quando há PR aberto
+  esperando CI/gate, tarefa com trabalho dentro do espaçamento ou corpo validando código novo; ocioso (5 min) só sem
+  nada a caminho. O espaçamento de 2 giros do gate e do Developer passa de ~10 min para ~1,5 min.
+- O modo atual fica em kv `ritmo` (rápido / em voo / ocioso) para o painel e o relatório.
+
 ## 1.27.0 — 2026-10-19
 
 **O Indagador vira especialista no próprio funil, e um 502 do GitHub não trava mais a evolução.** Medido no Mac à tarde:

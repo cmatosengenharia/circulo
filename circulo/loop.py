@@ -37,6 +37,9 @@ from .state import Store
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
+ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
+# Medido no Mac (19/10, 3 h): 121 de 180 min eram descanso de 5 min enquanto um PR esperava o CI ou o Developer esperava
+# os 2 giros de espaçamento. Em voo, o giro volta em 45 s; o descanso longo fica só para quando não há nada a caminho.
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
@@ -586,6 +589,28 @@ class Circle:
         except Exception:  # noqa: BLE001
             return False
 
+    def em_voo(self) -> bool:
+        """Trabalho a caminho que ainda não pode rodar neste giro: PR do Developer esperando CI/gate, tarefa com trabalho
+        dentro do espaçamento ou da recusa, corpo validando código novo. Não é 'pendente' (que pede giro de 15 s), mas
+        também não é ócio (5 min)."""
+        if self.controls()["pausado"]:
+            return False
+        s = self.store
+        if s.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0:
+            return True
+        if (s.get("corpo") or {}).get("estado") == "validando":
+            return True
+        return any(self._tem_trabalho(t) for t in TRABALHO)
+
+    def ritmo(self, r, pendente: bool) -> tuple[str, float]:
+        """(modo, segundos) do descanso: rápido com trabalho pronto, em voo com trabalho a caminho, ocioso sem nada."""
+        loop = self.ctx.policy["loop"]
+        if r.handled_event or pendente:
+            return "rapido", loop["interval_seconds"]
+        if self.em_voo():
+            return "em_voo", min(ESPERA_EM_VOO, loop["idle_interval_seconds"])
+        return "ocioso", loop["idle_interval_seconds"]
+
     def reclassificar_pendentes(self, limite: int = 20) -> int:
         """Autocorreção em finanças, sem perguntar: lançamentos de baixa confiança são reclassificados
         com as regras atuais (que evoluíram desde então). Só troca quando a confiança nova passa o limiar."""
@@ -806,7 +831,6 @@ class Circle:
                     break
                 if max_ticks is not None and n >= max_ticks:
                     break
-                loop = self.ctx.policy["loop"]
                 if r.paused and r.pause_reason == "humano":
                     self._rest(2, sleep, wake_on_input=False)                    # confere o botão com frequência
                 elif r.paused:
@@ -816,7 +840,9 @@ class Circle:
                 else:
                     pendente = self.trabalho_pendente()
                     self.store.set("trabalho_pendente", pendente)
-                    self._rest(loop["interval_seconds"] if (r.handled_event or pendente) else loop["idle_interval_seconds"], sleep)
+                    modo, segundos = self.ritmo(r, pendente)
+                    self.store.set("ritmo", {"modo": modo, "segundos": segundos, "em": time.time()})
+                    self._rest(segundos, sleep)
         finally:
             self.vigia.parar()
             self.store.set("batimento", None)
