@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.22.0 — 2026-10-18
+
+**Indagador: o agente da autoevolução. As perguntas são o ponto de partida, e o Jev classifica cada uma.**
+
+- **Novo agente `indagar`** (`indagador.py`), tarefa do giro como qualquer outra (aparece no Fluxo ao vivo). A cada
+  passagem olha o contexto de uma missão (a do loop ou qualquer missão cadastrada, em rodízio pelo mais esquecido, no
+  máximo a cada 6 h por missão) e levanta perguntas sem LLM, cada uma com evidência medida: critério mais fraco da
+  régua, ciclos rejeitados seguidos (Goodhart), verificação da saída falhando, gasto desproporcional; para o loop,
+  as candidatas do conselho de perspectivas.
+- **O Jev classifica cada pergunta, na mesma chamada**: `pertinente` (sim/não, com os dois lados descritos), `eixo`
+  (arquitetura · missão · operação · nenhum) e `acionável` (3 situações). Só a pertinente, com eixo e acionável vira
+  **válida**; em dúvida do Jev (a regra decidiu) fica **inconclusa** e volta depois — inconclusivo não passa; a
+  descartada fica registrada com a classificação completa.
+- **Ponto de partida**: o planejador do loop parte da pergunta válida (antes de voltar ao conselho) e o ciclo de melhoria
+  de cada missão parte da pergunta válida daquela missão (antes do modelo persona × critério).
+- **Seus pedidos entram pela mesma porta**: continuam virando item do roteiro (fila de estudo → Developer → portões),
+  nunca descartados; o Jev só anota eixo e pertinência no item e no registro de perguntas.
+- Painel: cartão “Indagador” na aba Evolução, com placar e as últimas classificações; `GET /api/indagador`.
+- Colunas novas em `perguntas`: `eixo`, `pertinencia`, `acionavel`, `classificacao`. A heurística da regra mora no
+  próprio módulo (`decision.py` fica abaixo do teto de 1000 linhas).
+- Testes: `tests/test_indagador.py` (classificação pelo Jev, descarte da genérica, dúvida vira inconclusa, consumo pelo
+  planejador/missão, pedido seu só anotado, rodízio e intervalo, painel).
+
 ## 1.21.1 — 2026-10-18
 
 - **Fluxo ao vivo sem balões:** a bolinha passa de agente em agente sem o balão de texto por cima do desenho. O que cada

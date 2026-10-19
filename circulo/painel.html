@@ -118,6 +118,9 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .list{list-style:none;margin:0;padding:0}
 .list li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline;justify-content:space-between}
 .list li:first-child{border-top:0}
+.indag-tot{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+#indag li{display:block;font-size:13px;line-height:1.4}
+#indag .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--line);margin-right:4px}
 .chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--muted)}
 .chip.applied,.chip.feito,.chip.resolvido{background:var(--ok-soft);color:var(--ok)}
 .chip.parcial,.chip.em_andamento{background:var(--jev-soft);color:var(--jev)}
@@ -484,6 +487,12 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
       <ul class="tl" id="tl"></ul>
     </section>
 
+    <section data-aba="evolucao" class="panel c12" aria-label="Indagador">
+      <h2>Indagador: as perguntas de onde a evolução parte</h2>
+      <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
+      <div class="indag-tot" id="indagTot"></div>
+      <ul class="list" id="indag"></ul>
+    </section>
     <section data-aba="evolucao" class="panel c7 zero-only" hidden>
       <h2>Roteiro do loop</h2>
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
@@ -1275,6 +1284,17 @@ function renderCamadas(v) {
 }
 $("#etapas").addEventListener("click", ev => { const b = ev.target.closest(".etapa"); if (b && b.dataset.run) abrirExecucao(b.dataset.run, b.dataset.chave); });
 $("#execs").addEventListener("click", ev => { const r = ev.target.closest("rect"); if (r) abrirExecucao(r.dataset.run); });
+async function refreshIndagador() {
+  try {
+    const j = await (await fetch("/api/indagador")).json();
+    const t = $("#indagTot"), ul = $("#indag");
+    if (!t || !ul) return;
+    t.textContent = j.total ? `${j.total} classificadas · ${j.validas} válidas esperando · ${j.usadas} viraram ponto de partida · ${j.descartadas} descartadas pelo Jev · ${j.inconclusas} em dúvida` : "O Indagador ainda não passou por nenhuma missão.";
+    const rot = {valida: "válida", feita: "em uso", virou_item: "virou item", entregue: "entregue", descartada: "descartada", inconclusa: "em dúvida", contestada: "contestada", repetida: "repetida"};
+    ul.innerHTML = (j.ultimas || []).map(p => `<li><span class="tag">${esc(p.cerebro === "loop" ? "loop" : p.cerebro.replace("missao:", "missão #"))}</span> <b>${esc(rot[p.status] || p.status)}</b> · eixo ${esc(p.eixo)} · pertinência ${Math.round((p.pertinencia || 0) * 100)}% · acionável ${p.acionavel ?? "?"}/2<br>${esc(p.texto)}</li>`).join("") || "<li>Nenhuma pergunta ainda.</li>";
+  } catch {}
+}
+setInterval(refreshIndagador, 15000); refreshIndagador();
 async function refreshCamadas() {
   if (!ZERO) return;
   try { renderCamadas(await (await fetch("/api/loop")).json()); } catch { $("#semaforo").dataset.c = ""; $("#semFrase").textContent = "Sem conexão com o painel"; }

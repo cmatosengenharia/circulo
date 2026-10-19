@@ -419,10 +419,12 @@ class Engine:
             fracos = sorted(visiveis, key=lambda c: notas.get(c["id"], 0))[:max(3, n)]
             # a melhoria parte de uma pergunta de quem usa esta missão (perspectivas do tipo, criadas pelo Questionador
             # uma vez por tipo; a pergunta do ciclo sai sem LLM). Em paralelo: uma pergunta e um critério por variante.
+            from . import indagador
             from .perguntas import pergunta_da_missao
             for i in range(n):
                 alvo = fracos[i % len(fracos)] if fracos else None
-                pq = pergunta_da_missao(self.ctx, p, alvo["texto"]) if alvo else None
+                v = indagador.proxima(self.s, f"missao:{p['id']}")        # pergunta que o Jev já validou para esta missão
+                pq = (v["id"], v["texto"]) if v else (pergunta_da_missao(self.ctx, p, alvo["texto"]) if alvo else None)
                 perguntas.append(pq)
                 pergunta_txt = f"Pergunta deste ciclo: {pq[1]}\n" if pq else ""
                 prompts.append(f"Pedido: {p['pedido']}\nFormato: {fmt}\n{pergunta_txt}Critérios mais fracos agora:\n" +

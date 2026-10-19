@@ -40,6 +40,7 @@ FAZ = {
     "evoluir_harness": "Testa prompts por A/B e promove o que rende mais.",
     "conectar_missoes": "Liga missões que se complementam para trocarem contexto e lições.",
     "jardinagem": "O jardineiro: mede padrões ruins se espalhando no código e abre item para podar o que cresce.",
+    "indagar": "O Indagador: levanta as perguntas pertinentes de cada missão e o Jev classifica (pertinente, eixo, acionável).",
     "jev": "Decide por tipos (sim/não, escolha, nota) antes de qualquer LLM; quando fica em dúvida, a regra decide.",
     "llm": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens).",
     "github": "Repositório: PRs, CI e merge.",
@@ -71,7 +72,7 @@ CURTO = {"orquestrador": "Orquestrador", "pedido": "Pedido seu", "decisao": "Esc
          "evoluir_projeto": "Missões", "meta_learner": "Aprendiz", "shadow": "Shadow", "licoes": "Lições", "saude": "Saúde",
          "analisar_padroes": "Padrões", "revisar_baixa_confianca": "Revisão", "rodar_regressao": "Regressão", "resumo": "Resumo",
          "propor_feature": "Melhorias", "evoluir_harness": "Prompts A/B", "conectar_missoes": "Conexões",
-         "jardinagem": "Jardineiro"}
+         "jardinagem": "Jardineiro", "indagar": "Indagador"}
 
 
 def nome_do_agente(chave: str) -> str:

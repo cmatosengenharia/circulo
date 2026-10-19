@@ -315,6 +315,9 @@ def make_handler(db_path: str):
                 c = _C()
                 c.store = self._store()
                 self._json(Conselho(c).resumo())
+            elif u.path == "/api/indagador":
+                from .indagador import resumo as indag
+                self._json(indag(self._store()))
             elif u.path == "/api/confianca":
                 from .confianca import confianca
                 self._json(confianca(self._store()))
