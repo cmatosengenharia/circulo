@@ -40,6 +40,7 @@ FAZ = {
     "evoluir_harness": "Testa prompts por A/B e promove o que rende mais.",
     "conectar_missoes": "Liga missões que se complementam para trocarem contexto e lições.",
     "jardinagem": "O jardineiro: mede padrões ruins se espalhando no código e abre item para podar o que cresce.",
+    "vigia": "O Vigia: em paralelo ao giro, mede as travas da autoevolução, o Jev classifica e ele abre item, alerta ou observa.",
     "indagar": "O Indagador: levanta as perguntas pertinentes de cada missão e o Jev classifica (pertinente, eixo, acionável).",
     "jev": "Decide por tipos (sim/não, escolha, nota) antes de qualquer LLM; quando fica em dúvida, a regra decide.",
     "llm": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens).",
@@ -72,7 +73,7 @@ CURTO = {"orquestrador": "Orquestrador", "pedido": "Pedido seu", "decisao": "Esc
          "evoluir_projeto": "Missões", "meta_learner": "Aprendiz", "shadow": "Shadow", "licoes": "Lições", "saude": "Saúde",
          "analisar_padroes": "Padrões", "revisar_baixa_confianca": "Revisão", "rodar_regressao": "Regressão", "resumo": "Resumo",
          "propor_feature": "Melhorias", "evoluir_harness": "Prompts A/B", "conectar_missoes": "Conexões",
-         "jardinagem": "Jardineiro", "indagar": "Indagador"}
+         "jardinagem": "Jardineiro", "indagar": "Indagador", "vigia": "Vigia"}
 
 
 def nome_do_agente(chave: str) -> str:
@@ -362,6 +363,13 @@ def obras(store: Store) -> list[dict]:
     if corpo.get("sha"):
         add("atualizar_corpo", f"Rodando {corpo['sha'][:7]}", f"{corpo.get('estado')} · {corpo.get('giros_ok', 0)} giro(s) sem erro",
             corpo.get("checado_em"), f"{gh}/commit/{corpo['sha']}" if gh else None)
+    vg = store.one("SELECT titulo, veredito, acao, item_id, primeira_em FROM vigia WHERE status='aberta' ORDER BY gravidade DESC LIMIT 1")
+    if vg:
+        add("vigia", vg["titulo"], f"{vg['veredito']} · {vg['acao']}" + (f" · item #{vg['item_id']}" if vg["item_id"] else ""), vg["primeira_em"])
+    else:
+        ult = store.get("vigia_ultima") or {}
+        if ult:
+            add("vigia", "Nenhuma trava na autoevolução", f"{ult.get('achados', 0)} achado(s) na última passagem", ult.get("em"))
     pq = store.one("SELECT texto, status, eixo, created_at FROM perguntas WHERE eixo IS NOT NULL ORDER BY id DESC LIMIT 1")
     if pq:
         add("indagar", pq["texto"][:140], f"{pq['status']} · eixo {pq['eixo']}", pq["created_at"])

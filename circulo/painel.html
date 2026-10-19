@@ -118,6 +118,14 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .list{list-style:none;margin:0;padding:0}
 .list li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline;justify-content:space-between}
 .list li:first-child{border-top:0}
+.vigia .vg-cab{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.vg-chip{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;background:var(--line);vertical-align:middle;margin-left:6px;text-transform:none;letter-spacing:0}
+.vg-chip[data-s=livre]{background:#D7EEE7;color:#1C8C6E}.vg-chip[data-s=travado]{background:#F6DCD8;color:#C0392B}.vg-chip[data-s=observando]{background:#F6E8D2;color:#B7791F}
+.vg-meta{font-size:12.5px;color:var(--muted)}
+#vigiaLista li,#vigiaHist li{display:block;font-size:13px;line-height:1.4}
+#vigiaLista .g{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--line)}
+#vigiaLista .g[data-v=trava]{background:#C0392B}#vigiaLista .g[data-v=em_duvida]{background:#B7791F}
+.vg-hist{margin-top:8px;font-size:13px}.vg-hist summary{cursor:pointer;color:var(--muted)}
 .indag-tot{font-size:12.5px;color:var(--muted);margin-bottom:6px}
 #indag li{display:block;font-size:13px;line-height:1.4}
 #indag .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--line);margin-right:4px}
@@ -432,6 +440,13 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
     <div class="cf-barra"><h2 style="margin:0">Sinapses ao vivo <small class="sub">cada verificação de cada neurônio, no momento em que acontece</small></h2>
       <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
     <ul class="sinapses" id="sinapses" aria-live="off"></ul>
+  </section>
+  <section data-aba="geral" class="panel vigia zero-only" hidden id="vigia" aria-label="Vigia da autoevolução">
+    <div class="vg-cab"><h2 style="margin:0">Vigia da autoevolução <span class="vg-chip" id="vigiaChip">—</span></h2>
+      <span class="vg-meta" id="vigiaMeta"></span></div>
+    <p class="sub" style="margin:6px 0 8px">Um agente paralelo ao giro mede, a cada minuto, se a evolução está andando: pergunta validada sem item, Developer parado com fila, PR preso, corpo atrás do GitHub, giro travado, Jev em dúvida crônica, fila seca. Cada achado passa pelo Jev; com confiança alta ele abre item ou alerta, com média só alerta, em dúvida observa e mede de novo.</p>
+    <ul class="list" id="vigiaLista"></ul>
+    <details class="vg-hist"><summary>Resolvidas recentemente</summary><ul class="list" id="vigiaHist"></ul></details>
   </section>
   <div data-aba="geral" class="about" id="about"></div>
   <div data-aba="geral" class="kpis" id="kpis" aria-label="Números ao vivo"></div>
@@ -1284,6 +1299,21 @@ function renderCamadas(v) {
 }
 $("#etapas").addEventListener("click", ev => { const b = ev.target.closest(".etapa"); if (b && b.dataset.run) abrirExecucao(b.dataset.run, b.dataset.chave); });
 $("#execs").addEventListener("click", ev => { const r = ev.target.closest("rect"); if (r) abrirExecucao(r.dataset.run); });
+async function refreshVigia() {
+  try {
+    const j = await (await fetch("/api/vigia")).json();
+    const chip = $("#vigiaChip"); if (!chip) return;
+    chip.dataset.s = j.estado; chip.textContent = j.estado === "livre" ? "sem travas" : j.estado === "travado" ? `${j.travas} trava(s)` : "observando";
+    $("#vigiaMeta").textContent = j.ultima_em ? `última passagem ${new Date(j.ultima_em * 1000).toLocaleTimeString("pt-BR")} · ${j.sondas.length} sondas a cada ${j.intervalo_s} s` : "ainda não passou";
+    const rot = {abrir_item: "abriu item", alertar: "alertou", observar: "observando", ignorar: "ignorado"};
+    const ver = {trava: "trava", em_duvida: "Jev em dúvida", nao_trava: "não é trava"};
+    $("#vigiaLista").innerHTML = (j.abertas || []).map(a => `<li><span class="g" data-v="${esc(a.veredito)}"></span><b>${esc(a.titulo)}</b><br>
+      <span style="color:var(--muted)">${esc(ver[a.veredito] || a.veredito)} (${Math.round((a.conf || 0) * 100)}%) · ${esc(rot[a.acao] || a.acao)}${a.item_id ? ` · item #${a.item_id}` : ""} · desde ${new Date(a.primeira_em * 1000).toLocaleTimeString("pt-BR")} · visto ${a.vezes}×<br>${esc(a.sugestao || "")}</span></li>`).join("")
+      || `<li style="color:var(--muted)">Nenhuma trava aberta. A evolução está andando.</li>`;
+    $("#vigiaHist").innerHTML = (j.resolvidas || []).map(r => `<li>${esc(r.titulo)} <span style="color:var(--muted)">· ${esc(rot[r.acao] || r.acao)} · resolvida ${new Date(r.resolvida_em * 1000).toLocaleTimeString("pt-BR")}</span></li>`).join("") || "<li style=\"color:var(--muted)\">Nenhuma ainda.</li>";
+  } catch {}
+}
+setInterval(refreshVigia, 15000); refreshVigia();
 async function refreshIndagador() {
   try {
     const j = await (await fetch("/api/indagador")).json();

@@ -98,6 +98,8 @@ class Circle:
         self.memory = Memory(self.ctx.store, self.ctx.dl)
         self.lab = HarnessLab(self.ctx)
         self.engine = Engine(self.ctx, self.memory, self.lab)
+        from .vigia import Vigia
+        self.vigia = Vigia(self.ctx)          # vigia as travas da autoevolução em paralelo ao giro
         self.graph = MissionGraph(self.ctx, self.memory)
         self.engine.graph = self.graph
         self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
@@ -760,6 +762,7 @@ class Circle:
         from .configuracao import ENV_FILE
         self._env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
         self._iniciado_em = time.time()
+        self.vigia.iniciar()
         n = 0
         try:
             while not self._stop.is_set():
@@ -790,5 +793,6 @@ class Circle:
                     self.store.set("trabalho_pendente", pendente)
                     self._rest(loop["interval_seconds"] if (r.handled_event or pendente) else loop["idle_interval_seconds"], sleep)
         finally:
+            self.vigia.parar()
             self.store.set("batimento", None)
         self.store.set("loop_status", "parado")

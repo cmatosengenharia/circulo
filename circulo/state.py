@@ -407,6 +407,25 @@ CREATE TABLE IF NOT EXISTS frescor (
 );
 CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
 
+CREATE TABLE IF NOT EXISTS vigia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  evidencia TEXT,
+  sugestao TEXT,
+  gravidade REAL,
+  veredito TEXT,                 -- trava | nao_trava | em_duvida
+  acao TEXT,                     -- abrir_item | alertar | observar | ignorar
+  conf REAL,
+  classificacao TEXT,
+  status TEXT NOT NULL,          -- aberta | resolvida
+  item_id INTEGER,
+  primeira_em REAL NOT NULL,
+  ultima_em REAL NOT NULL,
+  resolvida_em REAL,
+  vezes INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS run_errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT,                    -- execução (giro) em que o erro aconteceu: o painel abre o erro por ele

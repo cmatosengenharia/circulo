@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.24.0 — 2026-10-18
+
+**Vigia: o validador paralelo das travas da autoevolução.** Para você não precisar perguntar no chat se o loop está
+evoluindo.
+
+- **Thread própria** (`vigia.py`, a cada 60 s, independente do giro; pega inclusive giro travado). Para junto com o loop.
+- **13 sondas** com evidência medida (SQL, sem LLM): pergunta validada parada, porteiro recusando a mesma tarefa 3+
+  vezes, Developer parado com item pronto, fila seca, PR preso, corpo atrás do GitHub / validação longa, lição de
+  estrutura bloqueando há horas, Jev em dúvida crônica numa pergunta, estagnação, missão sem ciclo, Claude Code no
+  limite, giro travado numa etapa, orçamento esgotado.
+- **Jev First**: cada achado novo vai ao Jev na mesma chamada: `vigia_trava` (sim/não, os dois lados descritos) e
+  `vigia_acao` (abrir item · alertar · observar, com a situação de cada um). Roteamento por confiança: alta → faz o que
+  o Jev escolheu; média → no máximo alerta; baixa/regra → observa e pergunta de novo. A heurística da regra mora no
+  módulo do agente.
+- **Age sozinho**: abre item no roteiro (origem loop, evidência e sugestão; segue estudo → Developer → portões), alerta
+  na linha do tempo, ou registra. Sem duplicar: trava aberta não é realertada; quando a sonda para de disparar, marca
+  resolvida e avisa quanto tempo durou.
+- Painel: card "Vigia da autoevolução" no topo da Visão geral (estado, travas abertas com veredito, confiança, ação,
+  desde quando, sugestão; resolvidas recentes); `GET /api/vigia`; o Vigia aparece no Fluxo e em "o que cada agente
+  construiu". Tabela nova `vigia`.
+- Testes: sondas só com evidência, classificação e ação por confiança, item único, dúvida observa, thread paralela,
+  painel.
+
 ## 1.23.1 — 2026-10-18
 
 - **Pergunta validada pelo Jev agora vira trabalho.** No Mac, 3 perguntas válidas do Indagador ficaram paradas: o

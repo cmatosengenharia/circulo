@@ -201,8 +201,8 @@ class LocalJev:
                 v = self._valor_missao(c) if c else 0
                 out[qid] = Decision(qid, "score", 2.0 if v >= 2.5 else 1.0 if v >= 0.6 else 0.0, 0.6, self.source)
                 continue
-            if qid.startswith("indaga_"):
-                out[qid] = self._indaga(qid, q, state)
+            if qid.startswith(("indaga_", "vigia_")):      # a heurística mora no módulo do agente
+                out[qid] = self._agente(qid, q, state)
                 continue
             if qid.startswith("mens_"):
                 txt = norm(q.instructions.split("?", 1)[-1])
@@ -230,9 +230,9 @@ class LocalJev:
         p = min(1.0, max(0.0, p))
         return Decision(qid, "noul", p, abs(2 * p - 1), self.source)
 
-    def _indaga(self, qid, q: Question, state):
-        from .indagador import regra          # a heurística mora com o agente; a regra só decide quando o Jev está em dúvida
-        return regra(self, qid, q, state)
+    def _agente(self, qid, q: Question, state):
+        from . import indagador, vigia
+        return (indagador if qid.startswith("indaga_") else vigia).regra(self, qid, q, state)
 
     # --- porteiros
     def _q_worth_spending(self, q, s):
