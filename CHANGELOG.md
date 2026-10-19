@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.30.0 — 2026-10-19
+
+**O Indagador vira um dos agentes mais atuantes.** Medido no Mac (3 h, 62 giros): rodou 3 vezes, 0,0 min — embora TODOS
+os itens do loop do dia tenham nascido de uma pergunta dele. Dois motivos: era manutenção em rodízio com outras 8
+tarefas, e as perguntas do conselho têm chave fixa (uma vez julgadas, somem por 3 dias), então ele ficava sem o que
+perguntar.
+
+- **Perguntas por assunto, com evidência medida** (`candidatas_especialista`): cada lição que repete ou reincide, cada
+  trava aberta do Vigia, cada pergunta em que o Jev duvida (≥30% pela regra ou confiança <0,3 em 24 h), cada neurônio
+  barrado ≥3 vezes, cada PR fechado sem merge, cada arquivo que cruzou PRs paralelos, cada item 3× mais lento que a
+  mediana e cada missão ativa sem régua vira uma pergunta própria. Assunto novo = pergunta nova; nada de LLM.
+- **Ritmo**: indagar passa a ser trabalho real do giro (roda assim que precisa, não no rodízio). Com vaga na fila de
+  válidas volta em 5 min; com a fila cheia (agora 5 perguntas) em 1 h; sem candidata nova, em 30 min. Cada passagem
+  custa uma chamada ao Jev.
+- Ordem das candidatas: funil da autoevolução → especialista (por relevância) → conselho; o que já foi julgado não volta.
+
 ## 1.29.0 — 2026-10-19
 
 **Vários PRs do Developer em paralelo, com o Revisor validando cada um dentro do ecossistema.** (Mudança na constituição

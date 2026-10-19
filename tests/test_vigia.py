@@ -154,6 +154,7 @@ def test_porteiro_grava_a_decisao_sobre_a_pergunta_a_cada_ciclo(circle):
     from circulo.planejador import PORTEIRO
     _trava_pergunta(circle)
     pid = _pergunta_id(circle)
+    circle.store.set("indagador", {"loop": __import__("time").time()})   # o Indagador não toma o giro deste teste
     circle.planejador = _PlanejadorParado()
     _porteiro(circle, 0.33)
     circle.idle()

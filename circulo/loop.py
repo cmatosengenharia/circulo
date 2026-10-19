@@ -35,7 +35,9 @@ from .policy import PolicyStore
 from .state import Store
 
 # trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
-TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro")
+TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar")
+# indagar entrou no TRABALHO em 1.30: era manutenção em rodízio com outras 8 e rodou 3 vezes em 3 h; as perguntas são o
+# começo da autoevolução, então rodam a cada giro em que o Indagador tem o que perguntar (ele mesmo dosa o intervalo).
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
 # Medido no Mac (19/10, 3 h): 121 de 180 min eram descanso de 5 min enquanto um PR esperava o CI ou o Developer esperava
@@ -536,6 +538,9 @@ class Circle:
             return self.self_dev is not None and self.estudo.precisa()
         if t == "revisar_prs":
             return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
+        if t == "indagar":
+            from . import indagador
+            return indagador.precisa(self.store, self.engine)
         return False
 
     # ------------------------------------------------------------ neurônio de progresso

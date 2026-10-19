@@ -66,9 +66,15 @@ def test_indagador_volta_logo_quando_nao_ha_pergunta_valida(circle):
     s.set("indagador", {"loop": time.time() - indagador.INTERVALO_FOME - 1})
     assert indagador.proximo_cerebro(s) is not None                   # sem válida esperando: 30 min, não 6 h
     agora = time.time()
-    s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,created_at,updated_at) VALUES('k','arquiteto','q?','valida','loop',0.5,?,?)",
-        (agora, agora))
-    assert indagador.proximo_cerebro(s) is None                       # com válida esperando: volta ao intervalo longo
+    for i in range(indagador.MAX_VALIDAS):
+        s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,created_at,updated_at) VALUES(?,'arquiteto','q?','valida','loop',0.5,?,?)",
+            (f"k{i}", agora, agora))
+    assert indagador.proximo_cerebro(s) is None                       # estoque cheio: volta ao intervalo longo
+    s.x("DELETE FROM perguntas")
+    s.set("indagador_vazio", {"loop": time.time()})                   # última passagem sem candidata nova: espera mais
+    assert indagador.proximo_cerebro(s) is None
+    s.set("indagador", {"loop": time.time() - indagador.INTERVALO_VAZIO - 1})
+    assert indagador.proximo_cerebro(s) is not None
 
 
 def test_vigia_cita_o_motivo_medido_do_planejador_e_age_de_novo_se_a_trava_persiste(circle):
@@ -158,3 +164,44 @@ def test_trabalho_em_voo_nao_dorme_cinco_minutos(circle):
     circle.store.x("DELETE FROM prs")
     circle.store.set("corpo", {"estado": "validando"})
     assert circle.em_voo()                                                    # código novo em prova: também é trabalho a caminho
+
+
+def test_indagador_especialista_pergunta_por_assunto_com_evidencia(circle):
+    """1.30: lição que reincide, trava do Vigia, pergunta em que o Jev duvida, PR fechado — cada assunto vira pergunta própria."""
+    s = circle.store
+    agora = time.time()
+    s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,ultima_tick,created_at,updated_at) "
+        "VALUES('a','developer:testes','trabalho','developer:testes: tests/test_x.py falhou','p','validada',4,1,1,2,?,?)", (agora, agora))
+    s.x("INSERT INTO vigia(chave,titulo,evidencia,sugestao,gravidade,veredito,acao,conf,classificacao,status,primeira_em,ultima_em,vezes) "
+        "VALUES('pr_preso','PR #9 preso há 70 min','{}','s',0.8,'trava','alertar',0.7,'{}','aberta',?,?,12)", (agora - 4200, agora))
+    for i in range(24):
+        s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at) VALUES(?,?,?,?,?,?)",
+            (i, "worth_spending", "0.5", 0.1, "local" if i % 2 else "jev", agora - 60 * i))
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(77,1,'PR que caiu','b','fechado',?,?)", (agora - 600, agora - 60))
+    s.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(77,'s',0,'checks falhando: Testes','{}',?)", (agora - 120,))
+    chaves = {c["chave"] for c in indagador.candidatas_especialista(s)}
+    lic = s.one("SELECT id FROM licoes WHERE assinatura='a'")["id"]
+    assert {f"licao:{lic}", "vigia:pr_preso", "jev:worth_spending", "pr_fechado:77"} <= chaves
+    cands = indagador.candidatas(circle.ctx, None)
+    assert cands and all(c["evidencia"]["base"] == "medido" for c in cands) and len(cands) <= indagador.MAX_CANDIDATAS
+    r = indagador.indagar(circle.ctx, None)
+    assert r["candidatas"] >= 4
+    assert s.one("SELECT COUNT(*) n FROM perguntas WHERE chave LIKE 'licao:%' OR chave LIKE 'vigia:%' OR chave LIKE 'jev:%'")["n"] >= 2
+    # a passagem seguinte não repete o que já foi julgado; sem candidata nova marca "vazio" e espera mais
+    antes = s.one("SELECT COUNT(*) n FROM perguntas")["n"]
+    for _ in range(3):
+        indagador.indagar(circle.ctx, None)
+    assert s.one("SELECT COUNT(*) n FROM perguntas")["n"] - antes <= indagador.MAX_CANDIDATAS * 2
+    assert "loop" in (s.get("indagador_vazio") or {}) or s.one("SELECT COUNT(*) n FROM perguntas")["n"] > antes
+
+
+def test_indagar_e_trabalho_real_roda_assim_que_precisa(circle):
+    """1.30: indagar deixou o rodízio de manutenção; com vaga na fila de válidas, é escolhido já no giro."""
+    from circulo import loop as lp
+    assert "indagar" in lp.TRABALHO
+    s = circle.store
+    s.set("indagador", {"loop": time.time() - indagador.INTERVALO_FOME - 1})
+    assert circle._tem_trabalho("indagar") and circle.trabalho_pendente()
+    r = circle.tick()
+    assert r.idle_task == "indagar"
+    assert time.time() - float((s.get("indagador") or {}).get("loop", 0)) < 60

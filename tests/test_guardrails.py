@@ -51,6 +51,7 @@ def test_rollback_conta_e_oscilacao_bloqueia(circle):
 
 
 def test_orcamento_de_mudancas_nivel2(circle, monkeypatch):
+    circle.store.set("indagador", {"loop": __import__("time").time()})   # o Indagador não toma o giro deste teste
     monkeypatch.setattr(guardrails, "MAX_LEVEL2_PER_DAY", 0)
     for i in range(10):
         say(circle, f"{10 + i} uber")

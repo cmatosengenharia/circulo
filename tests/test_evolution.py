@@ -56,6 +56,7 @@ def test_reviewer_finance_rejeita_regra_que_quebra_historico(circle):
 
 
 def test_evolucao_do_circulo_vai_para_shadow(circle):
+    circle.store.set("indagador", {"loop": __import__("time").time()})   # o Indagador não toma o giro deste teste
     # 10 aceitos automaticamente, 3 errados => propõe subir o limiar (nível 2)
     for i in range(10):
         say(circle, f"{10 + i} uber")

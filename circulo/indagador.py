@@ -40,10 +40,13 @@ ACAO = ("a pergunta é tão ampla ou vaga que nenhum item pequeno a responde (ex
         "a pergunta cabe num item pequeno e medível: dá para dizer o que muda, onde, e como se mede que respondeu")
 PERTINENTE_MIN = 0.6
 ACAO_MIN = 1
-INTERVALO = 6 * 3600          # cada cérebro (loop ou missão) é indagado no máximo a cada 6 h...
-INTERVALO_FOME = 1800         # ...ou a cada 30 min quando não tem nenhuma pergunta válida esperando (a evolução não seca)
-MAX_VALIDAS = 3               # com 3 perguntas válidas esperando, não faz mais até consumirem
-MAX_CANDIDATAS = 5
+# Ritmo (1.30): o Indagador é um dos agentes mais atuantes. Com vaga na fila de válidas, volta a cada INTERVALO_FOME;
+# só espera INTERVALO quando a fila está cheia, e INTERVALO_VAZIO quando a última passagem não achou pergunta nova.
+INTERVALO = 3600              # fila de válidas cheia: volta em 1 h
+INTERVALO_FOME = 300          # há vaga: volta em 5 min (cada passagem só custa uma chamada ao Jev)
+INTERVALO_VAZIO = 1800        # a última passagem não tinha candidata nova: 30 min até haver evidência nova
+MAX_VALIDAS = 5               # estoque de perguntas válidas esperando o planejador
+MAX_CANDIDATAS = 6
 
 
 def _um(s, sql, args=()):
@@ -90,11 +93,13 @@ def candidatas(ctx, project: dict | None) -> list[dict]:
     s = ctx.store
     if project is None:
         from .perguntas import Conselho
-        # primeiro o funil da própria autoevolução (onde o tempo está indo), depois os sinais do conselho
+        # primeiro o funil (onde o tempo está indo), depois o especialista (assunto a assunto), depois o conselho
         out = candidatas_funil(s)
+        out += sorted(candidatas_especialista(s), key=lambda c: -c["relevancia"])
         out += [{"chave": p.id, "persona": p.persona, "texto": p.texto, "relevancia": p.relevancia,
                  "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()]
-        return out[:MAX_CANDIDATAS]
+        fora = ja_julgadas(s, "loop")
+        return [c for c in out if c["chave"] not in fora][:MAX_CANDIDATAS]
     from .perguntas import personas_da_missao
     c = contexto(s, project)
     ps = personas_da_missao(ctx, project["tipo"], project["pedido"])
@@ -175,6 +180,118 @@ def ja_julgadas(store, cerebro: str, agora: float | None = None) -> set[str]:
         if r["n"] >= INCONCLUSAS_MAX or agora - float(r["ultima"]) < INCONCLUSA_HORAS * 3600:
             fora.add(r["chave"])
     return fora
+
+
+# ------------------------------------------------------------------ o especialista: perguntas por ASSUNTO, com evidência
+# Cada chave carrega o assunto (lição #12, trava X, pergunta do Jev Y, arquivo Z): assunto novo = pergunta nova. Era isso
+# que faltava: as perguntas do conselho têm chave fixa e, uma vez julgadas, somem por 3 dias; o Indagador ficava sem o
+# que perguntar e rodava 3 vezes em 3 h.
+def _esp_licoes(s, agora):
+    out = []
+    for r in s.q("SELECT id, descricao, classe, ocorrencias, reincidencias, camada FROM licoes WHERE status IN ('aberta','validada','reincidente','em_correcao') "
+                 "AND classe!='ambiente' AND (ocorrencias>=2 OR reincidencias>=1) ORDER BY reincidencias DESC, ocorrencias DESC LIMIT 6"):
+        out.append({"chave": f"licao:{r['id']}", "persona": "curador_licoes", "relevancia": min(1.0, 0.4 + 0.1 * r["ocorrencias"] + 0.3 * r["reincidencias"]),
+                    "texto": f"A lição #{r['id']} ({r['descricao'][:90]}) ocorreu {r['ocorrencias']} vez(es)"
+                             + (f" e reincidiu {r['reincidencias']}x" if r["reincidencias"] else "")
+                             + ": que mudança de estrutura torna esse erro impossível, em vez de só um teste a mais?",
+                    "evidencia": {"licao": r["id"], "ocorrencias": r["ocorrencias"], "reincidencias": r["reincidencias"], "camada": r["camada"]}})
+    return out
+
+
+def _esp_vigia(s, agora):
+    out = []
+    for r in s.q("SELECT chave, titulo, gravidade, vezes, primeira_em FROM vigia WHERE status='aberta' AND veredito='trava' ORDER BY gravidade DESC LIMIT 4"):
+        mins = int((agora - float(r["primeira_em"] or agora)) / 60)
+        out.append({"chave": f"vigia:{r['chave']}", "persona": "operador", "relevancia": min(1.0, float(r["gravidade"] or 0.5)),
+                    "texto": f"O Vigia mede a trava “{r['titulo'][:100]}” há {mins} min ({r['vezes']} passagens): que mudança no loop "
+                             "evita que essa trava apareça de novo, sem depender do humano?",
+                    "evidencia": {"trava": r["chave"], "minutos": mins, "gravidade": r["gravidade"], "vezes": r["vezes"]}})
+    return out
+
+
+def _esp_jev(s, agora):
+    out = []
+    for r in s.q("SELECT question q, COUNT(*) n, SUM(source='local') regra, AVG(confidence) conf FROM decisions WHERE created_at>=? "
+                 "GROUP BY question HAVING n>=20 AND (regra*1.0/n>=0.3 OR conf<0.3) ORDER BY regra*1.0/n DESC LIMIT 4", (agora - 86400,)):
+        taxa = r["regra"] / r["n"]
+        out.append({"chave": f"jev:{r['q']}", "persona": "economista", "relevancia": min(1.0, 0.4 + taxa),
+                    "texto": f"O Jev decide “{r['q']}” com dúvida (a regra decidiu {taxa:.0%} de {r['n']} vezes em 24 h, confiança média {float(r['conf'] or 0):.2f}): "
+                             "que dado medido falta no estado dessa pergunta para ele decidir com confiança?",
+                    "evidencia": {"pergunta": r["q"], "decisoes_24h": r["n"], "pela_regra": r["regra"], "confianca_media": round(float(r["conf"] or 0), 2)}})
+    return out
+
+
+def _esp_neuronios(s, agora):
+    out = []
+    for r in s.q("SELECT ponto, COUNT(*) n, SUM(ok=0) f FROM verificacoes WHERE created_at>=? GROUP BY ponto HAVING f>=3 ORDER BY f DESC LIMIT 4", (agora - 86400,)):
+        out.append({"chave": f"neuronio:{r['ponto']}", "persona": "operador", "relevancia": min(1.0, 0.3 + r["f"] / max(r["n"], 1)),
+                    "texto": f"O neurônio {r['ponto']} foi barrado {r['f']} de {r['n']} vezes em 24 h: qual é a causa que se repete e o que a evita antes de gastar?",
+                    "evidencia": {"ponto": r["ponto"], "falhas_24h": r["f"], "total_24h": r["n"]}})
+    return out
+
+
+def _esp_prs(s, agora):
+    out = []
+    for r in s.q("SELECT p.number, p.titulo, (SELECT reason FROM merges m WHERE m.pr=p.number ORDER BY m.id DESC LIMIT 1) motivo "
+                 "FROM prs p WHERE p.status='fechado' AND p.updated_at>=? ORDER BY p.updated_at DESC LIMIT 3", (agora - 86400,)):
+        out.append({"chave": f"pr_fechado:{r['number']}", "persona": "arquiteto", "relevancia": 0.7,
+                    "texto": f"O PR #{r['number']} (“{(r['titulo'] or '')[:70]}”) fechou sem merge ({(r['motivo'] or 'motivo não registrado')[:80]}): "
+                             "que portão antes do PR teria evitado o gasto, e como medi-lo?",
+                    "evidencia": {"pr": r["number"], "motivo": r["motivo"]}})
+    arquivos: dict[str, int] = {}
+    for r in s.q("SELECT evidencia FROM revisoes WHERE veredito='rejeitado' AND created_at>=?", (agora - 7 * 86400,)):
+        try:
+            for c in json.loads(r["evidencia"] or "{}").get("compartilhados") or []:
+                for a in c.get("arquivos") or []:
+                    arquivos[a] = arquivos.get(a, 0) + 1
+        except ValueError:
+            continue
+    for a, n in sorted(arquivos.items(), key=lambda kv: -kv[1])[:2]:
+        if n >= 2:
+            out.append({"chave": f"revisor:{a}", "persona": "arquiteto", "relevancia": min(1.0, 0.4 + 0.15 * n),
+                        "texto": f"O arquivo {a} cruzou PRs paralelos {n} vez(es) em 7 dias (o Revisor rejeitou): dividir o módulo ou serializar quem o toca?",
+                        "evidencia": {"arquivo": a, "cruzamentos_7d": n}})
+    return out
+
+
+def _esp_itens(s, agora):
+    out = []
+    feitos = [float(r["updated_at"]) - float(r["created_at"]) for r in s.q(
+        "SELECT created_at, updated_at FROM roadmap WHERE status='feito' AND origem IN ('loop','erro') AND updated_at>=?", (agora - 86400,))]
+    if len(feitos) >= 3:
+        med = sorted(feitos)[len(feitos) // 2]
+        for r in s.q("SELECT id, titulo, created_at, updated_at FROM roadmap WHERE status='feito' AND origem IN ('loop','erro') AND updated_at>=? "
+                     "ORDER BY (updated_at-created_at) DESC LIMIT 2", (agora - 86400,)):
+            dur = float(r["updated_at"]) - float(r["created_at"])
+            if dur > 3 * med and dur > 1800:
+                out.append({"chave": f"item_lento:{r['id']}", "persona": "operador", "relevancia": min(1.0, 0.4 + dur / (6 * med)),
+                            "texto": f"O item #{r['id']} (“{r['titulo'][:70]}”) levou {dur / 60:.0f} min até entrar (mediana do dia {med / 60:.0f}): onde ele esperou, e qual espera era evitável?",
+                            "evidencia": {"item": r["id"], "minutos": round(dur / 60), "mediana_min": round(med / 60)}})
+    return out
+
+
+def _esp_missoes(s, agora):
+    out = []
+    for r in s.q("SELECT id, nome, tipo FROM projects WHERE kit!='circulo' AND status='ativo' AND COALESCE(pausada,0)=0 "
+                 "AND id NOT IN (SELECT project_id FROM rubrics)"):
+        out.append({"chave": f"missao:{r['id']}:sem_regua", "persona": "cientista", "relevancia": 0.8,
+                    "texto": f"A missão “{r['nome']}” ({r['tipo']}) está ativa sem régua: que critérios medidos dizem se ela está entregando valor ao Cássio?",
+                    "evidencia": {"missao": r["id"], "rubricas": 0}})
+    return out
+
+
+ESPECIALISTA = (_esp_vigia, _esp_licoes, _esp_jev, _esp_neuronios, _esp_prs, _esp_itens, _esp_missoes)
+
+
+def candidatas_especialista(store) -> list[dict]:
+    """Perguntas por assunto, todas com evidência medida (SQL, sem LLM)."""
+    agora = time.time()
+    out = []
+    for f in ESPECIALISTA:
+        out += f(store, agora)
+    for c in out:
+        c["evidencia"]["base"] = "medido"
+    return out
 
 
 # ------------------------------------------------------------------ o funil da autoevolução (medido)
@@ -261,6 +378,12 @@ def indagar(ctx, project: dict | None = None) -> dict:
     marcas = dict(s.get("indagador") or {})
     marcas[cer] = agora
     s.set("indagador", marcas)
+    vazios = dict(s.get("indagador_vazio") or {})
+    if cands:
+        vazios.pop(cer, None)
+    else:
+        vazios[cer] = agora                  # nada novo para perguntar: volta em INTERVALO_VAZIO, não em 5 min
+    s.set("indagador_vazio", vazios)
     validas = [c for c in res if c["veredito"] == "valida"]
     if validas and callable(getattr(ctx, "reply", None)):
         nome = "o loop" if project is None else (project.get("nome") or f"missão {project['id']}")
@@ -287,9 +410,9 @@ def proximo_cerebro(store, engine=None) -> dict | None:
         cer = cerebro_de(p)
         em = float(marcas.get(cer, 0))
         validas = _um(store, "SELECT COUNT(*) FROM perguntas WHERE cerebro=? AND status='valida'", (cer,))
-        if agora - em < (INTERVALO_FOME if validas == 0 else INTERVALO):
-            continue
-        if validas >= MAX_VALIDAS:
+        vazio = float((store.get("indagador_vazio") or {}).get(cer, 0))
+        espera = INTERVALO if validas >= MAX_VALIDAS else (INTERVALO_VAZIO if vazio >= em else INTERVALO_FOME)
+        if agora - em < espera:
             continue
         if pior_em is None or em < pior_em:
             pior, pior_em = {"project": p}, em
