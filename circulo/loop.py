@@ -407,7 +407,7 @@ class Circle:
         from . import indagador
         if indagador.precisa(self.store, self.engine) and "indagar" not in tasks:
             tasks.append("indagar")
-        if self.self_dev is not None and self.self_dev.tem_trabalho() and "corrigir_codigo" not in tasks:
+        if self._dev_tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
             tasks.append("atualizar_corpo")
@@ -504,11 +504,19 @@ class Circle:
         except Exception:  # noqa: BLE001 — rede fora: tenta de novo na próxima checagem
             return False
 
+    def _dev_tem_trabalho(self) -> bool:
+        """A fila do Developer, mais o sub-item liberado de um item dividido (que a fila normal não pega)."""
+        dev = self.self_dev
+        if dev is None:
+            return False
+        from . import fatiador
+        return dev.tem_trabalho() or (not dev.busy() and not dev.em_espera() and fatiador.tem_trabalho(self.store))
+
     def _tem_trabalho(self, t: str) -> bool:
         if t == "evoluir_projeto":
             return bool(self.engine.ready and self.engine.candidates())
         if t == "corrigir_codigo":
-            return self.self_dev is not None and self.self_dev.tem_trabalho()
+            return self._dev_tem_trabalho()
         if t == "planejar_roteiro":
             return self.planejador.precisa()
         if t == "atualizar_corpo":
@@ -616,10 +624,17 @@ class Circle:
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
-            item = self.self_dev.alvo()
+            from . import fatiador
+            livre = not (self.self_dev.busy() or self.self_dev.em_espera())
+            # item com LIMITE falhas locais vira sub-itens: só o sub-item liberado roda, com o erro anterior
+            item_id = fatiador.proximo(self.ctx, self.self_dev, self.planejador) if livre else None
+            if livre and item_id is None:
+                return
+            r = self.store.one("SELECT * FROM roadmap WHERE id=?", (item_id,)) if item_id else None
+            item = dict(r) if r else self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"), "tarefa": "corrigir_codigo",
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
-            res = self.self_dev.run_once(autorizado=True)
+            res = self.self_dev.run_once(item_id=item_id, autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
                 # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")
