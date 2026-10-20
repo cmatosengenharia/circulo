@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.32.0 — 2026-10-19
+
+**Círculo perfeito: a fábrica (`fabrica/`), reconstruída do básico.** Um pacote novo e independente no mesmo repo
+(o `circulo/` continua rodando no Mac), feito a partir das ideias da Lauren Tan (@poteto): confiança antes de
+paralelismo, corrigir na camada mais forte, verificar rodando o software, separar julgamento de trabalho mecânico,
+transformar operação resolvida em ferramenta, parar antes do irreversível.
+
+- **Seis estações de uma fábrica de software**: Gerente de produto → Arquiteto → Desenvolvedor → QA → Revisor →
+  Release, e o círculo fecha: achados viram o próximo cartão quando a fila esvazia. Um cartão por vez.
+- **Evidência rotulada** (`medido` / `inferido` / `chutado`); só a medida avança o cartão. O QA copia os testes novos
+  para a base e exige que falhem lá e passem na branch; o Revisor mede tamanho, protegidos e padrões proibidos; o
+  Release abre PR, espera CI, mescla e só implanta com permissão. Três devoluções seguidas = bloqueado, para o humano.
+- **Painel à mão livre** (`python -m fabrica demo`): as estações num círculo desenhado em SVG próprio (sem biblioteca,
+  offline), a nota amarela do cartão viajando, balões com a mensagem real, quadro de achados em post-its, diário, fila,
+  e um campo para pedir. Fonte manuscrita com fallback do sistema.
+- CLI: `iniciar`, `pedir`, `rodar [--painel]`, `painel`, `achados`, `demo`. Executor: Claude Code se existir; senão
+  simulado. GitHub por REST (`repo_github` + `GITHUB_TOKEN`); sem remoto, mescla local.
+- Testes em `tests/test_fabrica.py`: o círculo completo num repositório de exemplo, devolução até bloquear, caminho
+  protegido, CI vermelho, achado virando cartão, painel e a demonstração.
+
 ## 1.31.1 — 2026-10-19
 
 **O loop parou de evoluir por 4 h: o Jev recusava o estudo com confiança média.** Medido no Mac (17:24 → 21:30): dois

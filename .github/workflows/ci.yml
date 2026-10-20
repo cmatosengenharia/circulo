@@ -30,7 +30,7 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]" ruff
       - name: Lint
-        run: ruff check circulo tests --select E,F,W,B --ignore E501
+        run: ruff check circulo fabrica tests --select E,F,W,B --ignore E501
       - name: Testes
         run: pytest -q
       - name: Pacote instalável leva o painel

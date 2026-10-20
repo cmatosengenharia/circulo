@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo perfeito — chão de fábrica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+:root{--papel:#FBF7EE;--linha:#E6DEC9;--tinta:#1F2A37;--lapis:#5A6472;--marca:#FFE66D;--marca2:#FFF4B8;--verde:#1F8A5B;--vermelho:#C8372D;--azul:#2F6DB5;--postit:#FFF1A8;--postit2:#CDEBFF;--postit3:#FFD6D6;--cortica:#D9B98A}
+@media (prefers-color-scheme:dark){:root{--papel:#1C1F24;--linha:#2E333B;--tinta:#EDE7D9;--lapis:#A9B0BA;--marca:#8A7A1F;--marca2:#4D4518;--verde:#5CC48F;--vermelho:#F27A6F;--azul:#7FB2F0;--postit:#5C5420;--postit2:#1F4157;--postit3:#5A2A2A;--cortica:#5A4A32}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;color:var(--tinta);background:var(--papel);font:18px/1.35 "Patrick Hand","Chalkboard SE","Bradley Hand","Segoe Print","Comic Sans MS",cursive;
+  background-image:linear-gradient(var(--linha) 1px,transparent 1px),linear-gradient(90deg,var(--linha) 1px,transparent 1px);background-size:28px 28px}
+h1,h2,h3{font-family:"Caveat","Patrick Hand","Chalkboard SE","Bradley Hand","Segoe Print",cursive;font-weight:700;margin:0}
+h1{font-size:40px;line-height:1}h2{font-size:26px;margin-bottom:6px}
+.wrap{max-width:1420px;margin:0 auto;padding:14px 16px 40px}
+.cab{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;justify-content:space-between;margin-bottom:8px}
+.cab .sub{color:var(--lapis);font-size:17px;max-width:760px}
+.carimbo{display:inline-block;transform:rotate(-3deg);border:3px solid var(--verde);color:var(--verde);border-radius:8px;padding:2px 10px;font-family:"Caveat",cursive;font-weight:700;font-size:22px;letter-spacing:1px;text-transform:uppercase}
+.carimbo[data-s=parada]{border-color:var(--vermelho);color:var(--vermelho)}.carimbo[data-s=pausada]{border-color:var(--lapis);color:var(--lapis)}
+.grade{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.8fr);gap:14px;align-items:start}
+@media (max-width:960px){.grade{grid-template-columns:1fr}}
+.folha{position:relative;background:var(--papel);border:2px solid var(--tinta);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:12px 14px;box-shadow:3px 4px 0 rgba(0,0,0,.12)}
+.folha.fina{border-width:1.5px}
+svg text{font-family:"Patrick Hand","Chalkboard SE","Bradley Hand","Segoe Print",cursive;fill:var(--tinta)}
+svg .nome{font-family:"Caveat","Patrick Hand","Chalkboard SE",cursive;font-weight:700;font-size:22px}
+svg .cargo{font-size:14px;fill:var(--lapis)}
+svg .tracos{fill:none;stroke:var(--tinta);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+svg .fino{stroke-width:1.1;stroke:var(--lapis)}
+svg .marca{fill:var(--marca);opacity:.85}
+svg .estacao{cursor:pointer}
+svg .estacao.ativa .marca{opacity:1}
+svg .bolha{filter:drop-shadow(2px 3px 0 rgba(0,0,0,.12))}
+svg .bolha text{font-size:14px}
+svg .nota{filter:drop-shadow(2px 3px 0 rgba(0,0,0,.18))}
+svg .nota text{font-size:12.5px}
+.btn{font:inherit;font-size:17px;border:2px solid var(--tinta);background:var(--papel);color:var(--tinta);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:5px 14px;cursor:pointer;box-shadow:2px 2px 0 rgba(0,0,0,.15)}
+.btn:hover{background:var(--marca2)}.btn:active{transform:translate(1px,1px);box-shadow:none}
+.btn.primaria{background:var(--marca)}
+textarea{width:100%;font:inherit;font-size:17px;background:var(--postit);color:#2a2410;border:0;border-radius:3px;padding:10px;min-height:76px;box-shadow:3px 4px 0 rgba(0,0,0,.18);transform:rotate(-.6deg);resize:vertical}
+@media (prefers-color-scheme:dark){textarea{color:var(--tinta)}}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cortica{background:var(--cortica);border:6px solid #8B6B3F;border-radius:6px;padding:12px;min-height:120px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start}
+.postit{width:150px;min-height:110px;padding:8px 10px;font-size:14px;line-height:1.25;background:var(--postit);color:#2a2410;box-shadow:2px 3px 0 rgba(0,0,0,.22);position:relative;transform:rotate(var(--r,-1.5deg))}
+.postit.azul{background:var(--postit2)}.postit.rosa{background:var(--postit3)}
+@media (prefers-color-scheme:dark){.postit{color:var(--tinta)}}
+.postit::before{content:"";position:absolute;left:50%;top:-8px;width:34px;height:12px;margin-left:-17px;background:rgba(255,255,255,.55);transform:rotate(-2deg);border:1px solid rgba(0,0,0,.08)}
+.postit b{font-family:"Caveat",cursive;font-size:17px;display:block}
+.postit small{display:block;color:#5a5030;margin-top:4px}
+.fila{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto}
+.ficha{border:1.5px solid var(--tinta);border-radius:12px 4px 10px 4px;padding:5px 9px;background:var(--papel);display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:15.5px}
+.ficha .n{font-family:"Caveat",cursive;font-weight:700;font-size:20px;min-width:34px}
+.ficha .est{font-size:13px;color:var(--lapis);white-space:nowrap}
+.ficha[data-e=bloqueado]{border-color:var(--vermelho)}.ficha[data-e=concluido]{opacity:.65;text-decoration:line-through}
+.diario{list-style:none;margin:0;padding:0;max-height:380px;overflow:auto;display:flex;flex-direction:column;gap:3px;font-size:15.5px}
+.diario li{padding:3px 6px;border-left:3px solid var(--lapis);border-radius:2px}
+.diario li[data-tom=devolucao]{border-left-color:var(--vermelho)}.diario li[data-tom=entrega]{border-left-color:var(--verde)}
+.diario li[data-tom=alerta]{border-left-color:#C77D00}.diario li[data-tom=tarefa]{border-left-color:var(--azul)}
+.diario time{color:var(--lapis);font-size:13px;margin-right:6px}
+.diario b{font-family:"Caveat",cursive;font-size:18px}
+.detalhe{font-size:15px}
+.detalhe ul{margin:4px 0 0;padding-left:18px}
+.ok{color:var(--verde)}.ruim{color:var(--vermelho)}
+.legenda{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--lapis);margin-top:6px}
+.legenda i{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-radius:4px;vertical-align:-2px;margin-right:4px}
+.legenda .ver{color:var(--verde)}.legenda .dev{color:var(--vermelho)}.legenda .at{color:#9a8300;background:var(--marca)}
+.como{margin-top:10px;font-size:15px;color:var(--lapis)}
+.como summary{cursor:pointer;color:var(--tinta)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cab">
+    <div><h1>Círculo perfeito <small style="font-size:22px;color:var(--lapis)">· chão de fábrica</small></h1>
+      <div class="sub">Uma fábrica de software que trabalha sozinha: o cartão passa pelo Gerente de produto, Arquiteto, Desenvolvedor, QA, Revisor e Release, e volta como achado. Um cartão por vez; cada estação só avança com evidência medida.</div></div>
+    <div class="ctl"><span class="carimbo" id="carimbo" data-s="">ligando…</span>
+      <button class="btn" id="pausa">pausar</button>
+      <span style="color:var(--lapis);font-size:15px" id="numeros"></span></div>
+  </div>
+
+  <div class="grade">
+    <div>
+      <section class="folha" aria-label="Chão de fábrica">
+        <svg id="chao" viewBox="0 0 900 700" width="100%" role="img" aria-label="As seis estações em círculo e o cartão em andamento"></svg>
+        <div class="legenda"><span><i class="at"></i>estação com o cartão</span><span><i class="ver"></i>entrega / aprovado</span><span><i class="dev"></i>devolução</span><span>■ nota amarela = cartão em andamento · clique numa estação para ver a evidência</span></div>
+      </section>
+      <section class="folha fina detalhe" id="detalhe" style="margin-top:12px" hidden></section>
+      <details class="como"><summary>Como esta fábrica decide (e o que ela não faz)</summary>
+        <ul>
+          <li><b>Confiança antes de paralelismo</b>: um cartão de cada vez. O próximo só entra quando este termina ou bloqueia.</li>
+          <li><b>Evidência medida</b> libera a estação seguinte: teste novo que falha na base e passa na branch, lint e suíte verdes, CI verde, caminho protegido não tocado. Opinião é rotulada como inferida ou chutada e não basta.</li>
+          <li><b>Devolução</b> conta: na terceira seguida o cartão bloqueia e fica para você, com o histórico. Caminho protegido e implantação sem permissão também param na sua mão.</li>
+          <li><b>O círculo fecha</b>: sem pedido na fila, o Gerente de produto pega o achado mais frequente (um teste que oscila, uma estação que quebra) e faz dele o próximo cartão.</li>
+          <li>Não há escritório em pixel art nem dado inventado: cada balão é a mensagem real que a estação deixou no registro.</li>
+        </ul></details>
+    </div>
+    <aside style="display:flex;flex-direction:column;gap:12px">
+      <section class="folha fina"><h2>Pedir à fábrica</h2>
+        <textarea id="pedido" placeholder="Escreva o que você quer. Ex.: “a função soma está devolvendo a diferença; soma(2,2) tem de dar 4”."></textarea>
+        <div class="ctl" style="margin-top:8px"><button class="btn primaria" id="pedir">Colar o pedido na fila</button><span id="pedidoOk" style="color:var(--verde)"></span></div></section>
+      <section class="folha fina"><h2>Fila de cartões</h2><div class="fila" id="fila"></div></section>
+      <section class="folha fina"><h2>Quadro de achados</h2><div class="cortica" id="achados"></div></section>
+      <section class="folha fina"><h2>Diário da fábrica</h2><ul class="diario" id="diario"></ul></section>
+    </aside>
+  </div>
+</div>
+<script>
+// ------------------------------------------------------------ desenho à mão (sem biblioteca: funciona offline)
+const NS = "http://www.w3.org/2000/svg";
+function semente(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; }
+function el(tag, attrs = {}, pai) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (pai) pai.appendChild(e); return e; }
+function tremido(x1, y1, x2, y2, rnd, forca = 1.6) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+  const m1 = (rnd() - .5) * forca * 2, m2 = (rnd() - .5) * forca * 2;
+  const c1x = x1 + dx * .33 + nx * m1, c1y = y1 + dy * .33 + ny * m1, c2x = x1 + dx * .66 + nx * m2, c2y = y1 + dy * .66 + ny * m2;
+  return `M${x1 + (rnd() - .5)} ${y1 + (rnd() - .5)} C${c1x} ${c1y},${c2x} ${c2y},${x2 + (rnd() - .5)} ${y2 + (rnd() - .5)}`;
+}
+function linha(pai, x1, y1, x2, y2, rnd, cls = "tracos", passes = 2) { for (let i = 0; i < passes; i++) el("path", {d: tremido(x1, y1, x2, y2, rnd), class: cls}, pai); }
+function caixa(pai, x, y, w, h, rnd, cls = "tracos") { linha(pai, x, y, x + w, y, rnd, cls); linha(pai, x + w, y, x + w, y + h, rnd, cls); linha(pai, x + w, y + h, x, y + h, rnd, cls); linha(pai, x, y + h, x, y, rnd, cls); }
+function arcoPontos(cx, cy, r, a1, a2, n, rnd, forca = 1.2) { const pts = []; for (let i = 0; i <= n; i++) { const a = a1 + (a2 - a1) * i / n, rr = r + (rnd() - .5) * forca * 2; pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]); } return pts; }
+function arco(pai, cx, cy, r, a1, a2, rnd, cls = "tracos", passes = 2) {
+  for (let p = 0; p < passes; p++) { const pts = arcoPontos(cx, cy, r, a1, a2, Math.max(8, Math.round(Math.abs(a2 - a1) * 10)), rnd); el("path", {d: "M" + pts.map(q => q.join(" ")).join(" L"), class: cls}, pai); }
+}
+function circulo(pai, cx, cy, r, rnd, cls = "tracos") { arco(pai, cx, cy, r, -Math.PI / 2 + (rnd() - .5) * .2, 1.5 * Math.PI + (rnd() - .5) * .25, rnd, cls); }
+function hachura(pai, x, y, w, h, rnd, cls = "marca") {
+  const g = el("g", {class: cls}, pai); el("rect", {x, y, width: w, height: h, rx: 6, fill: "currentColor", opacity: .001}, g);
+  for (let d = -h; d < w; d += 10) { const x1 = Math.max(x, x + d), y1 = y + Math.max(0, -(d)), x2 = Math.min(x + w, x + d + h), y2 = y + Math.min(h, w - d);
+    if (x2 > x1) el("path", {d: tremido(x1, y + (x1 - x - d), x2, y + (x2 - x - d), rnd, .6), stroke: "currentColor", "stroke-width": 2, fill: "none", opacity: .55}, g); }
+  return g;
+}
+function texto(pai, x, y, t, cls = "", anchor = "middle") { const e = el("text", {x, y, class: cls, "text-anchor": anchor}, pai); e.textContent = t; return e; }
+function quebrar(t, n) { const palavras = String(t).split(/\s+/), linhas = [""]; for (const p of palavras) { if ((linhas[linhas.length - 1] + " " + p).trim().length > n) linhas.push(p); else linhas[linhas.length - 1] = (linhas[linhas.length - 1] + " " + p).trim(); } return linhas.slice(0, 4); }
+
+// ------------------------------------------------------------ o chão: seis estações num círculo
+const svg = document.getElementById("chao");
+const CX = 450, CY = 350, R = 215, LARG = 190, ALT = 86;
+let ESTACOES = [], posicao = {}, ultimoRetrato = null, notaEm = null, fila = [], animando = false, ultimoEvento = 0;
+const ORDEM = ["po", "arquiteto", "dev", "qa", "revisor", "release"];
+const ESTADO_PAPEL = {novo: "po", planejado: "arquiteto", em_desenvolvimento: "dev", verificando: "qa", em_revisao: "revisor", liberando: "release"};
+function angulo(i) { return -Math.PI / 2 + i * 2 * Math.PI / 6; }
+function desenharChao(r) {
+  svg.innerHTML = "";
+  const rnd = semente("chao");
+  const fundo = el("g", {}, svg);
+  arco(fundo, CX, CY, R, 0, 2 * Math.PI, rnd, "tracos fino", 1);               // a esteira circular
+  for (let i = 0; i < 6; i++) {                                                  // setinhas no sentido do círculo
+    const a = angulo(i) + Math.PI / 6, x = CX + R * Math.cos(a), y = CY + R * Math.sin(a), t = a + Math.PI / 2;
+    linha(fundo, x - 9 * Math.cos(t - .5), y - 9 * Math.sin(t - .5), x, y, rnd, "tracos fino", 1); linha(fundo, x - 9 * Math.cos(t + .5), y - 9 * Math.sin(t + .5), x, y, rnd, "tracos fino", 1);
+  }
+  texto(fundo, CX, CY - 6, "círculo perfeito", "nome").setAttribute("style", "font-size:30px;fill:var(--lapis);opacity:.7");
+  texto(fundo, CX, CY + 18, r.em_voo ? `cartão #${r.em_voo.id} em andamento` : (r.numeros.na_fila ? `${r.numeros.na_fila} na fila` : "fila vazia · esperando pedido ou achado"), "cargo").setAttribute("style", "font-size:15px");
+  ESTACOES = r.equipe;
+  r.equipe.forEach((m, i) => {
+    const a = angulo(i), cx = CX + R * Math.cos(a), cy = CY + R * Math.sin(a);
+    const x = cx - LARG / 2, y = cy - ALT / 2; posicao[m.id] = {cx, cy, x, y};
+    const rs = semente(m.id), g = el("g", {class: "estacao" + (m.ativo ? " ativa" : ""), "data-id": m.id, tabindex: 0, role: "button", "aria-label": `${m.nome}: ${m.faz}`}, svg);
+    if (m.ativo) hachura(g, x + 4, y + 4, LARG - 8, ALT - 8, rs);
+    caixa(g, x, y, LARG, ALT, rs);
+    // o boneco: cabeça, ombros, um traço de sorriso
+    const hx = x + 30, hy = y + 32; circulo(g, hx, hy, 13, rs); arco(g, hx, hy + 30, 20, Math.PI * 1.08, Math.PI * 1.92, rs, "tracos", 1); arco(g, hx, hy + 2, 6, .25 * Math.PI, .75 * Math.PI, rs, "tracos fino", 1);
+    el("circle", {cx: hx - 4, cy: hy - 3, r: 1.4, fill: "var(--tinta)"}, g); el("circle", {cx: hx + 4, cy: hy - 3, r: 1.4, fill: "var(--tinta)"}, g);
+    texto(g, x + 58, y + 30, m.nome, "nome", "start");
+    quebrar(m.faz, 30).slice(0, 2).forEach((l, k) => texto(g, x + 58, y + 50 + k * 15, l, "cargo", "start"));
+    texto(g, x + LARG - 6, y + 13, `${m.passos_24h}×/24 h`, "cargo", "end").setAttribute("style", "font-size:11px");
+    g.addEventListener("click", () => mostrarDetalhe(m.id)); g.addEventListener("keydown", e => { if (e.key === "Enter") mostrarDetalhe(m.id); });
+  });
+  if (r.em_voo) { const p = ESTADO_PAPEL[r.em_voo.estado]; if (p && !notaEm) notaEm = p; desenharNota(r.em_voo, notaEm || p); }
+}
+let notaG = null;
+function desenharNota(c, papel) {
+  notaG?.remove(); if (!papel || !posicao[papel]) return;
+  const p = posicao[papel], rs = semente("nota" + c.id);
+  notaG = el("g", {class: "nota", transform: `translate(${p.x + LARG - 62},${p.y - 26}) rotate(${(rs() - .5) * 10})`}, svg);
+  el("rect", {x: 0, y: 0, width: 74, height: 56, fill: "var(--postit)", stroke: "var(--tinta)", "stroke-width": 1.2}, notaG);
+  texto(notaG, 37, 16, `cartão #${c.id}`, "nome").setAttribute("style", "font-size:16px;fill:#2a2410");
+  quebrar(c.titulo, 14).slice(0, 3).forEach((l, k) => texto(notaG, 37, 30 + k * 12, l).setAttribute("style", "font-size:11px;fill:#2a2410"));
+  notaEm = papel;
+}
+let bolhas = {};
+function bolha(papel, textoMsg, tom) {
+  const p = posicao[papel]; if (!p) return;
+  bolhas[papel]?.remove();
+  const rs = semente(papel + textoMsg.length), g = el("g", {class: "bolha"}, svg);
+  // o balão fica do lado de fora do círculo, na direção radial da estação, sem cobrir as vizinhas
+  const linhas = quebrar(textoMsg, 34), w = 230, h = 16 + linhas.length * 16;
+  const ang = Math.atan2(p.cy - CY, p.cx - CX), dist = R + ALT / 2 + 18;
+  let bx = CX + dist * Math.cos(ang), by = CY + dist * Math.sin(ang);
+  const x = Math.max(6, Math.min(900 - w - 6, bx - w / 2 + Math.cos(ang) * w / 2)), y = Math.max(6, Math.min(700 - h - 6, by - h / 2 + Math.sin(ang) * h / 2));
+  el("rect", {x, y, width: w, height: h, rx: 8, fill: "var(--papel)"}, g);
+  caixa(g, x, y, w, h, rs, "tracos");
+  g.querySelectorAll("path").forEach(pa => pa.setAttribute("stroke", tom === "devolucao" ? "var(--vermelho)" : tom === "entrega" ? "var(--verde)" : "var(--tinta)"));
+  const ax = p.cx + Math.cos(ang) * (LARG / 2 - 10), ay = p.cy + Math.sin(ang) * (ALT / 2);        // rabinho até a borda da estação
+  const mx = Math.max(x, Math.min(x + w, ax)), my = Math.max(y, Math.min(y + h, ay));
+  linha(g, mx - 6, my, ax, ay, rs, "tracos", 1); linha(g, mx + 6, my, ax, ay, rs, "tracos", 1);
+  linhas.forEach((l, k) => texto(g, x + 10, y + 16 + k * 16, l, "", "start"));
+  bolhas[papel] = g; setTimeout(() => { if (bolhas[papel] === g) { g.remove(); delete bolhas[papel]; } }, 6500);
+}
+async function viajar(de, para, tom) {
+  if (!notaG || !posicao[de] || !posicao[para] || de === para) { if (posicao[para] && ultimoRetrato?.em_voo) desenharNota(ultimoRetrato.em_voo, para); return; }
+  const i1 = ORDEM.indexOf(de), i2 = ORDEM.indexOf(para), volta = tom === "devolucao";
+  let a1 = angulo(i1), a2 = angulo(i2); if (!volta && a2 < a1) a2 += 2 * Math.PI; if (volta && a2 > a1) a2 -= 2 * Math.PI;
+  const rastro = el("path", {d: "M" + arcoPontos(CX, CY, R, a1, a2, 24, semente("r" + de + para)).map(q => q.join(" ")).join(" L"), class: "tracos", stroke: volta ? "var(--vermelho)" : "var(--verde)", "stroke-dasharray": volta ? "6 6" : "", opacity: .9}, svg);
+  const passos = 28, dur = 900;
+  for (let k = 1; k <= passos; k++) {
+    const a = a1 + (a2 - a1) * (k / passos), x = CX + R * Math.cos(a) + 30, y = CY + R * Math.sin(a) - 60;
+    notaG.setAttribute("transform", `translate(${x},${y}) rotate(${Math.sin(k / 3) * 6})`);
+    await new Promise(r => setTimeout(r, dur / passos));
+  }
+  setTimeout(() => rastro.remove(), 1200);
+  if (ultimoRetrato?.em_voo) desenharNota(ultimoRetrato.em_voo, para); else notaEm = para;
+}
+
+// ------------------------------------------------------------ eventos → animação + diário
+const TOM_NOME = {tarefa: "tarefa", entrega: "entrega", devolucao: "devolução", alerta: "alerta", status: "", pergunta: "pergunta"};
+const NOMES = {po: "Gerente de produto", arquiteto: "Arquiteto", dev: "Desenvolvedor", qa: "QA", revisor: "Revisor", release: "Release", coordenador: "Coordenador", humano: "Você"};
+function diario(e) {
+  const ul = document.getElementById("diario"), li = document.createElement("li"), tom = e.dados?.tom || (e.tipo === "entrega" ? "entrega" : "status");
+  li.dataset.tom = tom;
+  const hora = new Date(e.em * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+  li.innerHTML = `<time>${hora}</time><b>${NOMES[e.de_papel] || e.de_papel || ""}</b> → <b>${NOMES[e.para_papel] || e.para_papel || ""}</b>${TOM_NOME[tom] ? ` <small>(${TOM_NOME[tom]})</small>` : ""}: ${escapar(e.texto)}`;
+  ul.appendChild(li); while (ul.children.length > 120) ul.firstChild.remove(); ul.scrollTop = ul.scrollHeight;
+}
+const escapar = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+function enfileirar(e) { fila.push(e); if (!animando) proximo(); }
+async function proximo() {
+  animando = true;
+  while (fila.length) {
+    const e = fila.shift(); diario(e);
+    if (e.tipo === "vez") { marcarAtiva(e.para_papel); }
+    else if (e.tipo === "mensagem" && e.de_papel in posicao) {
+      const tom = e.dados?.tom || "status";
+      bolha(e.de_papel, e.texto, tom);
+      const destino = e.dados?.para_estado ? ESTADO_PAPEL[e.dados.para_estado] : null;
+      if (destino && destino !== e.de_papel) { await new Promise(r => setTimeout(r, 700)); await viajar(e.de_papel, destino, tom); }
+      else if (e.dados?.para_estado === "concluido") { await new Promise(r => setTimeout(r, 500)); notaG?.remove(); notaG = null; notaEm = null; }
+      else if (e.dados?.para_estado === "bloqueado") { notaG?.setAttribute("opacity", ".45"); }
+      await new Promise(r => setTimeout(r, 500));
+    } else if (e.tipo === "cartao" || e.tipo === "entrega") { await retrato(); }
+  }
+  animando = false;
+}
+function marcarAtiva(id) { document.querySelectorAll(".estacao").forEach(g => g.classList.toggle("ativa", g.dataset.id === id)); }
+
+// ------------------------------------------------------------ lado direito e detalhe
+function desenharLado(r) {
+  const fila = document.getElementById("fila");
+  fila.innerHTML = r.cartoes.map(c => `<div class="ficha" data-e="${c.estado}"><span class="n">#${c.id}</span><span>${escapar(c.titulo)}</span><span class="est">${c.estado.replace(/_/g, " ")}${c.devolucoes ? ` · ${c.devolucoes} devol.` : ""}${c.dados?.pr ? ` · PR #${c.dados.pr}` : ""}</span></div>`).join("") || `<div style="color:var(--lapis)">Nenhum cartão ainda. Cole um pedido ao lado.</div>`;
+  const ach = document.getElementById("achados");
+  ach.innerHTML = r.achados.map((a, i) => `<div class="postit ${a.assunto.startsWith("protegido") || a.assunto.startsWith("devolucoes") ? "rosa" : i % 3 === 1 ? "azul" : ""}" style="--r:${((i * 37) % 7) - 3}deg"><b>${escapar(a.assunto)}</b>${escapar(a.texto).slice(0, 150)}<small>${a.vezes}× · ${NOMES[a.papel] || a.papel} · ${a.base}</small></div>`).join("") || `<div style="color:#5a4a32;font-size:15px">Nenhum achado aberto. O quadro enche conforme a fábrica aprende.</div>`;
+  const n = r.numeros; document.getElementById("numeros").textContent = `${n.concluidos_24h} concluído(s) em 24 h · ${n.devolucoes_24h} devolução(ões) · ${n.bloqueados} bloqueado(s) · ${n.achados} achado(s)`;
+  const ca = document.getElementById("carimbo");
+  ca.dataset.s = r.pausada ? "pausada" : r.rodando ? "" : "parada"; ca.textContent = r.pausada ? "pausada" : r.rodando ? "rodando" : "fábrica parada";
+  document.getElementById("pausa").textContent = r.pausada ? "retomar" : "pausar";
+}
+function mostrarDetalhe(id) {
+  const m = ESTACOES.find(x => x.id === id); if (!m) return;
+  const box = document.getElementById("detalhe"); box.hidden = false;
+  const passos = (ultimoRetrato?.em_voo?.passos || []).filter(p => p.papel === id);
+  const ult = passos[passos.length - 1];
+  box.innerHTML = `<h2>${escapar(m.nome)} <small style="font-size:16px;color:var(--lapis)">${escapar(m.faz)}</small></h2>` +
+    (ult ? `<div><b>Último passo no cartão #${ultimoRetrato.em_voo.id}</b>: ${escapar(ult.mensagem)} <small style="color:var(--lapis)">(${ult.duracao_s}s, ${escapar(ult.de_estado)} → ${escapar(ult.para_estado)})</small><ul>` +
+      ult.evidencias.map(e => `<li><span class="${e.base === "medido" ? "ok" : ""}">${e.base === "medido" ? "✓ medido" : e.base === "inferido" ? "~ inferido" : "? chutado"}</span> — ${escapar(e.texto)}${e.dado && typeof e.dado === "object" && "ok" in e.dado ? ` <span class="${e.dado.ok ? "ok" : "ruim"}">${e.dado.ok ? "passou" : "falhou"}</span>` : ""}</li>`).join("") + "</ul></div>"
+    : (m.ultima ? `<div><b>Último passo</b>: ${escapar(m.ultima.mensagem)} <small style="color:var(--lapis)">(${new Date(m.ultima.em * 1000).toLocaleTimeString("pt-BR")})</small></div>` : `<div style="color:var(--lapis)">Esta estação ainda não trabalhou.</div>`));
+}
+
+// ------------------------------------------------------------ ligação com a fábrica
+async function retrato() {
+  try {
+    const r = await (await fetch("/api/estado")).json();
+    const primeira = !ultimoRetrato; ultimoRetrato = r;
+    if (primeira || !animando) desenharChao(r); desenharLado(r);
+    if (primeira) { ultimoEvento = r.ultimo_evento; r.eventos.slice(-25).forEach(diario); ligar(); }
+  } catch { document.getElementById("carimbo").textContent = "sem conexão"; document.getElementById("carimbo").dataset.s = "parada"; }
+}
+function ligar() {
+  const es = new EventSource(`/api/eventos?desde=${ultimoEvento}`);
+  for (const t of ["vez", "mensagem", "cartao", "entrega"]) es.addEventListener(t, ev => { try { const e = JSON.parse(ev.data); ultimoEvento = e.id; enfileirar(e); } catch {} });
+  es.onerror = () => { document.getElementById("carimbo").textContent = "reconectando…"; };
+}
+document.getElementById("pedir").addEventListener("click", async () => {
+  const t = document.getElementById("pedido").value.trim(); if (!t) return;
+  const r = await (await fetch("/api/pedido", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({texto: t})})).json();
+  document.getElementById("pedidoOk").textContent = r.id ? `cartão #${r.id} na fila` : (r.erro || ""); document.getElementById("pedido").value = ""; retrato();
+});
+document.getElementById("pausa").addEventListener("click", async () => {
+  await fetch("/api/pausa", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pausar: !ultimoRetrato?.pausada})}); retrato();
+});
+retrato(); setInterval(retrato, 5000);
+</script>
+</body>
+</html>
