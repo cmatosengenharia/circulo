@@ -162,13 +162,14 @@ class Planejador:
         }
 
     # ------------------------------------------------------------ um planejamento
-    def run(self, autorizado: bool = False) -> dict | None:
-        """Uma tentativa real: o resultado (item, descarte ou falha classificada) fica em kv TENTATIVAS."""
+    def run(self, autorizado: bool = False, pergunta_id: int | None = None) -> dict | None:
+        """Uma tentativa real: o resultado (item, descarte ou falha classificada) fica em kv TENTATIVAS.
+        pergunta_id: responde só essa pergunta validada (o Vigia drenando a mais antiga), nunca outra."""
         self.s.set("planejador", {"em": time.time()})
         from . import indagador
-        alvo = indagador.espiar(self.s, "loop")
+        alvo = indagador.espiar(self.s, "loop", pergunta_id)
         try:
-            pid, desfecho, motivo, item = self._tentar(autorizado)
+            pid, desfecho, motivo, item = self._tentar(autorizado, pergunta_id)
         except Exception as exc:
             pid, classe = (alvo["id"] if alvo else None), classe_da_falha(exc)
             rec = registrar_tentativa(self.s, pid, "falhou", f"{type(exc).__name__}: {exc}", classe=classe, reply=self.ctx.reply)
@@ -209,7 +210,7 @@ class Planejador:
                     continue
                 raise
 
-    def _tentar(self, autorizado: bool) -> tuple[int | None, str, str, dict | None]:
+    def _tentar(self, autorizado: bool, pergunta_id: int | None = None) -> tuple[int | None, str, str, dict | None]:
         # a evolução parte de uma pergunta: o conselho escolhe (SQL + Jev, sem LLM); sem pergunta com dor, não gasta
         from .perguntas import Conselho, gerar, personas
         conselho = Conselho(self.ctx)
@@ -221,11 +222,13 @@ class Planejador:
         PERSONAS = personas(self.s)
         from . import indagador
         from .perguntas import Pergunta
-        validada = indagador.proxima(self.s, "loop")       # o Indagador já passou a pergunta pelo Jev: ela é o ponto de partida
+        validada = indagador.proxima(self.s, "loop", pergunta_id)   # o Indagador já passou a pergunta pelo Jev: ela é o ponto de partida
         if validada is not None:
             pergunta = Pergunta(validada["chave"], validada["persona"], validada["texto"], float(validada["relevancia"] or 0),
                                 json.loads(validada["evidencia"] or "{}"), score=float(validada["score"] or 0))
             pid = validada["id"]
+        elif pergunta_id is not None:
+            return pergunta_id, "sem_pergunta", f"a pergunta #{pergunta_id} já não está validada esperando", None
         else:
             pergunta = conselho.escolher()
             if pergunta is None:
