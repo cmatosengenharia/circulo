@@ -153,7 +153,7 @@ class Estudo:
         try:
             from .registro import registrar
             registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="estudo", modelo=escolha["modelo"],
-                      escolha=escolha, tokens=out.tokens, duracao_ms=int((time.time() - t0) * 1000), ok=r is not None,
+                      escolha=escolha, uso=out, duracao_ms=int((time.time() - t0) * 1000), ok=r is not None,
                       erro=None if r else "resposta sem JSON válido", entrada=f"[{modo}] {item['titulo']}", saida=out.text)
         except Exception:  # noqa: BLE001
             pass

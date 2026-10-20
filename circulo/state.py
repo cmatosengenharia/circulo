@@ -544,6 +544,9 @@ class Store:
                   ("verificacoes", "item_id", "INTEGER"), ("verificacoes", "item_titulo", "TEXT"),
                   ("events", "job", "TEXT"), ("events", "job_fonte", "TEXT"), ("events", "job_conf", "REAL"),
                   ("events", "job_margem", "REAL"),
+                  ("llm_calls", "tokens_entrada", "INTEGER"), ("llm_calls", "tokens_saida", "INTEGER"),
+                  ("llm_calls", "cache_lido", "INTEGER"), ("llm_calls", "cache_escrito", "INTEGER"),
+                  ("llm_calls", "job", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"))
 

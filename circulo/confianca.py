@@ -120,10 +120,9 @@ def confianca(store: Store, now: float | None = None) -> dict:
                  ult[0]["created_at"] if ult else None,
                  projecao="" if not erros else "erro que se repete vira lição e a etapa pode ir para a quarentena"))
     bud = s.one("SELECT * FROM budget ORDER BY day DESC LIMIT 1")
-    pol = s.one("SELECT body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")
-    if bud and pol:
-        from .budget import limite_diario
-        limite = limite_diario(s, int(json.loads(pol["body"])["budget"]["daily_token_limit"])) or 1
+    if bud:
+        from .orcamento_dia import limite_hoje
+        limite = limite_hoje(s)
         usado = int(bud["tokens"] or 0)
         frac = usado / limite
         ck.append(_c("orcamento", "agora", "Saturação (orçamento de hoje)", "ok" if frac < .8 else "atencao" if frac < 1 else "falha",
