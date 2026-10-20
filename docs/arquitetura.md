@@ -1,6 +1,6 @@
 # Arquitetura
 
-Versão documentada: **1.39.0**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
+Versão documentada: **1.40.1**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
 painel. Toda decisão passa primeiro pelo Jev (cascata regra → aluno → Jev → LLM).
 
 ## Constituição
@@ -13,7 +13,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 |---|---|---|
 | `agents.py` | 236 | Agentes de domínio. Todos decidem via DecisionLayer (Jev First). |
 | `aluno.py` | 263 | O aluno do Jev: um modelo local que aprende, com as respostas do Jev, a responder as mesmas perguntas. |
-| `aprovacoes.py` | 113 | Precisa de você: tudo o que, no loop inteiro, está parado esperando uma decisão humana — num lugar só, com a ação. |
+| `aprovacoes.py` | 117 | Precisa de você: tudo o que, no loop inteiro, está parado esperando uma decisão humana — num lugar só, com a ação. |
 | `atividade.py` | 125 | O que o loop está fazendo para evoluir: linha do tempo única, giros com a duração de cada etapa e ritmo de decisões. |
 | `budget.py` ⚖️ | 181 | Orçamento diário de tokens. |
 | `camadas.py` | 182 | Dash do loop em camadas: saúde no topo, todas as etapas do ciclo ao vivo, detalhe de uma execução pelo run_id. |
@@ -72,7 +72,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `repo_stats.py` | 65 | Números do repositório do loop (commits), lidos do clone local. Cache curto: o painel atualiza a cada poucos segundos. |
 | `reproducao.py` | 127 | Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo. |
 | `revisor.py` | 183 | Revisor: o agente que valida cada PR do Developer DENTRO do ecossistema, para vários PRs andarem em paralelo. |
-| `self_dev.py` ⚖️ | 713 | Developer do projeto zero: o círculo corrigindo o próprio código. |
+| `self_dev.py` ⚖️ | 717 | Developer do projeto zero: o círculo corrigindo o próprio código. |
 | `state.py` | 662 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
 | `status.py` | 57 | Estado do loop para humanos, derivado do batimento + controles + etapa. Usado pelo painel. |
 | `telemetria.py` | 422 | Trilha de eventos tipados do loop, no vocabulário OpenTelemetry GenAI, e o painel de timeline + grafo. |
