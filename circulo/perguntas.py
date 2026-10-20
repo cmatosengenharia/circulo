@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .decision import Question
+from .json_llm import objeto
 from .licoes import item_de
 
 DIVERSIDADE = 0.35        # a persona das últimas 3 perguntas pesa só isso (o conselho não fica preso num olhar só)
@@ -415,12 +416,7 @@ def gerar(ctx) -> list[int]:
     else:
         texto, tokens = llm.complete(GERAR_SYSTEM, prompt, 1200)
     ctx.budget.charge(tokens, "llm")
-    try:
-        import re
-        d = json.loads(re.search(r"\{.*\}", texto, re.S).group(0))
-        novas = d.get("perguntas") or []
-    except Exception:
-        novas = []
+    novas = (objeto(texto, "perguntas") or {}).get("perguntas") or []
     from .decision import norm
     ja = {norm(t) for t in existentes}
     ids = []
@@ -475,11 +471,7 @@ def personas_da_missao(ctx, tipo: str, pedido: str) -> dict[str, str]:
     else:
         texto, tokens = llm.complete(PERSONAS_MISSAO_SYSTEM, prompt, 500)
     ctx.budget.charge(tokens, "llm")
-    try:
-        import re
-        lista = json.loads(re.search(r"\{.*\}", texto, re.S).group(0)).get("personas") or []
-    except Exception:
-        lista = []
+    lista = (objeto(texto, "personas") or {}).get("personas") or []
     agora = time.time()
     for p in lista[:4]:
         chave = str(p.get("chave") or "").strip().lower().replace(" ", "_")[:40]

@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import json
 import random
-import re
 import sqlite3
 import time
 import urllib.error
 
 from .agents import Ctx
 from .decision import Question, norm
+from .json_llm import objeto
 from .merge_gate import CONSTITUICAO
 
 MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
@@ -360,12 +360,8 @@ Responda só com JSON numa linha, sem markdown:
 
 
 def _parse_sub_itens(texto: str) -> list[dict]:
-    m = re.search(r"\{.*\}", texto or "", re.S)
-    try:
-        d = json.loads(m.group(0)) if m else None
-    except json.JSONDecodeError:
-        return []
-    partes = d.get("sub_itens") if isinstance(d, dict) else None
+    d = objeto(texto, "sub_itens")
+    partes = d.get("sub_itens") if d else None
     if not isinstance(partes, list):
         return []
     out = [{k: str(p.get(k) or "").strip() for k in ("titulo", "detalhe", "teste")} for p in partes if isinstance(p, dict)]
@@ -374,23 +370,13 @@ def _parse_sub_itens(texto: str) -> list[dict]:
 
 
 def _sem_item(texto: str) -> str | None:
-    m = re.search(r"\{.*\}", texto or "", re.S)
-    try:
-        d = json.loads(m.group(0)) if m else None
-    except json.JSONDecodeError:
-        return None
-    return str(d["sem_item"]) if isinstance(d, dict) and d.get("sem_item") else None
+    d = objeto(texto, "sem_item")
+    return str(d["sem_item"]) if d and d.get("sem_item") else None
 
 
 def _parse(texto: str) -> dict | None:
-    m = re.search(r"\{.*\}", texto or "", re.S)
-    if not m:
-        return None
-    try:
-        d = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(d, dict):
+    d = objeto(texto, "titulo")
+    if d is None:
         return None
     item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado")}
     return item if item["titulo"] and item["detalhe"] else None

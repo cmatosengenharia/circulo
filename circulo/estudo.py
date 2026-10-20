@@ -25,6 +25,7 @@ import time
 
 from .agents import Ctx
 from .decision import Question, SN
+from .json_llm import objeto_ou_corte
 
 MIN_FONTES = 2
 EST_TOKENS = 9000
@@ -233,39 +234,9 @@ class Estudo:
         return True
 
 
-def _decodificar(texto: str) -> tuple[dict | None, bool]:
-    """O objeto JSON da resposta e se ele veio cortado (limite de tokens): no corte, vale o último valor completo."""
-    ini = (texto or "").find("{")
-    if ini < 0:
-        return None, False
-    s = texto[ini:]
-    try:
-        return json.JSONDecoder().raw_decode(s)[0], False
-    except json.JSONDecodeError:
-        pass
-    pilha, cortes, na_string, escape = [], [], False, False
-    for i, c in enumerate(s):
-        if na_string:
-            escape, na_string = (False, True) if escape else (c == "\\", c != '"')
-        elif c == '"':
-            na_string = True
-        elif c in "{[":
-            pilha.append("}" if c == "{" else "]")
-        elif c in "}]" and pilha:
-            pilha.pop()
-        elif c == ",":
-            cortes.append((i, "".join(reversed(pilha))))
-    for i, fecho in reversed(cortes):
-        try:
-            return json.loads(s[:i] + fecho), True
-        except json.JSONDecodeError:
-            continue
-    return None, False
-
-
 def _parse(texto: str) -> dict | None:
-    d, cortado = _decodificar(texto)
-    if not isinstance(d, dict) or d.get("veredito") not in ("adotar", "adaptar", "contestar"):
+    d, cortado = objeto_ou_corte(texto, "veredito")
+    if d is None or d.get("veredito") not in ("adotar", "adaptar", "contestar"):
         return None
     if cortado:
         if not d.get("justificativa"):

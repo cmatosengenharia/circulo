@@ -69,6 +69,15 @@ def test_except_exception_conta_so_o_erro_engolido(tmp_path):
     assert medir(tmp_path)["total"]["except_exception"] == 1
 
 
+def test_json_da_llm_so_e_lido_por_json_llm():
+    """lição #22: cada papel lia o JSON da LLM do seu jeito (primeiro `{`, `\\{.*\\}` guloso) e uma chave na narração
+    descartava a resposta inteira. Uma única forma de ler: circulo/json_llm.py."""
+    jeitos = ('r"\\{.*\\}"', "raw_decode", '.find("{")')
+    fora = {p.name: j for p in PACOTE.glob("*.py") if p.stem != "json_llm"
+            for j in jeitos if j in p.read_text(encoding="utf-8")}
+    assert not fora, f"leia o JSON da LLM com circulo.json_llm.objeto/objeto_ou_corte: {fora}"
+
+
 def test_padroes_ruins_nao_crescem():
     total = medir(PACOTE)["total"]
     passou = {k: (total[k], teto) for k, teto in TETO_JARDIM.items() if total[k] > teto}
