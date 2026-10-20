@@ -1,10 +1,5 @@
-"""DecisionLayer — Jev First.
-
-Todo ponto do círculo que vai gastar recurso pergunta primeiro aqui.
-- JevHttpClient: API real da TypeSafe (POST https://api.typesafe.ai/v1/systemone).
-- LocalJev: decisor determinístico com o MESMO contrato, usado quando não há chave ou a API falha.
-Ambos recebem o mesmo `state` + `questions`, então trocar um pelo outro não muda os agentes.
-"""
+"""DecisionLayer — Jev First: todo ponto do círculo que vai gastar recurso pergunta primeiro aqui.
+JevHttpClient (API da TypeSafe, POST /v1/systemone) e LocalJev (regra determinística) têm o MESMO contrato."""
 from __future__ import annotations
 
 import json
@@ -112,8 +107,8 @@ class JevHttpClient:
 
     def __init__(self, api_key: str, model: str | None = None, timeout: float = 5.0, tentativas: int = 3):
         self.api_key = api_key
-        # versão fixa (ex.: jev-1.13.0) recomendada quando os limiares estão calibrados; padrão: o alias estável
-        self.model = model or os.environ.get("JEV_MODEL", "jev-latest")
+        self.model = model or os.environ.get("JEV_MODEL", "jev-latest")   # versão fixa (ex.: jev-1.13.0) quando os limiares estão calibrados
+        self.despinado: str | None = None    # a versão fixa sumiu da API: voltou ao alias (fica registrado, vira alerta)
         self.timeout = timeout
         self.tentativas = tentativas
         self.ultimo_modelo: str | None = None
@@ -141,8 +136,11 @@ class JevHttpClient:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     data = json.loads(resp.read())
                 break
-            except urllib.error.HTTPError as e:
-                # a doc da TypeSafe: 429 (limite) e 529 (sobrecarga) se repetem com espera exponencial
+            except urllib.error.HTTPError as e:    # doc da TypeSafe: 429 (limite) e 529 (sobrecarga) repetem com espera exponencial
+                if e.code in (400, 404) and self.model != "jev-latest" and i < self.tentativas - 1:
+                    self.despinado, self.model, body["model"] = self.model, "jev-latest", "jev-latest"      # versão fixa saiu do ar: alias
+                    req.data = json.dumps(body, ensure_ascii=False).encode()
+                    continue
                 if e.code not in self.RETRY or i == self.tentativas - 1:
                     raise
                 time.sleep(0.4 * 2 ** i)
@@ -685,8 +683,7 @@ class DecisionLayer:
             seguro(self.metricas.decisao, out[qid].source, resultado)
         return out
 
-    # --- Jev aprende o worth_spending imitando a regra quando está em dúvida: cada decisão da regra no lugar dele vira
-    # rótulo por balde de entradas similares; com rótulos consistentes, a próxima dúvida é ajustada em vez de cair na regra.
+    # --- Jev aprende o worth_spending imitando a regra em dúvida: decisão da regra vira rótulo por balde; a próxima dúvida é ajustada.
     WORTH_KEY = "jev_aprendiz.worth_spending"
 
     def _worth_limiar(self, state: Mapping[str, Any]) -> float:
@@ -757,10 +754,13 @@ class DecisionLayer:
         return d
 
     def _registrar_modelo(self, modelo: str | None) -> None:
-        """A resposta diz a versão exata do Jev. Se ela mudar (alias apontou para outra), os limiares calibrados podem
-        não valer mais: fica registrado e vira alerta."""
+        """A resposta diz a versão exata do Jev; se mudar (alias apontou para outra), fica registrado e vira alerta."""
         if not modelo:
             return
+        if getattr(self.jev, "despinado", None):
+            self.s.x("INSERT INTO alerts(kind,message,created_at) VALUES('saude',?,strftime('%s','now'))",
+                     (f"A versão fixa do Jev ({self.jev.despinado}) saiu da API; voltei ao alias jev-latest ({modelo}).",))
+            self.jev.despinado = None
         antes = self.s.get("jev_modelo")
         if antes != modelo:
             self.s.set("jev_modelo", modelo)

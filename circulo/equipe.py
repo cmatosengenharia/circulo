@@ -220,6 +220,8 @@ def _de_alertas(store, c, out, limite):
             out.append(_msg(a["created_at"], "atualizar_corpo", "orquestrador", "entrega" if "evidenciado" in msg else "status", msg))
         elif k == "saude" and msg.startswith("Estagna"):
             out.append(_msg(a["created_at"], "saude", "orquestrador", "alerta", msg))
+        elif k == "duvida":
+            out.append(_msg(a["created_at"], "estudar_pedido", "indagar", "entrega" if "agora valida" in msg else "status", msg))
         elif k == "roteiro" and msg.startswith("Estudei"):
             out.append(_msg(a["created_at"], "estudar_pedido", "corrigir_codigo", "status", msg))
         elif k == "roteiro" and "sem item novo" in msg:

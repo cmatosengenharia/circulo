@@ -89,6 +89,8 @@ class Circle:
         budget = Budget(store, lambda: com_tokens_dia(policies.get()), now)
         dl = DecisionLayer(store, policies.get, budget, jev=jev if jev is not None else build_jev(),
                            llm=llm if llm is not None else build_llm())
+        if jev is None and not os.environ.get("JEV_MODEL") and store.get("jev_modelo") and getattr(dl.jev, "source", "") == "jev":
+            dl.jev.model = store.get("jev_modelo")    # doc da TypeSafe: versão fixa para os limiares calibrados não derivarem (pin automático)
         dl.metricas = self.metricas
         self.ctx = Ctx(store, policies, budget, dl, self.data_dir, now)
         self.collector = Collector(self.ctx)
@@ -727,8 +729,8 @@ class Circle:
             self.licoes.checar_no_main(self.corpo.repo)
         elif pick == "indagar":
             from . import indagador
-            res = indagador.rodar(self.ctx, self.engine)
-            if res and res["cerebro"] == "loop" and res["validas"]:
+            res = indagador.rodar(self.ctx, self.engine)        # inclui uma dúvida do Jev estudada pelo Arquiteto e reclassificada
+            if res and res["cerebro"] == "loop" and (res["validas"] or res.get("duvida_valida")):
                 seguro(self.planejador.no_giro, validou=True)   # a pergunta validada vira item neste giro (falha fica em TENTATIVAS)
         elif pick == "evoluir_projeto":
             # várias missões ao mesmo tempo; cada uma deixa a passagem na trilha do círculo

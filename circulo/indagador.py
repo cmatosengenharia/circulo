@@ -429,7 +429,14 @@ def proximo_cerebro(store, engine=None) -> dict | None:
 
 def rodar(ctx, engine=None) -> dict | None:
     alvo = proximo_cerebro(ctx.store, engine)
-    return indagar(ctx, alvo["project"]) if alvo else None
+    if not alvo:
+        return None
+    res = indagar(ctx, alvo["project"])
+    from . import duvidas
+    est = duvidas.estudar(ctx, alvo["project"])          # uma dúvida do Jev por passagem: Arquiteto estuda, Jev reclassifica
+    res["duvida"] = est
+    res["duvida_valida"] = bool(est and est.get("resultado") == "valida")
+    return res
 
 
 # ------------------------------------------------------------------ consumo: quem parte da pergunta válida
@@ -478,7 +485,8 @@ def resumo(store, limite: int = 12) -> dict:
                     "SUM(status IN ('feita','virou_item','entregue')) u FROM perguntas WHERE eixo IS NOT NULL")
     por_eixo = {r["eixo"]: r["n"] for r in store.q("SELECT eixo, COUNT(*) n FROM perguntas WHERE eixo IS NOT NULL GROUP BY eixo")}
     return {"ultimas": rows, "total": tot["n"] or 0, "validas": tot["v"] or 0, "descartadas": tot["d"] or 0, "inconclusas": tot["i"] or 0,
-            "usadas": tot["u"] or 0, "por_eixo": por_eixo, "marcas": store.get("indagador") or {}, "eixos": EIXOS, "funil": funil(store)}
+            "usadas": tot["u"] or 0, "por_eixo": por_eixo, "marcas": store.get("indagador") or {}, "eixos": EIXOS, "funil": funil(store),
+            "duvidas": __import__("circulo.duvidas", fromlist=["resumo"]).resumo(store)}
 
 
 # ------------------------------------------------------------------ a regra (LocalJev) quando o Jev está em dúvida ou nos testes

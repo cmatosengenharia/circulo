@@ -44,12 +44,15 @@ MENU = (("/", "Missões", "As missões suas e a do próprio loop"),
         ("/loop", "Gestão do loop", "Saúde, decisões, evolução e segurança do loop"),
         ("/fluxo", "Bastidores do giro", "O giro passo a passo: raias, obras e cada verificação"),
         ("/rastros", "Rastros e SLOs", "Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs"),
-        ("/integracoes", "Integrações", "Chaves do Jev, da LLM e do GitHub no cofre do sistema"))
+        ("/integracoes", "Integrações", "Chaves do Jev, da LLM e do GitHub no cofre do sistema"),
+        ("/aprovacoes", "Precisa de você", "Tudo o que está parado esperando uma decisão sua, com a ação do lado"))
+SELO = '<span class="selo" id="seloAprov" hidden></span>'     # contagem do "Precisa de você", em toda tela
 NAV = (f'{NAV_INI}<nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links">'
-       + "".join(f'<a href="{h}" title="{t}">{n}</a>' for h, n, t in MENU)
+       + "".join(f'<a href="{h}" title="{t}">{n}{SELO if h == "/aprovacoes" else ""}</a>' for h, n, t in MENU)
        + '</div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav>'
        '<script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}'
-       'var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});})();</script>'
+       'var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});'
+       'function selo(){fetch("/api/aprovacoes?so=n").then(function(r){return r.json()}).then(function(j){var s=document.getElementById("seloAprov");if(!s)return;s.hidden=!j.total;s.textContent=j.total;s.dataset.u=j.urgentes>0?"1":"0";}).catch(function(){});}selo();setInterval(selo,15000);})();</script>'
        f'{NAV_FIM}\n')
 
 
@@ -71,6 +74,8 @@ COMPONENTES = """
 .topo-links a:hover{background:var(--hover);color:var(--ink)}
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+.topo-links .selo{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--jev);color:var(--surface);font-size:11.5px;font-weight:800;text-align:center;vertical-align:1px}
+.topo-links .selo[data-u="1"]{background:var(--bad)}
 a.back{display:none !important}
 @media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
@@ -134,7 +139,7 @@ def aplicar(html: str) -> str:
     return corpo.replace("</style>", bloco + "</style>", 1)
 
 
-PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html")
+PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html", "aprovacoes.html")
 
 
 def reescrever(pasta: Path | None = None) -> list[str]:

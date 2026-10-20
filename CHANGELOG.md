@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.38.0 — 2026-10-20
+
+**Precisa de você, dúvidas do Jev estudadas, e o Jev usado até o fim da doc.**
+
+- **Precisa de você** (`/aprovacoes`, no menu de toda tela, com selo de contagem — vermelho quando há algo urgente):
+  tudo o que, no loop inteiro, espera uma decisão humana, com a ação do lado. Fontes: loop pausado por você
+  (retomar), orçamento esgotado no modo com limite (mudar para sem limite), itens que "dependem de você" (tirar da
+  fila), itens contestados pelo estudo (executar mesmo assim / deixar de lado), etapas em quarentena, travas do SRE
+  com gravidade ≥ 0,7 abertas há mais de 6 h, lançamentos de finanças esperando revisão (está certo), avisos não
+  lidos (visto) e peças de configuração paradas (com o como-ligar). Cada ação passa pelo mesmo caminho do botão que
+  já existia e fica registrada como alerta de controle. `GET /api/aprovacoes` (`?so=n` só a contagem) e
+  `POST /api/aprovacoes/acao`.
+- **Dúvidas do Jev vão para o Arquiteto** (`circulo/duvidas.py`): a pergunta que o Jev não soube classificar
+  (status "inconclusa") não espera mais 6 h para voltar igual. Uma por passagem do Product owner, a mais antiga é
+  estudada em modo leve (1 busca, ~9 mil tokens, pelo porteiro do gasto; a memória do time entra de graça): fatos com
+  base medido/inferido, parecer sobre pertinência, eixo e ação, e a pergunta reescrita se a dúvida vinha de vagueza.
+  Com a evidência nova, o Jev classifica de novo na hora. Se continuar em dúvida, descarta com o motivo: dúvida não
+  gira. A original fecha como "estudada"; a nova carrega `apos_estudo` e de onde veio. O canal `#equipe` mostra o
+  Arquiteto avisando o Product owner; o card do Product owner mostra quantas dúvidas foram estudadas e quantas
+  viraram válidas.
+- **Jev — o que a doc ainda oferecia** (docs.typesafe.ai, set/2026): o loop já usava os três tipos, critérios,
+  várias perguntas por chamada, inglês, probabilidades/legenda e o registro da versão. Faltava **fixar a versão**:
+  agora o loop sobe com a versão exata que o Jev respondeu da última vez (kv `jev_modelo`), para os limiares
+  calibrados não derivarem com o alias `jev-latest`; `JEV_MODEL` explícito continua valendo mais. Se a versão fixa
+  sair da API (400/404), o cliente volta ao alias na mesma chamada e registra alerta. Também confirmado na doc:
+  Noul não tem campo de confiança (o loop deriva de |2p−1|, como já fazia); estado irrelevante degrada a precisão
+  (o `estado` gravado por decisão desde a 1.37.0 permite medir o tamanho por pergunta); limites 64 mil tokens por
+  chamada e 1.200 chamadas/min, longe do uso atual.
+- `loop.py` fica em 898 linhas (a dúvida é estudada dentro de `indagador.rodar`); `decision.py` em 1.000.
+- Testes (`test_aprovacoes_duvidas`, 5): reúne tudo com ação e cada ação resolve; página, API e selo no menu;
+  dúvida vai ao Arquiteto e volta ao Jev na hora; sem LLM fica marcada e não trava; pin automático da versão do Jev.
+
 ## 1.37.0 — 2026-10-20
 
 **O aluno do Jev: aprendizado a partir das decisões, em sombra.** Onde o fine-tuning encaixa no loop é na camada de

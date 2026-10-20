@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — precisa de você</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E9EDF1;--surface:#F7F9FB;--line:#D3DAE1;--border:#7B8794;--hover:#E1E7ED;--ink:#17212B;--muted:#556270;--jev:#4B3FD1;--jev-soft:#E3E0FB;--llm:#8A5608;--llm-soft:#F6E6CC;--ok:#146B53;--ok-soft:#D3EDE4;--bad:#B02A1C;--bad-soft:#F8DBD6;--idle:#76828F;--gh:#2B3440;--node:#FFFFFF;--accent:#4B3FD1;--on-accent:#FFFFFF;}
+@media (prefers-color-scheme:dark){:root{--bg:#10161D;--surface:#18212B;--line:#2A3542;--border:#617080;--hover:#233140;--ink:#E6ECF2;--muted:#9AA8B5;--jev:#8E84FF;--jev-soft:#262249;--llm:#E0A53F;--llm-soft:#3A2C14;--ok:#3FBF98;--ok-soft:#16352C;--bad:#F06A5B;--bad-soft:#3E1C19;--idle:#7F8C9B;--gh:#C9D3DD;--node:#1F2A36;--accent:#8E84FF;--on-accent:#10161D;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 56px}
+h1{font-size:26px;margin:4px 0 2px}
+.sub{color:var(--muted);margin:0 0 14px;max-width:80ch}
+.vazio{background:var(--surface);border:1.5px solid var(--ok);border-radius:14px;padding:22px;display:flex;gap:14px;align-items:center}
+.vazio b{font-size:18px}
+.vazio i{width:14px;height:14px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px var(--ok-soft);flex:none}
+.grupo{margin:18px 0 6px;font-size:12.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.card{background:var(--surface);border:1.5px solid var(--line);border-left-width:5px;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center}
+.card[data-p="0"]{border-left-color:var(--bad)}.card[data-p="1"]{border-left-color:var(--llm)}.card[data-p="2"]{border-left-color:var(--jev)}.card[data-p="3"],.card[data-p="4"]{border-left-color:var(--idle)}
+.card b{display:block;font-size:15px}
+.card .d{color:var(--muted);font-size:13.5px;margin-top:2px;overflow-wrap:anywhere}
+.card .meta{color:var(--muted);font-size:12.5px;margin-top:4px}
+.card .meta a{color:var(--jev)}
+.acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.acoes button{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
+.acoes button:hover{background:var(--hover);border-color:var(--ink)}
+.acoes button.primaria{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;border:1.5px solid currentColor;margin-right:6px;vertical-align:1px;color:var(--muted)}
+.card.saiu{opacity:.4;transition:opacity .4s}
+.msg{min-height:22px;color:var(--muted);font-size:13px;margin:4px 0 10px}
+@media (max-width:640px){.card{grid-template-columns:1fr}.acoes{justify-content:flex-start}}
+/*TEMA:ini*/
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.topo{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--surface);border-bottom:1.5px solid var(--line);margin:0 0 14px}
+.topo .marca{font-weight:800;letter-spacing:.2px;color:var(--ink);text-decoration:none;font-size:17px;padding:6px 8px 6px 0}
+.topo .marca::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-right:8px;vertical-align:-1px}
+.topo-links{display:flex;flex-wrap:wrap;gap:2px}
+.topo-links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 11px;border-radius:8px;border:1.5px solid transparent}
+.topo-links a:hover{background:var(--hover);color:var(--ink)}
+.topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
+.topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+.topo-links .selo{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--jev);color:var(--surface);font-size:11.5px;font-weight:800;text-align:center;vertical-align:1px}
+.topo-links .selo[data-u="1"]{background:var(--bad)}
+a.back{display:none !important}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
+.btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
+.btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
+.btn:hover{background:var(--hover);border-color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent);filter:brightness(1.08);border-color:var(--ink)}
+.btn.perigo:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.btn:disabled,.btn[aria-disabled=true]{opacity:1;background:var(--bg);color:var(--muted);border:1.5px dashed var(--border);cursor:not-allowed;filter:none}
+.abas button,.vel button,.giros button,.seg button,.sugestoes button{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+.abas button{color:var(--muted)}
+.abas button:hover,.vel button:hover,.giros button:hover,.seg button:hover,.sugestoes button:hover{background:var(--hover);border-color:var(--ink);color:var(--ink)}
+.abas button[aria-pressed=true],.vel button[aria-pressed=true],.giros button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.giros button.bad{border-color:var(--bad);color:var(--bad)}
+.giros button.bad[aria-pressed=true]{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+input,select,textarea{border-color:var(--border)}
+form.ask input,.orc-form input,.ligar select,.paralelo select,.linha input,.campos input,form.busca input{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:focus,.linha input:focus,.campos input:focus,form.busca input:focus{border-color:var(--accent);outline:3px solid var(--accent);outline-offset:0}
+::placeholder{color:var(--muted);opacity:1}
+.chip{border:1px solid transparent}
+.legenda,.legend{color:var(--ink);font-size:13px;gap:8px 18px}
+.legenda span,.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:12px;height:12px;flex:none}
+.lg.c{border-radius:50%}.lg.d{transform:rotate(45deg) scale(.8)}.lg.q{border-radius:3px}.lg.a{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid currentColor}
+.lg.o{border-radius:50%;border:2px solid currentColor;background:transparent}.lg.t{border-radius:50%;border:2px dashed currentColor;background:transparent}
+
+/*TEMA:fim*/
+</style>
+</head>
+<body>
+<!--NAV:ini--><nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links"><a href="/" title="As missões suas e a do próprio loop">Missões</a><a href="/equipe" title="Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas">Equipe ao vivo</a><a href="/loop" title="Saúde, decisões, evolução e segurança do loop">Gestão do loop</a><a href="/fluxo" title="O giro passo a passo: raias, obras e cada verificação">Bastidores do giro</a><a href="/rastros" title="Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs">Rastros e SLOs</a><a href="/integracoes" title="Chaves do Jev, da LLM e do GitHub no cofre do sistema">Integrações</a><a href="/aprovacoes" title="Tudo o que está parado esperando uma decisão sua, com a ação do lado">Precisa de você<span class="selo" id="seloAprov" hidden></span></a></div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav><script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});function selo(){fetch("/api/aprovacoes?so=n").then(function(r){return r.json()}).then(function(j){var s=document.getElementById("seloAprov");if(!s)return;s.hidden=!j.total;s.textContent=j.total;s.dataset.u=j.urgentes>0?"1":"0";}).catch(function(){});}selo();setInterval(selo,15000);})();</script><!--NAV:fim-->
+<div class="wrap">
+  <h1>Precisa de você</h1>
+  <p class="sub">Tudo o que, no loop inteiro, está parado esperando uma decisão sua — com a ação do lado. O loop não espera por desenho; quando espera, aparece aqui na hora. A lista se atualiza sozinha a cada 10 s.</p>
+  <div class="msg" id="msg"></div>
+  <div id="lista"></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const TIPO = {loop_pausado: "loop", orcamento: "orçamento", item_depende: "item", item_contestado: "item contestado", quarentena: "quarentena", trava: "trava do SRE",
+              revisao: "finanças", aviso: "aviso", configuracao: "configuração"};
+const GRUPO = {0: "Agora", 1: "Decidir hoje", 2: "Quando puder", 3: "Rotina", 4: "Avisos"};
+const ha = t => { if (!t) return ""; const s = Date.now() / 1000 - t; return s < 3600 ? `há ${Math.round(s / 60)} min` : s < 86400 ? `há ${Math.round(s / 3600)} h` : `há ${Math.round(s / 86400)} d`; };
+async function carregar() {
+  try {
+    const j = await (await fetch("/api/aprovacoes")).json();
+    const t = $("#topoEstado"); if (t) t.textContent = j.total ? `${j.total} esperando você` : "nada esperando você";
+    if (!j.total) { $("#lista").innerHTML = `<div class="vazio"><i></i><div><b>Nada esperando você.</b><div class="sub" style="margin:0">O loop seguiu sozinho. Esta página fica aqui para quando algo precisar da sua decisão.</div></div></div>`; return; }
+    let html = "", g = null;
+    for (const i of j.itens) {
+      if (i.prioridade !== g) { g = i.prioridade; html += `<div class="grupo">${GRUPO[g] || "Outros"}</div>`; }
+      html += `<div class="card" data-p="${i.prioridade}" data-ref="${esc(String(i.ref ?? ""))}" data-tipo="${esc(i.tipo)}"><div><b><span class="tag">${esc(TIPO[i.tipo] || i.tipo)}</span>${esc(i.titulo)}</b>` +
+        (i.detalhe ? `<div class="d">${esc(i.detalhe)}</div>` : "") + `<div class="meta">${ha(i.desde)}${i.link ? ` · <a href="${esc(i.link)}">ver onde</a>` : ""}</div></div>` +
+        `<div class="acoes">${(i.acoes || []).map((a, k) => `<button type="button" class="${k === 0 ? "primaria" : ""}" data-acao="${esc(a.acao)}">${esc(a.rotulo)}</button>`).join("")}</div></div>`;
+    }
+    $("#lista").innerHTML = html;
+  } catch { $("#msg").textContent = "sem conexão com o painel"; }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("button[data-acao]"); if (!b) return;
+  const card = b.closest(".card"); b.disabled = true;
+  const r = await fetch("/api/aprovacoes/acao", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({acao: b.dataset.acao, ref: card.dataset.ref})});
+  const j = await r.json();
+  $("#msg").textContent = r.ok ? `✓ ${j.feito}` : (j.erro || "não deu");
+  if (r.ok) { card.classList.add("saiu"); setTimeout(carregar, 600); } else b.disabled = false;
+});
+carregar(); setInterval(carregar, 10000);
+</script>
+</body>
+</html>

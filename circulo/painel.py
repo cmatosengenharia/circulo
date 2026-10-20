@@ -262,9 +262,9 @@ def make_handler(db_path: str):
                 self.send_header("Location", f"/missao/{kit_project_id(self._store(), 'circulo')}")
                 self.end_headers()
                 return
-            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe") or u.path.startswith(("/projeto/", "/missao/")):
+            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes") or u.path.startswith(("/projeto/", "/missao/")):
                 body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html",
-                              "/fluxo": "fluxo.html", "/equipe": "equipe.html"}.get(u.path, "painel.html"))
+                              "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -342,6 +342,10 @@ def make_handler(db_path: str):
             elif u.path == "/api/aluno":
                 from .aluno import resumo as aluno_resumo
                 self._json(aluno_resumo(self._store()))
+            elif u.path == "/api/aprovacoes":
+                from .aprovacoes import resumo as aprov
+                r = aprov(self._store())
+                self._json({"total": r["total"], "urgentes": r["urgentes"]} if q.get("so") == ["n"] else r)
             elif u.path == "/api/consumo":
                 from .budget import consumo
                 self._json(consumo(self._store(), int((q.get("dias") or ["14"])[0])))
@@ -564,6 +568,12 @@ def make_handler(db_path: str):
                         (f"Você {'separou' if r['relacao'] == 'nenhuma' else 'ligou'} as missões #{r['a']} e #{r['b']}"
                          + ("" if r["relacao"] == "nenhuma" else f" ({r['relacao'].replace('_', ' ')})") + ".", time.time(), r["a"]))
                 return self._json({"ok": True, **r})
+            if u.path == "/api/aprovacoes/acao":
+                from .aprovacoes import agir
+                r = agir(store, str(data.get("acao", "")), data.get("ref"), getattr(self.server, "circle", None))
+                if r.get("ok"):
+                    store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('controle',?,?,1)", (f"Você decidiu em “Precisa de você”: {r['feito']}", time.time()))
+                return self._json(r, 200 if r.get("ok") else 400)
             if u.path == "/api/orcamento":
                 # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
                 from .budget import definir_limite, definir_modo

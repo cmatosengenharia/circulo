@@ -33,6 +33,7 @@ TELAS = (
     {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Bastidores do giro", "Raias do giro", "Laboratório"]},
     {"rota": "/rastros", "arquivo": "rastros.html", "contem": ["Seguir o fio", "Objetivos de serviço", "Sinais de ouro"]},
     {"rota": "/integracoes", "arquivo": "integracoes.html", "contem": ["Integrações", "Cadastrar outra integração"]},
+    {"rota": "/aprovacoes", "arquivo": "aprovacoes.html", "contem": ["Precisa de você", "Nada esperando você"]},
 )
 APIS = (
     ("/api/projetos", ["projetos", "loop", "versao"]),
@@ -43,6 +44,7 @@ APIS = (
     ("/api/memoria", ["total", "por_tipo", "usos_24h"]),
     ("/api/consumo", ["modo", "por_dia", "por_papel", "sugestao_limite"]),
     ("/api/aluno", ["perguntas", "resumo", "criterios"]),
+    ("/api/aprovacoes", ["total", "urgentes", "itens"]),
     ("/api/observabilidade", ["sinais", "slos", "rastros"]),
     ("/api/loop", None),
 )
