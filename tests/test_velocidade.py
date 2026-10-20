@@ -253,3 +253,45 @@ def test_jev_nao_com_confianca_media_nao_para_a_esteira(circle):
     circle.ctx.dl.jev = JevRecusaFraco(0.85)                                   # confiança alta no não: continua barrando
     circle.idle()
     assert s.one("SELECT estudo FROM roadmap WHERE titulo='Canário de falha'")["estudo"] is None
+
+
+# ------------------------------------------------------------------ 1.32.1: o orçamento do dia ia todo em estudos com busca
+def test_estudo_proporcional_a_evidencia_e_custo_medido(circle):
+    from circulo import estudo as es
+    s = circle.store
+    agora = time.time()
+    def item(titulo, origem, ev):
+        return dict(s.one("SELECT * FROM roadmap WHERE id=?", (s.x(
+            "INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,'pendente',?,?,?,?)",
+            (titulo, "d", origem, ev, 500 + len(titulo), agora, agora)),)))
+    vig = item("Vigia: pergunta parada", "loop", "Vigia (medido): pergunta_valida_parada")
+    jar = item("Jardineiro: podar noqa", "loop", "medido pelo jardineiro")
+    con = item("Planejador: vetar item", "loop", "pergunta do conselho #26: operador")
+    ped = item("Pedido seu", "pedido_cassio", "pedido pelo painel")
+    assert [es.modo_do_estudo(x) for x in (vig, jar, con, ped)] == ["dispensado", "dispensado", "leve", "completo"]
+    e = circle.estudo
+    assert e.custo_estimado(vig) == 0 and e.custo_estimado(con) == es.MODOS["leve"]["est"] and e.custo_estimado(ped) == es.MODOS["completo"]["est"]
+    for t in (31000, 35000, 29000, 40000):                                   # custo medido substitui a estimativa
+        s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) VALUES(1,'estudo','m','jev',?,1,'[completo] x',?)", (t, agora))
+    assert e.custo_estimado(ped) == 35000
+    # dispensado: estudo gravado sem gastar nada
+    r = e.run(vig)
+    assert r["veredito"] == "adotar" and r["modo"] == "dispensado"
+    assert s.one("SELECT estudo FROM roadmap WHERE id=?", (vig["id"],))["estudo"] is not None
+    assert s.one("SELECT COUNT(*) n FROM llm_calls WHERE papel='estudo' AND created_at>?", (agora + 0.5,))["n"] == 0
+
+
+def test_vigia_avisa_quando_o_orcamento_nao_paga_o_proximo_estudo(circle):
+    from datetime import datetime
+    from circulo import vigia
+    from circulo.budget import TZ
+    s = circle.store
+    agora = time.time()
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Pedido seu','d','pedido_cassio','pendente','pedido',1,?,?)", (agora, agora))
+    s.set("orcamento_limite", {"limite": 400000})
+    hoje = datetime.fromtimestamp(agora, TZ).date().isoformat()
+    s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,392000,0,0) ON CONFLICT(day) DO UPDATE SET tokens=392000", (hoje,))
+    a = {x["chave"]: x for x in vigia.sondar(s, agora)}
+    assert "orcamento_curto" in a and a["orcamento_curto"]["evidencia"]["restam"] == 8000 and a["orcamento_curto"]["evidencia"]["base"] == "medido"
+    s.x("UPDATE roadmap SET evidencia='Vigia (medido): x', origem='loop' WHERE titulo='Pedido seu'")
+    assert "orcamento_curto" not in {x["chave"] for x in vigia.sondar(s, agora)}   # item dispensado não gasta: sem trava

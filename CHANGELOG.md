@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.32.1 — 2026-10-19
+
+**O loop parou às 22 h porque o orçamento do dia acabou — quase todo em estudos com busca na web.** Medido no Mac:
+392 mil dos 400 mil tokens do dia gastos; 11 estudos a 28–40 mil cada (o porteiro achava que custavam 9 mil); três
+itens esperando estudo, Developer parado, e ninguém dizendo o porquê (o Vigia apontava "fila cheia").
+
+- **Estudo proporcional à evidência**: item do loop nascido de medida interna (Vigia, jardineiro, lição) é
+  **dispensado** (0 tokens: a evidência já é medida); item do loop nascido de pergunta do conselho tem estudo **leve**
+  (1 busca, ~9 mil); pedido seu tem estudo **completo** (4 buscas). O modo fica registrado no estudo e na chamada.
+- **Custo honesto no porteiro**: o Jev e o orçamento decidem com a mediana medida dos últimos estudos do mesmo modo,
+  não com uma constante. Estudo dispensado não passa pelo porteiro (não há gasto a decidir).
+- **Limite duro respeitado**: a roteirização por confiança (1.31.1) nunca autoriza gasto que o orçamento não cobre.
+- **Vigia `orcamento_curto`**: há item esperando estudo e o que sobra do dia não paga o estudo dele → trava com os
+  números (limite, usado, resta, custo) e a sugestão (subir o limite no painel ou esperar a meia-noite).
+
 ## 1.32.0 — 2026-10-19
 
 **Círculo perfeito: a fábrica (`fabrica/`), reconstruída do básico.** Um pacote novo e independente no mesmo repo

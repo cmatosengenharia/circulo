@@ -16,7 +16,7 @@ from typing import Callable
 from . import finance, intencoes, jobs, parada, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
-from .decision import SN, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
+from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
@@ -486,15 +486,22 @@ class Circle:
                     # o Jev vê o item e o que o estudo destrava (no Mac ele recusou o estudo por 4 h com p≈0,3 e o Developer parado)
                     it = self.estudo.pendente() or {}
                     fila = 0 if self.self_dev is None or self.self_dev.pick() is None else 1
-                    contexto.update({"item_esperando_estudo": (it.get("titulo") or "")[:160], "origem": it.get("origem"), "fila_do_developer": fila,
+                    est = self.estudo.custo_estimado(it or None)          # custo medido do modo (dispensado = 0, leve, completo)
+                    from .estudo import modo_do_estudo
+                    contexto.update({"est_tokens": est, "modo_estudo": modo_do_estudo(it) if it else None,
+                                     "item_esperando_estudo": (it.get("titulo") or "")[:160], "origem": it.get("origem"), "fila_do_developer": fila,
                                      "itens_esperando_estudo": s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND estudo IS NULL "
                                                                      "AND origem IN ('loop','pedido_cassio') AND COALESCE(desativado,0)=0")["n"],
                                      "desbloqueia_fila": fila == 0, "value_signal": max(VALOR.get(pick, 0.6), 0.95 if fila == 0 else 0.85)})
                 if pick == "planejar_roteiro":
                     contexto.setdefault("desbloqueia_fila", contexto.get("fila_do_developer") == 0 and not self.estudo.precisa())
-                gate = ctx.dl.worth_spending("idle_evolution", contexto)
-                d0 = gate.decision
-                if not gate.allowed and contexto.get("desbloqueia_fila") and d0.source == "jev" and float(d0.confidence) < CONF_PARA_BARRAR:
+                if int(contexto.get("est_tokens") or 0) <= 0:
+                    gate = None                                           # custo zero (estudo dispensado): não há gasto a decidir
+                else:
+                    gate = ctx.dl.worth_spending("idle_evolution", contexto)
+                d0 = gate.decision if gate else None
+                if gate is not None and not gate.allowed and contexto.get("desbloqueia_fila") and d0.source == "jev" \
+                        and float(d0.confidence) < CONF_PARA_BARRAR and ctx.budget.can_spend(int(contexto["est_tokens"])):
                     # Confiança média do Jev num "não" que para a esteira: pela roteirização por confiança, confiança média
                     # alerta, não age. A regra determinística decide (como quando o Jev está em dúvida), e a resposta dele fica
                     # registrada para o aprendiz. Confiança alta no "não" continua valendo.
@@ -502,9 +509,12 @@ class Circle:
                     r = ctx.dl.local.ask_many(estado, {"worth_spending": Question("noul", "vale gastar agora?", SN("sim", "não"))})[0]["worth_spending"]
                     gate = Gate(float(r.value) >= gate.threshold, r, gate.threshold)
                     regra += f"; Jev disse não com confiança média ({float(d0.confidence):.2f}) numa tarefa que destrava a fila: a regra decidiu ({float(r.value):.2f})"
-                if pick == "planejar_roteiro":
+                if pick == "planejar_roteiro" and gate is not None:
                     from .planejador import registrar_porteiro
                     registrar_porteiro(s, pv["id"] if pv else None, gate)
+                if gate is None:
+                    regra += "; sem gasto (estudo dispensado: evidência interna medida)"
+                    gate = Gate(True, Decision("worth_spending", "noul", 1.0, 1.0, "local"), 0.0, "sem gasto")
                 d = gate.decision
                 regra += f"; gasto autorizado por {d.source} ({float(d.value):.2f} ≥ {gate.threshold:.2f})"
                 if not gate.allowed:

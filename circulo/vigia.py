@@ -240,8 +240,36 @@ def s_orcamento(s, now):
             "gravidade": 0.5, "sugestao": "subir o limite diário no painel, ou aceitar a pausa"}
 
 
+def s_orcamento_curto(s, now):
+    """Há item esperando estudo e o que sobra do orçamento do dia não paga o estudo dele (medido na tabela budget).
+    No Mac (19/10, 22 h): 392 mil de 400 mil gastos, estudo completo custando ~33 mil: a evolução parou sem ninguém dizer."""
+    item = s.one("SELECT id, titulo, origem, evidencia FROM roadmap WHERE status='pendente' AND estudo IS NULL AND origem IN ('loop','pedido_cassio') "
+                 "AND COALESCE(desativado,0)=0 AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT 1")
+    if not item:
+        return None
+    from datetime import datetime
+    from .budget import TZ
+    from .estudo import MODOS, modo_do_estudo
+    modo = modo_do_estudo(dict(item))
+    if modo == "dispensado":
+        return None
+    limite = int((_kv(s, "orcamento_limite", {}) or {}).get("limite") or 0) or 200_000
+    hoje = datetime.fromtimestamp(now, TZ).date().isoformat()
+    r = s.one("SELECT tokens FROM budget WHERE day=?", (hoje,))
+    usados = int(r["tokens"] or 0) if r else 0
+    xs = sorted(int(x["tokens"] or 0) for x in s.q("SELECT tokens FROM llm_calls WHERE papel='estudo' AND ok=1 AND entrada LIKE ? ORDER BY id DESC LIMIT 8", (f"[{modo}]%",)))
+    custo = xs[len(xs) // 2] if len(xs) >= 3 else MODOS[modo]["est"]
+    resta = limite - usados
+    if resta >= custo:
+        return None
+    return {"chave": "orcamento_curto", "titulo": f"O orçamento do dia não paga o próximo estudo: restam {resta:,} tokens e o estudo {modo} custa ~{custo:,}".replace(",", "."),
+            "evidencia": {"limite": limite, "usados_hoje": usados, "restam": resta, "custo_estudo": custo, "modo": modo, "item": item["id"]},
+            "gravidade": 0.7, "sugestao": "subir o limite diário no painel ou esperar a meia-noite; item com evidência interna medida já não gasta estudo"}
+
+
 SONDAS: list[Callable] = [s_giro_travado, s_pergunta_valida_parada, s_porteiro_recusa, s_developer_parado, s_fila_seca, s_pr_preso,
-                          s_corpo_atrasado, s_licao_bloqueia, s_jev_duvida, s_estagnacao, s_missao_sem_ciclo, s_claude_code_limite, s_orcamento]
+                          s_corpo_atrasado, s_licao_bloqueia, s_jev_duvida, s_estagnacao, s_missao_sem_ciclo, s_claude_code_limite, s_orcamento,
+                          s_orcamento_curto]
 
 
 def sondar(store, now: float | None = None) -> list[dict]:
