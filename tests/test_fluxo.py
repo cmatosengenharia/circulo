@@ -45,7 +45,7 @@ def test_painel_do_fluxo(circle, painel):  # noqa: F811
         d = json.loads(r.read())
     assert {"agora", "agentes", "jev"} <= set(d) and any(a["id"] == "jev" for a in d["agentes"])
     with urllib.request.urlopen(painel + "/fluxo", timeout=5) as r:
-        assert "Fluxo ao vivo" in r.read().decode()
+        assert "Bastidores do giro" in r.read().decode()
     with urllib.request.urlopen(painel + "/api/fluxo/eventos?voltar=20", timeout=5) as r:
         linhas = b""
         while b"event: fluxo" not in linhas:
@@ -53,10 +53,13 @@ def test_painel_do_fluxo(circle, painel):  # noqa: F811
     assert b"orquestrador" in linhas or b"event: fluxo" in linhas
 
 
-def test_fluxo_nao_cobre_o_desenho_com_baloes(circle, painel):  # noqa: F811
+def test_fluxo_so_mostra_o_que_nao_esta_em_outra_tela(circle, painel):  # noqa: F811
+    """1.36.0: o anel, o cartão “Agora”, a grade de agentes e as obras saíram daqui (a Equipe ao vivo já mostra tudo isso);
+    ficam as raias do giro e o Jev, que só existem aqui."""
     with urllib.request.urlopen(painel + "/fluxo", timeout=5) as r:
         html = r.read().decode()
-    assert "balao" not in html and "mostrarAgora" in html     # o texto fica no cartão “Agora”, não sobre o desenho
+    assert 'id="raiasSvg"' in html and 'id="jevLab"' in html
+    assert 'id="svg"' not in html and 'id="agentes"' not in html and 'id="obras"' not in html and "mostrarAgora" not in html
 
 
 class JevFalso:
@@ -150,7 +153,7 @@ def test_raias_do_giro_mostram_quem_fez_o_que_e_quando(circle, painel):  # noqa:
     assert d["giro"]["run_id"] == g["run_id"] and d["recentes"]
     with urllib.request.urlopen(painel + "/fluxo", timeout=5) as r:
         html = r.read().decode()
-    assert 'id="raiasSvg"' in html and 'id="obras"' in html
+    assert 'id="raiasSvg"' in html
 
 
 def test_obras_dizem_o_que_cada_agente_construiu(circle, painel):  # noqa: F811

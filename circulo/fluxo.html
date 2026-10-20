@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Círculo — fluxo ao vivo</title>
+<title>Círculo — bastidores do giro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
@@ -26,51 +26,14 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .estado[data-s=trabalhando] i,.estado[data-s=rodando] i{background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
 .estado[data-s=desligado] i{background:var(--bad)}
 .links a{margin-left:12px;font-weight:600}
-.palco{display:grid;gap:14px;grid-template-columns:minmax(0,1.55fr) minmax(280px,1fr)}
 @media (max-width:900px){.palco{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px}
-.cena{position:relative;padding:6px}
-.cena svg{display:block;width:100%;height:auto}
 .anel{fill:none;stroke:var(--line);stroke-width:2}
 .raio{stroke:var(--line);stroke-width:1;stroke-dasharray:3 6}
-.no circle.c{fill:var(--node);stroke:var(--line);stroke-width:2;transition:stroke .3s,fill .3s}
-.no text{font-size:12.5px;font-weight:600;fill:var(--muted);text-anchor:middle;pointer-events:none}
-.no text.ic{font-size:13px;font-weight:800;fill:var(--ink)}
-.no{cursor:pointer}
-.no.ativo circle.c{stroke:var(--ok);stroke-width:3;fill:var(--ok-soft)}
-.no.ativo text{fill:var(--ink)}
-.no.novo circle.c{stroke-dasharray:4 3;stroke:var(--jev)}
-.no.falhou circle.c{stroke:var(--bad);fill:var(--bad-soft)}
-.no.ext.jev circle.c{fill:var(--jev-soft);stroke:var(--jev)}
-.no.ext.jev text{fill:var(--jev)}
-.no.ext.llm circle.c{fill:var(--llm-soft);stroke:var(--llm)}
-.no.ext.llm text{fill:var(--llm)}
-.no.ext.github circle.c{stroke:var(--gh)}
 .pulso{fill:none;stroke:var(--ok);stroke-width:2;opacity:0}
 .pulso.on{animation:pulso .8s ease-out}
 .pulso.bad{stroke:var(--bad)}
 @keyframes pulso{from{opacity:.9;r:24}to{opacity:0;r:46}}
-.bola{filter:drop-shadow(0 0 6px currentColor)}
-.lado{display:flex;flex-direction:column;gap:14px;min-width:0}
-.agora{padding:14px 16px}
-.agora .quem{font-size:22px;font-weight:800;letter-spacing:-.01em}
-.agora .oque{color:var(--muted);font-size:14px}
-.agora .meta{font-size:12.5px;color:var(--muted);margin-top:6px}
-.log{padding:6px 0;max-height:430px;overflow:auto}
-.log ol{list-style:none;margin:0;padding:0}
-.log li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:7px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
-.log li:last-child{border-bottom:0}
-.log .h{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;padding-top:2px}
-.log .a{font-weight:700}
-.log li.decisao .a::after{content:" → Jev";color:var(--jev);font-weight:600}
-.log li.llm .a::after{content:" → LLM";color:var(--llm);font-weight:600}
-.log li.erro .t,.log li.falha .t{color:var(--bad)}
-.legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);padding:2px 12px 10px}
-.legenda b{color:var(--ink);font-weight:600}
-.vel{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);padding:10px 14px 0}
-.vel button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--ink);font:inherit;font-size:12px;font-weight:600}
-.vel button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
-.agentes{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
 .ag{padding:12px 14px;scroll-margin-top:16px}
 .ag.foco{outline:2px solid var(--jev)}
 .ag .t{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
@@ -114,12 +77,6 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .raias .passo{font-size:11px;fill:var(--ink);pointer-events:none}
 .detalhe{font-size:13px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);min-height:20px}
 .detalhe b{font-weight:700}
-.obras{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
-.obra{padding:12px 14px}
-.obra .q{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
-.obra .t{font-weight:700;margin:4px 0 2px;line-height:1.3}
-.obra .e{font-size:12.5px;color:var(--muted)}
-.obra a{font-size:12.5px;font-weight:600}
 @media (max-width:600px){.no text.rot{display:none}.no.ativo text.rot{display:block;font-size:22px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /*TEMA:ini*/
@@ -169,39 +126,10 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
 <!--NAV:ini--><nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links"><a href="/" title="As missões suas e a do próprio loop">Missões</a><a href="/equipe" title="Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas">Equipe ao vivo</a><a href="/loop" title="Saúde, decisões, evolução e segurança do loop">Gestão do loop</a><a href="/fluxo" title="O giro passo a passo: raias, obras e cada verificação">Bastidores do giro</a><a href="/rastros" title="Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs">Rastros e SLOs</a><a href="/integracoes" title="Chaves do Jev, da LLM e do GitHub no cofre do sistema">Integrações</a></div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav><script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});})();</script><!--NAV:fim-->
 <div class="wrap">
   <div class="cab">
-    <h1>Fluxo ao vivo</h1>
+    <h1>Bastidores do giro</h1>
     <div><span class="estado" id="estado" data-s=""><i></i><span id="estadoTxt">conectando…</span></span><span class="links"><a href="/missao/2" id="linkLoop">Painel do loop</a><a href="/rastros">Rastros</a></span></div>
   </div>
-  <p class="sub">Cada giro passa de agente em agente. A bolinha mostra a requisição indo para o próximo; quando um agente pergunta ao Jev ou chama a LLM, ela vai e volta. Clique num agente para ver o que ele faz e como está indo.</p>
-
-  <div class="palco">
-    <div class="card cena" id="cena">
-      <svg id="svg" viewBox="0 0 800 660" role="img" aria-label="Agentes do loop em círculo, com o Jev no centro"></svg>
-      <div class="legenda" aria-hidden="true">
-        <span style="color:var(--ok)"><i class="lg c" style="background:currentColor"></i><b>passagem entre agentes</b></span>
-        <span style="color:var(--jev)"><i class="lg d" style="background:currentColor"></i><b>pergunta ao Jev</b></span>
-        <span style="color:var(--idle)"><i class="lg o"></i><b>Jev em dúvida → a regra decidiu</b></span>
-        <span style="color:var(--llm)"><i class="lg q" style="background:currentColor"></i><b>LLM</b></span>
-        <span style="color:var(--bad)"><i class="lg a"></i><b>falha</b></span>
-        <span style="color:var(--jev)"><i class="lg t"></i><b>agente novo (tracejado)</b></span>
-      </div>
-    </div>
-    <div class="lado">
-      <div class="card agora" aria-live="polite">
-        <div class="oque" id="agoraRot">Agora</div>
-        <div class="quem" id="agoraQuem">—</div>
-        <div class="oque" id="agoraOque"></div>
-        <div class="meta" id="agoraMeta"></div>
-      </div>
-      <div class="card">
-        <div class="vel" role="group" aria-label="Velocidade da animação">Animação
-          <button type="button" data-v="1" aria-pressed="true">tempo real</button>
-          <button type="button" data-v="3" aria-pressed="false">3×</button>
-          <button type="button" data-v="0" aria-pressed="false">pausar</button></div>
-        <div class="log"><ol id="log" aria-live="polite"></ol></div>
-      </div>
-    </div>
-  </div>
+  <p class="sub">O giro por dentro: uma raia por agente, com o tempo de cada trecho e o que passou pelo Jev e pela LLM ali; embaixo, como o Jev vem respondendo e o laboratório de formas de perguntar. Quem está trabalhando agora e a conversa entre os agentes ficam na tela Equipe ao vivo.</p>
 
   <h2>Raias do giro <span style="text-transform:none;letter-spacing:0;font-weight:500">(quem trabalhou, quanto tempo, e o que passou pelo Jev e pela LLM em cada trecho)</span></h2>
   <div class="card raias" id="raias">
@@ -209,12 +137,6 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <svg id="raiasSvg" role="img" aria-label="Linha do tempo do giro, uma raia por agente"></svg>
     <div class="detalhe" id="raiasDet">Clique num trecho para ver o que o agente fez ali.</div>
   </div>
-
-  <h2>O que cada agente construiu <span style="text-transform:none;letter-spacing:0;font-weight:500">(a última obra concreta de cada um, com o link quando existe)</span></h2>
-  <div class="obras" id="obras"></div>
-
-  <h2>Agentes <span style="text-transform:none;letter-spacing:0;font-weight:500">(o que cada um faz e como está indo nas últimas 24 h)</span></h2>
-  <div class="agentes" id="agentes"></div>
 
   <h2>Jev <span style="text-transform:none;letter-spacing:0;font-weight:500">(o decisor que vem antes de qualquer LLM)</span></h2>
   <div class="duas">
@@ -226,8 +148,6 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const NS = "http://www.w3.org/2000/svg";
-const C = {x: 400, y: 318, r: 262};
-const EXT_POS = {jev: [400, 300], llm: [300, 430], github: [500, 430]};
 const ORDEM = ["orquestrador", "pedido", "decisao", "indagar", "vigia", "revisor", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
                "revisar_prs", "evoluir_projeto", "conectar_missoes", "analisar_padroes", "revisar_baixa_confianca", "rodar_regressao",
                "resumo", "propor_feature", "evoluir_harness", "jardinagem", "meta_learner", "shadow", "licoes", "saude"];
@@ -235,149 +155,13 @@ const ICONE = {vigia: "👁", revisor: "⇄", indagar: "¿", orquestrador: "◎"
   corrigir_codigo: "</>", revisar_prs: "✓", evoluir_projeto: "★", conectar_missoes: "⇄", analisar_padroes: "≋", revisar_baixa_confianca: "↺",
   rodar_regressao: "⏮", resumo: "¶", propor_feature: "+", evoluir_harness: "A/B", jardinagem: "✿", meta_learner: "∑", shadow: "◐", licoes: "!", saude: "♥",
   jev: "Jev", llm: "LLM", github: "Git"};
-const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let AG = {}, pos = {}, atual = null, fila = [], velocidade = 1, rodando = false, catalogo = [];
-
-function el(tag, attrs, pai) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (pai) pai.appendChild(e); return e; }
+let AG = {};
+function el(tag, attrs, pai) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (pai || $("#raiasSvg")).append(e); return e; }
 function nome(k) { return (AG[k] && AG[k].nome) || ({descanso: "Descanso", pausado: "Pausado"}[k]) || k.replace(/_/g, " "); }
-
-function desenhar() {
-  const svg = $("#svg"); svg.innerHTML = "";
-  const internos = [...ORDEM.filter(k => AG[k]), ...Object.keys(AG).filter(k => !ORDEM.includes(k) && !AG[k].externo)];
-  pos = {};
-  internos.forEach((k, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / internos.length; pos[k] = [C.x + C.r * Math.cos(a), C.y + C.r * Math.sin(a)]; });
-  Object.assign(pos, EXT_POS);
-  pos.descanso = pos.orquestrador; pos.pausado = pos.orquestrador;
-  el("circle", {cx: C.x, cy: C.y, r: C.r, class: "anel"}, svg);
-  internos.forEach(k => el("line", {x1: pos[k][0], y1: pos[k][1], x2: pos.jev[0], y2: pos.jev[1], class: "raio"}, svg));
-  for (const k of [...internos, "jev", "llm", "github"]) {
-    const ext = ["jev", "llm", "github"].includes(k), [x, y] = pos[k], r = k === "jev" ? 46 : ext ? 30 : 24;
-    const g = el("g", {class: `no ${ext ? "ext " + k : ""} ${AG[k] && AG[k].novo ? "novo" : ""}`, id: "no-" + k, tabindex: 0, role: "button",
-      "aria-label": `${nome(k)}: ${(AG[k] && AG[k].faz) || ""}`}, svg);
-    el("circle", {cx: x, cy: y, r, class: "c"}, g);
-    el("circle", {cx: x, cy: y, r, class: "pulso"}, g);
-    const ic = el("text", {x, y: y + 5, class: "ic"}, g); ic.textContent = ICONE[k] || nome(k).slice(0, 2);
-    if (!ext) {
-      const below = y > C.y - 20, t = el("text", {x, y: below ? y + r + 16 : y - r - 8, class: "rot"}, g); t.textContent = nome(k);
-    }
-    g.addEventListener("click", () => focar(k));
-    g.addEventListener("keydown", e => { if (e.key === "Enter") focar(k); });
-  }
-  if (atual) ativar(atual, false);
-}
-
-function focar(k) {
-  const c = document.getElementById("ag-" + k); if (!c) return;
-  document.querySelectorAll(".ag.foco").forEach(x => x.classList.remove("foco"));
-  c.classList.add("foco"); c.scrollIntoView({behavior: reduz ? "auto" : "smooth", block: "center"});
-}
-
-function ativar(k, pulsar = true, ruim = false) {
-  document.querySelectorAll(".no.ativo").forEach(n => n.classList.remove("ativo"));
-  const n = document.getElementById("no-" + (k === "descanso" || k === "pausado" ? "orquestrador" : k));
-  if (!n) return;
-  if (k !== "descanso" && k !== "pausado") n.classList.add("ativo");
-  if (pulsar && !reduz) { const p = n.querySelector(".pulso"); p.classList.remove("on", "bad"); void p.getBBox(); if (ruim) p.classList.add("bad"); p.classList.add("on"); }
-}
-
-const FORMAS = {c: "M-8,0a8,8 0 1,0 16,0a8,8 0 1,0 -16,0", d: "M0,-10L10,0L0,10L-10,0Z", q: "M-7,-7H7V7H-7Z", a: "M0,-10L9,7H-9Z", o: "M-8,0a8,8 0 1,0 16,0a8,8 0 1,0 -16,0"};
-// forma + cor: a cor sozinha não basta (daltonismo); cada tipo de passagem tem a sua forma, igual à legenda
-function voar(de, para, cor, ms, forma = "c") {
-  return new Promise(res => {
-    const a = pos[de], b = pos[para];
-    if (!a || !b || de === para || reduz || !velocidade) return res();
-    const bola = el("path", {d: FORMAS[forma] || FORMAS.c, class: "bola", fill: forma === "o" ? "var(--node)" : cor, stroke: forma === "o" ? cor : "var(--node)", "stroke-width": forma === "o" ? 3 : 1.5, style: `color:${cor}`}, $("#svg"));
-    const t0 = performance.now(), dur = ms / velocidade;
-    // arco leve, para a bolinha não cortar o centro em linha reta
-    const mx = (a[0] + b[0]) / 2 + (C.y - (a[1] + b[1]) / 2) * 0.12, my = (a[1] + b[1]) / 2 - (C.x - (a[0] + b[0]) / 2) * 0.12;
-    (function passo(t) {
-      const u = Math.min(1, (t - t0) / dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
-      const x = (1 - e) ** 2 * a[0] + 2 * (1 - e) * e * mx + e * e * b[0], y = (1 - e) ** 2 * a[1] + 2 * (1 - e) * e * my + e * e * b[1];
-      bola.setAttribute("transform", `translate(${x},${y})`);
-      if (u < 1) requestAnimationFrame(passo); else { bola.remove(); res(); }
-    })(t0);
-  });
-}
-const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const espera = ms => new Promise(r => setTimeout(r, velocidade ? ms / velocidade : 0));
-
-function registrar(e) {
-  const li = document.createElement("li");
-  li.className = e.tipo + (e.ok === false ? " falha" : "");
-  const h = new Date(e.em * 1000).toLocaleTimeString("pt-BR");
-  li.innerHTML = `<span class="h">${h}</span><span><span class="a">${esc(nome(e.agente))}</span> <span class="t">${esc(e.texto)}</span></span>`;
-  const log = $("#log"); log.prepend(li);
-  while (log.children.length > 80) log.lastChild.remove();
-}
-
-async function tocar(e) {
-  if (!AG[e.agente] && !["descanso", "pausado"].includes(e.agente)) {    // agente novo nascido da autoevolução: entra no círculo
-    AG[e.agente] = {id: e.agente, nome: e.agente.replace(/_/g, " "), faz: e.texto, novo: true}; desenhar();
-  }
-  registrar(e);
-  if (e.tipo === "etapa") {
-    const de = e.de && pos[e.de] ? e.de : (atual || "orquestrador");
-    await voar(de, e.agente, css("--ok"), 520);
-    atual = e.agente; ativar(e.agente);
-    mostrarAgora(e);
-    await espera(220);
-  } else if (e.tipo === "decisao") {
-    const de = atual && pos[atual] ? atual : e.agente;
-    await voar(de, "jev", css("--jev"), 380, "d");
-    ativar("jev");
-    await espera(160);
-    await voar("jev", de, e.decidiu === "jev" ? css("--jev") : e.decidiu === "llm" ? css("--llm") : css("--idle"), 380, e.decidiu === "jev" ? "d" : e.decidiu === "llm" ? "q" : "o");
-    ativar(de, false);
-  } else if (e.tipo === "llm") {
-    const de = e.agente && pos[e.agente] ? e.agente : atual;
-    await voar(de, "llm", css("--llm"), 420, "q"); ativar("llm", true, e.ok === false);
-    await voar("llm", de, e.ok === false ? css("--bad") : css("--llm"), 420, e.ok === false ? "a" : "q"); ativar(de, false);
-  } else if (e.tipo === "verificacao") {
-    const k = pos[e.agente] ? e.agente : atual;
-    if (e.para === "github") { await voar(k, "github", css("--gh"), 360); await voar("github", k, e.ok ? css("--ok") : css("--bad"), 360, e.ok ? "c" : "a"); }
-    ativar(k, true, !e.ok);
-    await espera(160);
-  } else if (e.tipo === "erro") {
-    const k = pos[e.agente] ? e.agente : atual;
-    const n = document.getElementById("no-" + k); if (n) { n.classList.add("falhou"); setTimeout(() => n.classList.remove("falhou"), 2500); }
-    ativar(k, true, true); await espera(300);
-  }
-}
-
-async function tocador() {
-  if (rodando) return; rodando = true;
-  while (fila.length) {
-    if (!velocidade) { await new Promise(r => setTimeout(r, 300)); continue; }
-    if (fila.length > 160) {                       // atrasou demais (aba escondida): pula para o fim sem perder o registro
-      const pulados = fila.splice(0, fila.length - 40); pulados.forEach(registrar);
-      const ult = [...pulados].reverse().find(x => x.tipo === "etapa"); if (ult) { atual = ult.agente; ativar(atual, false); }
-    }
-    const extra = fila.length > 25 ? 3 : fila.length > 10 ? 1.8 : 1, v0 = velocidade;
-    velocidade = v0 * extra; await tocar(fila.shift()); velocidade = v0;
-  }
-  rodando = false;
-}
-
-function mostrarAgora(e) {
-  $("#agoraQuem").textContent = nome(e.agente);
-  $("#agoraOque").textContent = e.agente === "descanso" ? "Esperando o próximo giro" : (AG[e.agente] && AG[e.agente].faz) || e.texto;
-  $("#agoraMeta").textContent = `${e.texto}${e.tick ? " · giro " + e.tick : ""}`;
-}
 
 function fmtMs(ms) { return ms == null ? "—" : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : `${Math.round(ms / 60000)} min`; }
 function ha(t) { const s = Date.now() / 1000 - t; return s < 60 ? "agora há pouco" : s < 3600 ? `há ${Math.round(s / 60)} min` : `há ${Math.round(s / 3600)} h`; }
 
-function renderAgentes(lista) {
-  $("#agentes").innerHTML = lista.filter(a => !a.externo).map(a => {
-    const tend = a.tendencia == null ? "" : a.tendencia <= -0.05 ? `<span class="chip ok">↓ ${Math.round(-a.tendencia * 100)}% mais rápido</span>`
-      : a.tendencia >= 0.1 ? `<span class="chip warn">↑ ${Math.round(a.tendencia * 100)}% mais lento</span>` : `<span class="chip">ritmo estável</span>`;
-    return `<div class="card ag" id="ag-${esc(a.id)}"><div class="t"><span>${esc(ICONE[a.id] || "•")} ${esc(a.nome)}</span>${a.novo ? `<span class="chip jev">novo</span>` : ""}</div>
-      <p>${esc(a.faz)}</p>
-      <div class="chips"><span class="chip">${a.execucoes_24h} execução(ões)</span><span class="chip">p50 ${fmtMs(a.p50_ms)}</span>${tend}
-        ${a.falhas_24h ? `<span class="chip bad">${a.falhas_24h} falha(s)</span>` : ""}${a.tokens_24h ? `<span class="chip warn">${a.tokens_24h.toLocaleString("pt-BR")} tokens</span>` : ""}</div>
-      ${a.ultimo ? `<div class="ult">Último: ${esc(a.ultimo.texto || "trabalhou")} · ${ha(a.ultimo.em)}</div>` : `<div class="ult">Não trabalhou nas últimas 48 h.</div>`}</div>`;
-  }).join("");
-}
 
 function renderJev(j) {
   const PERG = {worth_spending: "Vale gastar agora?", idle_task: "Qual tarefa agora?", should_evolve: "A evidência justifica evoluir?",
@@ -464,47 +248,30 @@ async function carregarGiro() {
     renderGiros(j.recentes || []); renderRaias(j.giro);
   } catch (e) { /* tenta de novo */ }
 }
-function renderObras(lista) {
-  $("#obras").innerHTML = lista.map(o => `<div class="card obra"><div class="q">${esc(ICONE[o.agente] || "•")} ${esc(o.nome)}</div>
-    <div class="t">${esc(o.titulo)}</div>${o.estado ? `<div class="e">${esc(o.estado)}</div>` : ""}
-    <div class="e">${o.em ? ha(o.em) : ""}${o.link ? ` · <a href="${esc(o.link)}" target="_blank" rel="noopener">abrir</a>` : ""}</div></div>`).join("") ||
-    `<div class="card obra"><div class="e">Nada construído ainda.</div></div>`;
-}
-async function carregarObras() {
-  try { const j = await (await fetch("/api/fluxo/obras")).json(); renderObras(j.obras || []); } catch (e) { /* tenta de novo */ }
-}
 
 async function carregar() {
   try {
     const r = await fetch("/api/fluxo"), j = await r.json();
-    const novo = JSON.stringify(j.agentes.map(a => a.id + (a.novo ? "*" : "")));
     j.agentes.forEach(a => AG[a.id] = a);
-    if (novo !== window._ags) { window._ags = novo; desenhar(); }
-    renderAgentes(j.agentes); renderJev(j.jev); estado(j.agora);
+    renderJev(j.jev); estado(j.agora);
   } catch (e) { /* tenta de novo */ }
 }
 
 function estado(a) {
   if (!a) return;
   $("#estado").dataset.s = a.estado; $("#estadoTxt").textContent = a.titulo || a.estado;
-  if (!fila.length && a.agente && a.agente !== atual && pos[a.agente]) { atual = a.agente; ativar(atual, false); }
 }
 
 function conectar() {
   const es = new EventSource("/api/fluxo/eventos?voltar=40");
-  es.addEventListener("fluxo", m => { fila.push(JSON.parse(m.data)); tocador(); });
   es.addEventListener("agora", m => estado(JSON.parse(m.data)));
   es.onerror = () => { $("#estado").dataset.s = "desligado"; $("#estadoTxt").textContent = "reconectando…"; };
 }
 
-document.querySelectorAll(".vel button").forEach(b => b.onclick = () => {
-  velocidade = Number(b.dataset.v); document.querySelectorAll(".vel button").forEach(x => x.setAttribute("aria-pressed", x === b)); tocador();
-});
 if (new URLSearchParams(location.search).get("embed")) document.body.classList.add("embed");
 carregar().then(conectar);
 setInterval(carregar, 10000);
 carregarGiro(); setInterval(carregarGiro, 4000);
-carregarObras(); setInterval(carregarObras, 20000);
 fetch("/api/projetos").then(r => r.json()).then(j => { const z = (j.projetos || []).find(p => p.kit === "circulo"); if (z) $("#linkLoop").href = "/missao/" + z.id; }).catch(() => {});
 </script>
 </body>

@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.36.0 — 2026-10-20
+
+**Varredura do dash: o que aparecia em duas telas agora aparece numa só.** Levantamento tela a tela (todas as abas
+de Gestão do loop, Equipe ao vivo, Bastidores do giro, Rastros, Missões, Integrações) e remoção do que repetia:
+
+- **Gestão do loop**
+  - aba "Equipe ao vivo" (um iframe da própria tela Equipe ao vivo, que já está no menu do topo): removida;
+  - "O círculo ao vivo" (anel com as mesmas etapas de "Etapas do ciclo" e o mesmo passo atual de "Agora"): removido,
+    junto com a máquina de animação (cometa, raias no centro, faíscas) e seu CSS;
+  - "Giros" em Mais detalhes (as Raias do giro em Bastidores mostram o mesmo, melhor): removido;
+  - "Evolução" (linha do tempo = o canal #equipe) e "Evoluções" (= Versões da política): removidos;
+  - "Saúde do loop" (medidores já cobertos por "Posso confiar": invariantes, correções, eficiência, erros, tokens):
+    removido;
+  - "Sinapses ao vivo" (feed de verificações = Lições → verificações + o canal): removido;
+  - "Números da missão" (= KPIs): removido;
+  - a aba "Mais detalhes" sobrou com dois cartões (Autonomia, Versões da política) e foi dissolvida em Segurança e
+    confiança. De 6 abas para 4: Saúde e estado · Decisões (Jev First) · Autoevolução · Segurança e confiança;
+  - cartões do loop inteiro (Revisor, Memória do time, Product owner, Consumo de tokens) deixam de aparecer nas
+    páginas das outras missões, onde não têm contexto.
+- **Bastidores do giro** (`/fluxo`): o anel animado com o cartão "Agora" e o diário, a grade "Agentes" e "O que cada
+  agente construiu" repetiam a Equipe ao vivo e saíram; ficam as **Raias do giro** e o **Jev** (perguntas e
+  laboratório), que só existem aqui. Título e texto refletem isso.
+- `painel.html` de 1 466 para 1 176 linhas; `fluxo.html` de 511 para 278. O teste de higiene do tema (nenhum id
+  procurado pelo script sem existir na página) continua valendo: o código morto saiu, não foi só escondido.
+- Testes: `test_fluxo`/`test_tema`/`verificacao` atualizados para as telas novas.
+
 ## 1.35.0 — 2026-10-20
 
 **Orçamento sem corte, medindo.** Medido no Mac: o loop bateu 393 mil de 400 mil tokens ontem e 383 mil às 9 h de

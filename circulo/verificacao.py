@@ -30,7 +30,7 @@ TELAS = (
     {"rota": "/", "arquivo": "home.html", "contem": ["Nova missão", "Equipe ao vivo", "Rastros e SLOs", "Integrações"]},
     {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Saúde e estado", "Equipe ao vivo", "Segurança e confiança", "Memória do time", "Consumo de tokens"]},
     {"rota": "/equipe", "arquivo": "equipe.html", "contem": ["Equipe ao vivo", "#equipe", "Quadro de entregas"]},
-    {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Fluxo ao vivo", "Laboratório", "Agentes"]},
+    {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Bastidores do giro", "Raias do giro", "Laboratório"]},
     {"rota": "/rastros", "arquivo": "rastros.html", "contem": ["Seguir o fio", "Objetivos de serviço", "Sinais de ouro"]},
     {"rota": "/integracoes", "arquivo": "integracoes.html", "contem": ["Integrações", "Cadastrar outra integração"]},
 )

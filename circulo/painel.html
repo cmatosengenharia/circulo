@@ -59,38 +59,9 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
   .wrap .panel{padding:14px 14px;border-radius:12px}.wrap .kpis{grid-template-columns:repeat(2,1fr)}.wrap .about{margin-top:12px}}
 
 /* o círculo */
-.ringbox{position:relative;display:flex;flex-direction:column;align-items:center}
-#ring{width:100%;max-width:520px;height:auto;overflow:visible}
-.track{fill:none;stroke:var(--line);stroke-width:2}
-.arc{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .5s ease}
-.node circle{fill:var(--surface);stroke:var(--line);stroke-width:2;transition:fill .3s,stroke .3s}
-.node text{fill:var(--muted);font-size:13px;font-weight:500}
-.node.on circle{fill:var(--ink);stroke:var(--ink)}
-.node.on text{fill:var(--ink);font-weight:700}
-.hub{fill:var(--jev-soft);stroke:var(--jev);stroke-width:1.5}
-.hubnum{fill:var(--ink);font-size:44px;font-weight:800;letter-spacing:-.03em}
-.hublbl{fill:var(--muted);font-size:13px}
-.spark{transition:transform .9s cubic-bezier(.2,.7,.2,1),opacity .9s}
-.comet{transition:opacity .3s}
-.comet .head{fill:var(--jev)}
-.comet .halo{fill:var(--jev);opacity:.18}
-.trail-dot{fill:var(--jev);opacity:.5;transition:opacity 1.6s}
-.node.visited circle{stroke:var(--jev)}
-.hubstate{fill:var(--muted);font-size:13px}
-.hubnum.small{font-size:30px}
 .mission{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--muted);margin-left:6px;white-space:nowrap}
-.paused #ring .arc{stroke:var(--idle)}
-.now{align-self:flex-start;margin:0;font-weight:600}
-.now span{color:var(--muted);font-weight:400}
-.legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:13px;margin-top:6px}
-.legend b{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:2px;flex:none}
 
 /* saúde */
-.meter{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line)}
-.meter:first-of-type{border-top:0;padding-top:0}
-.meter .name{font-weight:600}
-.meter .val{font-weight:700;text-align:right}
-.meter .why{grid-column:1/-1;color:var(--muted);font-size:13px}
 .bar{grid-column:1/-1;height:8px;border-radius:999px;background:var(--bg);position:relative;overflow:hidden}
 .bar span{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--ok);transition:width .5s}
 .bar.warn span{background:var(--llm)}.bar.bad span{background:var(--bad)}
@@ -150,7 +121,6 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .chip.avancar,.chip.base,.chip.cumprida{background:var(--ok-soft);color:var(--ok)}
 .chip.refazer{background:var(--llm-soft);color:var(--llm)}
 .chip.descartar{background:var(--bad-soft);color:var(--bad)}
-.lanes{display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;margin-top:4px}.gain-down{color:var(--bad);font-weight:700}
 .chip.shadow{background:var(--jev-soft);color:var(--jev)}
 .chip.rejected,.chip.rolled_back{background:var(--bad-soft);color:var(--bad)}
 .empty{color:var(--muted);padding:6px 0}
@@ -158,9 +128,6 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 form.ask{display:flex;gap:8px;margin-top:4px}
 form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:9px 16px}
 .stack{display:flex;flex-direction:column;gap:16px}
-.proj{display:grid;gap:6px}
-.proj .bar span{background:var(--jev)}
-.budget{margin-top:14px}
 
 /* etapas: uma cor por tipo de trabalho, igual no círculo, na faixa de giros e no "agora" */
 :root{--s-pedido:var(--ok);--s-projeto:var(--jev);--s-developer:var(--llm);--s-idle:#4F7C99;--s-meta:#6B7683;--s-orq:#8E99A6}
@@ -190,16 +157,6 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 .passos li.new{animation:in .8s ease}
 
 /* faixa de giros: cada barra é um giro, cada pedaço uma etapa, largura = tempo */
-.giros{display:flex;flex-direction:column;gap:5px}
-.giro{display:grid;grid-template-columns:64px 1fr 64px;gap:10px;align-items:center;font-size:12.5px}
-.giro .n{color:var(--muted)}
-.giro .dur{color:var(--muted);text-align:right}
-.giro .barra{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--bg)}
-.giro .barra span{height:100%;min-width:2px;border-right:1px solid var(--surface)}
-.giro.ativo .n{color:var(--ink);font-weight:700}
-.giro.ativo .barra{outline:1.5px solid var(--jev);outline-offset:1px}
-.chaves{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:10px}
-.chaves b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 
 /* dash em camadas: semáforo no topo, etapas do ciclo, detalhe de uma execução pelo run_id */
 .camadas{margin:0 0 18px;display:flex;flex-direction:column;gap:14px}
@@ -253,16 +210,6 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 @media (max-width:640px){.dec{grid-template-columns:52px 1fr 50px}.dec .v,.dec .c{display:none}}
 
 /* linha do tempo da evolução */
-.tl{list-style:none;margin:0;padding:0;position:relative;max-height:620px;overflow:auto}
-.tl li{display:grid;grid-template-columns:14px 1fr;gap:12px;padding:0 0 14px;position:relative}
-.tl li::before{content:"";position:absolute;left:6px;top:14px;bottom:0;width:2px;background:var(--line)}
-.tl li:last-child::before{display:none}
-.tl .p{width:14px;height:14px;border-radius:50%;margin-top:3px;border:3px solid var(--surface);box-shadow:0 0 0 1.5px var(--tc,var(--muted));background:var(--tc,var(--muted))}
-.tl .x{min-width:0}
-.tl .x strong{display:block;font-weight:600;line-height:1.35}
-.tl .x span{display:block;color:var(--muted);font-size:13px}
-.tl .x em{font-style:normal;font-size:12px;font-weight:700;color:var(--tc,var(--muted))}
-.tl li.new .x{animation:in 1.2s ease}
 
 /* modelos */
 .modelos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
@@ -381,10 +328,6 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .cf-col .idade{font-size:11.5px;color:var(--muted)}.cf-col .idade.obsoleto{color:var(--bad);font-weight:700}
 .cf-col .pj{font-size:12.5px;margin-top:2px}.cf-col .pj::before{content:"→ ";color:var(--muted)}
 .cf-col .v{font-weight:600;overflow-wrap:anywhere}.cf-col .p{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
-.sinapses{list-style:none;margin:10px 0 0;padding:0;max-height:260px;overflow:auto;font-size:13px}
-.sinapses li{display:grid;grid-template-columns:70px 18px minmax(0,1fr);gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
-.sinapses .ok{color:var(--ok)}.sinapses .no{color:var(--bad);font-weight:700}
-.sinapses .m{color:var(--muted);overflow-wrap:anywhere}
 .cf-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
 @media (max-width:860px){.cf-cols{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -448,14 +391,10 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
   <div class="pausa-banner" id="pausaBanner" hidden role="status" aria-live="polite"></div>
   <nav class="abas" id="abas" hidden aria-label="Partes do painel do loop">
     <button type="button" data-aba="geral" aria-pressed="true" title="Está rodando? Está travado? O que cada etapa fez">Saúde e estado</button>
-    <button type="button" data-aba="fluxo" aria-pressed="false" title="A equipe de agentes conversando e entregando, em tempo real">Equipe ao vivo</button>
     <button type="button" data-aba="jev" aria-pressed="false" title="Toda pergunta que o loop faz antes de gastar ou mudar algo">Decisões (Jev First)</button>
     <button type="button" data-aba="evolucao" aria-pressed="false" title="Perguntas, roteiro, PRs, revisões e lições: como o loop evolui a si mesmo">Autoevolução</button>
     <button type="button" data-aba="seguranca" aria-pressed="false" title="Constituição, guardrails, orçamento e o botão de parada">Segurança e confiança</button>
-    <button type="button" data-aba="detalhes" aria-pressed="false" title="Tabelas e registros completos">Mais detalhes</button>
   </nav>
-  <section class="panel fluxo-embed" data-aba="fluxo" id="fluxoEmbed"><iframe title="Equipe de agentes ao vivo" data-src="/equipe?embed=1" loading="lazy"></iframe>
-    <p class="sub"><a href="/equipe" target="_blank" rel="noopener">Abrir a equipe em tela cheia ↗</a> · <a href="/fluxo" target="_blank" rel="noopener">bastidores do giro (raias e obras) ↗</a></p></section>
 
   <section data-aba="geral" class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
     <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
@@ -476,9 +415,6 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div class="cf-col"><h3>Entender · por que agiu e qual regra decidiu</h3><ul id="cfSeg"></ul></div>
       <div class="cf-col"><h3>Projetar · próximo passo e risco</h3><ul id="cfProx"></ul></div>
     </div>
-    <div class="cf-barra"><h2 style="margin:0">Sinapses ao vivo <small class="sub">cada verificação de cada neurônio, no momento em que acontece</small></h2>
-      <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
-    <ul class="sinapses" id="sinapses" aria-live="off"></ul>
   </section>
   <section data-aba="geral" class="panel vigia zero-only" hidden id="vigia" aria-label="SRE: vigia da autoevolução">
     <div class="vg-cab"><h2 style="margin:0">SRE · vigia da autoevolução <span class="vg-chip" id="vigiaChip">—</span></h2>
@@ -498,29 +434,11 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <span class="sub" id="orcMsg">Vale na hora para todo o loop. O porteiro do gasto passa a decidir com esse limite; ao chegar nele, o loop pausa até a meia-noite.</span>
   </form>
   <div class="grid">
-    <section data-aba="geral" class="panel c7 ringbox" aria-label="O círculo ao vivo">
-      <p class="now" id="now" aria-live="polite">Esperando o próximo giro</p>
-      <div class="lanes" id="lanes" aria-label="Missões evoluindo em paralelo neste giro"></div>
-      <svg id="ring" viewBox="-310 -250 620 500" role="img" aria-label="Etapa atual do giro"></svg>
-      <div class="legend">
-        <span><b style="background:var(--jev);border-radius:50%"></b>Resolvido pelo Jev (círculo cheio)</span>
-        <span><b style="border:2px solid var(--jev);border-radius:50%"></b>Decisor local (círculo vazado)</span>
-        <span><b style="background:var(--llm);border-radius:50%"></b>Subiu para LLM (círculo âmbar)</span>
-      </div>
-    </section>
-
-    <section data-aba="geral" class="panel c5 agora" aria-label="O que o loop está fazendo agora">
+    <section data-aba="geral" class="panel c7 agora" aria-label="O que o loop está fazendo agora">
       <h2>Agora</h2>
       <div class="tarefa"><span class="marca" id="agoraMarca"></span>
         <div><h3 id="agoraTitulo">Conectando…</h3><p id="agoraDetalhe"></p></div></div>
       <ul class="passos" id="passos" aria-live="polite"></ul>
-    </section>
-
-    <section data-aba="detalhes" class="panel c12" aria-label="Giros">
-      <div class="cabeca"><div><h2>Giros</h2><p class="sub" style="margin:2px 0 0">Cada linha é um giro; cada pedaço, uma etapa, do tamanho do tempo que levou.</p></div>
-        <p class="sub" id="girosResumo" style="margin:0"></p></div>
-      <div class="giros" id="giros"></div>
-      <div class="chaves" id="chaves"></div>
     </section>
 
     <section data-aba="jev" class="panel c7" aria-label="Decisões ao vivo">
@@ -536,13 +454,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div class="console" id="feed"><p class="empty">Esperando a próxima decisão…</p></div>
     </section>
 
-    <section data-aba="evolucao" class="panel c5" aria-label="Como o loop está evoluindo">
-      <h2>Evolução</h2>
-      <p class="sub" style="margin:-6px 0 10px">Cada coisa que o loop mudou, tentou ou aprendeu, na ordem em que aconteceu.</p>
-      <ul class="tl" id="tl"></ul>
-    </section>
-
-    <section data-aba="evolucao" class="panel c12" aria-label="Revisor">
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Revisor">
       <h2>Revisor: vários PRs em paralelo, sem conflito</h2>
       <p class="sub" style="margin:-6px 0 8px">O Desenvolvedor abre até <span id="revMax">3</span> PRs ao mesmo tempo. Antes de cada um, o Revisor de código traz a main de agora para a branch e roda os testes, compara os arquivos com os outros PRs abertos e simula o merge entre eles; no gate, confere de novo. O Jev classifica cada revisão. Rejeitado, o PR não entra (ou é fechado) e o item volta para a fila, esperando o PR que ele cruza.</p>
       <div class="indag-tot" id="revTot"></div>
@@ -550,14 +462,14 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <ul class="list" id="revLista"></ul>
     </section>
 
-    <section data-aba="evolucao" class="panel c12" aria-label="Memória do time">
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Memória do time">
       <h2>Memória do time: o que já aconteceu de parecido, na hora certa</h2>
       <p class="sub" style="margin:-6px 0 8px">Lições, itens feitos, estudos, revisões, gates, incidentes e episódios do Desenvolvedor num índice de texto (FTS5 do SQLite). Cada agente recebe só os trechos mais parecidos com a tarefa de agora, com o resultado que tiveram, em vez das mesmas 15 lições globais. O Arquiteto reaproveita um estudo recente de assunto parecido (0 tokens); o Gerente de produto não abre item que já existe com outras palavras.</p>
       <div class="indag-tot" id="memTot"></div>
       <ul class="list" id="memUsos"></ul>
     </section>
 
-    <section data-aba="evolucao" class="panel c12" aria-label="Product owner">
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Product owner">
       <h2>Product owner: as perguntas de onde a evolução parte</h2>
       <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
       <div class="indag-tot" id="indagTot"></div>
@@ -569,7 +481,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Desenvolvedor pega daqui.</p>
       <div id="roadmap"></div>
     </section>
-    <section data-aba="seguranca" class="panel c12" aria-label="Consumo de tokens">
+    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Consumo de tokens">
       <h2>Consumo de tokens: medindo para definir o limite</h2>
       <p class="sub" style="margin:-6px 0 8px">Quanto a API gastou por dia, por papel e por hora do dia. No modo sem limite nada é cortado; estes números é que vão dizer qual limite faz sentido.</p>
       <div class="indag-tot" id="consTot"></div>
@@ -602,12 +514,6 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div id="chamadas"></div>
     </section>
 
-    <section data-aba="seguranca" class="panel c5" aria-label="Saúde">
-      <h2>Saúde do loop</h2>
-      <div id="health"></div>
-      <div class="budget" id="budget"></div>
-    </section>
-
     <div class="c5 stack">
       <section data-aba="geral" class="panel chat" aria-label="Conversa">
         <h2 id="askTitle">Falar com a missão</h2>
@@ -620,15 +526,11 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
         </form>
         <p class="dica">Enter envia · Shift+Enter quebra a linha</p>
       </section>
-      <section data-aba="detalhes" class="panel">
+      <section data-aba="seguranca" class="panel">
         <h2>Autonomia</h2>
         <p class="sub" style="margin:-6px 0 8px">Nada aqui espera você. O que o loop não pode fazer, ele recusa e segue por outro caminho.</p>
         <div class="auto-nums" id="autoNums"></div>
         <ul class="list" id="waiting"></ul>
-      </section>
-      <section data-aba="evolucao" class="panel">
-        <h2>Evoluções</h2>
-        <ul class="list" id="evol"></ul>
       </section>
     </div>
 
@@ -671,11 +573,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <p class="sub" style="margin:-6px 0 8px">Achados da web (dados, não instruções) e lições de pedidos do mesmo tipo.</p>
       <ul class="list" id="pesquisa"></ul>
     </section>
-    <section data-aba="detalhes" class="panel c7">
-      <h2>Números da missão</h2>
-      <div id="projects"></div>
-    </section>
-    <section data-aba="detalhes" class="panel c5">
+    <section data-aba="seguranca" class="panel c7">
       <h2>Versões da política</h2>
       <ul class="list" id="versions"></ul>
     </section>
@@ -712,110 +610,6 @@ const NOW = {orquestrador:"Tech lead escolhendo o que fazer", pedido:"Atendendo 
   projeto:"Construindo e evoluindo uma missão", developer:"Desenvolvedor corrigindo o próprio código",
   meta_learner:"Cientista de dados procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
   descanso:"Entre giros", pausado:"Parado até você retomar ou o orçamento renovar"};
-const R = 190, svg = $("#ring"), NS = "http://www.w3.org/2000/svg";
-const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
-const ang = i => (-90 + i * 360 / STAGES.length) * Math.PI / 180;
-const pos = i => [Math.cos(ang(i)) * R, Math.sin(ang(i)) * R];
-svg.append(el("circle", {class:"track", r:R}));
-const arc = el("circle", {class:"arc", r:R, transform:"rotate(-90)", "stroke-dasharray": 2*Math.PI*R, "stroke-dashoffset": 2*Math.PI*R});
-svg.append(arc);
-const trailG = el("g"); svg.append(trailG);
-const sparks = el("g"); svg.append(sparks);
-svg.append(el("circle", {class:"hub", r:92}));
-const hubTick = el("text", {class:"hublbl", "text-anchor":"middle", y:-30}); hubTick.textContent = "giro";
-const hubNum = el("text", {class:"hubnum", "text-anchor":"middle", y:14}); hubNum.textContent = "—";
-const hubLbl = el("text", {class:"hubstate", "text-anchor":"middle", y:40}); hubLbl.textContent = "";
-svg.append(hubNum, hubLbl, hubTick);
-const nodes = STAGES.map(([id, label], i) => {
-  const [x, y] = pos(i);
-  const g = el("g", {class:"node"}); g.append(el("circle", {cx:x, cy:y, r:11}));
-  const lx = Math.cos(ang(i)) * (R + 30), ly = Math.sin(ang(i)) * (R + 30) + 4;
-  const tx = el("text", {x:lx, y:ly, "text-anchor": Math.abs(lx) < 20 ? "middle" : lx > 0 ? "start" : "end"});
-  tx.textContent = label; g.append(tx); svg.append(g); return [id, g];
-});
-const comet = el("g", {class:"comet"}); comet.append(el("circle", {class:"halo", r:22}), el("circle", {class:"head", r:9}));
-svg.append(comet);
-let cometAt = -1, giroAtual = null, cometAng = ang(0), animId = 0;
-function placeComet(a) { comet.setAttribute("transform", `translate(${Math.cos(a) * R} ${Math.sin(a) * R})`); }
-placeComet(cometAng);
-function moveComet(i) {
-  if (i < 0) { comet.style.opacity = .25; return; }
-  comet.style.opacity = 1;
-  let alvo = ang(i);
-  while (alvo < cometAng - 1e-6) alvo += 2 * Math.PI;          // sempre no sentido do giro
-  if (alvo - cometAng > 2 * Math.PI - 1e-6) alvo -= 2 * Math.PI;
-  if (cometAt >= 0 && cometAt !== i && !reduce) {
-    const [px, py] = pos(cometAt), d = el("circle", {class:"trail-dot", cx:px, cy:py, r:5});
-    trailG.append(d); requestAnimationFrame(() => d.style.opacity = 0); setTimeout(() => d.remove(), 1700);
-  }
-  cometAt = i;
-  const de = cometAng, ate = alvo, t0 = performance.now(), dur = reduce ? 0 : 200, id = ++animId;
-  const passo = now => {
-    if (id !== animId) return;
-    const k = dur ? Math.min(1, (now - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 3);
-    cometAng = de + (ate - de) * e; placeComet(cometAng);
-    if (k < 1) requestAnimationFrame(passo); else cometAng = ate % (2 * Math.PI);
-  };
-  requestAnimationFrame(passo);
-}
-function showStage(e) {
-  const name = e && e.nome;
-  const i = STAGES.findIndex(s => s[0] === name);
-  if (e && e.tick && e.tick !== giroAtual) { giroAtual = e.tick; nodes.forEach(([, g]) => g.classList.remove("visited")); }
-  nodes.forEach(([id, g]) => { g.classList.toggle("on", id === name); if (id === name) g.classList.add("visited"); });
-  const C = 2 * Math.PI * R;
-  arc.setAttribute("stroke-dashoffset", i < 0 ? C : C - C * (i + 1) / STAGES.length);
-  moveComet(i);
-  if (e && e.tick) hubNum.textContent = Number(e.tick).toLocaleString("pt-BR");
-  const missao = e && e.projeto && S && S.nomes && String(e.projeto) !== PID ? S.nomes[e.projeto] : null;
-  if (name) $("#now").innerHTML = esc(NOW[name] || name) + (missao ? ` <span class="mission">${esc(missao)}</span>` : "") + (e.tick ? ` <span>· giro ${e.tick}</span>` : "");
-  hubLbl.textContent = name === "descanso" ? "" : name === "pausado" ? "parado" : (STAGES[i] || [, ""])[1].toLowerCase();
-}
-// a trilha chega em rajadas (um giro inteiro pode levar milissegundos): toca etapa por etapa
-const fila = [];
-let tocando = false;
-const lanes = {tick: null, ids: new Set()};
-function marcarLane(t) {
-  if (t.tick !== lanes.tick) { lanes.tick = t.tick; lanes.ids = new Set(); }
-  if (t.etapa === "projeto" && t.project_id) lanes.ids.add(t.project_id);
-  if (!S || !S.nomes) return;
-  $("#lanes").innerHTML = lanes.ids.size ? `<span class="sub">Em paralelo neste giro:</span>` +
-    [...lanes.ids].map(id => `<span class="mission">${esc(S.nomes[id] || "missão " + id)}</span>`).join("") : "";
-}
-function enfileirar(t) {
-  marcarLane(t);
-  fila.push({nome: t.etapa, tick: t.tick, projeto: t.project_id});
-  if (fila.length > 40) fila.splice(0, fila.length - 40);
-  if (!tocando) tocar();
-}
-function tocar() {
-  const e = fila.shift();
-  if (!e) { tocando = false; return; }
-  tocando = true; showStage(e);
-  setTimeout(tocar, reduce ? 0 : fila.length > 12 ? 90 : 230);
-}
-// entre giros: contagem regressiva no centro
-setInterval(() => {
-  if (!S || tocando) return;
-  const V = S.loop.vivo || {};
-  if (V.estado === "aguardando" && V.proximo_giro_em) {
-    const s = Math.max(0, Math.round(V.proximo_giro_em - Date.now() / 1000));
-    hubLbl.textContent = s > 0 ? `próximo giro em ${s}s` : "começando…";
-  } else if (V.estado === "desligado") hubLbl.textContent = "loop desligado";
-  else if (V.estado && V.estado.startsWith("pausado")) hubLbl.textContent = "pausado";
-}, 500);
-function spark(d) {
-  if (reduce) return;
-  const color = d.source === "llm" ? "var(--llm)" : "var(--jev)";
-  const c = el("circle", {r:6, class:"spark", fill: d.source === "local" ? "var(--surface)" : color, stroke: color, "stroke-width": 2});
-  sparks.append(c);
-  const a = Math.random() * Math.PI * 2, dist = 120 + d.confidence * (R - 130);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    c.style.transform = `translate(${Math.cos(a) * dist}px, ${Math.sin(a) * dist}px)`; c.style.opacity = 0;
-  }));
-  setTimeout(() => c.remove(), 1000);
-}
-
 /* ---------- cores e nomes das etapas ---------- */
 const COR = {pedido:"var(--s-pedido)", projeto:"var(--s-projeto)", developer:"var(--s-developer)", idle:"var(--s-idle)",
   meta_learner:"var(--s-meta)", shadow:"var(--s-meta)", saude:"var(--s-meta)", orquestrador:"var(--s-orq)"};
@@ -858,27 +652,12 @@ function renderAgora() {
   $("#agoraTitulo").textContent = titulo; $("#agoraDetalhe").innerHTML = vivo ? detalhe : esc(detalhe);
 }
 
-/* ---------- giros ---------- */
-function renderGiros(gs) {
-  const el = $("#giros");
-  if (!gs || !gs.length) { el.innerHTML = `<p class="empty">Nenhum giro registrado ainda.</p>`; return; }
-  const max = Math.max(1, ...gs.map(g => g.dur));
-  el.innerHTML = gs.slice(-14).reverse().map(g => `<div class="giro ${g.ativo ? "ativo" : ""}"><span class="n">giro ${g.tick}</span>
-    <div class="barra" style="width:${Math.max(4, g.dur / max * 100)}%">${g.etapas.map(e => `<span title="${esc((e.detalhe || NOME[e.etapa] || e.etapa) + (e.projeto && nomeMissao(e.projeto) ? " · " + nomeMissao(e.projeto) : "") + " · " + dur(e.dur))}" style="flex:${Math.max(e.dur, max / 400)};background:${COR[e.etapa] || "var(--muted)"}"></span>`).join("")}</div>
-    <span class="dur">${g.ativo ? "rodando" : dur(g.dur)}</span></div>`).join("");
-  const med = gs.filter(g => !g.ativo).map(g => g.dur);
-  $("#girosResumo").textContent = med.length ? `Giro médio: ${dur(med.reduce((a, b) => a + b, 0) / med.length)} de trabalho` : "";
-  if (!$("#chaves").innerHTML) $("#chaves").innerHTML = [["pedido","Pedido"],["projeto","Missões"],["developer","Desenvolvedor (código)"],["idle","Manutenção"],["meta_learner","Aprender e checar"],["orquestrador","Orquestrar"]]
-    .map(([k, l]) => `<span><b style="background:${COR[k]}"></b>${l}</span>`).join("");
-}
-
 /* ---------- console de decisões ---------- */
 let lastId = 0, filtro = "", congelado = false;
 const DECS = [];
 function addDecision(d) {
   d._novo = true; DECS.unshift(d);
   if (DECS.length > 160) DECS.length = 160;
-  spark(d);
   if (!congelado) agendar(renderDecs);
 }
 function renderDecs() {
@@ -914,32 +693,6 @@ function renderRitmo(r) {
   $("#resumoDec").innerHTML = `<span>${sparkline(r.serie)}${tot} nos últimos ${r.minutos} min</span>
     <span><b>${pct(((f.jev || 0) + (f.local || 0)) / n)}</b>sem LLM</span>
     <span><b>${r.confianca_media != null ? pct(r.confianca_media) : "—"}</b>confiança média</span>`;
-}
-
-/* ---------- evolução ---------- */
-const TCOR = {regra:"var(--ok)", politica:"var(--jev)", ciclo:"var(--jev)", evidencia:"var(--ok)", pr:"var(--llm)", merge:"var(--ok)",
-  harness:"var(--jev)", versao:"var(--jev)", roteiro:"var(--s-idle)", erro:"var(--bad)", developer:"var(--llm)"};
-const TNOME = {regra:"regra de domínio", politica:"o próprio loop", ciclo:"ciclo da missão", evidencia:"evidência", pr:"pull request", merge:"gate de merge",
-  harness:"prompt em A/B", versao:"política", roteiro:"roteiro", erro:"erro registrado", developer:"Desenvolvedor"};
-const ESTADO = {applied:"aplicada", shadow:"em teste (shadow)", deferred:"adiada", rejected:"rejeitada", rolled_back:"revertida", backlog:"na fila",
-  aceita:"aceita", recusada:"recusada pela catraca", aberto:"aberto", mergeado:"mergeado", recusado:"recusado", isolado:"etapa isolada",
-  resolvido:"resolvido", feito:"feito", parcial:"parcial", pendente:"pendente", em_andamento:"em andamento", rodando:"rodando",
-  promovido:"promovido", descartado:"descartado", active:"ativa", retired:"anterior", adiado_valor:"adiado: pouco ganho",
-  adiado_orcamento:"adiado: orçamento", pesquisa:"pesquisa", construcao:"construção", melhoria:"melhoria", bloqueado:"parado",
-  base:"primeira versão", avancar:"avançou", refazer:"refazer", descartar:"descartada", cumprida:"cumprida"};
-let vistos = new Set();
-function renderTimeline(items) {
-  const el = $("#tl");
-  if (!items || !items.length) { el.innerHTML = `<li><span></span><div class="x"><strong>Nada mudou ainda</strong><span>Quando o loop aprender uma regra, testar um prompt, melhorar uma missão ou abrir um PR, aparece aqui com o motivo.</span></div></li>`; return; }
-  const primeira = !vistos.size;
-  el.innerHTML = items.map(i => { const k = i.tipo + i.em + i.titulo, novo = !primeira && !vistos.has(k); vistos.add(k);
-    return `<li class="${novo ? "new" : ""}" style="--tc:${TCOR[i.tipo] || "var(--muted)"}"><span class="p"></span><div class="x">
-      <em>${esc(TNOME[i.tipo] || i.tipo)}${i.estado ? " · " + esc(ESTADO[i.estado] || i.estado) : ""}${i.missao && ZERO ? " · " + esc(i.missao) : ""}</em>
-      <strong>${esc(i.titulo)}</strong>${i.detalhe && !/^\s*[{\[]/.test(i.detalhe) ? `<span>${esc(i.detalhe)}</span>` : ""}<span>${quando(i.em)}</span></div></li>`; }).join("");
-}
-function quando(ts) {
-  const s = Date.now() / 1000 - ts;
-  return s < 60 ? "agora há pouco" : s < 3600 ? `há ${Math.round(s / 60)} min` : s < 86400 ? `há ${Math.round(s / 3600)} h` : new Date(ts * 1000).toLocaleDateString("pt-BR");
 }
 
 /* ---------- modelos ---------- */
@@ -1015,14 +768,6 @@ function agendar(fn) { if (!pend.size) requestAnimationFrame(() => { const l = [
 
 /* ---------- estado ---------- */
 let S = null;
-function meter(name, value, frac, limit, why, inverse) {
-  const bad = inverse ? frac > limit : frac < limit;
-  const warn = !bad && (inverse ? frac > limit * .75 : frac < limit * 1.1);
-  return `<div class="meter"><span class="name">${name}</span><span class="val">${value}</span>
-    <div class="bar ${bad ? "bad" : warn ? "warn" : ""}"><span style="width:${Math.min(100, frac * 100)}%"></span>
-    ${limit != null ? `<em style="left:${Math.min(100, limit * 100)}%" title="limite"></em>` : ""}</div>
-    <span class="why">${why}</span></div>`;
-}
 function render(s) {
   S = s;
   const L = s.loop, st = $("#state");
@@ -1090,29 +835,11 @@ function render(s) {
       : `<li class="empty">Nenhuma lição ainda.</li>`;
     $("#verificacoes").innerHTML = (LC.verificacoes_24h || []).map(v => `<li><span>${esc(v.ponto)}<span class="meta">${v.total} verificações · ${v.falhas || 0} falhas</span></span><span class="chip ${v.falhas ? "aberto" : "resolvido"}">${v.total ? Math.round(100 * (v.total - (v.falhas || 0)) / v.total) : 100}% ok</span></li>`).join("") || `<li class="empty">Nenhuma verificação ainda.</li>`;
   }
-  renderKpis(s); renderAgora(); renderGiros(s.giros); renderRitmo(s.ritmo); renderTimeline(s.linha_do_tempo); renderModelos(s.llm);
+  renderKpis(s); renderAgora(); renderRitmo(s.ritmo); renderModelos(s.llm);
   if (!passos.length && s.giros && s.giros.length) {           // primeira carga: passos do último giro
     for (const g of s.giros.slice(-2)) { let em = g.inicio; for (const e of g.etapas) { if (!ZERO && PID && String(e.projeto) !== PID) { em += e.dur; continue; } addPasso({em, etapa: e.etapa, detalhe: e.detalhe, project_id: e.projeto, tick: g.tick}, false); em += e.dur; if (passos[0]) passos[0].fim = em; } }
   }
-  if (!tocando) showStage(L.etapa && (ZERO || !PID || !L.etapa.projeto || String(L.etapa.projeto) === PID) ? L.etapa : {nome: "descanso", tick: L.tick});
 
-  const h = s.saude;
-  if (!tocando && L.tick) hubNum.textContent = Number(L.tick).toLocaleString("pt-BR");
-  const inv = h.invariantes.length;
-  const errRate = h.giros_100 ? h.erros_100 / h.giros_100 : 0;
-  $("#health").innerHTML =
-    meter("Integridade", inv ? inv + " violação(ões)" : "ok", inv ? 0 : 1, null,
-      inv ? esc(h.invariantes.join("; ")) : "Invariantes financeiros intactos.") +
-    meter("Qualidade", pct(h.correcao), h.correcao, h.correcao_limite,
-      `Correções nos lançamentos aceitos sozinhos (${h.amostras} amostras). Acima da marca, a última mudança é revertida.`, true) +
-    (h.decisoes_24h ? meter("Eficiência", pct(h.sem_llm), h.sem_llm, .9, `${h.decisoes_24h} decisões nas últimas 24h; meta: 90% sem LLM.`)
-                    : meter("Eficiência", "—", 0, .9, "Nenhuma decisão nas últimas 24h ainda.")) +
-    meter("Confiabilidade", h.erros_100 + " erros", errRate, .05, `Nos últimos ${h.giros_100} giros.`, true);
-  const o = s.orcamento;
-  $("#budget").innerHTML = o.modo === "ilimitado"
-    ? meter("Tokens de hoje (sem limite)", o.tokens.toLocaleString("pt-BR"), 0, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Modo ilimitado: nada é cortado; o consumo fica medido para você escolher o limite depois (veja "Consumo de tokens" em Segurança e confiança).`)
-    : meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
-    o.tokens / o.limite, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Ao esgotar, o círculo pausa e retoma à meia-noite.`);
 
   const A = s.autonomia;
   $("#autoNums").innerHTML = `<div><b class="${A.intervencoes_7d ? "" : "zero"}">${A.intervencoes_7d}</b><span>intervenções suas (7 dias)</span></div>
@@ -1147,14 +874,8 @@ function render(s) {
     $("#evidencias").innerHTML = s.evidencias.length ? s.evidencias.map(e => `<li><span>${e.versao ? "v" + e.versao + " · " : ""}giro ${e.tick}<span class="meta">${esc(e.motivo)}</span></span><span class="chip ${esc(e.decisao)}">${DEC[e.decisao] || esc(e.decisao)}</span></li>`).join("")
       : `<li class="empty">Nenhum ciclo avaliado ainda.</li>`;
   }
-  $("#evol").innerHTML = s.evolucoes.length ? s.evolucoes.map(e =>
-    `<li><span>${esc(e.description)}<br><span class="sub">nível ${e.level}</span></span><span class="chip ${esc(e.status)}">${EVOL[e.status] || esc(e.status)}</span></li>`).join("")
-    : `<li class="empty">Nenhuma mudança de regra ou de política ainda. Elas aparecem aqui quando o loop tiver evidência para mudar.</li>`;
   $("#versions").innerHTML = s.versoes.map(v =>
     `<li><span>v${v.version} · ${esc(v.reason)}</span><span class="chip ${v.status === "active" ? "applied" : esc(v.status)}">${{active:"ativa",retired:"anterior",shadow:"shadow",rolled_back:"revertida",rejected:"rejeitada"}[v.status] || esc(v.status)}</span></li>`).join("");
-  $("#projects").innerHTML = (P ? `<div class="proj"><span class="sub">${P.giros} giros · ${P.decisoes} decisões · ${P.evolucoes_aplicadas} evoluções aplicadas</span></div>` : "") + s.projetos.map(p =>
-    `<div class="proj"><strong>${esc(p.nome)}</strong><span class="sub">${esc(p.linha)} · ${p.lancamentos} lançamentos</span>
-     <div class="bar"><span style="width:${pct(p.progresso)}"></span></div></div>`).join("");
   renderConversa(s.conversa || []);
 }
 async function refresh() {
@@ -1180,8 +901,6 @@ function aplicarAbas(zero) {
   if (!document.querySelector(`#abas [data-aba="${ABA}"]`)) ABA = "geral";
   document.querySelectorAll("#abas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.aba === ABA));
   document.querySelectorAll("[data-aba]:not(#abas button)").forEach(e => e.classList.toggle("fora-da-aba", e.dataset.aba !== ABA));
-  const f = document.querySelector("#fluxoEmbed iframe");
-  if (ABA === "fluxo" && !f.src) f.src = f.dataset.src;
 }
 addEventListener("hashchange", () => { const h = location.hash.slice(1); if (document.querySelector(`#abas [data-aba="${h}"]`)) { ABA = h; aplicarAbas(true); } });
 $("#confia").addEventListener("click", () => { if (document.body.classList.contains("com-abas")) { ABA = "seguranca"; aplicarAbas(true); } });
@@ -1248,7 +967,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-send
 
 
 /* ---------- central de confiança (empurrada pelo servidor; o frescor de cada dado conta sozinho) ---------- */
-let CF = null, ultimoDado = 0, atrasoMs = null, sinapses = [];
+let CF = null, ultimoDado = 0, atrasoMs = null;
 const VTXT = {confiavel: ["✓", "Pode confiar"], atencao: ["!", "Em observação"], falha: ["×", "Atenção"], parado: ["■", "Loop parado"]};
 function ha(ts) { if (!ts) return "—"; const s = Math.max(0, Date.now() / 1000 - ts); return s < 60 ? `há ${s.toFixed(0)} s` : s < 3600 ? `há ${(s / 60).toFixed(0)} min` : `há ${(s / 3600).toFixed(1)} h`; }
 function renderConfianca() {
@@ -1275,14 +994,6 @@ function renderParada(p) {
     : p.estado === "vazou" ? "Pausado, mas agindo! · Retomar" : p.pausado ? "Retomar o loop" : "Parar o loop";
   b.title = p.estado === "parado" ? `o loop confirmou a parada no giro ${p.tick} e nenhuma ação começou depois` : "Para o loop: o giro em andamento termina e nenhum outro começa.";
 }
-function renderSinapses() {
-  const so = $("#soFalhas").checked, l = sinapses.filter(v => !so || !v.ok).slice(0, 40);
-  $("#sinapses").innerHTML = l.map(v => `<li><span class="sub">${new Date(v.created_at * 1000).toLocaleTimeString("pt-BR")}</span>
-    <span class="${v.ok ? "ok" : "no"}" title="${v.ok ? "passou" : "barrado"}">${v.ok ? "✓" : "×"}</span>
-    <span><b>${esc(v.ponto)}</b>${v.sujeito ? ` · ${esc(v.sujeito)}` : ""}${!v.ok && v.motivo ? `<span class="m"> — ${esc(v.motivo.split("\n")[0].slice(0, 160))}</span>` : ""}</span></li>`).join("")
-    || `<li><span></span><span></span><span class="sub">${so ? "Nada barrado desde que você abriu o painel." : "Nenhuma verificação ainda."}</span></li>`;
-}
-$("#soFalhas").addEventListener("change", renderSinapses);
 function renderAoVivo() {
   const s = ultimoDado ? (Date.now() - ultimoDado) / 1000 : Infinity, el = $("#aovivo");
   el.dataset.f = s <= 3 ? "aovivo" : s <= 10 ? "atrasado" : "velho";
@@ -1324,10 +1035,9 @@ function connect() {
   const filtro = ZERO ? "" : Q;
   const es = new EventSource("/api/eventos?desde=" + lastId + (filtro ? "&" + filtro : ""));
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
-  es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { enfileirar(e); if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
+  es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
   es.addEventListener("status", m => { ultimoDado = Date.now(); if (S) { S.loop.vivo = JSON.parse(m.data); } });
   es.addEventListener("confianca", m => { CF = JSON.parse(m.data); ultimoDado = Date.now(); atrasoMs = Math.max(0, Date.now() - CF.gerado_em * 1000); renderAoVivo(); });
-  es.addEventListener("sinapse", m => { sinapses.unshift(JSON.parse(m.data)); sinapses = sinapses.slice(0, 200); ultimoDado = Date.now(); agendar(renderSinapses); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
 /* ---------- dash em camadas: saúde → etapas → execução (run_id) ---------- */

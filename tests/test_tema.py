@@ -39,5 +39,4 @@ def test_chips_e_botoes_tem_pista_alem_da_cor():
     assert ".btn:disabled" in painel and "dashed" in painel       # desativado se distingue sem cor
     assert re.search(r'\.chip\.[\w-]+::before\{content:"[✓✕!◆]"', painel)   # glifo por tom do chip
     fluxo = (PASTA / "fluxo.html").read_text(encoding="utf-8")
-    assert all(f'class="lg {c}' in fluxo for c in "cdqaot")        # legenda por forma
-    assert "FORMAS" in fluxo and 'voar(de, "jev", css("--jev"), 380, "d")' in fluxo   # a bolinha usa a mesma forma da legenda
+    assert "raiasSvg" in fluxo and 'id="svg"' not in fluxo      # o anel animado saiu daqui (1.36.0): a Equipe ao vivo mostra quem está com a bola
