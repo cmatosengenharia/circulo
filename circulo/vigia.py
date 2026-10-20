@@ -24,10 +24,14 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
-from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, TENTATIVAS
+from .metrics import seguro
+from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
 
 INTERVALO = 60                   # segundos entre passagens da thread
 ESPERA_PERGUNTA = 30 * 60        # pergunta validada esperando mais que isso = trava
+DRENAR = 45 * 60                 # trava com pergunta validada mais velha que isso: o Vigia chama o planejador só com ela
+DISJUNTOR = 3                    # falhas seguidas da drenagem = falha sistêmica: pausa REAGIR em vez de queimar a fila
+DRENAGEM = "vigia_drenagem"      # kv: perguntas já tentadas pela drenagem, falhas seguidas, pausa e a última tentativa
 REAGIR = 2 * 3600                # trava que continua aberta tanto tempo depois da ação: age de novo (não fica muda)
 RECUSAS_PORTEIRO = 3             # a mesma pergunta recusada tantas vezes seguidas pelo mesmo motivo sai da fila
 DEV_PARADO = 45 * 60
@@ -343,6 +347,7 @@ def regra(jev, qid: str, q: Question, state) -> Decision:
 class Vigia:
     def __init__(self, ctx, intervalo: float = INTERVALO):
         self.ctx, self.s, self.intervalo = ctx, ctx.store, intervalo
+        self.planejador = None           # o loop liga o Planejador: sem ele, a trava de pergunta só é alertada
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -351,6 +356,7 @@ class Vigia:
         now = now or time.time()
         self._recusada_pelo_porteiro(now)
         achados = sondar(self.s, now)
+        drenou = self._drenar(achados, now)
         abertas = {r["chave"]: dict(r) for r in self.s.q("SELECT * FROM vigia WHERE status='aberta'")}
         novos = [a for a in achados if a["chave"] not in abertas or abertas[a["chave"]]["veredito"] == "em_duvida"]
         try:
@@ -390,7 +396,36 @@ class Vigia:
                 if r["acao"] in ("abrir_item", "alertar"):
                     self.ctx.reply(f"Vigia: resolvido — {r['titulo']} (durou {int((now - r['primeira_em']) / 60)} min).", "saude")
         self.s.set("vigia_ultima", {"em": now, "achados": len(achados), "abertas": len([a for a in achados]), "agiu": agiu})
-        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas}
+        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou}
+
+    def _drenar(self, achados: list[dict], now: float) -> dict | None:
+        """Trava de pergunta validada além de DRENAR: o planejador responde só a mais antiga ainda não tentada, uma por
+        passagem. A falha fica registrada e a próxima passagem tenta outra; DISJUNTOR falhas seguidas pausam a drenagem
+        por REAGIR (falha sistêmica: a quarentena do planejador não deve engolir a fila inteira)."""
+        if self.planejador is None or "pergunta_valida_parada" not in {a["chave"] for a in achados}:
+            return None
+        d = self.s.get(DRENAGEM) or {}
+        if float(d.get("pausa_ate", 0)) > now:
+            return None
+        velhas = [r["id"] for r in self.s.q("SELECT id FROM perguntas WHERE cerebro='loop' AND status='valida' AND created_at<=? "
+                                            "ORDER BY created_at, id", (now - DRENAR,))]
+        tentadas = [p for p in d.get("tentadas", []) if p in velhas]
+        pid = next((p for p in velhas if p not in tentadas), None)
+        if pid is None:
+            return None
+        antes = (self.s.get(TENTATIVAS) or {}).get("ultima")
+        seguro(self.planejador.run, autorizado=True, pergunta_id=pid)   # a falha classificada fica no registro do planejador
+        u = (self.s.get(TENTATIVAS) or {}).get("ultima") or {}
+        if u == (antes or {}) or u.get("pergunta_id") != pid:
+            u = {"desfecho": "sem_registro", "motivo": "o planejador não registrou a tentativa"}
+        falhas = 0 if u["desfecho"] in PROGRESSO else int(d.get("falhas_seguidas", 0)) + 1
+        rec = {"em": now, "pergunta_id": pid, "desfecho": u["desfecho"], "motivo": str(u.get("motivo", ""))[:300]}
+        pausa = now + REAGIR if falhas >= DISJUNTOR else 0
+        self.s.set(DRENAGEM, {"tentadas": [*tentadas, pid], "falhas_seguidas": 0 if pausa else falhas, "pausa_ate": pausa, "ultima": rec})
+        if pausa:
+            self.ctx.reply(f"Vigia: drenagem pausada por {int(REAGIR / 60)} min: {DISJUNTOR} tentativas seguidas do planejador "
+                           f"sem item (última, pergunta #{pid}: {rec['motivo'][:140]})", "saude")
+        return rec
 
     def _recusada_pelo_porteiro(self, now: float) -> None:
         """A mesma pergunta recusada RECUSAS_PORTEIRO vezes seguidas pelo mesmo motivo sai da fila (não trava as outras
