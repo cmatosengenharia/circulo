@@ -14,7 +14,11 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--jev);outline-offset:2px}
-.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+.wrap{max-width:none;margin:0;padding:16px clamp(16px,2vw,40px) 48px}
+/* tela cheia: em monitores largos as duas primeiras seções da aba "Saúde e estado" ficam lado a lado */
+@media (min-width:1440px){.wrap{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:0 16px;align-items:start}
+  .wrap>*{grid-column:1/-1;min-width:0}.wrap>#camadas{grid-column:1}.wrap>#vigia{grid-column:2;margin-bottom:18px}}
+@media (min-width:1800px){.grid{gap:20px}.panel{padding:20px 24px}}
 
 header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:18px}
 header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
@@ -51,6 +55,8 @@ header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0}
 .sub{color:var(--muted);font-size:13px}
 .c7{grid-column:span 7}.c5{grid-column:span 5}.c12{grid-column:span 12}
 @media (max-width:900px){.c7,.c5{grid-column:span 12}}
+@media (max-width:640px){header h1{font-size:24px}.controls{margin-left:0;width:100%}.controls .btn,.controls .switch{flex:1;justify-content:center}
+  .wrap .panel{padding:14px 14px;border-radius:12px}.wrap .kpis{grid-template-columns:repeat(2,1fr)}.wrap .about{margin-top:12px}}
 
 /* o círculo */
 .ringbox{position:relative;display:flex;flex-direction:column;align-items:center}
@@ -336,7 +342,7 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .com-abas [data-aba].fora-da-aba{display:none!important}
 .fluxo-embed{display:none}
 .com-abas .fluxo-embed{display:block;padding:0;overflow:hidden;margin:0 0 16px}
-.fluxo-embed iframe{display:block;width:100%;height:2200px;border:0}
+.fluxo-embed iframe{display:block;width:100%;height:max(900px,calc(100vh - 230px));border:0}
 .fluxo-embed .sub{padding:8px 16px;margin:0}
 /* ---------- pausa por missão ---------- */
 .pausa-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:var(--llm-soft);color:var(--ink);border:1px solid var(--llm);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:14px}
@@ -393,7 +399,7 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 a.back{display:none !important}
-@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -474,10 +480,10 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <label class="sub"><input type="checkbox" id="soFalhas"> só o que foi barrado</label></div>
     <ul class="sinapses" id="sinapses" aria-live="off"></ul>
   </section>
-  <section data-aba="geral" class="panel vigia zero-only" hidden id="vigia" aria-label="Vigia da autoevolução">
-    <div class="vg-cab"><h2 style="margin:0">Vigia da autoevolução <span class="vg-chip" id="vigiaChip">—</span></h2>
+  <section data-aba="geral" class="panel vigia zero-only" hidden id="vigia" aria-label="SRE: vigia da autoevolução">
+    <div class="vg-cab"><h2 style="margin:0">SRE · vigia da autoevolução <span class="vg-chip" id="vigiaChip">—</span></h2>
       <span class="vg-meta" id="vigiaMeta"></span></div>
-    <p class="sub" style="margin:6px 0 8px">Um agente paralelo ao giro mede, a cada minuto, se a evolução está andando: pergunta validada sem item, Developer parado com fila, PR preso, corpo atrás do GitHub, giro travado, Jev em dúvida crônica, fila seca. Cada achado passa pelo Jev; com confiança alta ele abre item ou alerta, com média só alerta, em dúvida observa e mede de novo.</p>
+    <p class="sub" style="margin:6px 0 8px">Um agente paralelo ao giro mede, a cada minuto, se a evolução está andando: pergunta validada sem item, Desenvolvedor parado com fila, PR preso, corpo atrás do GitHub, giro travado, Jev em dúvida crônica, fila seca. Cada achado passa pelo Jev; com confiança alta ele abre item ou alerta, com média só alerta, em dúvida observa e mede de novo.</p>
     <ul class="list" id="vigiaLista"></ul>
     <details class="vg-hist"><summary>Resolvidas recentemente</summary><ul class="list" id="vigiaHist"></ul></details>
   </section>
@@ -537,14 +543,14 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
 
     <section data-aba="evolucao" class="panel c12" aria-label="Revisor">
       <h2>Revisor: vários PRs em paralelo, sem conflito</h2>
-      <p class="sub" style="margin:-6px 0 8px">O Developer abre até <span id="revMax">3</span> PRs ao mesmo tempo. Antes de cada um, o Revisor traz a main de agora para a branch e roda os testes, compara os arquivos com os outros PRs abertos e simula o merge entre eles; no gate, confere de novo. O Jev classifica cada revisão. Rejeitado, o PR não entra (ou é fechado) e o item volta para a fila, esperando o PR que ele cruza.</p>
+      <p class="sub" style="margin:-6px 0 8px">O Desenvolvedor abre até <span id="revMax">3</span> PRs ao mesmo tempo. Antes de cada um, o Revisor de código traz a main de agora para a branch e roda os testes, compara os arquivos com os outros PRs abertos e simula o merge entre eles; no gate, confere de novo. O Jev classifica cada revisão. Rejeitado, o PR não entra (ou é fechado) e o item volta para a fila, esperando o PR que ele cruza.</p>
       <div class="indag-tot" id="revTot"></div>
       <ul class="list" id="revAbertos"></ul>
       <ul class="list" id="revLista"></ul>
     </section>
 
-    <section data-aba="evolucao" class="panel c12" aria-label="Indagador">
-      <h2>Indagador: as perguntas de onde a evolução parte</h2>
+    <section data-aba="evolucao" class="panel c12" aria-label="Product owner">
+      <h2>Product owner: as perguntas de onde a evolução parte</h2>
       <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
       <div class="indag-tot" id="indagTot"></div>
       <div class="indag-tot" id="indagFunil" aria-label="Funil da autoevolução"></div>
@@ -552,7 +558,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     </section>
     <section data-aba="evolucao" class="panel c7 zero-only" hidden>
       <h2>Roteiro do loop</h2>
-      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Developer pega daqui.</p>
+      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Desenvolvedor pega daqui.</p>
       <div id="roadmap"></div>
     </section>
     <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Cérebros">
@@ -685,11 +691,11 @@ const PREF = [["crit_","Critério da régua"],["rel_","Trecho relevante?"],["ach
 const pergunta = q => QUEST[q] || (q.startsWith("llm:") ? "Chamar LLM: " + (PAPEL[q.slice(4)] || q.slice(4)) : (PREF.find(([k]) => q.startsWith(k)) || [, q.replace(/_/g, " ")])[1]);
 
 /* ---------- o círculo ---------- */
-const STAGES = [["orquestrador","Orquestrador"],["pedido","Pedido"],["idle","Evolução natural"],["projeto","Construindo missões"],
-  ["developer","Developer"],["meta_learner","Meta-Learner"],["shadow","Shadow"],["saude","Saúde"]];
-const NOW = {orquestrador:"Orquestrador escolhendo o que fazer", pedido:"Atendendo um pedido", idle:"Evolução natural: sem pedido, o loop melhora a si mesmo",
-  projeto:"Construindo e evoluindo uma missão", developer:"Developer corrigindo o próprio código",
-  meta_learner:"Meta-Learner procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
+const STAGES = [["orquestrador","Tech lead"],["pedido","Pedido"],["idle","Evolução natural"],["projeto","Construindo missões"],
+  ["developer","Desenvolvedor"],["meta_learner","Cientista de dados"],["shadow","Simulação"],["saude","Saúde"]];
+const NOW = {orquestrador:"Tech lead escolhendo o que fazer", pedido:"Atendendo um pedido", idle:"Evolução natural: sem pedido, o loop melhora a si mesmo",
+  projeto:"Construindo e evoluindo uma missão", developer:"Desenvolvedor corrigindo o próprio código",
+  meta_learner:"Cientista de dados procurando o que aprender", shadow:"Avaliando mudanças em shadow", saude:"Checando a saúde (e se precisa de rollback)",
   descanso:"Entre giros", pausado:"Parado até você retomar ou o orçamento renovar"};
 const R = 190, svg = $("#ring"), NS = "http://www.w3.org/2000/svg";
 const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
@@ -847,7 +853,7 @@ function renderGiros(gs) {
     <span class="dur">${g.ativo ? "rodando" : dur(g.dur)}</span></div>`).join("");
   const med = gs.filter(g => !g.ativo).map(g => g.dur);
   $("#girosResumo").textContent = med.length ? `Giro médio: ${dur(med.reduce((a, b) => a + b, 0) / med.length)} de trabalho` : "";
-  if (!$("#chaves").innerHTML) $("#chaves").innerHTML = [["pedido","Pedido"],["projeto","Missões"],["developer","Developer (código)"],["idle","Manutenção"],["meta_learner","Aprender e checar"],["orquestrador","Orquestrar"]]
+  if (!$("#chaves").innerHTML) $("#chaves").innerHTML = [["pedido","Pedido"],["projeto","Missões"],["developer","Desenvolvedor (código)"],["idle","Manutenção"],["meta_learner","Aprender e checar"],["orquestrador","Orquestrar"]]
     .map(([k, l]) => `<span><b style="background:${COR[k]}"></b>${l}</span>`).join("");
 }
 
@@ -899,7 +905,7 @@ function renderRitmo(r) {
 const TCOR = {regra:"var(--ok)", politica:"var(--jev)", ciclo:"var(--jev)", evidencia:"var(--ok)", pr:"var(--llm)", merge:"var(--ok)",
   harness:"var(--jev)", versao:"var(--jev)", roteiro:"var(--s-idle)", erro:"var(--bad)", developer:"var(--llm)"};
 const TNOME = {regra:"regra de domínio", politica:"o próprio loop", ciclo:"ciclo da missão", evidencia:"evidência", pr:"pull request", merge:"gate de merge",
-  harness:"prompt em A/B", versao:"política", roteiro:"roteiro", erro:"erro registrado", developer:"Developer"};
+  harness:"prompt em A/B", versao:"política", roteiro:"roteiro", erro:"erro registrado", developer:"Desenvolvedor"};
 const ESTADO = {applied:"aplicada", shadow:"em teste (shadow)", deferred:"adiada", rejected:"rejeitada", rolled_back:"revertida", backlog:"na fila",
   aceita:"aceita", recusada:"recusada pela catraca", aberto:"aberto", mergeado:"mergeado", recusado:"recusado", isolado:"etapa isolada",
   resolvido:"resolvido", feito:"feito", parcial:"parcial", pendente:"pendente", em_andamento:"em andamento", rodando:"rodando",
@@ -922,7 +928,7 @@ function quando(ts) {
 }
 
 /* ---------- modelos ---------- */
-const PAPEL = {researcher:"Pesquisador", rubric:"Régua", builder:"Construtor", improver:"Melhorador", reflector:"Reflexão", developer:"Developer (código)"};
+const PAPEL = {researcher:"Pesquisador", rubric:"Régua", builder:"Construtor", improver:"Melhorador", reflector:"Reflexão", developer:"Desenvolvedor (código)"};
 const curto = m => String(m || "").replace(/^claude-/, "").replace(/-(\d)-(\d)$/, " $1.$2").replace(/^./, c => c.toUpperCase());
 function renderModelos(L) {
   if (!L) return;
@@ -946,7 +952,7 @@ function renderKpis(s) {
   const ult5 = r.serie.slice(-5).reduce((a, b) => a + b, 0) / 5;
   const k = [];
   k.push([Number(ZERO ? L.tick : (P.giros || 0)).toLocaleString("pt-BR"), ZERO ? "giros" : "giros nesta missão"]);
-  if (R) k.push([`<a href="${s.repo_url ? s.repo_url + "/commits/main" : "#"}" target="_blank" rel="noopener"><b>${R.total}</b></a>`, `commits <small>+${R.ultimas_24h} em 24h${R.pelo_developer ? " · " + R.pelo_developer + " do Developer" : ""}</small>`, true]);
+  if (R) k.push([`<a href="${s.repo_url ? s.repo_url + "/commits/main" : "#"}" target="_blank" rel="noopener"><b>${R.total}</b></a>`, `commits <small>+${R.ultimas_24h} em 24h${R.pelo_developer ? " · " + R.pelo_developer + " do Desenvolvedor" : ""}</small>`, true]);
   if (M.prs) k.push([M.prs.mergeados, `PRs mergeados <small>${M.prs.abertos} abertos</small>`]);
   k.push([M.versao || "—", "versão"]);
   k.push([(M.evolucoes || 0).toLocaleString("pt-BR"), "evoluções"]);
@@ -969,16 +975,16 @@ function renderRoteiro(s) {
   const n = st => itens.filter(r => r.status === st && !r.desativado).length, tot = itens.filter(r => !r.desativado).length || 1;
   const card = r => `<li style="--rc:${RCOR[r.status]}" class="${r.id === dev ? "agora-dev" : ""} ${r.desativado ? "off" : ""}"><div class="top"><strong>${esc(r.titulo)}</strong>
       <span class="origem ${r.origem === "erro" ? "erro" : /depende de você/.test(r.evidencia) ? "voce" : ""}">${r.origem === "erro" ? "erro que o loop achou" : /depende de você/.test(r.evidencia) ? "depende de você" : r.origem === "pedido_cassio" ? "seu pedido" : "do loop"}</span></div>
-      ${r.detalhe && r.detalhe !== r.titulo ? `<p>${esc(r.detalhe)}</p>` : ""}${r.evidencia && r.evidencia !== "depende de você" ? `<div class="ev">${r.id === dev ? "Developer trabalhando nisto agora · " : ""}${comLinks(r.evidencia, s.repo_url)}</div>` : ""}
+      ${r.detalhe && r.detalhe !== r.titulo ? `<p>${esc(r.detalhe)}</p>` : ""}${r.evidencia && r.evidencia !== "depende de você" ? `<div class="ev">${r.id === dev ? "Desenvolvedor trabalhando nisto agora · " : ""}${comLinks(r.evidencia, s.repo_url)}</div>` : ""}
       <div class="ev"><a href="/rastros#item%20${r.id}" title="Da origem até a evidência no código rodando">Rastro do item #${r.id} →</a></div>
       ${r.status === "contestado" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="1" title="O estudo contestou com evidência; você decide seguir mesmo assim">Executar mesmo assim</button></div>`
-        : r.status !== "feito" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="${r.desativado ? 1 : 0}" title="${r.desativado ? "Volta para a fila do Developer" : "O loop não vai evoluir este item até você reativar"}">${r.desativado ? "Reativar" : "Desativar"}</button></div>` : ""}</li>`;
+        : r.status !== "feito" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="${r.desativado ? 1 : 0}" title="${r.desativado ? "Volta para a fila do Desenvolvedor" : "O loop não vai evoluir este item até você reativar"}">${r.desativado ? "Reativar" : "Desativar"}</button></div>` : ""}</li>`;
   const ativos = itens.filter(r => !r.desativado), off = itens.filter(r => r.desativado);
   const grupo = (tit, sub, st) => { const l = ativos.filter(r => st.includes(r.status)).sort((a, b) => /depende de você/.test(a.evidencia) - /depende de você/.test(b.evidencia)); return l.length ? `<div class="rt-grupo">${tit} <small>${sub} · ${l.length}</small></div><ul class="rt">${l.map(card).join("")}</ul>` : ""; };
   const feitos = itens.filter(r => r.status === "feito" && !r.desativado);
   $("#roadmap").innerHTML = `<div class="rt-prog" role="img" aria-label="${n("feito")} de ${itens.length} itens feitos">${["feito","parcial","em_andamento","pendente"].map(st => `<span style="width:${n(st) / tot * 100}%;background:${RCOR[st]}"></span>`).join("")}</div>
     <div class="rt-leg"><span><b>${n("feito")}</b> feitos</span><span><b>${n("parcial")}</b> parciais</span><span><b>${n("em_andamento")}</b> em andamento</span><span><b>${n("pendente")}</b> na fila</span>${itens.some(r => r.desativado) ? `<span><b>${itens.filter(r => r.desativado).length}</b> desativados por você</span>` : ""}</div>` +
-    grupo("Em andamento", "sendo feito agora", ["em_andamento"]) + grupo("Na fila", "o Developer pega na ordem; os que dependem de você ficam de lado", ["pendente"]) +
+    grupo("Em andamento", "sendo feito agora", ["em_andamento"]) + grupo("Na fila", "o Desenvolvedor pega na ordem; os que dependem de você ficam de lado", ["pendente"]) +
     grupo("Em observação", "o código parece corrigido; vira entregue quando o erro parar de acontecer", ["observacao"]) +
     grupo("Contestados pelo estudo", "a evidência contradiz o pedido; não serão executados a menos que você mande", ["contestado"]) +
     grupo("Parciais", "entregue em parte", ["parcial"]) +
@@ -1012,7 +1018,7 @@ function render(s) {
   if (P) {
     $("#pname").textContent = P.nome; document.title = "Círculo — " + P.nome;
     const ASK = P.kit === "circulo"
-      ? ["Falar com o loop", "O que você pedir vira um item no roteiro dele, e o Developer pega na ordem. Dá para desativar qualquer item depois.", "Peça uma melhoria, uma regra ou uma prioridade…",
+      ? ["Falar com o loop", "O que você pedir vira um item no roteiro dele, e o Desenvolvedor pega na ordem. Dá para desativar qualquer item depois.", "Peça uma melhoria, uma regra ou uma prioridade…",
          ["Priorize corrigir erros antes de features novas", "Mostre no painel quanto cada missão custou na semana", "Pesquise antes de construir em toda missão nova"]]
       : P.kit === "financas" ? ["Registrar ou corrigir", "Um gasto por mensagem, ou uma correção de categoria. O loop responde com o que entendeu.", "38,90 ifood almoço",
          ["38,90 ifood almoço", "120 mercado", "corrige 1 lazer impulso"]]
@@ -1363,7 +1369,7 @@ async function refreshRevisor() {
     if (!t || !ab || !ul) return;
     $("#revMax").textContent = j.max_abertos;
     t.textContent = `${(j.abertos || []).length} de ${j.max_abertos} vagas em uso · ${j.total} revisões · ${j.rejeitadas} rejeitadas · ${j.antes_do_pr} antes do PR`;
-    ab.innerHTML = (j.abertos || []).map(p => `<li><span class="tag">PR #${p.number}</span> item #${p.item_id} · <code>${esc(p.branch || "")}</code> · ${(p.arquivos || []).length} arquivo(s): ${esc((p.arquivos || []).slice(0, 5).join(", "))}</li>`).join("") || "<li>Nenhum PR do Developer aberto agora.</li>";
+    ab.innerHTML = (j.abertos || []).map(p => `<li><span class="tag">PR #${p.number}</span> item #${p.item_id} · <code>${esc(p.branch || "")}</code> · ${(p.arquivos || []).length} arquivo(s): ${esc((p.arquivos || []).slice(0, 5).join(", "))}</li>`).join("") || "<li>Nenhum PR do Desenvolvedor aberto agora.</li>";
     ul.innerHTML = (j.ultimas || []).map(r => `<li><b class="${r.veredito === "rejeitado" ? "bad" : "ok"}">${esc(r.veredito)}</b> · ${esc(r.momento.replace("_", " "))} · ${r.pr ? "PR #" + r.pr : "item #" + r.item_id} · Jev ${r.conf == null ? "—" : Math.round(r.conf * 100) + "%"} (${esc(r.fonte || "")})<br>${esc(r.motivo || "")}</li>`).join("") || "<li>Nenhuma revisão ainda.</li>";
   } catch {}
 }
@@ -1380,7 +1386,7 @@ async function refreshIndagador() {
       const partes = Object.entries(f.etapas || {}).map(([k, e]) => e.mediana_min == null ? `${nome[k]}: sem medida` :
         `${nome[k]}: <b${e.atraso > 1 ? ' style="color:var(--bad)"' : ''}>${Math.round(e.mediana_min)} min</b> (alvo ${e.alvo_min}, ${e.amostras} caso${e.amostras === 1 ? "" : "s"})`);
       fu.innerHTML = `Funil 24 h (medido): ${partes.join(" · ")} · PRs ${f.prs_mergeados} mesclado(s) / ${f.prs_fechados} fechado(s)` +
-        (f.planejador_motivo ? ` · Planejador parado: <b>${esc(f.planejador_motivo)}</b>` : " · Planejador livre");
+        (f.planejador_motivo ? ` · Gerente de produto parado: <b>${esc(f.planejador_motivo)}</b>` : " · Gerente de produto livre");
     }
     const rot = {valida: "válida", feita: "em uso", virou_item: "virou item", entregue: "entregue", descartada: "descartada", inconclusa: "em dúvida", contestada: "contestada", repetida: "repetida"};
     ul.innerHTML = (j.ultimas || []).map(p => `<li><span class="tag">${esc(p.cerebro === "loop" ? "loop" : p.cerebro.replace("missao:", "missão #"))}</span> <b>${esc(rot[p.status] || p.status)}</b> · eixo ${esc(p.eixo)} · pertinência ${Math.round((p.pertinencia || 0) * 100)}% · acionável ${p.acionavel ?? "?"}/2<br>${esc(p.texto)}</li>`).join("") || "<li>Nenhuma pergunta ainda.</li>";

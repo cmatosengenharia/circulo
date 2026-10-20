@@ -107,7 +107,7 @@ def confianca(store: Store, now: float | None = None) -> dict:
         lat = p99(dur)
         ck.append(_c("latencia", "agora", "Latência do giro (p99, 24 h)", "atencao" if lat > GIRO_LONGO_S * 1000 else "ok",
                      f"p99 {_ms(lat)} · mediana {_ms(sorted(dur)[len(dur) // 2])}",
-                     f"{len(dur)} giros medidos; giros com o Developer podem levar minutos",
+                     f"{len(dur)} giros medidos; giros com o Desenvolvedor podem levar minutos",
                      now, projecao="acima de 20 min no p99, um giro travado segura todo o resto"))
     hora = s.one("SELECT COUNT(*) n, MAX(created_at) em FROM metrics WHERE created_at>=?", (now - 3600,))
     acoes = s.one("SELECT COUNT(*) n FROM intencoes WHERE tipo='intencao' AND ator='loop' AND em>=?", (now - 3600,))["n"]
@@ -219,11 +219,11 @@ def confianca(store: Store, now: float | None = None) -> dict:
     dev = s.get("self_dev_aberto") or {}
     espera = s.get("self_dev_espera") or {}
     if float(espera.get("ate", 0)) > now:
-        ck.append(_c("developer", "seguranca", "Developer", "atencao", f"esperando até {espera.get('hora')}",
+        ck.append(_c("developer", "seguranca", "Desenvolvedor", "atencao", f"esperando até {espera.get('hora')}",
                      espera.get("motivo", ""), now))
     elif dev.get("pr") and not dev.get("fechado"):
         m = s.one("SELECT reason, created_at FROM merges WHERE pr=? ORDER BY id DESC LIMIT 1", (dev["pr"],))
-        ck.append(_c("developer", "seguranca", "Developer", "info", f"PR #{dev['pr']} aberto",
+        ck.append(_c("developer", "seguranca", "Desenvolvedor", "info", f"PR #{dev['pr']} aberto",
                      f"gate: {m['reason']}" if m else "esperando o CI", m["created_at"] if m else dev.get("em")))
 
     # missões pausadas por você: o loop segue, elas não
@@ -272,7 +272,7 @@ def confianca(store: Store, now: float | None = None) -> dict:
     estudar = s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND origem IN ('pedido_cassio','loop') "
                     "AND COALESCE(desativado,0)=0 AND estudo IS NULL AND evidencia NOT LIKE '%depende de você%'")["n"]
     if alvo:
-        ck.append(_c("proximo_item", "proximo", "Próximo trabalho do Developer", "info", f"#{alvo['id']} {alvo['titulo'][:90]}",
+        ck.append(_c("proximo_item", "proximo", "Próximo trabalho do Desenvolvedor", "info", f"#{alvo['id']} {alvo['titulo'][:90]}",
                      {"erro": "erro do próprio loop vem primeiro", "pedido_cassio": "seu pedido, já estudado"}.get(alvo["origem"],
                                                                                                                  "planejado pelo loop, já estudado"), now))
     if estudar:

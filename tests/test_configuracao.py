@@ -61,8 +61,8 @@ def test_instalar_escreve_servico_com_caminhos_reais(casa):
 
 def test_registrar_fecha_itens_de_configuracao_do_roteiro(circle):
     P = cfg.Peca
-    pecas = [P("Jev (decisões)", "ligado", ""), P("Motor das missões (LLM)", "ligado", ""), P("Gate de merge", "ligado", ""),
-             P("Developer (corrige o próprio código)", "ligado", ""), P("Rodando 24/7", "ligado", "")]
+    pecas = [P("Jev (decisões)", "ligado", ""), P("Motor das missões (LLM)", "ligado", ""), P("QA e release (merge)", "ligado", ""),
+             P("Desenvolvedor (corrige o próprio código)", "ligado", ""), P("Rodando 24/7", "ligado", "")]
     cfg.registrar(circle.store, pecas)
     st = {r["titulo"]: r["status"] for r in circle.store.q("SELECT titulo, status FROM roadmap")}
     assert st["Ligar as chaves e o Claude Code na máquina do loop"] == "feito" and st["Rodar 24/7"] == "feito"
@@ -114,7 +114,7 @@ def test_gate_testa_o_token_de_verdade_quando_pedido(monkeypatch):
         def open_prs(self): return []
         def check_runs(self, sha): return [{"name": "Testes"}]
 
-    gate = lambda: next(x for x in cfg.diagnostico(testar_conexoes=True) if x.nome == "Gate de merge")  # noqa: E731
+    gate = lambda: next(x for x in cfg.diagnostico(testar_conexoes=True) if x.nome == "QA e release (merge)")  # noqa: E731
     monkeypatch.setattr(merge_gate, "GitHubREST", Falha)
     assert gate().estado == "parado" and "401" in gate().detalhe
     monkeypatch.setattr(merge_gate, "GitHubREST", Ok)

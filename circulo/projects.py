@@ -50,7 +50,7 @@ ROTEIRO_SEMENTE = [
     ("Evolução de domínio sem aprovar PR por PR", "Regras aprendidas com correções, replay e invariantes.", "feito", "commit 84abb23"),
     ("Evolução do próprio círculo em shadow", "Limiares em shadow e prompts por A/B; perguntas do Jev e parâmetros do portfólio ainda não evoluem sozinhos.", "parcial", "commits 84abb23, c714cf4"),
     ("Rollback automático quando a saúde cai", "Health Monitor reverte a última política.", "feito", "commit 84abb23"),
-    ("Gate de merge no próprio círculo", "Checks verdes, limite de linhas, label aprovado-humano, SHA travado.", "feito", "commit df0b278"),
+    ("QA e release (merge) no próprio círculo", "Checks verdes, limite de linhas, label aprovado-humano, SHA travado.", "feito", "commit df0b278"),
     ("Entregar qualquer solução, não só software", "Motor genérico atende todos os tipos; produto de software ainda sai como especificação, não como código.", "parcial", "commit af9deb7"),
     ("Pesquisar o melhor da internet e transformar em régua", "Busca na web, achados filtrados pelo Jev, régua mensurável com critérios ocultos.", "feito", "commit af9deb7"),
     ("Autogerenciar o portfólio de projetos", "next_project, orçamento por projeto, retorno decrescente, manutenção e reabertura.", "feito", "commit af9deb7"),

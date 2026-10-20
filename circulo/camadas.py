@@ -11,15 +11,14 @@ import re
 import time
 from statistics import median
 
+from . import nomes
 from .state import Store
 from .status import loop_status
 
 # todas as etapas de um ciclo, na ordem em que acontecem
-ETAPAS = (("orquestrador", "Orquestrador"), ("pedido", "Pedido seu"), ("decisao", "Decisão do Jev"),
-          ("atualizar_corpo", "Atualizar corpo"), ("estudar_pedido", "Pesquisa"), ("planejar_roteiro", "Planejar roteiro"),
-          ("corrigir_codigo", "Developer → PR"), ("revisar_prs", "Validação e merge"), ("evoluir_projeto", "Missões"),
-          ("manutencao", "Manutenção"), ("meta_learner", "Aprender regras"), ("shadow", "Shadow"),
-          ("licoes", "Lições"), ("saude", "Saúde"))
+_ORDEM = ("orquestrador", "pedido", "decisao", "atualizar_corpo", "estudar_pedido", "planejar_roteiro", "corrigir_codigo",
+          "revisar_prs", "evoluir_projeto", "manutencao", "meta_learner", "shadow", "licoes", "saude")
+ETAPAS = tuple((c, nomes.nome(c)) for c in _ORDEM)
 NOME = dict(ETAPAS)
 OCIOSO = ("descanso", "pausado")
 RUN_ID = re.compile(r"[0-9a-f]{1,32}")

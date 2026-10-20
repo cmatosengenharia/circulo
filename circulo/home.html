@@ -153,7 +153,7 @@ a.card:hover{border-color:var(--ink)}
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 a.back{display:none !important}
-@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -232,7 +232,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
   pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
 const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", projeto:"construindo",
-  developer:"corrigindo o próprio código", meta_learner:"no Meta-Learner", shadow:"avaliando shadow", saude:"checando a saúde"};
+  developer:"corrigindo o próprio código", meta_learner:"com o Cientista de dados", shadow:"avaliando shadow", saude:"checando a saúde"};
 const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado", cumprida:"Cumprida"};
 const REL = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
 function ago(ts) {

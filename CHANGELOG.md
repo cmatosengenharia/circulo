@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.33.0 — 2026-10-19
+
+**A equipe ao vivo virou um canal de chat; o quadro anda em tempo real; a gestão do loop ocupa a tela toda; e os
+agentes têm nome de gente de time em todas as telas.**
+
+- **Equipe ao vivo como canal (`#equipe`)**: cada agente é um integrante com avatar, nome e cargo; mensagens seguidas
+  do mesmo integrante se agrupam; pergunta ao Jev e resposta aparecem como "em resposta a…"; etiquetas de tom (tarefa,
+  entrega, devolução, alerta); "fulano está trabalhando…" enquanto o giro roda; separador por dia; botão "N novas
+  mensagens" quando você não está no fim; filtro "só o que importa" esconde o rotineiro sem deixar cabeçalhos vazios.
+- **Quadro em tempo real**: toda mensagem que fala de um item traz a coluna em que ele fica agora (`coluna`); o
+  cartão muda de coluna no instante em que a mensagem chega, com o avatar de quem o moveu "carregando" o cartão
+  (voa do integrante até o cartão, que desliza para a coluna nova e fica destacado). A cada 4 s o quadro se confere
+  com o banco; colunas mostram até 8 cartões e "+ N na fila". A reprise inicial não anima: o quadro vem do retrato.
+- **Fonte única de nomes (`circulo/nomes.py`)**: Tech lead (Orquestrador), Jev (head de engenharia), Product owner
+  (Indagador), Gerente de produto (Planejador), Arquiteto (Estudo), Desenvolvedor (Developer), Revisor de código,
+  QA e release (Gate), DevOps (Corpo), SRE (Vigia), Curador de lições, Monitor de saúde, Cientista de dados
+  (Meta-Learner), Simulação (Shadow), Gerente de missões, Operações… Etapas (`camadas`), raias (`fluxo`), equipe,
+  painel, integrações e confiança usam o mesmo nome; o nome antigo fica em `antes` (tooltip). Agente que nascer da
+  autoevolução entra com o próprio nome.
+- **Gestão do loop em tela cheia e responsiva**: sem a caixa de 1240 px; em monitores largos (≥ 1440 px) "Saúde e
+  estado" e o SRE ficam lado a lado; a aba Equipe ao vivo usa a altura da janela; no celular os botões do cabeçalho
+  ocupam a linha inteira, os KPIs viram duas colunas e o menu do topo rola na horizontal em vez de quebrar em três.
+- Testes: `test_nomes` (todas as telas com o mesmo nome), `test_equipe` (mensagens de item carregam `coluna`; página
+  com canal, integrantes, colunas e `moverCard`), mapa de verificação atualizado.
+
 ## 1.32.1 — 2026-10-19
 
 **O loop parou às 22 h porque o orçamento do dia acabou — quase todo em estudos com busca na web.** Medido no Mac:

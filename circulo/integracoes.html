@@ -52,7 +52,7 @@ details.nova summary{cursor:pointer;font-weight:700}
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 a.back{display:none !important}
-@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -105,7 +105,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COFRE = {keychain: "Keychain do macOS (criptografado pelo sistema)", "secret-service": "Secret Service do Linux (criptografado)", arquivo: "arquivo de configuração com permissão 600"};
 const TESTE = {TYPESAFE_API_KEY: "Jev (decisões)", ANTHROPIC_API_KEY: "Motor das missões (LLM)", ANTHROPIC_WORKSPACE_ID: "Motor das missões (LLM)",
-  GITHUB_TOKEN: "Gate de merge", CIRCULO_REPO: "Gate de merge", CIRCULO_REPO_DIR: "Developer (corrige o próprio código)"};
+  GITHUB_TOKEN: "QA e release (merge)", CIRCULO_REPO: "QA e release (merge)", CIRCULO_REPO_DIR: "Desenvolvedor (corrige o próprio código)"};
 async function post(url, body) {
   const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify(body)});
   return [r.ok, await r.json()];

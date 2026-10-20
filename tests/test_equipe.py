@@ -35,6 +35,11 @@ def test_mensagens_nascem_dos_registros_e_citam_o_dado(circle):
     assert any(m["de"] == "corrigir_codigo" and m["para"] == "revisar_prs" and "PR #17" in m["texto"] for m in por_tom["entrega"])   # abriu o PR
     assert any(m["de"] == "revisar_prs" and m["para"] == "corrigir_codigo" and "checks falhando" in m["texto"] for m in por_tom["devolucao"])
     assert any(m["de"] == "revisor" and "aguarda PR #17" in m["texto"] for m in por_tom["devolucao"])                           # item devolvido
+    # toda mensagem que fala de um item diz em que coluna do quadro ele fica agora: é o que move o cartão em tempo real
+    com_item = [m for m in msgs if m.get("item") is not None and m["tom"] not in ("pergunta", "resposta")]
+    assert com_item and all(m.get("coluna") in {"planejado", "pronto", "dev", "revisao", "devolvidos", "producao", "fora"} for m in com_item)
+    assert any(m["de"] == "corrigir_codigo" and m.get("coluna") == "revisao" for m in com_item)
+    assert any(m["de"] == "revisor" and m.get("coluna") == "devolvidos" for m in com_item)
     assert any(m["de"] == "indagar" and m["para"] == "jev" and "Qual parte" in m["texto"] for m in por_tom["pergunta"])
     assert any(m["de"] == "jev" and m["para"] == "indagar" and "86%" in m["texto"] for m in por_tom["resposta"])
     assert any(m["de"] == "vigia" and m["para"] == "orquestrador" and "PR #17 preso" in m["texto"] for m in por_tom["alerta"])
@@ -68,7 +73,8 @@ def test_pagina_equipe_api_e_menu_em_todas_as_telas(circle, painel):  # noqa: F8
         with urllib.request.urlopen(painel + caminho, timeout=5) as r:
             html = r.read().decode()
         assert 'id="navTopo"' in html and 'href="/equipe"' in html and "Gestão do loop" in html, caminho
-    assert 'id="sala"' in urllib.request.urlopen(painel + "/equipe", timeout=5).read().decode()
+    pagina = urllib.request.urlopen(painel + "/equipe", timeout=5).read().decode()
+    assert 'id="membros"' in pagina and 'id="msgs"' in pagina and 'id="colunas"' in pagina and "moverCard" in pagina and "#equipe" in pagina
     req = urllib.request.Request(painel + "/loop")
     with urllib.request.urlopen(req, timeout=5) as r:                           # /loop leva à missão do loop
         assert 'id="navTopo"' in r.read().decode() and "/missao/" in r.geturl()

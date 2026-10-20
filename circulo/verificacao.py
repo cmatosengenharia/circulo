@@ -29,7 +29,7 @@ REGRA_HIDDEN = "[hidden]{display:none!important}"
 TELAS = (
     {"rota": "/", "arquivo": "home.html", "contem": ["Nova missão", "Equipe ao vivo", "Rastros e SLOs", "Integrações"]},
     {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Saúde e estado", "Equipe ao vivo", "Segurança e confiança"]},
-    {"rota": "/equipe", "arquivo": "equipe.html", "contem": ["Equipe ao vivo", "Conversa da equipe", "Quadro de entregas"]},
+    {"rota": "/equipe", "arquivo": "equipe.html", "contem": ["Equipe ao vivo", "#equipe", "Quadro de entregas"]},
     {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Fluxo ao vivo", "Laboratório", "Agentes"]},
     {"rota": "/rastros", "arquivo": "rastros.html", "contem": ["Seguir o fio", "Objetivos de serviço", "Sinais de ouro"]},
     {"rota": "/integracoes", "arquivo": "integracoes.html", "contem": ["Integrações", "Cadastrar outra integração"]},

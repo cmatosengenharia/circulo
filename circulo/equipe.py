@@ -17,31 +17,34 @@ import re
 import time
 from typing import Any
 
+from . import nomes
 from .state import Store
 
 # ------------------------------------------------------------------ o time
 GRUPOS = {"direcao": "Direção", "produto": "Produto", "engenharia": "Engenharia", "qualidade": "Qualidade e operação", "externos": "Parceiros externos"}
 EQUIPE: dict[str, dict[str, str]] = {
-    "cassio": {"nome": "Cássio", "cargo": "Cliente", "grupo": "produto", "faz": "Pede, aprova e recebe as entregas."},
-    "orquestrador": {"nome": "Orquestrador", "cargo": "Tech lead", "grupo": "direcao", "faz": "Abre cada giro, confere orçamento e distribui o trabalho."},
-    "jev": {"nome": "Jev", "cargo": "Decisor (head de engenharia)", "grupo": "direcao", "faz": "Responde sim/não, escolhe e dá nota antes de qualquer gasto; aprova ou barra."},
-    "indagar": {"nome": "Indagador", "cargo": "Product owner", "grupo": "produto", "faz": "Levanta as perguntas certas a partir do que foi medido; cada uma passa pelo Jev."},
-    "planejar_roteiro": {"nome": "Planejador", "cargo": "Gerente de produto", "grupo": "produto", "faz": "Transforma a pergunta validada num item pequeno e medível do roteiro."},
-    "estudar_pedido": {"nome": "Estudo", "cargo": "Arquiteto de soluções", "grupo": "engenharia", "faz": "Pesquisa fontes confiáveis e decide adotar, adaptar ou contestar o item."},
-    "corrigir_codigo": {"nome": "Developer", "cargo": "Desenvolvedor", "grupo": "engenharia", "faz": "Escreve o código e o teste num worktree, passa nos portões e abre o PR."},
-    "revisor": {"nome": "Revisor", "cargo": "Revisor de código", "grupo": "engenharia", "faz": "Confere cada PR contra a main de agora e os outros PRs abertos; devolve o que cruza."},
-    "revisar_prs": {"nome": "Gate", "cargo": "QA / release", "grupo": "engenharia", "faz": "CI verde, teste novo, constituição intacta: mescla ou devolve com o motivo."},
-    "atualizar_corpo": {"nome": "Corpo", "cargo": "DevOps", "grupo": "engenharia", "faz": "Sobe o código novo em produção, prova em 5 giros e desfaz se piorar."},
-    "vigia": {"nome": "Vigia", "cargo": "SRE", "grupo": "qualidade", "faz": "Mede as travas da autoevolução a cada minuto e abre item ou alerta."},
-    "licoes": {"nome": "Curador", "cargo": "Líder de qualidade", "grupo": "qualidade", "faz": "Transforma cada erro em lição, portão e item de correção; fecha o que provou."},
-    "saude": {"nome": "Saúde", "cargo": "Monitoramento", "grupo": "qualidade", "faz": "Mede a saúde do loop a cada giro e pede rollback se piorar."},
-    "jardinagem": {"nome": "Jardineiro", "cargo": "Dívida técnica", "grupo": "qualidade", "faz": "Mede padrões ruins crescendo no código e abre item para podar."},
-    "meta_learner": {"nome": "Aprendiz", "cargo": "Cientista de dados", "grupo": "qualidade", "faz": "Aprende regras com as correções e testa a política candidata em shadow."},
-    "evoluir_projeto": {"nome": "Missões", "cargo": "Entregas das missões", "grupo": "produto", "faz": "Faz um ciclo nas missões suas: régua, versão nova, torneio e evidência."},
-    "rotinas": {"nome": "Rotinas", "cargo": "Operações", "grupo": "qualidade", "faz": "Regressão, padrões, resumo, prompts A/B e demais manutenções em rodízio."},
-    "llm": {"nome": "LLM", "cargo": "Consultor externo", "grupo": "externos", "faz": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens)."},
-    "github": {"nome": "GitHub", "cargo": "Repositório e CI", "grupo": "externos", "faz": "Guarda o código, roda o CI e registra os PRs."},
+    "cassio": {"grupo": "produto", "faz": "Pede, aprova e recebe as entregas."},
+    "orquestrador": {"grupo": "direcao", "faz": "Abre cada giro, confere orçamento e distribui o trabalho."},
+    "jev": {"grupo": "direcao", "faz": "Responde sim/não, escolhe e dá nota antes de qualquer gasto; aprova ou barra."},
+    "indagar": {"grupo": "produto", "faz": "Levanta as perguntas certas a partir do que foi medido; cada uma passa pelo Jev."},
+    "planejar_roteiro": {"grupo": "produto", "faz": "Transforma a pergunta validada num item pequeno e medível do roteiro."},
+    "estudar_pedido": {"grupo": "engenharia", "faz": "Pesquisa fontes confiáveis e decide adotar, adaptar ou contestar o item."},
+    "corrigir_codigo": {"grupo": "engenharia", "faz": "Escreve o código e o teste num worktree, passa nos portões e abre o PR."},
+    "revisor": {"grupo": "engenharia", "faz": "Confere cada PR contra a main de agora e os outros PRs abertos; devolve o que cruza."},
+    "revisar_prs": {"grupo": "engenharia", "faz": "CI verde, teste novo, constituição intacta: mescla ou devolve com o motivo."},
+    "atualizar_corpo": {"grupo": "engenharia", "faz": "Sobe o código novo em produção, prova em 5 giros e desfaz se piorar."},
+    "vigia": {"grupo": "qualidade", "faz": "Mede as travas da autoevolução a cada minuto e abre item ou alerta."},
+    "licoes": {"grupo": "qualidade", "faz": "Transforma cada erro em lição, portão e item de correção; fecha o que provou."},
+    "saude": {"grupo": "qualidade", "faz": "Mede a saúde do loop a cada giro e pede rollback se piorar."},
+    "jardinagem": {"grupo": "qualidade", "faz": "Mede padrões ruins crescendo no código e abre item para podar."},
+    "meta_learner": {"grupo": "qualidade", "faz": "Aprende regras com as correções e testa a política candidata em shadow."},
+    "evoluir_projeto": {"grupo": "produto", "faz": "Faz um ciclo nas missões suas: régua, versão nova, torneio e evidência."},
+    "rotinas": {"grupo": "qualidade", "faz": "Regressão, padrões, resumo, prompts A/B e demais manutenções em rodízio."},
+    "llm": {"grupo": "externos", "faz": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens)."},
+    "github": {"grupo": "externos", "faz": "Guarda o código, roda o CI e registra os PRs."},
 }
+for _k, _v in EQUIPE.items():                      # nome e cargo vêm da fonte única de nomes
+    _v.update(nome=nomes.nome(_k), cargo=nomes.cargo(_k), antes=nomes.antes(_k))
 # agentes que a tela do fluxo conhece e que aqui se agrupam num integrante só
 ALIAS = {"shadow": "meta_learner", "pedido": "cassio", "decisao": "orquestrador", "descanso": "orquestrador", "pausado": "cassio",
          "analisar_padroes": "rotinas", "revisar_baixa_confianca": "rotinas", "rodar_regressao": "rotinas", "resumo": "rotinas",
@@ -97,7 +100,7 @@ def _de_perguntas(store, c, out, limite):
                      (c.get("perg", 0), limite)):
         c["perg"] = p["id"]
         if p["persona"] == "cassio":
-            out.append(_msg(p["created_at"], "cassio", "planejar_roteiro", "tarefa", f"Pedido: {p['texto']}", item=p["item_id"]))
+            out.append(_msg(p["created_at"], "cassio", "planejar_roteiro", "tarefa", f"Pedido: {p['texto']}", item=p["item_id"], coluna="planejado" if p["item_id"] else None))
             continue
         if p["status"] in ("feita",) and p["eixo"] is None:
             continue                                       # pergunta do conselho antigo, sem passar pelo Indagador
@@ -120,40 +123,40 @@ def _de_roadmap(store, c, out, limite):
         novo = abs(float(r["updated_at"]) - float(r["created_at"])) < 1.0
         pr = _pr_de(ev)
         if novo and r["origem"] == "erro":
-            out.append(_msg(r["updated_at"], "licoes", "corrigir_codigo", "tarefa", f"Erro virou lição: corrigir «{t}» (item #{i}).", item=i))
+            out.append(_msg(r["updated_at"], "licoes", "corrigir_codigo", "tarefa", f"Erro virou lição: corrigir «{t}» (item #{i}).", item=i, coluna="pronto"))
         elif novo and t.startswith("Vigia:"):
-            out.append(_msg(r["updated_at"], "vigia", "planejar_roteiro", "alerta", f"Trava detectada: {t[7:]} (item #{i}).", item=i))
+            out.append(_msg(r["updated_at"], "vigia", "planejar_roteiro", "alerta", f"Trava detectada: {t[7:]} (item #{i}).", item=i, coluna="planejado"))
         elif novo and r["origem"] == "loop":
-            out.append(_msg(r["updated_at"], "planejar_roteiro", "estudar_pedido", "tarefa", f"Planejei o item #{i}: {t}. Pode estudar.", item=i))
+            out.append(_msg(r["updated_at"], "planejar_roteiro", "estudar_pedido", "tarefa", f"Planejei o item #{i}: {t}. Pode estudar.", item=i, coluna="planejado"))
         elif novo and r["origem"] == "pedido_cassio":
-            out.append(_msg(r["updated_at"], "cassio", "estudar_pedido", "tarefa", f"Pedido novo no roteiro: {t} (item #{i}).", item=i))
+            out.append(_msg(r["updated_at"], "cassio", "estudar_pedido", "tarefa", f"Pedido novo no roteiro: {t} (item #{i}).", item=i, coluna="planejado"))
         elif st == "pendente" and ev.startswith("estudado"):
-            out.append(_msg(r["updated_at"], "estudar_pedido", "corrigir_codigo", "tarefa", f"Item #{i} estudado ({ev[10:60]}): pronto para desenvolver.", item=i))
+            out.append(_msg(r["updated_at"], "estudar_pedido", "corrigir_codigo", "tarefa", f"Item #{i} estudado ({ev[10:60]}): pronto para desenvolver.", item=i, coluna="pronto"))
         elif st == "em_andamento" and ev.startswith("branch"):
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "corrigir_codigo", "status", f"Comecei o item #{i}: {t}.", item=i))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "corrigir_codigo", "status", f"Comecei o item #{i}: {t}.", item=i, coluna="dev"))
         elif st == "em_andamento" and pr and "conserto" not in ev:
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "revisar_prs", "entrega", f"Abri o PR #{pr} para o item #{i}: {t}.", item=i, pr=pr))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "revisar_prs", "entrega", f"Abri o PR #{pr} para o item #{i}: {t}.", item=i, pr=pr, coluna="revisao"))
         elif st == "pendente" and ev.startswith("aguarda PR"):
-            out.append(_msg(r["updated_at"], "revisor", "planejar_roteiro", "devolucao", f"Devolvi o item #{i}: {ev}.", item=i, pr=_pr_de(ev)))
+            out.append(_msg(r["updated_at"], "revisor", "planejar_roteiro", "devolucao", f"Devolvi o item #{i}: {ev}.", item=i, pr=_pr_de(ev), coluna="devolvidos"))
         elif st == "pendente" and ev.startswith("revisor:"):
-            out.append(_msg(r["updated_at"], "revisor", "corrigir_codigo", "devolucao", f"Rejeitei o item #{i} antes do PR: {ev[9:]}.", item=i))
+            out.append(_msg(r["updated_at"], "revisor", "corrigir_codigo", "devolucao", f"Rejeitei o item #{i} antes do PR: {ev[9:]}.", item=i, coluna="devolvidos"))
         elif st == "pendente" and ev.startswith("barrado"):
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "corrigir_codigo", "devolucao", f"Item #{i} barrado nos portões antes do PR; nada enviado.", item=i))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "corrigir_codigo", "devolucao", f"Item #{i} barrado nos portões antes do PR; nada enviado.", item=i, coluna="pronto"))
         elif st == "pendente" and pr and "fechado" in ev:
-            out.append(_msg(r["updated_at"], "revisar_prs", "planejar_roteiro", "devolucao", f"PR #{pr} fechado; o item #{i} volta para a fila: {ev[:120]}.", item=i, pr=pr))
+            out.append(_msg(r["updated_at"], "revisar_prs", "planejar_roteiro", "devolucao", f"PR #{pr} fechado; o item #{i} volta para a fila: {ev[:120]}.", item=i, pr=pr, coluna="devolvidos"))
         elif st == "pendente" and "depende de você" in ev:
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "cassio", "alerta", f"O item #{i} depende de você: {ev[:120]}.", item=i))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "cassio", "alerta", f"O item #{i} depende de você: {ev[:120]}.", item=i, coluna="devolvidos"))
         elif st == "pendente" and ev.startswith("aguardando o limite"):
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "orquestrador", "status", f"Claude Code no limite; o item #{i} espera ({ev[:80]}).", item=i))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "orquestrador", "status", f"Claude Code no limite; o item #{i} espera ({ev[:80]}).", item=i, coluna="devolvidos"))
         elif st == "feito" and pr:
-            out.append(_msg(r["updated_at"], "revisar_prs", "atualizar_corpo", "entrega", f"PR #{pr} entrou na main: item #{i} concluído. Pode subir.", item=i, pr=pr))
+            out.append(_msg(r["updated_at"], "revisar_prs", "atualizar_corpo", "entrega", f"PR #{pr} entrou na main: item #{i} concluído. Pode subir.", item=i, pr=pr, coluna="producao"))
         elif st == "feito":
-            out.append(_msg(r["updated_at"], "orquestrador", "cassio", "entrega", f"Item #{i} concluído: {t}.", item=i))
+            out.append(_msg(r["updated_at"], "orquestrador", "cassio", "entrega", f"Item #{i} concluído: {t}.", item=i, coluna="producao"))
         elif st in ("descartado", "contestado"):
             quem = "estudar_pedido" if st == "contestado" else "planejar_roteiro"
-            out.append(_msg(r["updated_at"], quem, "cassio", "devolucao", f"Item #{i} {st}: {ev[:120] or t}.", item=i))
+            out.append(_msg(r["updated_at"], quem, "cassio", "devolucao", f"Item #{i} {st}: {ev[:120] or t}.", item=i, coluna="fora"))
         elif st == "observacao":
-            out.append(_msg(r["updated_at"], "corrigir_codigo", "licoes", "status", f"Item #{i} em observação: o erro precisa parar de acontecer.", item=i))
+            out.append(_msg(r["updated_at"], "corrigir_codigo", "licoes", "status", f"Item #{i} em observação: o erro precisa parar de acontecer.", item=i, coluna="producao"))
 
 
 def _de_merges(store, c, out, limite):
@@ -184,9 +187,9 @@ def _de_revisoes(store, c, out, limite):
         conf = f" (Jev {int(float(r['conf'] or 0) * 100)}%)" if r["conf"] is not None else ""
         out.append(_msg(r["created_at"], "revisor", "jev", "pergunta", f"O {alvo} é seguro junto com os PRs abertos?", pr=r["pr"], item=r["item_id"]))
         if r["veredito"] == "aprovado":
-            out.append(_msg(float(r["created_at"]) + 0.3, "revisor", "corrigir_codigo", "resposta", f"Revisão do {alvo}: seguro{conf}. Pode seguir.", pr=r["pr"], item=r["item_id"]))
+            out.append(_msg(float(r["created_at"]) + 0.3, "revisor", "corrigir_codigo", "resposta", f"Revisão do {alvo}: seguro{conf}. Pode seguir.", pr=r["pr"], item=r["item_id"], coluna="revisao"))
         else:
-            out.append(_msg(float(r["created_at"]) + 0.3, "revisor", "corrigir_codigo", "devolucao", f"Revisão do {alvo}: {r['motivo']}{conf}.", pr=r["pr"], item=r["item_id"]))
+            out.append(_msg(float(r["created_at"]) + 0.3, "revisor", "corrigir_codigo", "devolucao", f"Revisão do {alvo}: {r['motivo']}{conf}.", pr=r["pr"], item=r["item_id"], coluna="devolvidos"))
 
 
 def _de_vigia(store, c, out, limite):

@@ -1,4 +1,4 @@
-"""Gate de merge do círculo.
+"""QA e release (merge) do círculo.
 
 O GitHub Free não aplica proteção de branch em repositório privado, então a regra mora aqui.
 Ordem: regras duras (código, não evoluem) → Reviewer Code (Jev) → merge com SHA travado.

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 
+from . import nomes
 from .camadas import NOME, chave_trilha
 from .state import Store
 
@@ -69,21 +70,11 @@ def _agente_da_trilha(etapa: str, tarefa: str | None) -> str | None:
     return chave_trilha(etapa, tarefa) or etapa
 
 
-CURTO = {"orquestrador": "Orquestrador", "pedido": "Pedido seu", "decisao": "Escolha", "atualizar_corpo": "Corpo",
-         "estudar_pedido": "Estudo", "planejar_roteiro": "Planejador", "corrigir_codigo": "Developer", "revisar_prs": "Gate",
-         "evoluir_projeto": "Missões", "meta_learner": "Aprendiz", "shadow": "Shadow", "licoes": "Lições", "saude": "Saúde",
-         "analisar_padroes": "Padrões", "revisar_baixa_confianca": "Revisão", "rodar_regressao": "Regressão", "resumo": "Resumo",
-         "propor_feature": "Melhorias", "evoluir_harness": "Prompts A/B", "conectar_missoes": "Conexões",
-         "jardinagem": "Jardineiro", "indagar": "Indagador", "vigia": "Vigia", "revisor": "Revisor"}
+CURTO = {k: v["curto"] for k, v in nomes.AGENTES.items()}
 
 
 def nome_do_agente(chave: str) -> str:
-    if chave in CURTO:
-        return CURTO[chave]
-    if chave in NOME:
-        return NOME[chave]
-    return {"jev": "Jev", "llm": "LLM", "github": "GitHub", "descanso": "Descanso", "pausado": "Pausado"}.get(
-        chave, chave.replace("_", " ").capitalize())
+    return nomes.curto(chave)
 
 
 def _agente_no_momento(store: Store, tick: int | None, em: float) -> tuple[str, float]:

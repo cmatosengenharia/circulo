@@ -13,7 +13,7 @@
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
 a{color:var(--jev)}
-.wrap{max-width:1400px;margin:0 auto;padding:0 16px 56px}
+.wrap{max-width:1500px;margin:0 auto;padding:0 16px 56px}
 h1{font-size:26px;margin:4px 0 2px;letter-spacing:-.2px}
 h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
 .sub{color:var(--muted);margin:0 0 10px;max-width:980px}
@@ -27,79 +27,76 @@ h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;co
 .estado i{width:10px;height:10px;border-radius:50%;background:var(--idle)}
 .estado[data-s=ao_vivo] i{background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
 .estado[data-s=parado] i{background:var(--bad)}
-.legenda{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:6px 0 12px}
-.legenda span{display:inline-flex;align-items:center;gap:6px}
-.lg{display:inline-block;width:12px;height:12px;border-radius:50%}
 .panel{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px}
+.grade{display:grid;grid-template-columns:minmax(300px,.95fr) minmax(0,1.4fr);gap:14px;align-items:start}
+@media (max-width:1000px){.grade{grid-template-columns:1fr}}
+.av{border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;flex:none}
+.g-direcao{background:var(--jev)}.g-produto{background:var(--ok)}.g-engenharia{background:#2F6DB5}.g-qualidade{background:#6B7683}.g-externos{background:var(--gh)}
+@media (prefers-color-scheme:dark){.g-engenharia{background:#5EA0E6;color:#10161D}.g-qualidade{background:#8B96A3;color:#10161D}.g-externos{color:#10161D}}
 
-/* ---------- a sala ---------- */
-.sala-wrap{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr);gap:14px;align-items:start}
-@media (max-width:1000px){.sala-wrap{grid-template-columns:1fr}}
-.grupo{margin-bottom:12px}
-.grupo h3{font-size:12.5px;margin:0 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
-.grupo h3::after{content:"";flex:1;height:1.5px;background:var(--line)}
-.membros{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:8px}
-.membro{position:relative;background:var(--node);border:1.5px solid var(--line);border-radius:12px;padding:10px 10px 8px;min-height:92px;transition:border-color .25s,box-shadow .25s,transform .25s}
-.membro[data-estado=trabalhando]{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
-.membro[data-estado=parado]{opacity:.78}
-.membro.falando{border-color:var(--accent)}
-.membro.recebeu{transform:translateY(-2px);border-color:var(--ink)}
-.membro .topo-m{display:flex;gap:9px;align-items:center}
-.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;color:#fff;flex:none;border:2px solid transparent}
-.g-direcao .avatar{background:var(--jev)}.g-produto .avatar{background:var(--ok)}.g-engenharia .avatar{background:#2F6DB5}.g-qualidade .avatar{background:#6B7683}.g-externos .avatar{background:var(--gh)}
-@media (prefers-color-scheme:dark){.g-engenharia .avatar{background:#5EA0E6;color:#10161D}.g-qualidade .avatar{background:#8B96A3;color:#10161D}.g-externos .avatar{color:#10161D}}
+/* ---------- membros (lista lateral, como a barra de um canal) ---------- */
+.membros{display:flex;flex-direction:column;gap:4px}
+.membros h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 2px}
+.membro{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;border:1.5px solid transparent;position:relative}
+.membro[data-estado=trabalhando]{border-color:var(--ok);background:var(--ok-soft)}
+.membro .av{width:34px;height:34px;font-size:13px;position:relative}
+.membro .av::after{content:"";position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:var(--idle);border:2px solid var(--surface)}
+.membro[data-estado=trabalhando] .av::after{background:var(--ok);animation:pulsa 1.2s infinite}
+.membro[data-estado=parado] .av::after{background:var(--bad)}
+@keyframes pulsa{0%{box-shadow:0 0 0 0 var(--ok-soft)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
 .membro b{display:block;font-size:14px;line-height:1.2}
-.membro small{display:block;color:var(--muted);font-size:12px}
-.membro .agora{font-size:12.5px;margin-top:6px;color:var(--ink);min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.membro .agora.vazio{color:var(--muted)}
-.membro .carga{position:absolute;top:8px;right:8px;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--bg);border:1.5px solid var(--border);color:var(--ink)}
-.membro .carga[data-zero]{display:none}
-.membro .dot{position:absolute;left:36px;top:36px;width:10px;height:10px;border-radius:50%;background:var(--idle);border:2px solid var(--node)}
-.membro[data-estado=trabalhando] .dot{background:var(--ok);animation:pulsa 1.2s infinite}
-.membro[data-estado=parado] .dot{background:var(--bad)}
-@keyframes pulsa{0%{box-shadow:0 0 0 0 var(--ok-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-.balao{position:absolute;left:6px;right:6px;bottom:6px;background:var(--ink);color:var(--surface);font-size:12px;line-height:1.3;padding:6px 8px;border-radius:9px;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18);animation:sobe .25s ease-out;max-height:46px;overflow:hidden}
-.membro{min-height:104px}
-.balao[data-tom=devolucao]{background:var(--bad)}.balao[data-tom=entrega]{background:var(--ok)}.balao[data-tom=alerta]{background:var(--llm)}
-@keyframes sobe{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.voo{position:fixed;z-index:60;pointer-events:none;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface);border:2px solid var(--accent);color:var(--ink);font-size:12.5px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.18);will-change:transform;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.voo[data-tom=devolucao]{border-color:var(--bad)}.voo[data-tom=entrega]{border-color:var(--ok)}.voo[data-tom=alerta]{border-color:var(--llm)}.voo[data-tom=pergunta]{border-style:dashed}
-.voo i{width:10px;height:10px;border-radius:50%;background:var(--accent)}
-.voo[data-tom=devolucao] i{background:var(--bad);border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}.voo[data-tom=entrega] i{background:var(--ok);border-radius:2px}
-.voo[data-tom=pergunta] i{background:var(--jev);transform:rotate(45deg);border-radius:0}.voo[data-tom=alerta] i{background:var(--llm)}
+.membro small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.membro .carga{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--bg);border:1.5px solid var(--border)}
+.membro .carga[data-zero]{visibility:hidden}
 
-/* ---------- a conversa ---------- */
-.conversa{position:sticky;top:60px;max-height:calc(100vh - 80px);display:flex;flex-direction:column}
-.chat{list-style:none;margin:0;padding:0;overflow:auto;flex:1;display:flex;flex-direction:column;gap:6px;scroll-behavior:smooth}
-.chat li{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:start;padding:6px 8px;border-radius:10px;background:var(--bg);border-left:3px solid var(--line);animation:sobe .2s ease-out}
-.chat li[data-tom=devolucao]{border-left-color:var(--bad)}.chat li[data-tom=entrega]{border-left-color:var(--ok)}.chat li[data-tom=alerta]{border-left-color:var(--llm)}
-.chat li[data-tom=pergunta],.chat li[data-tom=resposta]{border-left-color:var(--jev)}.chat li[data-tom=tarefa]{border-left-color:#2F6DB5}
-.chat li[data-detalhe]{opacity:.8}
-.chat .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px}
-.chat .quem{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.chat .quem b{color:var(--ink)}
-.chat .quem .seta{color:var(--muted)}
-.chat .txt{font-size:13.5px;line-height:1.35}
-.chat time{margin-left:auto;font-variant-numeric:tabular-nums}
-.chat .tom{font-size:11px;font-weight:700;padding:0 6px;border-radius:999px;border:1.5px solid currentColor}
-.chat li[data-tom=devolucao] .tom{color:var(--bad)}.chat li[data-tom=entrega] .tom{color:var(--ok)}.chat li[data-tom=alerta] .tom{color:var(--llm)}
-.chat li[data-tom=pergunta] .tom,.chat li[data-tom=resposta] .tom{color:var(--jev)}.chat li[data-tom=tarefa] .tom{color:#2F6DB5}.chat li[data-tom=status] .tom{color:var(--muted)}
-.vazio-chat{color:var(--muted);font-size:13.5px;padding:10px}
+/* ---------- o canal ---------- */
+.canal{display:flex;flex-direction:column;height:min(78vh,860px);min-height:460px}
+.canal-cab{display:flex;align-items:center;gap:10px;padding-bottom:8px;border-bottom:1.5px solid var(--line);margin-bottom:6px}
+.canal-cab b{font-size:16px}.canal-cab .topico{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgs{flex:1;overflow:auto;padding-right:4px;scroll-behavior:smooth}
+.dia{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:10px 0 6px}
+.dia::before,.dia::after{content:"";flex:1;height:1px;background:var(--line)}
+.grupo{display:grid;grid-template-columns:38px 1fr;gap:10px;padding:6px 6px;border-radius:10px;animation:sobe .2s ease-out}
+.grupo:hover{background:var(--hover)}
+.grupo:not(:has(.msg:not([hidden]))){display:none}
+.grupo .av{width:38px;height:38px;font-size:14px;margin-top:2px}
+.grupo .quem{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.grupo .quem b{font-size:14.5px}.grupo .quem small{color:var(--muted);font-size:12px}.grupo .quem time{color:var(--muted);font-size:12px;margin-left:auto}
+.msg{position:relative;padding:3px 0 3px 10px;border-left:3px solid transparent;margin-top:2px;font-size:14.5px;line-height:1.4}
+.msg[data-tom=devolucao]{border-left-color:var(--bad)}.msg[data-tom=entrega]{border-left-color:var(--ok)}.msg[data-tom=alerta]{border-left-color:var(--llm)}
+.msg[data-tom=tarefa]{border-left-color:#2F6DB5}.msg[data-tom=pergunta],.msg[data-tom=resposta]{border-left-color:var(--jev)}
+.msg .para{color:var(--muted);font-weight:600}
+.msg .para b{color:var(--ink);font-weight:700}
+.msg .tag{display:inline-block;font-size:11px;font-weight:700;padding:0 6px;border-radius:999px;border:1.5px solid currentColor;margin-left:6px;vertical-align:1px}
+.msg[data-tom=devolucao] .tag{color:var(--bad)}.msg[data-tom=entrega] .tag{color:var(--ok)}.msg[data-tom=alerta] .tag{color:var(--llm)}.msg[data-tom=tarefa] .tag{color:#2F6DB5}
+.msg[data-tom=pergunta] .tag,.msg[data-tom=resposta] .tag{color:var(--jev)}
+.msg .em-resposta{display:block;color:var(--muted);font-size:12.5px;border-left:2px solid var(--line);padding-left:8px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg.detalhe{opacity:.75;font-size:13.5px}
+.msg .reacao{display:inline-flex;gap:4px;margin-left:8px;font-size:12px;color:var(--muted)}
+.digitando{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;min-height:24px;padding:4px 6px}
+.digitando i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);animation:pisca 1.2s infinite}
+.digitando i:nth-child(2){animation-delay:.2s}.digitando i:nth-child(3){animation-delay:.4s}
+@keyframes pisca{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.novas{position:sticky;bottom:6px;margin:0 auto;display:block;width:max-content;font:inherit;font-size:12.5px;padding:4px 12px;border-radius:999px;background:var(--ink);color:var(--surface);border:0;cursor:pointer}
+@keyframes sobe{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 /* ---------- o quadro ---------- */
 .quadro{margin-top:14px}
-.colunas{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:8px;overflow:auto;padding-bottom:4px}
-.coluna{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:8px;min-height:120px}
+.colunas{display:grid;grid-template-columns:repeat(7,minmax(160px,1fr));gap:8px;overflow:auto;padding-bottom:4px}
+.coluna{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:8px;min-height:140px;transition:box-shadow .3s}
+.coluna.recebe{box-shadow:inset 0 0 0 2px var(--accent)}
 .coluna h4{margin:0 0 6px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:6px}
 .coluna h4 .n{font-weight:700;background:var(--surface);border:1.5px solid var(--border);border-radius:999px;padding:0 7px;font-size:11.5px}
 .coluna[data-k=devolvidos]{border-color:var(--bad)}.coluna[data-k=producao]{border-color:var(--ok)}
-.card{background:var(--node);border:1.5px solid var(--line);border-radius:9px;padding:7px 8px;margin-bottom:6px;font-size:12.5px;line-height:1.3;position:relative;transition:transform .5s cubic-bezier(.2,.8,.2,1),box-shadow .5s}
+.card{background:var(--node);border:1.5px solid var(--line);border-radius:9px;padding:7px 8px;margin-bottom:6px;font-size:12.5px;line-height:1.3;position:relative;transition:transform .55s cubic-bezier(.2,.8,.2,1),box-shadow .55s,opacity .4s}
 .card.mudou{box-shadow:0 0 0 3px var(--jev-soft);border-color:var(--jev)}
+.card.saiu{opacity:0;transform:scale(.9)}
 .card .id{font-weight:700;color:var(--muted);font-size:11.5px}
-.card .dono{position:absolute;right:6px;top:6px;width:20px;height:20px;border-radius:50%;color:#fff;font-size:9.5px;font-weight:800;display:grid;place-items:center}
+.card .dono{position:absolute;right:6px;top:6px;width:22px;height:22px;font-size:10px;transition:transform .4s}
+.card .dono.carrega{transform:scale(1.25);box-shadow:0 0 0 3px var(--ok-soft)}
 .card .ev{display:block;color:var(--muted);font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.coluna[data-k=devolvidos] .card{border-color:var(--bad-soft)}.coluna[data-k=producao] .card{border-color:var(--ok-soft)}
 .coluna .nada{color:var(--muted);font-size:12px;padding:6px 2px}
+.voo{position:fixed;z-index:60;pointer-events:none;width:26px;height:26px;font-size:11px;border:2px solid var(--surface);box-shadow:0 6px 16px rgba(0,0,0,.25);will-change:transform}
 .crit{margin-top:14px;font-size:13.5px}
 .crit summary{cursor:pointer;font-weight:600}
 .crit li{margin:4px 0}
@@ -114,7 +111,7 @@ h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;co
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 a.back{display:none !important}
-@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -148,75 +145,68 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
 <div class="wrap">
   <div class="cab">
     <div><h1>Equipe ao vivo</h1>
-      <p class="sub">Os agentes do loop como um time que entrega qualquer produto: quem está com a bola agora, a conversa entre eles (pergunta, resposta, tarefa passada adiante, entrega, devolução, alerta) e o quadro de entregas, da pergunta válida à produção. Cada mensagem nasce de um registro real do loop e cita o dado.</p></div>
+      <p class="sub">Os agentes do loop como um time num canal: quem está com a bola, o que cada um diz ao outro (tarefa passada, entrega, devolução, pergunta ao Jev e resposta) e o quadro de entregas, onde os cartões andam na hora em que o estado muda. Cada mensagem nasce de um registro real do loop.</p></div>
     <div class="ctl">
       <span class="estado" id="estado" data-s=""><i></i><span id="estadoTxt">conectando…</span></span>
-      <span class="vel" role="group" aria-label="Velocidade da animação"><button type="button" data-vel="1" aria-pressed="true">tempo real</button><button type="button" data-vel="3" aria-pressed="false">3×</button><button type="button" data-vel="0" aria-pressed="false">pausar</button></span>
-      <span class="seg" role="group" aria-label="O que mostrar na conversa"><button type="button" data-filtro="tudo" aria-pressed="false">tudo</button><button type="button" data-filtro="importante" aria-pressed="true">só o que importa</button></span>
+      <span class="seg" role="group" aria-label="O que mostrar no canal"><button type="button" data-filtro="tudo" aria-pressed="false">tudo</button><button type="button" data-filtro="importante" aria-pressed="true">só o que importa</button></span>
     </div>
   </div>
-  <div class="legenda" aria-hidden="true">
-    <span><i class="lg" style="background:var(--jev)"></i>Direção</span><span><i class="lg" style="background:var(--ok)"></i>Produto</span>
-    <span><i class="lg" style="background:#2F6DB5"></i>Engenharia</span><span><i class="lg" style="background:#6B7683"></i>Qualidade e operação</span>
-    <span><i class="lg" style="background:var(--gh)"></i>Parceiros externos</span>
-    <span style="margin-left:auto"><b>◆</b> pergunta · <b>■</b> entrega · <b>▲</b> devolução · <b>●</b> tarefa/alerta</span>
-  </div>
 
-  <div class="sala-wrap">
-    <section class="panel" aria-label="A sala da equipe"><h2>A sala <small id="salaMeta" style="text-transform:none;letter-spacing:0;font-weight:400"></small></h2><div id="sala"></div></section>
-    <aside class="panel conversa" aria-label="Conversa da equipe"><h2>Conversa da equipe</h2><ul class="chat" id="chat" aria-live="polite"><li class="vazio-chat">Esperando a primeira mensagem…</li></ul></aside>
+  <div class="grade">
+    <section class="panel" aria-label="Integrantes"><h2>Integrantes <small id="salaMeta" style="text-transform:none;letter-spacing:0;font-weight:400"></small></h2><div class="membros" id="membros"></div></section>
+    <section class="panel canal" aria-label="Canal da equipe">
+      <div class="canal-cab"><b>#equipe</b><span class="topico" id="topico">a conversa real do loop, na ordem em que acontece</span></div>
+      <div class="msgs" id="msgs"></div>
+      <div class="digitando" id="digitando" hidden></div>
+    </section>
   </div>
 
   <section class="panel quadro" aria-label="Quadro de entregas"><h2>Quadro de entregas <small id="quadroMeta" style="text-transform:none;letter-spacing:0;font-weight:400"></small></h2><div class="colunas" id="colunas"></div></section>
 
   <details class="crit"><summary>Como ler esta tela (e o que ela não mostra)</summary>
     <ul>
-      <li>O time segue os papéis de uma equipe de engenharia: o <b>Indagador</b> é o product owner (faz as perguntas certas a partir do que foi medido), o <b>Jev</b> é o decisor que aprova ou barra antes de qualquer gasto, o <b>Planejador</b> transforma pergunta em item, o <b>Estudo</b> é o arquiteto, o <b>Developer</b> escreve código, o <b>Revisor</b> e o <b>Gate</b> fazem revisão, QA e release, o <b>Corpo</b> é o DevOps, o <b>Vigia</b> é o SRE e o <b>Curador</b> cuida das lições.</li>
-      <li>Um só integrante trabalha por vez no giro (o loop é sequencial por desenho); o Vigia e o CI do GitHub correm em paralelo. O cartão verde pulsando é quem está com a bola.</li>
-      <li>A conversa não é gerada por LLM: cada frase é montada do registro que já existe (perguntas, roteiro, PRs, gate, revisões, Vigia, lições). "Só o que importa" esconde as perguntas rotineiras ao Jev e as chamadas de LLM; "tudo" mostra cada uma.</li>
-      <li>O quadro move os cartões quando o estado muda no banco (a cada poucos segundos), não no instante exato; a animação do cartão mostra de onde para onde foi.</li>
+      <li>Cada agente aparece com o papel que tem no time (Tech lead, Jev como head de engenharia, Product owner, Gerente de produto, Arquiteto, Desenvolvedor, Revisor de código, QA e release, DevOps, SRE, Curador de lições…). O nome técnico antigo aparece ao passar o mouse.</li>
+      <li>Um só integrante trabalha por vez no giro (o loop é sequencial por desenho); o Vigia e o CI do GitHub correm em paralelo. O ponto verde pulsando é quem está com a bola; "está trabalhando…" aparece no canal enquanto ele trabalha.</li>
+      <li>O canal não é gerado por LLM: cada frase é montada do registro que já existe (perguntas, roteiro, PRs, gate, revisões, Vigia, lições). "Só o que importa" esconde as perguntas rotineiras ao Jev e as chamadas de LLM.</li>
+      <li>O quadro move o cartão no instante em que a mensagem chega (quem o move aparece carregando o cartão); a cada 4 s ele se confere com o banco.</li>
     </ul>
   </details>
 </div>
 <script>
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-const GRUPO_COR = {direcao: "var(--jev)", produto: "var(--ok)", engenharia: "#2F6DB5", qualidade: "#6B7683", externos: "var(--gh)"};
-const TOM_NOME = {pergunta: "pergunta", resposta: "resposta", tarefa: "tarefa", entrega: "entrega", devolucao: "devolução", alerta: "alerta", status: "status"};
+const TOM_NOME = {pergunta: "pergunta", resposta: "resposta", tarefa: "tarefa", entrega: "entrega", devolucao: "devolução", alerta: "alerta", status: ""};
 const IMPORTANTE = new Set(["tarefa", "entrega", "devolucao", "alerta"]);
 const ALIAS = {shadow: "meta_learner", pedido: "cassio", decisao: "orquestrador", descanso: "orquestrador", pausado: "cassio", analisar_padroes: "rotinas", revisar_baixa_confianca: "rotinas",
                rodar_regressao: "rotinas", resumo: "rotinas", propor_feature: "rotinas", evoluir_harness: "rotinas", conectar_missoes: "evoluir_projeto", checar_licoes: "licoes"};
-let EQUIPE = {}, GRUPOS = {}, vel = 1, filtro = "importante", fila = [], animando = false, ultimoRetrato = null, posAntes = {};
+const COLUNAS = ["ideias", "planejado", "pronto", "dev", "revisao", "producao", "devolvidos"];
+let EQUIPE = {}, GRUPOS = {}, filtro = "importante", ultimoRetrato = null, ultimoGrupo = null, ultimoDia = "", naoLidas = 0, animandoQuadro = false, carregando = true;
+const LIMITE_COLUNA = 8;
 const membro = k => { const m = ALIAS[k] || k; return EQUIPE[m] ? m : (EQUIPE[k] ? k : "rotinas"); };
 const iniciais = n => (n || "?").split(/\s+/).map(p => p[0]).join("").slice(0, 2).toUpperCase();
-const hora = t => new Date((t || Date.now() / 1000) * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+const hora = t => new Date((t || Date.now() / 1000) * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
+const dia = t => new Date((t || Date.now() / 1000) * 1000).toLocaleDateString("pt-BR", {weekday: "long", day: "2-digit", month: "long"});
+const avatar = (id, cls = "") => { const m = EQUIPE[id] || {nome: id, grupo: "qualidade"}; return `<span class="av g-${m.grupo} ${cls}" title="${esc(m.nome)}">${iniciais(m.nome)}</span>`; };
 
-// ---------- a sala
-function desenharSala(r) {
+// ---------- integrantes
+function desenharMembros(r) {
   EQUIPE = Object.fromEntries(r.membros.map(m => [m.id, m])); GRUPOS = r.grupos;
-  const sala = $("#sala");
   const porGrupo = {};
   r.membros.forEach(m => (porGrupo[m.grupo] ||= []).push(m));
-  if (!sala.dataset.pronto) {
-    sala.innerHTML = Object.entries(GRUPOS).filter(([g]) => porGrupo[g]).map(([g, nome]) => `<div class="grupo g-${g}"><h3>${esc(nome)}</h3><div class="membros">${porGrupo[g].map(cardMembro).join("")}</div></div>`).join("");
-    sala.dataset.pronto = "1";
+  const box = $("#membros");
+  if (!box.dataset.pronto) {
+    box.innerHTML = Object.entries(GRUPOS).filter(([g]) => porGrupo[g]).map(([g, nome]) => `<h3>${esc(nome)}</h3>` + porGrupo[g].map(m =>
+      `<div class="membro" id="m-${m.id}" data-estado="${m.estado}" title="${esc(m.faz)}">${avatar(m.id)}<div><b>${esc(m.nome)}</b><small class="agora"></small></div><span class="carga" data-zero></span></div>`).join("")).join("");
+    box.dataset.pronto = "1";
   }
   r.membros.forEach(atualizarMembro);
   $("#salaMeta").textContent = r.rodando ? `· giro ${r.tick} · ritmo ${r.ritmo || "—"}` : "· o loop não está rodando";
 }
-function cardMembro(m) {
-  return `<article class="membro" id="m-${m.id}" data-estado="${m.estado}" title="${esc(m.faz)}" tabindex="0">
-    <div class="topo-m"><span class="avatar" aria-hidden="true">${iniciais(m.nome)}</span><span class="dot" aria-hidden="true"></span><div><b>${esc(m.nome)}</b><small>${esc(m.cargo)}</small></div></div>
-    <div class="agora vazio"></div><span class="carga" data-zero></span></article>`;
-}
 function atualizarMembro(m) {
   const el = $(`#m-${m.id}`); if (!el) return;
   el.dataset.estado = m.estado;
-  const ag = $(".agora", el);
-  const txt = m.estado === "trabalhando" ? (m.agora || "trabalhando agora") : m.estado === "parado" ? "loop parado" : "disponível";
-  ag.textContent = txt; ag.classList.toggle("vazio", m.estado !== "trabalhando");
-  const c = $(".carga", el);
-  const n = m.vagas ? `${m.carga} · ${m.vagas}` : m.carga;
+  $(".agora", el).textContent = m.estado === "trabalhando" ? (m.agora || "trabalhando agora") : (m.cargo || "");
+  const c = $(".carga", el), n = m.vagas ? `${m.carga} · ${m.vagas}` : m.carga;
   c.textContent = n; c.title = `${m.carga} ${m.carga_rotulo}${m.vagas ? " · vagas " + m.vagas : ""}`;
   if (m.carga || m.vagas) c.removeAttribute("data-zero"); else c.setAttribute("data-zero", "");
 }
@@ -225,135 +215,152 @@ function marcarAtivo(k, texto) {
   Object.values(EQUIPE).forEach(m => { if (m.estado === "trabalhando" && m.id !== id) { m.estado = "disponivel"; m.agora = ""; atualizarMembro(m); } });
   const m = EQUIPE[id]; if (!m) return;
   m.estado = "trabalhando"; m.agora = texto || m.agora; atualizarMembro(m);
+  const d = $("#digitando");
+  if (id === "orquestrador" && /descans/.test(texto || "")) { d.hidden = true; return; }
+  d.hidden = false; d.innerHTML = `${avatar(id)} <b>${esc(m.nome)}</b> está trabalhando<i></i><i></i><i></i> <span style="opacity:.8">${esc((texto || "").slice(0, 80))}</span>`;
+  d.querySelector(".av").style.cssText = "width:20px;height:20px;font-size:9px";
 }
 
-// ---------- a conversa (fila animada)
-function enfileirar(msg) {
-  if (filtro === "importante" && !IMPORTANTE.has(msg.tom)) { registrar(msg, true); return; }
-  fila.push(msg); if (fila.length > 40) fila.splice(0, fila.length - 40);
-  if (!animando) proxima();
-}
-async function proxima() {
-  animando = true;
-  while (fila.length) {
-    if (vel === 0) { await espera(250); continue; }
-    const msg = fila.shift();
-    registrar(msg, false);
-    await voar(msg);
+// ---------- o canal
+let ultimaPergunta = {};   // por par (de→jev): a pergunta mais recente, para a resposta vir "em resposta a"
+function postar(msg, detalhe) {
+  const box = $("#msgs");
+  const d = dia(msg.em);
+  if (d !== ultimoDia) { ultimoDia = d; box.insertAdjacentHTML("beforeend", `<div class="dia">${esc(d)}</div>`); ultimoGrupo = null; }
+  const perto = ultimoGrupo && ultimoGrupo.dataset.de === msg.de && (msg.em - Number(ultimoGrupo.dataset.em)) < 180;
+  if (!perto) {
+    const m = EQUIPE[msg.de] || {nome: msg.de, cargo: ""};
+    box.insertAdjacentHTML("beforeend", `<div class="grupo" data-de="${esc(msg.de)}" data-em="${msg.em}">${avatar(msg.de)}<div><div class="quem"><b>${esc(m.nome)}</b><small>${esc(m.cargo || "")}</small><time>${hora(msg.em)}</time></div><div class="corpo"></div></div></div>`);
+    ultimoGrupo = box.lastElementChild;
   }
-  animando = false;
+  ultimoGrupo.dataset.em = msg.em;
+  const para = EQUIPE[msg.para] || {nome: msg.para};
+  const tom = msg.tom || "status";
+  let emResposta = "";
+  if (tom === "resposta" && ultimaPergunta[`${msg.para}>${msg.de}`]) emResposta = `<span class="em-resposta">↳ em resposta a “${esc(ultimaPergunta[`${msg.para}>${msg.de}`])}”</span>`;
+  if (tom === "pergunta") ultimaPergunta[`${msg.de}>${msg.para}`] = msg.texto.slice(0, 90);
+  const reacao = tom === "entrega" ? `<span class="reacao">✓ entregue</span>` : tom === "devolucao" ? `<span class="reacao">↩ devolvido</span>` : "";
+  const html = `<div class="msg ${detalhe ? "detalhe" : ""}" data-tom="${tom}" ${detalhe ? 'data-detalhe="1"' : ""} ${detalhe && filtro === "importante" ? "hidden" : ""}>${emResposta}<span class="para">@<b>${esc(para.nome)}</b></span> ${esc(msg.texto)}${TOM_NOME[tom] ? `<span class="tag">${TOM_NOME[tom]}</span>` : ""}${reacao}</div>`;
+  $(".corpo", ultimoGrupo).insertAdjacentHTML("beforeend", html);
+  while (box.children.length > 220) box.firstChild.remove();
+  const noFim = carregando || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  if (noFim || detalhe) box.scrollTop = box.scrollHeight;
+  else if (!detalhe) { naoLidas++; let b = $(".novas", box); if (!b) { b = document.createElement("button"); b.className = "novas"; b.onclick = () => { box.scrollTop = box.scrollHeight; b.remove(); naoLidas = 0; }; box.appendChild(b); } b.textContent = `${naoLidas} nova(s) mensagem(ns) ↓`; }
+  $("#topico").textContent = `${EQUIPE[msg.de]?.nome || msg.de} → ${para.nome}: ${msg.texto.slice(0, 90)}`;
 }
-const espera = ms => new Promise(r => setTimeout(r, ms / (vel || 1)));
-function centro(id) {
-  const el = $(`#m-${id}`); if (!el) return null;
-  const r = el.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, el};
-}
-async function voar(msg) {
-  const de = centro(msg.de), para = centro(msg.para);
-  if (!de || !para) return;
-  de.el.classList.add("falando");
-  if (msg.de === msg.para) { balao(para.el, msg); await espera(900); de.el.classList.remove("falando"); return; }
-  const v = document.createElement("div");
-  v.className = "voo"; v.dataset.tom = msg.tom;
-  v.innerHTML = `<i></i>${esc(msg.texto.slice(0, 48))}${msg.texto.length > 48 ? "…" : ""}`;
-  document.body.appendChild(v);
-  const w = v.offsetWidth, h = v.offsetHeight;
-  v.style.transform = `translate(${de.x - w / 2}px, ${de.y - h / 2}px)`;
-  v.style.transition = `transform ${820 / (vel || 1)}ms cubic-bezier(.3,.7,.3,1)`;
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  v.style.transform = `translate(${para.x - w / 2}px, ${para.y - h / 2}px)`;
-  await espera(860);
-  v.remove(); de.el.classList.remove("falando");
-  para.el.classList.add("recebeu"); balao(para.el, msg);
-  await espera(650); para.el.classList.remove("recebeu");
-}
-function balao(el, msg) {
-  $(".balao", el)?.remove();
-  const b = document.createElement("div"); b.className = "balao"; b.dataset.tom = msg.tom; b.textContent = msg.texto.slice(0, 140);
-  el.appendChild(b); setTimeout(() => b.remove(), 3200 / (vel || 1));
-}
-function registrar(msg, detalhe) {
-  const chat = $("#chat"); $(".vazio-chat", chat)?.remove();
-  const de = EQUIPE[msg.de] || {nome: msg.de, grupo: "qualidade"}, para = EQUIPE[msg.para] || {nome: msg.para, grupo: "qualidade"};
-  const li = document.createElement("li"); li.dataset.tom = msg.tom; if (detalhe) li.dataset.detalhe = "1";
-  if (detalhe && filtro === "importante") li.hidden = true;
-  li.innerHTML = `<span class="av" style="background:${GRUPO_COR[de.grupo] || "var(--idle)"}" aria-hidden="true">${iniciais(de.nome)}</span>
-    <div><div class="quem"><b>${esc(de.nome)}</b><span class="seta">→</span><b>${esc(para.nome)}</b><span class="tom">${TOM_NOME[msg.tom] || msg.tom}</span><time>${hora(msg.em)}</time></div><div class="txt">${esc(msg.texto)}</div></div>`;
-  chat.appendChild(li);
-  while (chat.children.length > 160) chat.firstChild.remove();
-  chat.scrollTop = chat.scrollHeight;
-}
-function aplicarFiltro() {
-  $("#chat").querySelectorAll("li[data-detalhe]").forEach(li => { li.hidden = filtro === "importante"; });
-}
+function aplicarFiltro() { $("#msgs").querySelectorAll(".msg[data-detalhe]").forEach(li => { li.hidden = filtro === "importante"; }); }
 
 // eventos do fluxo (etapa, decisão, LLM, verificação, erro) viram mensagens também
 function doFluxo(e) {
   if (e.tipo === "etapa") {
     if (e.agente === "descanso") { marcarAtivo("orquestrador", `giro ${e.tick} terminou; descansando`); return; }
     marcarAtivo(e.agente, e.texto);
-    if (e.de && e.de !== "descanso" && membro(e.de) !== membro(e.agente)) enfileirar({tipo: "mensagem", em: e.em, de: "orquestrador", para: e.agente, tom: "status", texto: `Sua vez: ${e.texto}`});
+    if (e.de && e.de !== "descanso" && membro(e.de) !== membro(e.agente)) postar({em: e.em, de: "orquestrador", para: e.agente, tom: "status", texto: `sua vez: ${e.texto}`}, true);
     return;
   }
   if (e.tipo === "decisao") {
     const [perg, resp] = String(e.texto).replace(/^perguntou ao Jev: /, "").split(" → ");
-    enfileirar({tipo: "mensagem", em: e.em, de: e.agente, para: "jev", tom: "pergunta", texto: perg || e.texto});
-    enfileirar({tipo: "mensagem", em: e.em + .1, de: e.decidiu === "llm" ? "llm" : "jev", para: e.agente, tom: "resposta",
-                texto: (resp || "") + (e.decidiu === "local" ? " (fiquei em dúvida; a regra decidiu)" : "")});
+    postar({em: e.em, de: e.agente, para: "jev", tom: "pergunta", texto: perg || e.texto}, true);
+    postar({em: e.em + .1, de: e.decidiu === "llm" ? "llm" : "jev", para: e.agente, tom: "resposta", texto: (resp || "") + (e.decidiu === "local" ? " (fiquei em dúvida; a regra decidiu)" : "")}, true);
     return;
   }
   if (e.tipo === "llm") {
-    enfileirar({tipo: "mensagem", em: e.em, de: e.agente, para: "llm", tom: "pergunta", texto: e.texto});
-    enfileirar({tipo: "mensagem", em: e.em + .1, de: "llm", para: e.agente, tom: e.ok === false ? "devolucao" : "resposta", texto: e.ok === false ? "A chamada falhou." : "Resposta pronta."});
+    postar({em: e.em, de: e.agente, para: "llm", tom: "pergunta", texto: e.texto}, true);
+    postar({em: e.em + .1, de: "llm", para: e.agente, tom: e.ok === false ? "devolucao" : "resposta", texto: e.ok === false ? "a chamada falhou." : "resposta pronta."}, true);
     return;
   }
-  if (e.tipo === "verificacao") {
-    if (e.ok) { registrar({em: e.em, de: e.agente, para: e.para || e.agente, tom: "status", texto: e.texto}, true); return; }
-    enfileirar({tipo: "mensagem", em: e.em, de: e.para === "github" ? "github" : e.agente, para: e.agente, tom: "devolucao", texto: e.texto});
-    return;
-  }
-  if (e.tipo === "erro") enfileirar({tipo: "mensagem", em: e.em, de: e.agente, para: "licoes", tom: "alerta", texto: e.texto});
+  if (e.tipo === "verificacao") { postar({em: e.em, de: e.para === "github" ? "github" : e.agente, para: e.agente, tom: e.ok ? "status" : "devolucao", texto: e.texto}, e.ok); return; }
+  if (e.tipo === "erro") postar({em: e.em, de: e.agente, para: "licoes", tom: "alerta", texto: e.texto});
+}
+function doMensagem(m) {
+  postar(m, !IMPORTANTE.has(m.tom));
+  if (m.item && m.coluna && !carregando) moverCard(m.item, m.coluna, m.de, m.tom, m);   // na reprise inicial o quadro vem do retrato
+  if (m.tom === "entrega" && m.pergunta == null && /virou o item|Planejei o item/.test(m.texto)) retrato();
 }
 
-// ---------- o quadro (FLIP)
+// ---------- o quadro: em tempo real, com quem move o cartão
 function desenharQuadro(r) {
+  if (animandoQuadro) return;
   const cols = $("#colunas");
-  posAntes = {}; cols.querySelectorAll(".card").forEach(c => { posAntes[c.dataset.id] = {r: c.getBoundingClientRect(), col: c.closest(".coluna").dataset.k}; });
-  cols.innerHTML = r.quadro.map(c => `<div class="coluna" data-k="${c.chave}"><h4><span>${esc(c.nome)}</span><span class="n">${c.cards.length}</span></h4>
-    ${c.cards.map(k => `<div class="card" data-id="${esc(k.id)}" title="${esc(k.evidencia)}"><span class="id">${String(k.id).startsWith("p") ? "pergunta" : "item"} #${String(k.id).replace(/^p/, "")}${k.pr ? ` · PR #${k.pr}` : ""}</span>
-      <span class="dono" style="background:${GRUPO_COR[(EQUIPE[k.dono] || {}).grupo] || "var(--idle)"}" title="${esc((EQUIPE[k.dono] || {}).nome || k.dono)}">${iniciais((EQUIPE[k.dono] || {}).nome || k.dono)}</span>
-      <div>${esc(k.titulo)}</div><span class="ev">${esc(k.evidencia)}</span></div>`).join("") || `<div class="nada">—</div>`}</div>`).join("");
+  const antes = {}; cols.querySelectorAll(".card").forEach(c => { antes[c.dataset.id] = {r: c.getBoundingClientRect(), col: c.closest(".coluna").dataset.k}; });
+  cols.innerHTML = r.quadro.map(c => `<div class="coluna" data-k="${c.chave}"><h4><span>${esc(c.nome)}</span><span class="n">${c.cards.length}</span></h4><div class="cards">
+    ${c.cards.slice(0, 8).map(k => cardHtml(k)).join("")}</div>${c.cards.length > 8 ? `<div class="nada">+ ${c.cards.length - 8} na fila</div>` : ""}${c.cards.length ? "" : `<div class="nada">—</div>`}</div>`).join("");
   let moveu = 0;
   cols.querySelectorAll(".card").forEach(c => {
-    const a = posAntes[c.dataset.id]; if (!a) return;
+    const a = antes[c.dataset.id]; if (!a) return;
     const col = c.closest(".coluna").dataset.k; if (a.col === col) return;
     const b = c.getBoundingClientRect(), dx = a.r.left - b.left, dy = a.r.top - b.top;
     c.style.transition = "none"; c.style.transform = `translate(${dx}px,${dy}px)`; c.classList.add("mudou"); moveu++;
     requestAnimationFrame(() => requestAnimationFrame(() => { c.style.transition = ""; c.style.transform = ""; setTimeout(() => c.classList.remove("mudou"), 1600); }));
   });
   const total = r.quadro.reduce((n, c) => n + c.cards.length, 0);
-  $("#quadroMeta").textContent = `· ${total} cartão(ões)${moveu ? ` · ${moveu} mudou de coluna agora` : ""}`;
+  $("#quadroMeta").textContent = `· ${total} cartão(ões)${moveu ? ` · ${moveu} mudou de coluna` : ""}`;
+}
+function cardHtml(k) {
+  return `<div class="card" data-id="${esc(k.id)}" title="${esc(k.evidencia)}"><span class="id">${String(k.id).startsWith("p") ? "pergunta" : "item"} #${String(k.id).replace(/^p/, "")}${k.pr ? ` · PR #${k.pr}` : ""}</span>
+    ${avatar(k.dono, "dono")}<div>${esc(k.titulo)}</div><span class="ev">${esc(k.evidencia)}</span></div>`;
+}
+async function moverCard(itemId, coluna, quem, tom, m) {
+  const cols = $("#colunas"), destino = cols.querySelector(`.coluna[data-k="${coluna}"] .cards`);
+  let card = cols.querySelector(`.card[data-id="${itemId}"]`);
+  if (coluna === "fora") { if (card) { card.classList.add("saiu"); setTimeout(() => card.remove(), 500); } return; }
+  if (!destino) return;
+  if (!card) {   // cartão ainda não conhecido pelo quadro: nasce já na coluna certa (respeitando o teto da coluna)
+    if (destino.querySelectorAll(".card").length >= LIMITE_COLUNA) { contar(); return; }
+    destino.insertAdjacentHTML("afterbegin", cardHtml({id: itemId, titulo: (m.texto.split(": ")[1] || m.texto).slice(0, 110), dono: quem, pr: m.pr, evidencia: m.texto.slice(0, 140)}));
+    card = destino.firstElementChild; card.classList.add("mudou"); setTimeout(() => card.classList.remove("mudou"), 1600);
+    contar(); return;
+  }
+  if (card.closest(".coluna").dataset.k === coluna) { card.classList.add("mudou"); setTimeout(() => card.classList.remove("mudou"), 1200); return; }
+  animandoQuadro = true;
+  try {
+    const a = card.getBoundingClientRect();
+    // quem move vai "carregando" o cartão: o avatar voa do membro até o cartão, e o cartão desliza até a coluna nova
+    const quemEl = $(`#m-${quem} .av`);
+    if (quemEl) {
+      const q = quemEl.getBoundingClientRect(), v = document.createElement("span");
+      v.className = `av voo g-${(EQUIPE[quem] || {}).grupo || "qualidade"}`; v.textContent = iniciais((EQUIPE[quem] || {}).nome || quem);
+      v.style.transform = `translate(${q.left}px,${q.top}px)`; document.body.appendChild(v);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      v.style.transition = "transform .6s cubic-bezier(.3,.7,.3,1)"; v.style.transform = `translate(${a.right - 20}px,${a.top - 6}px)`;
+      await new Promise(r => setTimeout(r, 620)); v.remove();
+    }
+    const dono = $(".dono", card); if (dono) { dono.className = `av dono g-${(EQUIPE[quem] || {}).grupo || "qualidade"} carrega`; dono.textContent = iniciais((EQUIPE[quem] || {}).nome || quem); }
+    destino.closest(".coluna").classList.add("recebe");
+    destino.insertBefore(card, destino.firstChild);
+    const b = card.getBoundingClientRect();
+    card.style.transition = "none"; card.style.transform = `translate(${a.left - b.left}px,${a.top - b.top}px)`; card.classList.add("mudou");
+    if (tom === "devolucao") card.style.borderColor = "var(--bad)";
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    card.style.transition = ""; card.style.transform = "";
+    await new Promise(r => setTimeout(r, 700));
+    destino.closest(".coluna").classList.remove("recebe"); dono?.classList.remove("carrega");
+    setTimeout(() => { card.classList.remove("mudou"); card.style.borderColor = ""; }, 1200);
+    contar();
+  } finally { animandoQuadro = false; }
+}
+function contar() {
+  $("#colunas").querySelectorAll(".coluna").forEach(c => { const n = c.querySelectorAll(".card").length; $(".n", c).textContent = n; const nada = $(".nada", c); if (nada) nada.hidden = n > 0 && !/na fila/.test(nada.textContent); });
 }
 
 // ---------- ligação com o painel
 async function retrato() {
   try {
     const r = await (await fetch("/api/equipe")).json();
-    ultimoRetrato = r; desenharSala(r); desenharQuadro(r);
+    ultimoRetrato = r; desenharMembros(r); desenharQuadro(r);
     $("#estado").dataset.s = r.rodando ? "ao_vivo" : "parado"; $("#estadoTxt").textContent = r.rodando ? "ao vivo" : "loop parado";
     const t = $("#topoEstado"); if (t) t.textContent = r.rodando ? `ao vivo · giro ${r.tick}` : "loop parado";
   } catch { $("#estado").dataset.s = ""; $("#estadoTxt").textContent = "sem conexão com o painel"; }
 }
 function ligar() {
-  const es = new EventSource("/api/fluxo/eventos?voltar=40&minutos=30");
-  es.addEventListener("mensagem", ev => { try { enfileirar(JSON.parse(ev.data)); } catch {} });
+  const es = new EventSource("/api/fluxo/eventos?voltar=40&minutos=45");
+  es.addEventListener("mensagem", ev => { try { doMensagem(JSON.parse(ev.data)); } catch {} });
   es.addEventListener("fluxo", ev => { try { doFluxo(JSON.parse(ev.data)); } catch {} });
   es.addEventListener("agora", ev => { try { const a = JSON.parse(ev.data); if (a && a.agente) marcarAtivo(a.agente, a.texto || a.detalhe); } catch {} });
   es.onerror = () => { $("#estadoTxt").textContent = "reconectando…"; $("#estado").dataset.s = ""; };
 }
-document.querySelectorAll("[data-vel]").forEach(b => b.addEventListener("click", () => { vel = Number(b.dataset.vel); document.querySelectorAll("[data-vel]").forEach(x => x.setAttribute("aria-pressed", x === b)); }));
 document.querySelectorAll("[data-filtro]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.filtro; document.querySelectorAll("[data-filtro]").forEach(x => x.setAttribute("aria-pressed", x === b)); aplicarFiltro(); }));
-retrato().then(() => { ligar(); setInterval(retrato, 6000); });
+retrato().then(() => { ligar(); setInterval(retrato, 4000); setTimeout(() => { carregando = false; }, 5000); });
 </script>
 </body>
 </html>

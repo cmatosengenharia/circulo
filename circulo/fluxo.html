@@ -133,7 +133,7 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute
 .topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 a.back{display:none !important}
-@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links a{padding:6px 8px;font-size:13px}.topo-estado{display:none}}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
 .btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
@@ -381,7 +381,7 @@ function renderAgentes(lista) {
 
 function renderJev(j) {
   const PERG = {worth_spending: "Vale gastar agora?", idle_task: "Qual tarefa agora?", should_evolve: "A evidência justifica evoluir?",
-    pick_model: "Qual modelo basta?", review_code: "O PR pode entrar?", should_run_idle: "Vale rodar a manutenção?", evidencia_sustenta: "A evidência sustenta?", indaga_pert: "Indagador: a pergunta é pertinente?", indaga_eixo: "Indagador: que eixo evolui?", indaga_acao: "Indagador: dá para agir?", pergunta_evolucao: "Qual pergunta do conselho?", dado_na_evidencia: "O dado está na evidência?"};
+    pick_model: "Qual modelo basta?", review_code: "O PR pode entrar?", should_run_idle: "Vale rodar a manutenção?", evidencia_sustenta: "A evidência sustenta?", indaga_pert: "Product owner: a pergunta é pertinente?", indaga_eixo: "Product owner: que eixo evolui?", indaga_acao: "Product owner: dá para agir?", pergunta_evolucao: "Qual pergunta do conselho?", dado_na_evidencia: "O dado está na evidência?"};
   const linhas = (j.perguntas || []).map(p => `<div class="lin"><span title="${esc(p.pergunta)}">${esc(PERG[p.pergunta] || p.pergunta.replace(/_/g, " "))}
       <span style="color:var(--muted);font-size:12px">· Jev ${p.jev || 0} · regra ${p.regra || 0}${p.llm ? " · LLM " + p.llm : ""}</span></span>
       <span class="barra" title="confiança média do Jev"><b style="width:${Math.round((p.conf_jev || 0) * 100)}%"></b></span>

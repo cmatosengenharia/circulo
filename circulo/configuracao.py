@@ -162,17 +162,17 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
         p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else "Confira ANTHROPIC_API_KEY."))
     gh = bool(os.environ.get("GITHUB_TOKEN") and os.environ.get("CIRCULO_REPO"))
     if not gh:
-        p.append(Peca("Gate de merge", "parado", "sem GITHUB_TOKEN/CIRCULO_REPO", "Preencha GITHUB_TOKEN e CIRCULO_REPO."))
+        p.append(Peca("QA e release (merge)", "parado", "sem GITHUB_TOKEN/CIRCULO_REPO", "Preencha GITHUB_TOKEN e CIRCULO_REPO."))
     else:
         ok, det = _github_ok() if testar_conexoes else (True, "PRs de agente avaliados e mergeados sozinhos (use --testar para chamar a API)")
-        p.append(Peca("Gate de merge", "ligado" if ok else "parado", det,
+        p.append(Peca("QA e release (merge)", "ligado" if ok else "parado", det,
                       "" if ok else "Confira o GITHUB_TOKEN: só o repo circulo, Contents e Pull requests em escrita; Checks (ou Actions) em leitura."))
     repo = os.environ.get("CIRCULO_REPO_DIR")
     claude = shutil.which(os.environ.get("CIRCULO_CODE_AGENT", "claude"))
     dev_ok = bool(repo and (Path(repo) / ".git").exists() and claude)
     falta = [x for x, ok in (("CIRCULO_REPO_DIR (clone do repo)", repo and (Path(repo) / ".git").exists()),
                               ("Claude Code (comando `claude`)", claude)) if not ok]
-    p.append(Peca("Developer (corrige o próprio código)", "ligado" if dev_ok else "parado",
+    p.append(Peca("Desenvolvedor (corrige o próprio código)", "ligado" if dev_ok else "parado",
                   "pega erros e pedidos do roteiro e abre PR" if dev_ok else "falta: " + ", ".join(falta),
                   "" if dev_ok else "Clone o repo, aponte CIRCULO_REPO_DIR e instale o Claude Code."))
     sistema = platform.system()
@@ -187,7 +187,7 @@ def registrar(store, pecas: list[Peca]) -> None:
     store.set("configuracao", {"em": time.time(), "pecas": [asdict(x) for x in pecas]})
     estado = {x.nome: x.estado for x in pecas}
     chaves_ok = estado.get("Motor das missões (LLM)") == "ligado" and estado.get("Jev (decisões)") == "ligado"
-    if chaves_ok and estado.get("Developer (corrige o próprio código)") == "ligado" and estado.get("Gate de merge") == "ligado":
+    if chaves_ok and estado.get("Desenvolvedor (corrige o próprio código)") == "ligado" and estado.get("QA e release (merge)") == "ligado":
         store.x("UPDATE roadmap SET status='feito', evidencia='diagnóstico: tudo ligado' WHERE titulo LIKE 'Ligar as chaves%'")
     elif chaves_ok:
         store.x("UPDATE roadmap SET status='parcial', evidencia='diagnóstico: Jev e LLM ligados; falta Developer/Gate · depende de você' "
