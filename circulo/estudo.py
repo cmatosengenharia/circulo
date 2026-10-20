@@ -21,7 +21,6 @@ estudo LEVE (1 busca); pedido seu tem estudo COMPLETO (4 buscas). O custo que o 
 from __future__ import annotations
 
 import json
-import re
 import time
 
 from .agents import Ctx
@@ -234,16 +233,48 @@ class Estudo:
         return True
 
 
-def _parse(texto: str) -> dict | None:
-    m = re.search(r"\{.*\}", texto or "", re.S)
-    if not m:
-        return None
+def _decodificar(texto: str) -> tuple[dict | None, bool]:
+    """O objeto JSON da resposta e se ele veio cortado (limite de tokens): no corte, vale o último valor completo."""
+    ini = (texto or "").find("{")
+    if ini < 0:
+        return None, False
+    s = texto[ini:]
     try:
-        d = json.loads(m.group(0))
+        return json.JSONDecoder().raw_decode(s)[0], False
     except json.JSONDecodeError:
-        return None
+        pass
+    pilha, cortes, na_string, escape = [], [], False, False
+    for i, c in enumerate(s):
+        if na_string:
+            escape, na_string = (False, True) if escape else (c == "\\", c != '"')
+        elif c == '"':
+            na_string = True
+        elif c in "{[":
+            pilha.append("}" if c == "{" else "]")
+        elif c in "}]" and pilha:
+            pilha.pop()
+        elif c == ",":
+            cortes.append((i, "".join(reversed(pilha))))
+    for i, fecho in reversed(cortes):
+        try:
+            return json.loads(s[:i] + fecho), True
+        except json.JSONDecodeError:
+            continue
+    return None, False
+
+
+def _parse(texto: str) -> dict | None:
+    d, cortado = _decodificar(texto)
     if not isinstance(d, dict) or d.get("veredito") not in ("adotar", "adaptar", "contestar"):
         return None
+    if cortado:
+        if not d.get("justificativa"):
+            return None
+        d["cortado"] = True
+        novo = d.get("item") if isinstance(d.get("item"), dict) else {}
+        if d["veredito"] == "adaptar" and not (novo.get("titulo") and novo.get("detalhe") and novo.get("sucesso")):
+            d["rebaixado"] = "adaptar com o item novo cortado pelo limite de tokens: adotado como pedido"
+            d["veredito"] = "adotar"
     d["achados"] = [a for a in d.get("achados") or [] if isinstance(a, dict)]
     d["justificativa"] = str(d.get("justificativa") or "")
     d["item"] = d.get("item") if isinstance(d.get("item"), dict) else {}
