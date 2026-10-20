@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.40.1 — 2026-10-20
+
+**Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17):** o loop não estava travado nem na 1.32.1 — rodava a
+1.39.0 (reiniciou às 14:04 depois de puxar o `abcad8d`, 5 giros de prova ok). Dois problemas reais por trás da impressão:
+
+- **A versão do painel era fixa.** `circulo/__init__.py` tinha `__version__ = "1.32.1"` escrito à mão e o painel
+  mostrava isso. Agora `__version__` é lida do `pyproject.toml` (fonte única); teste garante que as duas batem.
+- **O Desenvolvedor estava deslogado do Claude Code.** O agente respondia em 26 ms "Failed to authenticate: OAuth
+  session expired and could not be refreshed"; o loop tentava o mesmo item a cada giro (9 vezes em 15 min, lição
+  #42 subindo de camada) sem sair do lugar e sem avisar você. Agora essa resposta é tratada como o limite da conta:
+  o Desenvolvedor espera 30 min antes de tentar de novo, o SRE mostra a trava, e **"Precisa de você" abre no topo**:
+  "Desenvolvedor parado: Claude Code deslogado no Mac — abra o Terminal, rode `claude` e faça login".
+
 ## 1.40.0 — 2026-10-20
 
 **O Redator técnico: documentação profissional do loop, gerada da autoevolução e publicada por PR.**

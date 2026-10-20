@@ -48,6 +48,10 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
     for r in store.q("SELECT id, titulo, evidencia, updated_at FROM roadmap WHERE status='contestado' ORDER BY updated_at DESC"):
         out.append(_item("item_contestado", f"Item #{r['id']} contestado pelo estudo: {r['titulo']}", r["evidencia"], r["updated_at"],
                          [{"acao": "reafirmar_item", "rotulo": "Executar mesmo assim"}, {"acao": "desativar_item", "rotulo": "Deixar de lado"}], 1, ref=r["id"], link="/loop#evolucao"))
+    esp = store.get("self_dev_espera") or {}
+    if esp.get("precisa_de_voce") and float(esp.get("ate", 0)) > agora:
+        out.append(_item("developer_parado", "Desenvolvedor parado: " + str(esp.get("motivo", "")), f"Nenhum item do roteiro anda até isso ser resolvido; o loop tenta de novo às {esp.get('hora', '?')}.",
+                         None, [], 0, link="/loop"))
     q = store.get("quarentena") or {}
     for etapa, v in q.items():
         if isinstance(v, dict) and int(v.get("ate_tick", 0)) > store.tick:

@@ -41,6 +41,7 @@ EST_TOKENS = 40_000
 # item rejeitado pelo Revisor por cruzar com um PR aberto espera aquele PR fechar antes de voltar à fila do Developer
 ESPERA_PR = (" AND NOT EXISTS (SELECT 1 FROM prs WHERE prs.status='aberto' AND roadmap.evidencia LIKE 'aguarda PR #' || prs.number || ':%')")
 MAX_CONSERTOS = 2
+ESPERA_DESLOGADO = 30 * 60   # Claude Code sem login: tenta de novo em 30 min (e o "Precisa de você" avisa na hora)
 MAX_CORRECOES_LOCAIS = 1
 MAX_SESSOES = 4             # sessões interrompidas no mesmo item antes de registrar "grande demais" (lição de trabalho)    # barrado antes do PR: o Developer corrige no mesmo worktree antes de desistir
 LINT_CMD = ["-m", "ruff", "check", "circulo", "tests", "--select", "E,F,W,B", "--ignore", "E501"]   # o mesmo do CI
@@ -425,13 +426,16 @@ class SelfDeveloper:
         return out
 
     def _limite(self, out: dict) -> str | None:
-        """Agente parou no limite da conta: guarda até quando esperar. Devolve o horário (texto) ou None."""
-        ate = limite_ate(str(out.get("log", "")), time.time())
+        """Agente parou no limite da conta (ou deslogou): guarda até quando esperar. Devolve o horário (texto) ou None."""
+        log = str(out.get("log", ""))
+        ate, motivo = limite_ate(log, time.time()), "limite de uso do Claude Code"
+        if ate is None and re.search(r"Failed to authenticate|OAuth session expired|not logged in|please run /login", log, re.I):
+            ate, motivo = time.time() + ESPERA_DESLOGADO, "Claude Code deslogado no Mac: abra o Terminal, rode `claude` e faça login"
         if ate is None:
             return None
         from datetime import datetime
         hora = datetime.fromtimestamp(ate, TZ).strftime("%H:%M")
-        self.s.set("self_dev_espera", {"ate": ate, "motivo": "limite de uso do Claude Code", "hora": hora})
+        self.s.set("self_dev_espera", {"ate": ate, "motivo": motivo, "hora": hora, "precisa_de_voce": motivo.startswith("Claude Code deslogado")})
         return hora
 
     # ------------------------------------------------------------ um ciclo do Developer

@@ -438,3 +438,33 @@ def test_assinatura_do_limite_e_estavel():
     a = assinatura_de("developer:agente", '{"disabled_reason":"x","api_error_status":429,"result":"hit your session limit"}')
     b = assinatura_de("developer:agente", '{"subagent_stats":{},"api_error_status":429}')
     assert a == b == "developer:agente:limite_de_uso"
+
+
+def test_claude_code_deslogado_espera_30_min_e_pede_voce(circle, repo):
+    """No Mac (20/10): o agente respondia em 26 ms "Failed to authenticate: OAuth session expired" e o loop tentava o mesmo
+    item a cada giro, 9 vezes, sem sair do lugar. Agora: espera 30 min e o "Precisa de você" mostra o que fazer."""
+    from circulo import aprovacoes
+    from circulo.self_dev import ESPERA_DESLOGADO
+
+    class Deslogado(FixAgent):
+        def run(self, task, workdir):
+            super().run(task, workdir)
+            return {"ok": False, "tokens": 0, "log": '{"is_error":true,"num_turns":1,"result":"Failed to authenticate: OAuth session expired and could not be refreshed"}'}
+    item = erro_recorrente(circle)
+    dev = SelfDeveloper(circle.ctx, repo, Deslogado(), FakeGH(), test_cmd=TEST_CMD)
+    r = dev.run_once()
+    assert r.status == "limite" and dev.em_espera() and not dev.tem_trabalho()
+    e = circle.store.get("self_dev_espera")
+    import time as _t
+    assert e["precisa_de_voce"] and "deslogado" in e["motivo"] and 0 < e["ate"] - _t.time() <= ESPERA_DESLOGADO
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == "pendente"
+    pend = aprovacoes.pendentes(circle.store, diagnostico=False)
+    assert pend[0]["tipo"] == "developer_parado" and "claude" in pend[0]["titulo"] and pend[0]["prioridade"] == 0
+
+
+def test_versao_do_painel_e_a_do_pyproject():
+    import re
+    from pathlib import Path
+    import circulo
+    pyproject = (Path(circulo.__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    assert circulo.__version__ == re.search(r'^version = "([^"]+)"', pyproject, flags=re.M).group(1)
