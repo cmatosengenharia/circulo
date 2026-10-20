@@ -48,12 +48,13 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.11.0 | 2026-10-18 | Orçamento contado errado | 4 |
 | 1.10.0 | 2026-10-18 | perceber | 13 |
 
-## Entregas do loop (32 PRs mergeados)
+## Entregas do loop (33 PRs mergeados)
 
-Por tipo: **funcionalidade** 9 · **correcao** 8 · **observabilidade** 7 · **seguranca** 5 · **documentacao** 2 · **velocidade** 1.
+Por tipo: **correcao** 11 · **observabilidade** 10 · **seguranca** 5 · **documentacao** 4 · **funcionalidade** 2 · **velocidade** 1.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #34 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #33 | 20/10/2026 | correcao (87%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #32 | 20/10/2026 | correcao (47%) | sim | Developer: classificar a causa de cada falha de testes e rodar pré-voo dos testes afetados na main antes de ga | pergunta do operador: “O neurônio developer:testes foi barrado 6 de 22 vezes em 24 h: qual é a causa qu” |
 | #31 | 20/10/2026 | velocidade (38%) | sim | Vigia: drenar sozinho a pergunta validada mais antiga quando a fila passa do prazo, 1 por ciclo | pergunta do operador: “O Vigia mede a trava “6 pergunta(s) validada(s) pelo Jev esperando há 31 min sem” |
@@ -78,11 +79,11 @@ Por tipo: **funcionalidade** 9 · **correcao** 8 · **observabilidade** 7 · **s
 | #11 | 18/10/2026 | documentacao (0%) | sim | Developer: ruff --fix determinístico + 1 rodada de reparo com saída focada antes do PR | — |
 | #10 | 18/10/2026 | correcao (64%) | — | Expor métricas do loop via prometheus_client (/metrics) e dashboard Grafana opcional | — |
 | #9 | 18/10/2026 | observabilidade (94%) | sim | Replay em lote priorizado e calibrado para worth_spending, validado em dados retidos | — |
-| #8 | 18/10/2026 | funcionalidade (0%) | — | Trilha de eventos tipados do loop + painel de timeline e grafo de agentes/workflow | — |
-| #7 | 18/10/2026 | funcionalidade (0%) | — | Dash do loop em camadas: saúde no topo, todas as etapas em tempo real, drill-down por run_id | — |
-| #6 | 18/10/2026 | funcionalidade (0%) | — | Central de confiança: 3 níveis Endsley, sinais de ouro, trilha write-ahead e parada testada | — |
-| #5 | 18/10/2026 | funcionalidade (0%) | — | Lição #2: corpo:atualizar: >       with pytest.raises(RuntimeError):                                  # o erro | — |
-| #4 | 18/10/2026 | funcionalidade (0%) | — | Lição #1: Corrigir erro: RuntimeError em idle:atualizar_corpo | — |
-| #3 | 18/10/2026 | funcionalidade (0%) | — | Jev aprende worth_spending imitando a regra quando está em dúvida | — |
-| #2 | 18/10/2026 | funcionalidade (0%) | — | a escolha do modelo deve ser decidida pelo jev, dependendo da complexidade da tarefa | — |
-| #1 | 18/10/2026 | funcionalidade (0%) | — | Perguntas do Jev e portfólio evoluindo sozinhos | — |
+| #8 | 18/10/2026 | observabilidade (76%) | sim | Trilha de eventos tipados do loop + painel de timeline e grafo de agentes/workflow | — |
+| #7 | 18/10/2026 | observabilidade (98%) | sim | Dash do loop em camadas: saúde no topo, todas as etapas em tempo real, drill-down por run_id | — |
+| #6 | 18/10/2026 | observabilidade (99%) | sim | Central de confiança: 3 níveis Endsley, sinais de ouro, trilha write-ahead e parada testada | — |
+| #5 | 18/10/2026 | correcao (80%) | sim | Lição #2: corpo:atualizar: >       with pytest.raises(RuntimeError):                                  # o erro | — |
+| #4 | 18/10/2026 | correcao (89%) | — | Lição #1: Corrigir erro: RuntimeError em idle:atualizar_corpo | — |
+| #3 | 18/10/2026 | correcao (56%) | — | Jev aprende worth_spending imitando a regra quando está em dúvida | — |
+| #2 | 18/10/2026 | funcionalidade (45%) | sim | a escolha do modelo deve ser decidida pelo jev, dependendo da complexidade da tarefa | — |
+| #1 | 18/10/2026 | documentacao (48%) | sim | Perguntas do Jev e portfólio evoluindo sozinhos | — |

@@ -5,14 +5,15 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
+| 22 | estudo:saida_invalida | estrutural | reincidente | 10 | 2 | Já corrigido (PR #33 mergeado); não repetir: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/a |
 | 15 | rastro:lacuna | trabalho | validada | 6 | 2 | arquitetura (erro impossível): rastro:cadeia: item planejado pelo loop sem a pergunta do conselho que o originou |
 | 18 | developer:agente:s fast_mode_state:off fast_mode_disabled_reason:sd | trabalho | reincidente | 3 | 2 | arquitetura (erro impossível): developer:agente: s","fast_mode_state":"off","fast_mode_disabled_reason":"sdk_opt_in_requ |
-| 22 | estudo:saida_invalida | estrutural | evidenciada | 9 | 1 | Já corrigido (PR #33 mergeado); não repetir: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/a |
 | 9 | developer:testes:ImportError | trabalho | validada | 2 | 1 | CI (teste ou lint): developer:testes: ==================================== ERRORS ==================================== |
 | 26 | developer:reparo:- aprendido#n: teste tests/test_vigia_trava_estado | trabalho | reincidente | 2 | 1 | CI (teste ou lint): developer:reparo: ERROR: file or directory not found: tests/test_vigia_trava_estado.py::test_200_dec |
 | 27 | developer:abrir_pr:- aprendido#n: teste tests/test_vigia_trava_estado | trabalho | aberta | 128 | 0 | CI (teste ou lint): developer:abrir_pr: ERROR: file or directory not found: tests/test_vigia_trava_estado.py::test_200_d |
-| 42 | developer:agente:d_reason:sdk_opt_in_required subagent_stats: spawn | trabalho | aberta | 13 | 0 | CI (teste ou lint): developer:agente: d_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"backgr |
+| 42 | developer:agente:d_reason:sdk_opt_in_required subagent_stats: spawn | trabalho | aberta | 14 | 0 | CI (teste ou lint): developer:agente: d_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"backgr |
 | 7 | developer:testes:teste:tests/test_jev_replay.py::test_200_decisoes_do_ | trabalho | evidenciada | 7 | 0 | Fechada: tests/test_jev_replay.py::test_200_decisoes_do_worth_spending_saem_da_duvida_concordando_com_a_regra passou no  |
+| 43 | incidente:da69e2d5c9071056 | estrutural | aberta | 7 | 0 | CI (teste ou lint): execucao:meta: JSONDecodeError: Unterminated string starting at: line 1 column 60 (char 59) |
 | 29 | developer:sub_item_falhou | trabalho | aberta | 6 | 0 | CI (teste ou lint): developer:fatiador: sub-item #60 “Extrair features das tentativas do planejador (minutos, categoria, |
 | 33 | developer:testes:teste:tests/test_espera.py::test_pr_29_reexecucao_de_ | trabalho | obsoleta | 4 | 0 | Não repetir: developer:testes: tests/test_espera.py:55: in test_pr_29_reexecucao_de_ci_por_atraso_da_main_e_a_espera_evi |
 | 37 | developer:testes:teste:tests/test_reparo.py::test_commit_na_constituic | trabalho | obsoleta | 4 | 0 | Não repetir: developer:testes: tests/test_reparo.py:212: in test_commit_na_constituicao_depois_da_ultima_rodada_e_revert |
@@ -46,3 +47,4 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 38 | developer:lint:tests/test_fatiador.py:n:n: invalid-syntax: unexpe | trabalho | aberta | 1 | 0 | Não repetir: developer:lint: tests/test_fatiador.py:68:1: invalid-syntax: Unexpected indentation |
 | 39 | developer:reparo:- lint e testes iguais ao ci : tests/test_fatiador | trabalho | aberta | 1 | 0 | Não repetir: developer:reparo: ERROR: file or directory not found: tests/test_vigia_trava_estado.py::test_200_decisoes_d |
 | 41 | developer:base:teste:tests/test_loop.py::test_run_forever_respeita_max | trabalho | validada | 1 | 0 | Fechada: tests/test_loop.py::test_run_forever_respeita_max_ticks passou no main (sha 5699c3c2b39b, exit 0 em 2 execuções |
+| 44 | corpo:regressao_pos_atualizacao | estrutural | aberta | 1 | 0 | Não repetir: corpo:evidencia: erros nos primeiros giros do código novo: ['meta:JSONDecodeError(\'Unterminated string sta |
