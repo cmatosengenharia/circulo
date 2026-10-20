@@ -15,7 +15,8 @@ Limites:
   MAX_TENTATIVAS ou IDADE_MAX, e então (ou na hora, se a falha é permanente) vai para a quarentena com o motivo;
 - o Jev decide antes se vale o gasto (worth_spending) e qual modelo usar (pick_model);
 - título repetido de item que já existe é descartado;
-- a constituição continua fora do alcance (o gate recusa).
+- a constituição continua fora do alcance: item que cita um caminho dela é vetado aqui, antes do Developer (o gate
+  recusaria o PR).
 """
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ import urllib.error
 
 from .agents import Ctx
 from .decision import Question, norm
+from .merge_gate import CONSTITUICAO
 
 MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
 FREIO_POR_DIA = 6           # teto quando a qualidade cai (maioria dos últimos PRs fechada sem merge)
@@ -65,7 +67,7 @@ arquiteto, auditor, cético, financeiro). Responda à pergunta com UM item de ro
 - não repita o que já existe: o roteiro mostra o que já foi feito, e se a resposta já está no código, diga isso;
 - caiba em um PR pequeno (até ~300 linhas) com teste de regressão;
 - tenha um critério de sucesso mensurável nos dados do próprio loop;
-- não altere a constituição (merge_gate.py, policy.py, budget.py, guardrails.py, self_dev.py, .github/);
+- não altere nem cite a constituição (""" + ", ".join(CONSTITUICAO) + """): item que cita um desses caminhos é vetado;
 - não repita um item que já está no roteiro.
 
 Marque a base do problema que o item resolve: "medido" (um número da evidência do loop mostra o problema), "inferido"
@@ -271,6 +273,14 @@ class Planejador:
         if not item:
             conselho.marcar(pid, "descartada")
             return pid, "descartada", "resposta sem JSON válido", None
+        from .neuronios import cita_constituicao
+        const = cita_constituicao(f"{item['titulo']}\n{item['detalhe']}")
+        if const:
+            # o gate recusaria o PR: vetado aqui, antes de o Developer gastar com ele
+            conselho.marcar(pid, "descartada")
+            self.ctx.reply(f"Conselho ({pergunta.persona}): “{item['titulo'][:100]}” vetado: cita a constituição "
+                           f"({', '.join(const)}).", "roteiro")
+            return pid, "descartada", f"constituição: o item cita {', '.join(const)}", None
         if item.get("dado") and item.get("base") in ("medido", "inferido"):
             # verificação pelo Jev (caso de uso da doc: conferir afirmações de IA contra a fonte): o dado existe na evidência?
             from .decision import SN
@@ -340,7 +350,7 @@ SYSTEM_DIVIDIR = """Você é o Planejador do círculo autoevolutivo (repositóri
 3 vezes nos testes locais do Developer. Divida-o em 2 a 5 sub-itens executados em sequência, cada um:
 - pequeno (até ~100 linhas de mudança) e completo sozinho;
 - com o seu próprio teste de regressão (diga qual teste prova que ele está pronto);
-- sem alterar a constituição (merge_gate.py, policy.py, budget.py, guardrails.py, self_dev.py, corpo.py, .github/).
+- sem alterar a constituição (""" + ", ".join(CONSTITUICAO) + """).
 Use o erro da última tentativa para isolar a parte difícil num sub-item próprio.
 Responda só com JSON numa linha, sem markdown:
 {"sub_itens": [{"titulo": "até 100 caracteres", "detalhe": "até 2 frases: o que mudar e onde", "teste": "o teste que prova"}]}"""

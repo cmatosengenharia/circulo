@@ -542,6 +542,7 @@ class Store:
                   ("perguntas", "eixo", "TEXT"), ("perguntas", "pertinencia", "REAL"), ("perguntas", "acionavel", "INTEGER"),
                   ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"), ("perguntas", "motivo", "TEXT"),
                   ("verificacoes", "item_id", "INTEGER"), ("verificacoes", "item_titulo", "TEXT"),
+                  ("verificacoes", "causa", "TEXT"),
                   ("events", "job", "TEXT"), ("events", "job_fonte", "TEXT"), ("events", "job_conf", "REAL"),
                   ("events", "job_margem", "REAL"),
                   ("llm_calls", "tokens_entrada", "INTEGER"), ("llm_calls", "tokens_saida", "INTEGER"),

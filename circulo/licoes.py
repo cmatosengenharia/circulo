@@ -190,15 +190,15 @@ class Licoes:
     # ------------------------------------------------------------ monitorar todo ponto de verificação
     def verificar(self, ponto: str, ok: bool, sujeito: str = "", motivo: str = "", assinatura: str | None = None,
                   classe: str | None = None, licao: bool = True, detalhe_item: str = "", titulo: str = "",
-                  item_id: int | None = None) -> dict | None:
-        """Registra o resultado da verificação, com o item do roteiro em execução. Falha (com `licao=True`) vira ou
-        reforça uma lição."""
+                  item_id: int | None = None, causa: str | None = None) -> dict | None:
+        """Registra o resultado da verificação, com o item do roteiro em execução e a causa normalizada da falha
+        (quem tem: developer:abrir_pr). Falha (com `licao=True`) vira ou reforça uma lição."""
         tick, agora = self.s.tick, time.time()
         sig = (assinatura or assinatura_de(ponto, motivo)) if not ok else assinatura
         item, item_titulo = item_de(self.s, sujeito, item_id)
-        vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo) "
-                       "VALUES(?,?,?,?,?,?,?,?,?)", (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig,
-                                                     (motivo or "")[:1000], agora, item, item_titulo))
+        vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo,causa) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,?)", (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig,
+                                                       (motivo or "")[:1000], agora, item, item_titulo, causa))
         if vid % 500 == 0:
             self.s.x("DELETE FROM verificacoes WHERE id <= ?", (vid - MAX_VERIFICACOES,))
         if ok or not licao:
