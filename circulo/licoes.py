@@ -192,7 +192,7 @@ class Licoes:
                   classe: str | None = None, licao: bool = True, detalhe_item: str = "", titulo: str = "",
                   item_id: int | None = None, causa: str | None = None) -> dict | None:
         """Registra o resultado da verificação, com o item do roteiro em execução e a causa normalizada da falha
-        (quem tem: developer:abrir_pr). Falha (com `licao=True`) vira ou reforça uma lição."""
+        (quem tem: developer:abrir_pr, developer:testes, developer:base). Falha (com `licao=True`) vira ou reforça uma lição."""
         tick, agora = self.s.tick, time.time()
         sig = (assinatura or assinatura_de(ponto, motivo)) if not ok else assinatura
         item, item_titulo = item_de(self.s, sujeito, item_id)

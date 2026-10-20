@@ -18,6 +18,11 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      nenhuma chamada; o parcial fica guardado e o item vai para o fatiador, sem exceção.
   7. A mesma falha 2x seguidas (node id + linha do erro normalizada, `assinatura_falha`) não ganha outra chamada:
      o item vai para o fatiador na hora, sem esperar as LIMITE falhas.
+  8. Toda falha de developer:testes grava a causa normalizada (`causa_testes`: tipo de exceção + arquivo de teste, sem o
+     caminho do worktree), para agregar falhas de testes diferentes.
+  9. Pré-voo antes da 1ª chamada do item: os testes dos módulos que o item cita rodam na main limpa. Vermelhos lá, a
+     base está quebrada: nenhuma chamada, lição `developer:base` com a causa, e o item volta para a fila (Agentless e
+     SWE Atlas rodam os testes no código original antes de julgar o patch).
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -40,6 +45,7 @@ from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git,
 
 REPARO = "developer:reparo"
 REVERTIDA = "developer:constituicao_revertida"
+BASE = "developer:base"
 TETO, REPETIDA = CORTES
 PISO_TETO = 100_000
 JANELA_TETO = 86400
@@ -84,6 +90,21 @@ def assinatura_falha(saida: str) -> str:
     return "\n".join(sorted({_normal(f) for f in falhas}))
 
 
+def _excecao(mensagem: str) -> str:
+    m = re.match(r"(?:[\w.]+\.)?([A-Z]\w*(?:Error|Exception|Exit|Interrupt|Timeout))\b", mensagem or "")
+    return m.group(1) if m else "AssertionError" if (mensagem or "").startswith("assert") else "Falha"
+
+
+def causa_testes(saida: str) -> str:
+    """Tipo de exceção + arquivo de teste de cada falha do pytest, sem o caminho do worktree (`.circulo-wt-*`) nem
+    diretórios absolutos. 'sem_resumo' = a saída não tem o resumo do pytest (timeout, coleta abortada)."""
+    causas = set()
+    for node, msg in FALHA_PYTEST.findall(saida or ""):
+        arquivo = re.sub(r"^.*/\.circulo-wt-[^/]+/", "", node.split("::")[0])
+        causas.add(f"{_excecao(msg)}@{_normal(arquivo)}")
+    return ", ".join(sorted(causas)) or "sem_resumo"
+
+
 def _ambiente() -> dict:
     """O ambiente isolado dos portões, sem bytecode: o `git add -A` levaria o `__pycache__` dos testes para o PR."""
     return {**ambiente_isolado(), "PYTHONDONTWRITEBYTECODE": "1"}
@@ -103,10 +124,14 @@ class DeveloperComReparo(SelfDeveloper):
         self._consertando = False
         self._repetida = False
         self._cortado = ""
+        self._base_quebrada = ""
 
     def run_once(self, *a, **kw):
-        self._rodada, self._cortado = 0, ""
+        self._rodada, self._cortado, self._base_quebrada = 0, "", ""
         r = super().run_once(*a, **kw)
+        if self._base_quebrada and r.status == "agente_falhou" and not r.pr:
+            self._set_item(r.item_id, "pendente", self._base_quebrada[:300])
+            return DevResult(r.item_id, "base_quebrada", self._base_quebrada)
         if self._cortado and r.status == "agente_falhou" and not r.pr:
             self._set_item(r.item_id, "pendente", f"{self._cortado}; vai para o fatiador")
             return DevResult(r.item_id, "teto", self._cortado)
@@ -215,7 +240,44 @@ class DeveloperComReparo(SelfDeveloper):
                       motivo=f"rodada {self._rodada}: {', '.join(caminhos)} restaurados de {base[:12]}")
         return caminhos
 
+    # ------------------------------------------------------------ pré-voo na main limpa
+    @staticmethod
+    def _testes_afetados(wt: Path, texto: str) -> list[str]:
+        """Os arquivos de teste (`test_<módulo>.py`, `test_<módulo>_*.py`) dos módulos que o texto do item cita."""
+        arquivos = _git(["ls-files", "*.py"], wt, check=False).splitlines()
+        testes = [f for f in arquivos if Path(f).name.startswith("test_")]
+        modulos = {Path(f).stem for f in arquivos if f not in testes} - {"__init__", "conftest"}
+        citados = {m for m in modulos if re.search(rf"(?<![\w-]){re.escape(m)}(?:\.py)?\b", texto)}
+        return sorted(t for t in testes if any(Path(t).stem == f"test_{m}" or Path(t).stem.startswith(f"test_{m}_")
+                                               for m in citados))
+
+    def _preflight(self, wt: Path, titulo: str) -> str:
+        """Roda na main limpa só os testes dos módulos que o item cita. Vermelhos: a lição `developer:base` com a causa
+        e o motivo para não chamar o agente. '' = segue (verdes, nada a rodar, ou o worktree já não é a main limpa)."""
+        if _git(["status", "--porcelain"], wt, check=False) or _git(["rev-parse", "HEAD"], wt) != self._merge_base(wt):
+            return ""
+        r = self.s.one("SELECT detalhe FROM roadmap WHERE titulo=? ORDER BY updated_at DESC LIMIT 1", (titulo,))
+        testes = self._testes_afetados(wt, f"{titulo}\n{r['detalhe'] if r else ''}")
+        if not testes:
+            return ""
+        try:
+            p = subprocess.run([sys.executable, "-m", "pytest", "-q", "--tb=short", *testes], cwd=wt,
+                               capture_output=True, text=True, timeout=900, env=_ambiente())
+        except subprocess.TimeoutExpired:
+            return ""
+        if p.returncode in (0, 5):                   # 5 = nenhum teste coletado
+            return ""
+        from .licoes import registrar as monitorar
+        causa = causa_testes(p.stdout + p.stderr)
+        monitorar(self.ctx, BASE, False, sujeito=titulo[:120], motivo=saida_focada(p.stdout + p.stderr), causa=causa)
+        self._base_quebrada = f"base quebrada: {causa} já falha na main; nenhuma chamada ao agente"
+        return self._base_quebrada
+
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
+        if self._rodada == 0 and papel == "developer" and not self._consertando and not PREFIXO_TITULO.match(titulo):
+            quebrada = self._preflight(wt, titulo)
+            if quebrada:
+                return {"ok": False, "tokens": 0, "log": quebrada}
         tokens, chamadas = self._tokens_do_item(titulo)
         estimativa, teto = self._estimativa(tokens, chamadas), self.teto()
         if tokens + estimativa > teto:
@@ -280,7 +342,8 @@ class DeveloperComReparo(SelfDeveloper):
                 saida = saida_focada(p.stdout + p.stderr)
                 if registrar:
                     self._repetida = self._mesma_falha(wt, saida) or self._repetida
-                    monitorar(self.ctx, f"developer:{nome}", False, sujeito=str(wt.name), motivo=saida)
+                    monitorar(self.ctx, f"developer:{nome}", False, sujeito=str(wt.name), motivo=saida,
+                              causa=causa_testes(p.stdout + p.stderr) if nome == "testes" else None)
                 return False, saida
             if registrar:
                 monitorar(self.ctx, f"developer:{nome}", True, sujeito=str(wt.name))
