@@ -226,7 +226,7 @@ class Circle:
                         self.handle(payload, ev["id"])
                 s.finish_event(ev["id"], True)
                 intencoes.concluir(s, seq, True)
-            except Exception as exc:  # noqa: BLE001 — o círculo não pode morrer
+            except Exception as exc:  # o círculo não pode morrer
                 if seq is not None:
                     intencoes.concluir(s, seq, False, repr(exc))
                 s.finish_event(ev["id"], False, repr(exc))
@@ -238,7 +238,7 @@ class Circle:
         else:
             try:
                 r.idle_task = self.idle()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 r.errors.append(f"idle: {exc!r}")
                 if not getattr(exc, "_registrado", False):
                     self.incidents.record("idle", exc, circulo_pid)
@@ -263,19 +263,19 @@ class Circle:
                     r.shadow = out
                 else:
                     r.health = out
-            except Exception as exc:  # noqa: BLE001
-                r.errors.append(f"{stage}: {exc!r}\n{traceback.format_exc(limit=3)}")
+            except Exception as exc:
+                r.errors.append(f"{stage}:{exc!r}\n{traceback.format_exc(limit=3)}")
                 self.incidents.record(stage, exc, circulo_pid)
 
         try:
             self._vigiar_progresso(havia_trabalho, antes, r)
-        except Exception as exc:  # noqa: BLE001
-            r.errors.append(f"progresso: {exc!r}")
+        except Exception as exc:
+            r.errors.append(f"progresso:{exc!r}")
         if self.corpo is not None:
             try:
                 self.corpo.validar(r.errors)     # evidência depois da troca de código: os primeiros giros
-            except Exception as exc:  # noqa: BLE001
-                r.errors.append(f"corpo: {exc!r}")
+            except Exception as exc:
+                r.errors.append(f"corpo:{exc!r}")
         self._record(r)
         # traço tipado do giro (OTel GenAI) + painel de timeline/grafo; nunca levanta
         telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
@@ -287,7 +287,7 @@ class Circle:
                 rastro.verificar(ctx)
                 from . import jev_lab
                 jev_lab.avaliar(s, ctx.reply)        # adota (ou desfaz) a forma de perguntar ao Jev que provou ganho
-        except Exception as exc:  # noqa: BLE001 — observar nunca derruba o giro
+        except Exception as exc:  # observar nunca derruba o giro
             r.errors.append(f"rastro: {exc!r}")
         self._stage("descanso")
         seguro(self.metricas.ciclo_concluido, s)
@@ -535,7 +535,7 @@ class Circle:
                 # write-ahead: intenção (motivo, regra que decidiu, entradas) gravada antes; só então a tarefa roda
                 intencoes.executar(s, pick, lambda pick=pick: self._run_idle_task(pick), motivo=TAREFAS.get(pick, pick),
                                    entradas=contexto, regra=regra)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 last[pick] = s.tick
                 s.set("idle_last", last)
                 self.incidents.record(f"idle:{pick}", exc, ctx.dl.project_id)
@@ -550,7 +550,7 @@ class Circle:
     def _corpo_precisa(self) -> bool:
         try:
             return self.corpo.precisa()
-        except Exception:  # noqa: BLE001 — rede fora: tenta de novo na próxima checagem
+        except Exception:  # rede fora: tenta de novo na próxima checagem
             return False
 
     def _dev_tem_trabalho(self) -> bool:
@@ -627,7 +627,7 @@ class Circle:
                 espera = max(ESPACO.get(t, 1), min(64, 2 ** int(rec[t])) if rec.get(t) else 1)
                 return s.tick - int(last.get(t, -10**6)) >= espera
             return any(pronto(t) and self._tem_trabalho(t) for t in TRABALHO)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def em_voo(self) -> bool:
@@ -794,7 +794,7 @@ class Circle:
     def testar_parada(self) -> bool | None:
         try:
             return parada.testar(self)
-        except Exception as exc:  # noqa: BLE001 — o teste nunca derruba o loop; a falha vira incidente
+        except Exception as exc:  # o teste nunca derruba o loop; a falha vira incidente
             self.incidents.record("parada", exc, kit_project_id(self.store, "circulo"))
             return False
 
@@ -813,7 +813,7 @@ class Circle:
             while not parar.wait(self.HEARTBEAT_EVERY):
                 try:
                     self.heartbeat()
-                except Exception:  # noqa: BLE001 — o pulso nunca derruba o giro
+                except Exception:  # o pulso nunca derruba o giro
                     pass
         t = threading.Thread(target=pulso, name="pulso", daemon=True)
         t.start()
