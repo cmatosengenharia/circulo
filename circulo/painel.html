@@ -507,6 +507,12 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
       <ul class="list" id="incidents"></ul>
     </section>
+    <section data-aba="jev" class="panel c12 zero-only" hidden aria-label="Aluno do Jev">
+      <h2>Aluno do Jev: um modelo local aprendendo com as respostas dele (em sombra)</h2>
+      <p class="sub" style="margin:-6px 0 8px">Destilação: para cada pergunta, um modelo treinado nas decisões confiantes do Jev palpita em paralelo; a decisão continua sendo do Jev. Quando a concordância em sombra passar de 95 % em 300 palpites, a pergunta fica "pronta para decidir" — e só uma chave sua liga o degrau na cascata (regra → aluno → Jev → LLM).</p>
+      <div class="indag-tot" id="alunoTot"></div>
+      <ul class="list" id="alunoLista"></ul>
+    </section>
     <section data-aba="jev" class="panel c7" aria-label="Modelos de IA">
       <h2>Modelos escolhidos pelo Jev</h2>
       <p class="sub" style="margin:-6px 0 10px">Antes de cada chamada, o Jev escolhe o modelo pelo papel, pelo orçamento e por como cada modelo se saiu antes. Tudo fica registrado.</p>
@@ -1141,6 +1147,19 @@ async function refreshMemoria() {
   } catch {}
 }
 setInterval(refreshMemoria, 20000); refreshMemoria();
+async function refreshAluno() {
+  try {
+    const j = await (await fetch("/api/aluno")).json();
+    const pct = x => (x == null ? "—" : Math.round(x * 100) + "%");
+    $("#alunoTot").textContent = j.treinado_em ? `treinado ${new Date(j.treinado_em * 1000).toLocaleString("pt-BR")} · ${j.resumo.perguntas} pergunta(s) · ${j.resumo.prontas} pronta(s) para sombra · ${(j.resumo.exemplos || 0).toLocaleString("pt-BR")} exemplos · ${j.decide ? "decidindo" : "só sombra"}` : "ainda não treinou: precisa de decisões do Jev com o estado gravado (a partir da 1.37.0)";
+    $("#alunoLista").innerHTML = (j.perguntas || []).map(p => `<li style="display:block"><span class="tag">${esc(p.pergunta)}</span> ${p.exemplos} exemplos · ${p.classes || 0} classe(s) · ` +
+      (p.acuracia != null ? `acurácia ${pct(p.acuracia)} (maioria ${pct(p.baseline)})` : esc(p.status.replace(/_/g, " "))) +
+      (p.sombra_n ? ` · sombra: concorda ${pct(p.sombra_concorda)} em ${p.sombra_n}` : " · sombra: ainda sem palpites") +
+      (p.pronta_para_decidir ? ` <b style="color:var(--ok)">· pronta para decidir</b>` : "") + `</li>`).join("") || "<li class=\"sub\">Nenhuma pergunta com exemplos suficientes ainda.</li>";
+  } catch {}
+}
+setInterval(refreshAluno, 30000); refreshAluno();
+
 async function refreshConsumo() {
   try {
     const j = await (await fetch("/api/consumo?dias=14")).json();

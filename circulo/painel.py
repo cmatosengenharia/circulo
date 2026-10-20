@@ -339,6 +339,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/revisor":
                 from .revisor import resumo as revis
                 self._json(revis(self._store()))
+            elif u.path == "/api/aluno":
+                from .aluno import resumo as aluno_resumo
+                self._json(aluno_resumo(self._store()))
             elif u.path == "/api/consumo":
                 from .budget import consumo
                 self._json(consumo(self._store(), int((q.get("dias") or ["14"])[0])))

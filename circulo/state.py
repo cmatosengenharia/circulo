@@ -549,7 +549,8 @@ class Store:
                   ("llm_calls", "cache_lido", "INTEGER"), ("llm_calls", "cache_escrito", "INTEGER"),
                   ("llm_calls", "job", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
-                  ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"))
+                  ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
+                  ("decisions", "estado", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

@@ -19,6 +19,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Mapping, Protocol
 
+from . import aluno
 from .budget import Budget
 from .metrics import METRICAS, seguro
 from .state import Store
@@ -674,21 +675,18 @@ class DecisionLayer:
                 resultado = "aprendido"
             elif d.source == "jev" and d.confidence < incerto and not qid.startswith(("crit_", "rel_")):
                 resultado = "incerto"
-                # Cascata: o Jev respondeu "não sei" (perto de 50%, confiança baixa). A resposta dele fica registrada,
-                # e a decisão passa para a regra determinística, em vez de um meio-termo que trava tudo.
-                self._log(d)
+                # Cascata: Jev em dúvida → resposta dele registrada, decisão passa para a regra determinística.
+                self._log(d, state)
                 regra = self.local.ask_many(state, {qid: q})[0][qid]
                 out[qid] = Decision(regra.name, regra.kind, regra.value, regra.confidence, "local", regra.probabilities)
                 if qid == "worth_spending":
                     self._worth_rotular(state, regra)
-            self._log(out[qid])
+            self._log(out[qid], state, final=True)
             seguro(self.metricas.decisao, out[qid].source, resultado)
         return out
 
-    # --- Jev aprende o worth_spending imitando a regra quando está em dúvida
-    # Cada vez que a regra decide no lugar do Jev, o exemplo (features, decisão da regra, desfecho) vira rótulo.
-    # Os pesos são contagens por balde de entradas similares; com rótulos consistentes a confiança sobe e,
-    # na próxima rodada, a resposta em dúvida do Jev é ajustada por eles em vez de cair de novo na regra.
+    # --- Jev aprende o worth_spending imitando a regra quando está em dúvida: cada decisão da regra no lugar dele vira
+    # rótulo por balde de entradas similares; com rótulos consistentes, a próxima dúvida é ajustada em vez de cair na regra.
     WORTH_KEY = "jev_aprendiz.worth_spending"
 
     def _worth_limiar(self, state: Mapping[str, Any]) -> float:
@@ -782,12 +780,14 @@ class DecisionLayer:
             return 0.0 <= float(d.value) <= 1.0
         return 0.0 <= float(d.value) <= max(0, len(q.criteria or ()) - 1)
 
-    def _log(self, d: Decision) -> None:
+    def _log(self, d: Decision, state: Mapping[str, Any] | None = None, final: bool = False) -> None:
         probs = {k: v for k, v in (d.probabilities or {}).items() if not str(k).startswith("_")}
-        self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id,probabilidades) "
-                 "VALUES(?,?,?,?,?,?,?,?)",
+        estado = json.dumps(dict(state), ensure_ascii=False, default=str)[:1500] if state is not None else None
+        self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id,probabilidades,estado) VALUES(?,?,?,?,?,?,?,?,?)",
                  (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source, time.time(), self.project_id,
-                  json.dumps(probs, ensure_ascii=False)[:2000] if probs else None))
+                  json.dumps(probs, ensure_ascii=False)[:2000] if probs else None, estado))
+        if final and d.source == "jev" and state is not None:
+            aluno.observar(self.s, d.name, state, d.value)        # o aluno palpita em sombra; a decisão continua sendo do Jev
 
     def _thr(self, path: str, default: float = 0.5) -> float:
         cur: Any = self.policy()["thresholds"]

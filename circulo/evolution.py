@@ -187,6 +187,11 @@ class MetaLearner:
     # ---------------------------------------------------- decisão + apply
     def step(self) -> list[str]:
         log = []
+        from . import aluno
+        rel = aluno.treinar_se_preciso(self.ctx.store)
+        if rel:
+            r = rel["resumo"]
+            log.append(f"aluno do Jev treinado: {r['perguntas']} pergunta(s), {r['prontas']} pronta(s) para sombra, {r['exemplos']} exemplos")
         cands = self.domain_candidates()
         if not getattr(self, "so_dominio", False):
             cands += self.circle_candidates() + self.question_candidates() + self.portfolio_candidates() + self.distillation_candidates()

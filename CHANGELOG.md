@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.37.0 — 2026-10-20
+
+**O aluno do Jev: aprendizado a partir das decisões, em sombra.** Onde o fine-tuning encaixa no loop é na camada de
+decisão: um degrau novo na cascata (regra → **aluno** → Jev → LLM), com o Jev como professor e árbitro. Nesta versão
+ele só palpita em paralelo e a concordância fica medida; nada é decidido por ele.
+
+- **Estado gravado com cada decisão** (`decisions.estado`): o que o Jev viu agora fica junto com o que respondeu —
+  é o dataset de destilação (1,8 mil decisões/dia no Mac).
+- **`circulo/aluno.py`**: um modelo por pergunta (nome normalizado: `indaga_pert_5` → `indaga_pert`), regressão
+  logística multiclasse sobre features em hash (categorias, números em faixas log e normalizados, palavras dos
+  textos, listas e dicionários rasos), treinada por SGD em Python puro, sem dependência. Rótulo = resposta do Jev
+  com confiança ≥ 0,8 (escolhas como estão; números em faixas de 0,1). Validação temporal: últimos 20 % como
+  holdout, acurácia comparada com a classe majoritária. Critérios: ≥ 120 exemplos, acurácia ≥ 90 % e ≥ 3 pontos
+  acima do baseline → "pronto para sombra"; em sombra, concordância ≥ 95 % em ≥ 300 palpites → "pronto para decidir".
+- **Sombra na cascata**: a cada decisão final do Jev, `aluno.observar` palpita e grava em `aluno_sombra`
+  (previsto, probabilidade, resposta do Jev, concorda). A decisão continua sendo do Jev.
+- **Treino automático**: o Cientista de dados (`MetaLearner.step`) retreina a cada 6 h ou a cada 200 decisões novas
+  do Jev, e registra no log do giro.
+- **Painel**: card "Aluno do Jev" na aba Decisões (Jev First) com, por pergunta, exemplos, classes, acurácia vs
+  maioria, concordância em sombra e o selo "pronta para decidir"; `/api/aluno`.
+- Fora por desenho: perguntas por critério/trecho (`crit_`, `rel_`, `ach_`) e o Desenvolvedor/gate/constituição.
+  Ligar o aluno como decisor será uma chave de política explícita, só para perguntas provadas, com rollback pelas
+  versões de política — próxima versão, depois de dias de sombra medida.
+- Testes (`test_aluno`, 5): features e rótulos estáveis; o aluno aprende uma regra escondida de um Jev sintético
+  (categoria ≥ 95 %, worth_spending > baseline) e mede no holdout; poucos exemplos não viram modelo; retreino só
+  quando precisa; em sombra palpita sem decidir e "pronto" exige prova; MetaLearner treina e o painel expõe.
+  `decision.py` continua em 1.000 linhas (comentários encurtados para caber o gancho).
+
 ## 1.36.0 — 2026-10-20
 
 **Varredura do dash: o que aparecia em duas telas agora aparece numa só.** Levantamento tela a tela (todas as abas
