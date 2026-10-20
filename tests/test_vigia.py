@@ -237,3 +237,16 @@ def test_pergunta_recusada_alem_do_prazo_recebe_descarte_explicito(circle):
     r = circle.store.one("SELECT status, motivo FROM perguntas WHERE id=?", (pid,))
     assert r["status"] == "descartada_abaixo_do_limiar" and "0.33" in r["motivo"] and "0.40" in r["motivo"]
     assert PRAZO_PORTEIRO + vigia.ESPERA_PERGUNTA + vigia.INTERVALO <= 240 * 60   # destino explícito em até 240 min
+
+
+def test_fila_cheia_e_contrapressao_e_nao_trava_de_pergunta_validada(circle):
+    """Item #50: 6 perguntas validadas esperando 31 min com a fila cheia (2 itens). O planejador espera de propósito:
+    o Developer tem trabalho. Alarmar abre mais um item do loop e enche ainda mais a fila."""
+    from circulo import planejador as pl
+    _trava_pergunta(circle)
+    agora = time.time()
+    circle.store.set(pl.GATE, {"em": agora, "motivo": "fila cheia (2 itens)"})   # o que Planejador.precisa gravou
+    assert "pergunta_valida_parada" not in {a["chave"] for a in vigia.sondar(circle.store, agora)}
+    assert vigia.Vigia(circle.ctx).rodar(agora)["achados"] == 0
+    circle.store.set(pl.GATE, {"em": agora, "motivo": "teto diário: 24 itens em 24 h (teto 24)"})   # fila livre e parada: trava
+    assert "pergunta_valida_parada" in {a["chave"] for a in vigia.sondar(circle.store, agora)}
