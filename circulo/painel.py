@@ -648,6 +648,17 @@ def make_handler(db_path: str):
     return Handler
 
 
+class _Servidor(ThreadingHTTPServer):
+    """Navegador fechou a aba no meio da resposta: não é erro do loop, não suja o loop.err."""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        import sys
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def serve(db_path: str | Path, port: int = 8765, background: bool = False) -> ThreadingHTTPServer:
     # O painel pode subir antes do loop: prepara o banco do mesmo jeito que o loop faria.
     from .policy import PolicyStore
@@ -656,8 +667,7 @@ def serve(db_path: str | Path, port: int = 8765, background: bool = False) -> Th
     PolicyStore(st)
     ensure_seed(st)
     finance.base(st)
-    srv = ThreadingHTTPServer((HOST, port), make_handler(str(db_path)))
-    srv.daemon_threads = True
+    srv = _Servidor((HOST, port), make_handler(str(db_path)))
     if background:
         threading.Thread(target=srv.serve_forever, daemon=True, name="painel").start()
     else:

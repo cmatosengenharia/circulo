@@ -156,3 +156,20 @@ def test_conversa_liga_cada_resposta_a_sua_mensagem(circle, painel):
     c = estado(circle.store, zero)["conversa"]
     assert c[-1]["texto"] == "Priorize corrigir erros" and c[-1]["status"] == "done"
     assert "item #" in c[-1]["respostas"][0]["message"]
+
+
+def test_aba_fechada_no_meio_da_resposta_nao_vira_traceback(capsys):
+    """No Mac o loop.err enchia de BrokenPipeError do painel quando o navegador fechava a aba."""
+    import socket
+    from circulo.painel import _Servidor
+    srv = _Servidor.__new__(_Servidor)
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        srv.handle_error(None, ("127.0.0.1", 1))
+    try:
+        raise ValueError("outro erro")
+    except ValueError:
+        srv.handle_error(socket.socket(), ("127.0.0.1", 1))
+    err = capsys.readouterr().err
+    assert "BrokenPipeError" not in err and "ValueError" in err

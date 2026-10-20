@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.41.1 — 2026-10-20
+
+- Painel: aba fechada pelo navegador no meio de um `/api/...` gerava `BrokenPipeError` com traceback no `loop.err`; agora é ignorado (outros erros do servidor continuam no log).
+
 ## 1.41.0 — 2026-10-20
 
 **O Médico do loop: plano de controle que diagnostica gargalos por padrão medido e responde pela escada mais barata —
