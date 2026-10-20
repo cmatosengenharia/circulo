@@ -782,7 +782,7 @@ class DecisionLayer:
 
     def _log(self, d: Decision, state: Mapping[str, Any] | None = None, final: bool = False) -> None:
         probs = {k: v for k, v in (d.probabilities or {}).items() if not str(k).startswith("_")}
-        estado = json.dumps(dict(state), ensure_ascii=False, default=str)[:1500] if state is not None else None
+        estado = aluno.compactar(state) if state is not None else None
         self.s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,project_id,probabilidades,estado) VALUES(?,?,?,?,?,?,?,?,?)",
                  (self.s.tick, d.name, json.dumps(d.value), d.confidence, d.source, time.time(), self.project_id,
                   json.dumps(probs, ensure_ascii=False)[:2000] if probs else None, estado))

@@ -103,3 +103,16 @@ def test_meta_learner_treina_o_aluno_e_painel_expoe(circle, painel):  # noqa: F8
     j = json.loads(urllib.request.urlopen(painel + "/api/aluno", timeout=5).read())
     assert j["resumo"]["perguntas"] >= 2 and j["criterios"]["concordancia_min"] == aluno.CONCORDANCIA_MIN
     assert "Aluno do Jev" in urllib.request.urlopen(painel + "/loop", timeout=5).read().decode()
+
+
+def test_estado_compacto_sempre_fecha_e_registro_cortado_nao_derruba_o_treino():
+    """No Mac: estado JSON cortado em 1.500 caracteres → JSONDecodeError no treino, 8 giros seguidos com erro na meta."""
+    grande = {"tarefa": "x" * 5000, "lista": list(range(100)), "d": {str(i): "y" * 300 for i in range(40)}, "n": 3}
+    s = aluno.compactar(grande)
+    assert len(s) <= 1500 and json.loads(s)["n"] == 3
+    st = Store(":memory:")
+    st.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,estado) VALUES(1,'q','\"a\"',0.9,'jev',1,'{\"tarefa\": \"cortado no mei')")
+    for i in range(3):
+        _decisao(st, "q", {"k": i}, "a")
+    ex = aluno.exemplos_de(st)
+    assert len(ex["q"]) == 3                                                    # o registro quebrado foi ignorado, o resto treina

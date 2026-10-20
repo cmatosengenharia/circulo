@@ -94,4 +94,17 @@ def test_pr_de_docs_fechado_libera_o_proximo(circle):
     s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(42,2,'docs','circulo/docs-1','aberto',?,?)", (time.time(), time.time()))
     assert not documentador.precisa(s)                                    # o PR de docs ainda está aberto
     s.x("UPDATE prs SET status='mergeado' WHERE number=42")              # o gate fechou: a tabela prs diz
+    assert not documentador.precisa(s)                                    # mas a doc mergeada não é entrega nova
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(43,2,'x','circulo/fix-1','mergeado',?,?)", (time.time(), time.time()))
+    assert documentador.precisa(s)                                        # uma entrega do loop, sim
+
+
+def test_doc_mergeada_nao_dispara_outra_doc(circle):
+    """No Mac: cada PR de docs mergeado contava como entrega nova e o Redator abria PR atrás de PR (#34, #35, #36, #37)."""
+    s = circle.store
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(50,2,'x','circulo/fix-1','mergeado',?,?)", (time.time(), time.time()))
+    s.set(documentador.KV, {"em": time.time(), "merge_visto": 50, "pr_aberto": None})
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(51,2,'docs','circulo/docs-1','mergeado',?,?)", (time.time(), time.time()))
+    assert not documentador.precisa(s)
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(52,2,'y','circulo/fix-2','mergeado',?,?)", (time.time(), time.time()))
     assert documentador.precisa(s)

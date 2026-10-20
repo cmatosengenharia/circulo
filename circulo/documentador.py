@@ -238,8 +238,8 @@ def precisa(store: Store, agora: float | None = None) -> bool:
         return False
     if st.get("pr_aberto") and store.one("SELECT 1 FROM prs WHERE number=? AND status='aberto'", (st["pr_aberto"],)):
         return False                                  # um PR de docs por vez (o gate fecha; a tabela prs diz)
-    ultimo = store.one("SELECT COALESCE(MAX(number),0) m FROM prs WHERE status='mergeado'")["m"]
-    novos = int(ultimo) - int(st.get("merge_visto", 0))
+    ultimo = store.one("SELECT COALESCE(MAX(number),0) m FROM prs WHERE status='mergeado' AND COALESCE(branch,'') NOT LIKE ?", (BRANCH_PREFIX + "%",))["m"]
+    novos = int(ultimo) - int(st.get("merge_visto", 0))      # a própria doc mergeada não conta (no Mac virou PR atrás de PR)
     return novos >= MERGES_PARA_RODAR or (bool(st.get("em")) and agora - float(st["em"]) >= A_CADA)
 
 
@@ -295,7 +295,8 @@ def rodar(ctx, repo: Path | None = None, gh=None) -> dict[str, Any] | None:
         return None
     docs = gerar(ctx, repo)
     r = publicar(ctx, repo, docs, gh)
-    ultimo = s.one("SELECT COALESCE(MAX(number),0) m FROM prs WHERE status='mergeado'")["m"] if s.one("SELECT 1 FROM sqlite_master WHERE name='prs'") else 0
+    ultimo = s.one("SELECT COALESCE(MAX(number),0) m FROM prs WHERE status='mergeado' AND COALESCE(branch,'') NOT LIKE ?", (BRANCH_PREFIX + "%",))["m"] \
+        if s.one("SELECT 1 FROM sqlite_master WHERE name='prs'") else 0
     s.set(KV, {"em": time.time(), "merge_visto": int(ultimo), "pr_aberto": r.get("pr"), "modo": r["modo"], "arquivos": len(docs)})
     if callable(getattr(ctx, "reply", None)):
         if r["modo"] == "pr":

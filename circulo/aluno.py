@@ -71,6 +71,34 @@ def rotulo(valor: Any) -> str:
     return str(valor)[:60]
 
 
+def compactar(estado: Mapping[str, Any], limite: int = 1500) -> str:
+    """O estado como JSON que SEMPRE fecha: textos encurtados, listas cortadas e, se ainda passar do limite, as chaves
+    maiores saem — em vez de cortar a string do JSON no meio (no Mac isso quebrou o treino 8 vezes seguidas)."""
+    def enxuto(v, n=200):
+        if isinstance(v, str):
+            return v[:n]
+        if isinstance(v, (list, tuple)):
+            return [enxuto(x, 80) for x in list(v)[:8]]
+        if isinstance(v, dict):
+            return {str(k)[:40]: enxuto(x, 80) for k, x in list(v.items())[:12]}
+        return v if isinstance(v, (int, float, bool)) or v is None else str(v)[:n]
+    d = {str(k)[:40]: enxuto(v) for k, v in dict(estado).items()}
+    s = json.dumps(d, ensure_ascii=False)
+    while len(s) > limite and len(d) > 1:
+        maior = max(d, key=lambda k: len(json.dumps(d[k], ensure_ascii=False)))
+        d[maior] = "…"
+        s = json.dumps(d, ensure_ascii=False)
+    return s[:limite]
+
+
+def _estado(texto: str | None) -> dict:
+    try:
+        d = json.loads(texto) if texto else {}
+    except ValueError:                           # registro antigo cortado no meio: não ensina nada, não derruba o treino
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
 def _h(s: str) -> int:
     return zlib.crc32(s.encode("utf-8")) % DIM
 
@@ -151,7 +179,9 @@ def exemplos_de(store: Store, desde: float = 0.0, limite: int = 20000) -> dict[s
         q = pergunta(r["question"])
         if q.startswith(IGNORAR):
             continue
-        estado = json.loads(r["estado"]) if r["estado"] else {}
+        estado = _estado(r["estado"])
+        if not estado:
+            continue
         por_q.setdefault(q, []).append((features(estado), rotulo(json.loads(r["value"])), float(r["created_at"])))
     for q in por_q:
         por_q[q].sort(key=lambda e: e[2])        # do mais antigo ao mais novo: o holdout é o fim

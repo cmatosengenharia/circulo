@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.40.2 — 2026-10-20
+
+**Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste:**
+
+- **Treino do aluno quebrava** (8 erros seguidos na etapa meta no Mac): o estado gravado com a decisão era o JSON
+  cortado em 1.500 caracteres — inválido — e `json.loads` derrubava o treino inteiro. Agora o estado é compactado
+  antes de virar JSON (`aluno.compactar`: textos encurtados, listas e dicionários cortados, chaves maiores removidas
+  até caber) e o treino ignora registros antigos cortados em vez de parar.
+- **O Redator técnico abria PR atrás de PR** (#34, #35, #36, #37): a própria doc mergeada contava como "entrega
+  nova". PRs de `circulo/docs-*` deixam de contar; só entrega do loop (ou 24 h) dispara nova doc.
+
 ## 1.40.1 — 2026-10-20
 
 **Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17):** o loop não estava travado nem na 1.32.1 — rodava a
