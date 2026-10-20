@@ -8,7 +8,7 @@ nenhum número aqui é estimado. O agente roda quando há entrega nova e abre um
 | [Agentes](agentes.md) | o time: papéis, o que cada um faz, as tarefas do giro |
 | [Arquitetura](arquitetura.md) | constituição, módulos, telas e APIs |
 | [Decisões Jev First](decisoes.md) | o catálogo de perguntas que o código faz ao Jev |
-| [Evolução](evolucao.md) | versões e as 33 entregas que o loop fez sozinho, classificadas pelo Jev |
+| [Evolução](evolucao.md) | versões e as 34 entregas que o loop fez sozinho, classificadas pelo Jev |
 | [Lições](licoes.md) | as 43 lições aprendidas e o estado de cada uma |
 
 Sistema de design das telas: [`circulo/DESIGN.md`](../circulo/DESIGN.md). Histórico completo: [`CHANGELOG.md`](../CHANGELOG.md).

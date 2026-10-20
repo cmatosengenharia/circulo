@@ -48,12 +48,13 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.11.0 | 2026-10-18 | Orçamento contado errado | 4 |
 | 1.10.0 | 2026-10-18 | perceber | 13 |
 
-## Entregas do loop (33 PRs mergeados)
+## Entregas do loop (34 PRs mergeados)
 
-Por tipo: **correcao** 11 · **observabilidade** 10 · **seguranca** 5 · **documentacao** 4 · **funcionalidade** 2 · **velocidade** 1.
+Por tipo: **correcao** 11 · **observabilidade** 10 · **documentacao** 5 · **seguranca** 5 · **funcionalidade** 2 · **velocidade** 1.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #35 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #34 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #33 | 20/10/2026 | correcao (87%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #32 | 20/10/2026 | correcao (47%) | sim | Developer: classificar a causa de cada falha de testes e rodar pré-voo dos testes afetados na main antes de ga | pergunta do operador: “O neurônio developer:testes foi barrado 6 de 22 vezes em 24 h: qual é a causa qu” |
