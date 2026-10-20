@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.39.0 — 2026-10-20
+
+**Sistema de design: o Círculo sobre o Primer (GitHub).** Escolha: entre os sistemas prontos que funcionam sem build
+(Primer, Tabler, Shoelace, Radix/Open Props, Pico), o Primer é o que fala a língua do loop (PRs, merges, CI) e tem
+tema escuro oficial. Adotados os **primitives** (cores, tipografia, raio, sombra, formas de botão e Label) em cima da
+infraestrutura que já existia — `tema.py` escreve o mesmo bloco em toda página e o teste confere os contrastes — sem
+carregar a folha de estilo inteira (evita choque de classes e mantém as telas offline).
+
+- **Tokens** = Primer light/dark: canvas `#f6f8fa`/`#0d1117`, superfície `#ffffff`/`#151b23`, texto `#1f2328`/`#f0f6fc`,
+  done (decisões/Jev) `#8250df`/`#ab7df8`, attention `#9a6700`/`#d29922`, success `#1a7f37`/`#3fb950`, danger
+  `#d1242f`/`#f85149`, accent (links/foco) `#0969da`/`#1f6feb`, e dois novos: `--primary` (botão primário verde
+  `#1f883d`/`#238636`) e `--on-primary`. Todos os pares de contraste (4,5:1 texto, 3:1 marcas) continuam cumpridos
+  nos dois temas; bordas de componente usam o cinza de texto secundário do Primer (3:1+), não a borda clara dele.
+- **Tipografia de sistema** (a pilha do Primer, 14 px), sem Google Fonts: as telas abrem offline. Raio 6 px em
+  botões/abas/campos e 12 px em cartões; Labels em pílula com borda `currentColor`; botão padrão com fundo
+  `canvas` e sombra de 1 px; foco com anel de 2 px em `accent`.
+- **Parar o loop** vira botão de perigo (vermelho no hover); **Retomar** é o primário verde — irreversível é vermelho.
+- **Design System "Círculo" publicado** no seu artefato do Claude: README (princípios, cores, tipografia, componentes,
+  o que não fazer), `tokens.json` com os dois temas, componentes com preview (Botão, Rótulo, Selo, Cartão) e a capa.
+  `circulo/DESIGN.md` é a cópia no repo; o prompt do Desenvolvedor manda seguir esse arquivo quando o item toca uma
+  tela e rodar `python -m circulo.tema` antes de terminar.
+- Teste novo em `test_tema`: tokens do Primer, nenhuma fonte externa, raio nos tokens, DESIGN.md citado no Desenvolvedor.
+
 ## 1.38.0 — 2026-10-20
 
 **Precisa de você, dúvidas do Jev estudadas, e o Jev usado até o fim da doc.**

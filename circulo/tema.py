@@ -15,24 +15,26 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-CLARO = {
-    "--bg": "#E9EDF1", "--surface": "#F7F9FB", "--line": "#D3DAE1", "--border": "#7B8794", "--hover": "#E1E7ED",
-    "--ink": "#17212B", "--muted": "#556270",
-    "--jev": "#4B3FD1", "--jev-soft": "#E3E0FB", "--llm": "#8A5608", "--llm-soft": "#F6E6CC",
-    "--ok": "#146B53", "--ok-soft": "#D3EDE4", "--bad": "#B02A1C", "--bad-soft": "#F8DBD6",
-    "--idle": "#76828F", "--gh": "#2B3440", "--node": "#FFFFFF", "--accent": "#4B3FD1", "--on-accent": "#FFFFFF",
+CLARO = {   # Primer (GitHub) primitives, tema "light": canvas, fg, border, accent, done, attention, success, danger
+    "--bg": "#f6f8fa", "--surface": "#ffffff", "--line": "#d1d9e0", "--border": "#59636e", "--hover": "#eff2f5",
+    "--ink": "#1f2328", "--muted": "#59636e",
+    "--jev": "#8250df", "--jev-soft": "#fbefff", "--llm": "#9a6700", "--llm-soft": "#fff8c5",
+    "--ok": "#1a7f37", "--ok-soft": "#dafbe1", "--bad": "#d1242f", "--bad-soft": "#ffebe9",
+    "--idle": "#59636e", "--gh": "#1f2328", "--node": "#ffffff", "--accent": "#0969da", "--on-accent": "#ffffff",
+    "--primary": "#1f883d", "--on-primary": "#ffffff",
 }
-ESCURO = {
-    "--bg": "#10161D", "--surface": "#18212B", "--line": "#2A3542", "--border": "#617080", "--hover": "#233140",
-    "--ink": "#E6ECF2", "--muted": "#9AA8B5",
-    "--jev": "#8E84FF", "--jev-soft": "#262249", "--llm": "#E0A53F", "--llm-soft": "#3A2C14",
-    "--ok": "#3FBF98", "--ok-soft": "#16352C", "--bad": "#F06A5B", "--bad-soft": "#3E1C19",
-    "--idle": "#7F8C9B", "--gh": "#C9D3DD", "--node": "#1F2A36", "--accent": "#8E84FF", "--on-accent": "#10161D",
+ESCURO = {  # Primer primitives, tema "dark"
+    "--bg": "#0d1117", "--surface": "#151b23", "--line": "#3d444d", "--border": "#9198a1", "--hover": "#1c232c",
+    "--ink": "#f0f6fc", "--muted": "#9198a1",
+    "--jev": "#ab7df8", "--jev-soft": "#2a1f47", "--llm": "#d29922", "--llm-soft": "#372e12",
+    "--ok": "#3fb950", "--ok-soft": "#12361f", "--bad": "#f85149", "--bad-soft": "#3c1a1d",
+    "--idle": "#9198a1", "--gh": "#f0f6fc", "--node": "#1c232c", "--accent": "#1f6feb", "--on-accent": "#ffffff",
+    "--primary": "#238636", "--on-primary": "#ffffff",
 }
 # pares (texto, fundo) que precisam de 4,5:1 e (marca/borda, fundo) que precisam de 3:1 — conferidos no teste
 TEXTO = [("--ink", "--surface"), ("--ink", "--bg"), ("--muted", "--surface"), ("--muted", "--bg"), ("--jev", "--surface"), ("--jev", "--jev-soft"),
          ("--llm", "--surface"), ("--llm", "--llm-soft"), ("--ok", "--surface"), ("--ok", "--ok-soft"), ("--bad", "--surface"),
-         ("--bad", "--bad-soft"), ("--on-accent", "--accent"), ("--surface", "--ink"), ("--surface", "--ok"), ("--surface", "--bad"), ("--surface", "--jev")]
+         ("--bad", "--bad-soft"), ("--on-accent", "--accent"), ("--on-primary", "--primary"), ("--surface", "--ink"), ("--surface", "--ok"), ("--surface", "--bad"), ("--surface", "--jev")]
 MARCA = [("--border", "--surface"), ("--border", "--bg"), ("--idle", "--surface"), ("--jev", "--surface"), ("--llm", "--surface"),
          ("--ok", "--surface"), ("--bad", "--surface")]
 
@@ -60,12 +62,13 @@ def _vars(d: dict) -> str:
     return "".join(f"{k}:{v};" for k, v in d.items())
 
 
-TOKENS = (f":root{{{_vars(CLARO)}}}\n"
+TOKENS = (f":root{{--r-sm:6px;--r-lg:12px;{_vars(CLARO)}}}\n"
           f"@media (prefers-color-scheme:dark){{:root{{{_vars(ESCURO)}}}}}")
 
 # Componentes: vêm DEPOIS das regras da página para valerem sobre elas (mesma especificidade, última ganha).
 COMPONENTES = """
-:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:14px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .topo{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--surface);border-bottom:1.5px solid var(--line);margin:0 0 14px}
 .topo .marca{font-weight:800;letter-spacing:.2px;color:var(--ink);text-decoration:none;font-size:17px;padding:6px 8px 6px 0}
 .topo .marca::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-right:8px;vertical-align:-1px}
@@ -79,11 +82,12 @@ COMPONENTES = """
 a.back{display:none !important}
 @media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
-.btn{border:1.5px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px}
+.btn,.abas button,.seg button,.vel button,.giros button,.sugestoes button,.acoes button,.enviar{border-radius:6px}
+.btn{border:1px solid var(--border);background:var(--bg);color:var(--ink);min-height:32px;padding:5px 16px;font-weight:500;font-size:14px;box-shadow:0 1px 0 rgba(31,35,40,.04)}
 .btn:hover{background:var(--hover);border-color:var(--ink)}
 .btn:active{transform:translateY(1px)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.btn.primary:hover{background:var(--accent);filter:brightness(1.08);border-color:var(--ink)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary);filter:brightness(1.08);border-color:var(--ink)}
 .btn.perigo:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
 .btn:disabled,.btn[aria-disabled=true]{opacity:1;background:var(--bg);color:var(--muted);border:1.5px dashed var(--border);cursor:not-allowed;filter:none}
 .abas button,.vel button,.giros button,.seg button,.sugestoes button{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
@@ -96,7 +100,7 @@ input,select,textarea{border-color:var(--border)}
 form.ask input,.orc-form input,.ligar select,.paralelo select,.linha input,.campos input,form.busca input{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
 form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:focus,.linha input:focus,.campos input:focus,form.busca input:focus{border-color:var(--accent);outline:3px solid var(--accent);outline-offset:0}
 ::placeholder{color:var(--muted);opacity:1}
-.chip{border:1px solid transparent}
+.chip,.tag,.vg-chip{border:1px solid currentColor;border-radius:999px;font-size:12px;font-weight:500;line-height:18px;padding:0 7px}
 .legenda,.legend{color:var(--ink);font-size:13px;gap:8px 18px}
 .legenda span,.legend span{display:inline-flex;align-items:center;gap:6px}
 .lg{display:inline-block;width:12px;height:12px;flex:none}
@@ -131,9 +135,8 @@ def aplicar(html: str) -> str:
     antigo = re.search(r":root\{[^}]*--bg:[^}]*\}\s*@media \(prefers-color-scheme:dark\)\{:root\{[^}]*\}\}", corpo, flags=re.S)
     if antigo is None:
         raise ValueError("página sem o bloco de tokens esperado")
-    extras = re.findall(r"(--r-lg:[^;}]*;|--r-sm:[^;}]*;)", antigo.group(0))
-    tokens = TOKENS if not extras else TOKENS.replace(":root{", ":root{" + "".join(extras), 1)
-    corpo = corpo[:antigo.start()] + tokens + corpo[antigo.end():]
+    corpo = corpo[:antigo.start()] + TOKENS + corpo[antigo.end():]
+    corpo = re.sub(r'<link rel="preconnect" href="https://fonts\.googleapis\.com">\n?|<link href="https://fonts\.googleapis\.com[^"]*" rel="stylesheet">\n?', "", corpo)   # tipografia do sistema: sem fonte externa
     css = corpo.split("<style>", 1)[1].split("</style>", 1)[0]
     bloco = f"{INI}\n{COMPONENTES.strip()}\n{glifos(css)}\n{FIM}\n"
     return corpo.replace("</style>", bloco + "</style>", 1)
