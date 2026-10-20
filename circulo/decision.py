@@ -461,12 +461,9 @@ class LocalJev:
 
 
 # ---------------------------------------------------------------- replay do aprendiz worth_spending
-# Reaprende em lote com as decisões em que a regra decidiu (agregado de todas, como no DAgger).
-# A meta é concordância com a regra em dados retidos e calibração (ECE); a confiança sobe só como efeito.
-# - replay priorizado pela perda (onde o Jev discorda da regra ou está em dúvida pesa mais);
-# - N passes limitados, parada antecipada se a concordância no holdout de 20% cair;
-# - temperatura T ajustada por NLL no holdout se o ECE estiver alto (não muda a acurácia);
-# - o modelo só é adotado se não piorar a concordância de antes e ficar calibrado.
+# Reaprende em lote com as decisões da regra (DAgger): meta = concordância em holdout de 20% e calibração (ECE).
+# Replay priorizado pela perda; N passes com parada antecipada; temperatura T por NLL se o ECE estiver alto;
+# o modelo só é adotado se não piorar a concordância de antes e ficar calibrado.
 
 REPLAY_MAX_EXEMPLOS = 500
 REPLAY_MIN_EXEMPLOS = 40
@@ -647,8 +644,8 @@ class DecisionLayer:
 
     # --- chamada base (várias perguntas, um request, avaliadas em paralelo pelo Jev)
     def ask_many(self, state: Mapping[str, Any], questions: Mapping[str, Question]) -> dict[str, Decision]:
-        from . import jev_lab
-        jev_fora = False
+        from . import conexoes, jev_lab
+        jev_fora, t0 = False, time.monotonic()
         try:
             enviar, mapa = jev_lab.preparar(self.s, self.jev, state, questions)
             out, tokens = self.jev.ask_many(state, enviar)
@@ -656,9 +653,12 @@ class DecisionLayer:
             modelo = getattr(self.jev, "ultimo_modelo", None)
             out = jev_lab.colher(self.s, dict(out), mapa, modelo)
             self._registrar_modelo(modelo)
+            if not isinstance(self.jev, LocalJev):
+                conexoes.pulso(self.s, "jev", True, (time.monotonic() - t0) * 1000)
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError, OSError) as exc:
             out, _ = self.local.ask_many(state, questions)
             self.s.set("jev_last_error", str(exc)[:300])
+            conexoes.pulso(self.s, "jev", False, (time.monotonic() - t0) * 1000, str(exc))
             jev_fora = True
         incerto = self._thr("jev_incerto", 0.25)
         for qid, q in questions.items():

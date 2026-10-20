@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -325,6 +326,8 @@ class MergeGate:
 class GitHubREST:
     API = "https://api.github.com"
 
+    ouvinte = None      # (ok, ms, erro) a cada chamada — conexoes.instalar() liga; o cliente não conhece o registro
+
     def __init__(self, repo: str, token: str, timeout: float = 15.0):
         self.repo = repo
         self.token = token
@@ -336,8 +339,15 @@ class GitHubREST:
             data=json.dumps(body).encode() if body is not None else None,
             headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
                      "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "circulo"})
-        with urllib.request.urlopen(req, timeout=self.timeout) as r:
-            return json.loads(r.read() or b"null")
+        t0, ok = time.monotonic(), False
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                data = json.loads(r.read() or b"null")
+            ok = True
+            return data
+        finally:
+            if GitHubREST.ouvinte:
+                GitHubREST.ouvinte(ok, (time.monotonic() - t0) * 1000, None if ok else f"{method} {path}: {sys.exc_info()[1]}"[:200])
 
     def open_prs(self):
         return [{"number": p["number"], "head_sha": p["head"]["sha"], "head_ref": p["head"]["ref"],

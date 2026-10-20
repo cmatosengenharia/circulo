@@ -329,6 +329,21 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .cf-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
 @media (max-width:860px){.cf-cols{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.conexoes{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.cx{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:8px 12px;min-width:230px;flex:1 1 230px;font-size:12.5px;color:var(--muted)}
+.cx .cxdot{width:10px;height:10px;border-radius:50%;background:var(--idle);flex:none;box-shadow:0 0 0 0 transparent}
+.cx[data-e="ok"] .cxdot{background:var(--ok)}.cx[data-e="instavel"] .cxdot,.cx[data-e="limite"] .cxdot{background:var(--llm)}
+.cx[data-e="fora"] .cxdot,.cx[data-e="parado"] .cxdot{background:var(--bad)}.cx[data-e="sem_chave"] .cxdot{background:var(--idle)}
+.cx[data-vivo="1"] .cxdot{animation:cxpulso 1.2s ease-out infinite}
+@keyframes cxpulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+.cx[data-e="fora"][data-vivo="1"] .cxdot,.cx[data-e="parado"] .cxdot{animation:cxpulsobad 1.2s ease-out infinite}
+@keyframes cxpulsobad{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--bad) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+.cx b{color:var(--ink);font-weight:600}.cx .cxtxt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.cx .cxsub{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3}
+.cx[data-e="fora"] .cxsub,.cx[data-e="parado"] .cxsub{color:var(--bad)}.cx[data-e="instavel"] .cxsub,.cx[data-e="limite"] .cxsub{color:var(--llm)}
+.cx .cxserie{display:flex;align-items:flex-end;gap:2px;height:18px;flex:none}
+.cx .cxserie i{display:block;width:3px;min-height:3px;border-radius:1px;background:var(--ok);opacity:.85}.cx .cxserie i[data-ok="0"]{background:var(--bad);height:18px!important}
+@media (max-width:720px){.cx{min-width:150px;flex-basis:150px}.cx .cxserie{display:none}}
 /*TEMA:ini*/
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:14px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -391,6 +406,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     </div>
   </header>
   <div class="pausa-banner" id="pausaBanner" hidden role="status" aria-live="polite"></div>
+  <div class="conexoes" id="conexoes" aria-label="Conexões do loop ao vivo" title="Cada chamada ao Jev, ao Claude Code, à LLM e ao GitHub vira um pulso; a bolinha pisca quando acabou de responder"></div>
   <nav class="abas" id="abas" hidden aria-label="Partes do painel do loop">
     <button type="button" data-aba="geral" aria-pressed="true" title="Está rodando? Está travado? O que cada etapa fez">Saúde e estado</button>
     <button type="button" data-aba="jev" aria-pressed="false" title="Toda pergunta que o loop faz antes de gastar ou mudar algo">Decisões (Jev First)</button>
@@ -1182,6 +1198,38 @@ async function refreshMedico() {
   } catch {}
 }
 setInterval(refreshMedico, 20000); refreshMedico();
+// --- conexões ao vivo: Jev, Claude Code, LLM, GitHub e o batimento do loop, pulso a pulso
+const ROTULO_CX = {ok: "respondendo", instavel: "instável", fora: "fora", parado: "parado", limite: "no limite", ocioso: "sem chamada na última hora", sem_chave: "sem chave"};
+function cxHa(t, agora) { if (t == null) return ""; const d = Math.max(0, agora - t); return d < 60 ? `há ${Math.round(d)} s` : d < 3600 ? `há ${Math.round(d / 60)} min` : `há ${Math.round(d / 3600)} h`; }
+async function refreshConexoes() {
+  try {
+    const j = await (await fetch("/api/conexoes")).json();
+    const agora = j.em;
+    const el = $("#conexoes");
+    const feitos = new Set();
+    for (const sv of j.servicos) {
+      feitos.add(sv.servico);
+      let c = el.querySelector(`[data-sv="${sv.servico}"]`);
+      if (!c) { c = document.createElement("div"); c.className = "cx"; c.dataset.sv = sv.servico;
+        c.innerHTML = `<span class="cxdot"></span><span class="cxtxt"><b></b><span class="cxsub"></span></span><span class="cxserie"></span>`; el.appendChild(c); }
+      c.dataset.e = sv.estado;
+      c.dataset.vivo = sv.ultimo_pulso != null && agora - sv.ultimo_pulso < 10 ? "1" : "0";
+      c.querySelector("b").textContent = `${sv.nome} · ${sv.papel}`;
+      let sub = sv.detalhe || ROTULO_CX[sv.estado] || sv.estado;
+      if (!sv.detalhe) {
+        if (sv.estado === "ok" || sv.estado === "instavel") sub += (sv.latencia_ms != null ? ` · ${sv.latencia_ms} ms` : "") + (sv.ultima_ok != null ? ` · ${cxHa(sv.ultima_ok, agora)}` : "");
+        if (sv.ultimo_erro && sv.estado !== "ok") sub += ` · ${cxHa(sv.ultimo_erro.em, agora)}: ${sv.ultimo_erro.texto}`;
+      }
+      if (sv.chamadas_1h) sub += ` · 1 h: ${sv.chamadas_1h - sv.falhas_1h} ok${sv.falhas_1h ? `, ${sv.falhas_1h} falha(s)` : ""}`;
+      const sb = c.querySelector(".cxsub"); sb.textContent = sub; c.title = `${sv.nome}: ${sub}`;
+      const maxMs = Math.max(1, ...sv.serie.map(x => x.ms || 0));
+      c.querySelector(".cxserie").innerHTML = sv.servico === "loop" ? "" : sv.serie.map(x => `<i data-ok="${x.ok ? 1 : 0}" style="height:${Math.max(3, Math.round(18 * (x.ms || 0) / maxMs))}px" title="${x.ok ? "ok" : esc(x.erro || "falhou")}${x.ms != null ? ` · ${x.ms} ms` : ""}"></i>`).join("");
+    }
+    el.querySelectorAll(".cx").forEach(c => { if (!feitos.has(c.dataset.sv)) c.remove(); });
+  } catch {}
+}
+setInterval(refreshConexoes, 3000); refreshConexoes();
+
 
 
 async function refreshConsumo() {

@@ -364,8 +364,10 @@ class Vigia:
     def __init__(self, ctx, intervalo: float = INTERVALO):
         self.ctx, self.s, self.intervalo = ctx, ctx.store, intervalo
         self.planejador = None           # o loop liga o Planejador: sem ele, a trava de pergunta só é alertada
+        from . import conexoes
         from .medico import Medico
         self.medico = Medico(ctx)        # o plano de controle roda na mesma thread, depois das travas
+        conexoes.instalar(self.s)        # cada chamada ao GitHub vira um pulso na faixa de conexões
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 

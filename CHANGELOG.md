@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.42.0 — 2026-10-20
+
+**Conexões ao vivo na Gestão do loop.** Uma faixa logo abaixo do cabeçalho mostra, em tempo real (3 s), se cada
+dependência externa está respondendo: **Jev** (decisões), **Claude Code** (Desenvolvedor), **LLM** (API da Anthropic),
+**GitHub** (PRs e CI) e o próprio **Loop** (batimento). Por serviço: estado (respondendo / instável / fora / parado /
+no limite / sem chamada / sem chave), latência mediana da última hora, última resposta, último erro com hora, contagem
+de ok e falhas em 1 h e uma linha do tempo dos últimos 24 pulsos (altura = latência, vermelho = falha). A bolinha pisca
+quando o serviço acabou de responder; vermelha pulsando quando caiu.
+
+- **`circulo/conexoes.py`**: tabela `conexoes` de pulsos (serviço, ok, ms, erro, hora; 7 dias). O Jev grava um pulso a
+  cada `ask_many` real (o decisor local não conta); o GitHub avisa por um `ouvinte` no `GitHubREST` que o SRE liga ao
+  subir (a constituição não importa nada novo); LLM e Claude Code vêm de `llm_calls`; o Loop, do batimento.
+- Claude Code mostra a espera do Desenvolvedor como está ("parado: deslogado · tenta de novo às 18:07" ou "no limite").
+- `GET /api/conexoes`. Olhar a faixa nunca chama ninguém: só lê o que as chamadas reais deixaram.
+
 ## 1.41.1 — 2026-10-20
 
 - Painel: aba fechada pelo navegador no meio de um `/api/...` gerava `BrokenPipeError` com traceback no `loop.err`; agora é ignorado (outros erros do servidor continuam no log).
