@@ -99,7 +99,7 @@ def test_meta_learner_treina_o_aluno_e_painel_expoe(circle, painel):  # noqa: F8
     s = circle.store
     _semear(s, n=150)
     log = circle.meta.step()
-    assert any("aluno do Jev treinado" in l for l in log)
+    assert any("aluno do Jev treinado" in linha for linha in log)
     j = json.loads(urllib.request.urlopen(painel + "/api/aluno", timeout=5).read())
     assert j["resumo"]["perguntas"] >= 2 and j["criterios"]["concordancia_min"] == aluno.CONCORDANCIA_MIN
     assert "Aluno do Jev" in urllib.request.urlopen(painel + "/loop", timeout=5).read().decode()
