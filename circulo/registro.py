@@ -11,19 +11,26 @@ import json
 import time
 from typing import Any
 
+from . import jobs
+from .llm import LLMResult
 from .state import Store
 
 
 def registrar(store: Store, *, tick: int, project_id: int | None, papel: str, modelo: str, escolha: dict | None = None,
               tokens: int = 0, duracao_ms: int | None = None, ok: bool = True, erro: str | None = None,
-              entrada: str = "", saida: str = "") -> int:
+              entrada: str = "", saida: str = "", uso: LLMResult | None = None) -> int:
+    """`uso` é a resposta da LLM: dela saem o custo e o uso separado em entrada, saída e cache."""
     e = escolha or {}
+    if uso is not None:
+        tokens = uso.tokens
+    detalhe = (uso.entrada, uso.saida, uso.cache_lido, uso.cache_escrito) if uso is not None else (None,) * 4
     return store.x(
-        "INSERT INTO llm_calls(tick,project_id,papel,modelo,nivel,decidido_por,confianca,contexto,tokens,duracao_ms,ok,erro,entrada,saida,created_at) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO llm_calls(tick,project_id,papel,modelo,nivel,decidido_por,confianca,contexto,tokens,duracao_ms,ok,erro,entrada,saida,"
+        "tokens_entrada,tokens_saida,cache_lido,cache_escrito,job,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (tick, project_id, papel, modelo, e.get("nivel"), e.get("decidido_por", "fixo"), e.get("confianca"),
          json.dumps(e.get("contexto") or {}, ensure_ascii=False, default=str)[:2000], int(tokens or 0), duracao_ms,
-         int(bool(ok)), (erro or None) and erro[:500], (entrada or "")[:400], (saida or "")[:600], time.time()))
+         int(bool(ok)), (erro or None) and erro[:500], (entrada or "")[:400], (saida or "")[:600], *detalhe,
+         jobs.da_missao(store, project_id), time.time()))
 
 
 def marcar_resultado(store: Store, project_id: int, tick: int, aceita: bool | None) -> None:

@@ -31,6 +31,7 @@ from .memory import Memory
 from .metrics import METRICAS, Metricas, seguro
 from .projects import ensure_seed, intake, kit_project_id
 from .money import fmt_brl
+from .orcamento_dia import avisar_marcos, com_tokens_dia
 from .policy import PolicyStore
 from .state import Store
 
@@ -85,7 +86,7 @@ class Circle:
         store = Store(db_path or (self.data_dir / "circulo.db"))
         policies = PolicyStore(store)
         now = now or (lambda: datetime.now(TZ))
-        budget = Budget(store, policies.get, now)
+        budget = Budget(store, lambda: com_tokens_dia(policies.get()), now)
         dl = DecisionLayer(store, policies.get, budget, jev=jev if jev is not None else build_jev(),
                            llm=llm if llm is not None else build_llm())
         dl.metricas = self.metricas
@@ -173,6 +174,7 @@ class Circle:
     def tick(self) -> TickResult:
         s, ctx = self.store, self.ctx
         ctl = self.controls()
+        avisar_marcos(s, ctx.budget, ctx.reply)
         if ctl["pausado"] or ctx.budget.exhausted():
             s.set("run_id", None)                # giro que não roda não é execução: nada a rastrear
         if ctl["pausado"]:

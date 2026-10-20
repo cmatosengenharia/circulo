@@ -255,7 +255,8 @@ def s_orcamento_curto(s, now):
     modo = modo_do_estudo(dict(item))
     if modo == "dispensado":
         return None
-    limite = int((_kv(s, "orcamento_limite", {}) or {}).get("limite") or 0) or 200_000
+    from .orcamento_dia import limite_hoje
+    limite = limite_hoje(s)
     hoje = datetime.fromtimestamp(now, TZ).date().isoformat()
     r = s.one("SELECT tokens FROM budget WHERE day=?", (hoje,))
     usados = int(r["tokens"] or 0) if r else 0

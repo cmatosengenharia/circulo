@@ -19,6 +19,7 @@ from . import __version__, finance
 from . import atividade as atv
 from . import registro, repo_stats
 from .money import fmt_brl
+from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
@@ -68,7 +69,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
     for r in ([] if kit != "financas" else s.q("SELECT id, description, amount_cents, category FROM ledger WHERE status='open' AND auto_accepted=0 ORDER BY id DESC LIMIT 8")):
         aguardando.append({"tipo": "revisao", "texto": f"#{r['id']} {fmt_brl(r['amount_cents'])} {r['description']} → {r['category']}?",
                            "acao": f"ok {r['id']}"})
-    for r in s.q("SELECT message FROM alerts WHERE kind IN ('merge','saude') AND delivered=0 ORDER BY id DESC LIMIT 8"):
+    for r in s.q("SELECT message FROM alerts WHERE kind IN ('merge','saude','orcamento') AND delivered=0 ORDER BY id DESC LIMIT 8"):
         aguardando.append({"tipo": "aviso", "texto": r["message"]})
 
     serie = [{"tick": t, "tokens": b.get("budget", {}).get("tokens", 0), "erros": len(b.get("errors", [])),
@@ -96,7 +97,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
             "vivo": loop_status(s, now),
         },
         "orcamento": {"dia": budget["day"] if budget else day, "tokens": budget["tokens"] if budget else 0,
-                      "limite": _limite(s, policy), "limite_padrao": policy["budget"]["daily_token_limit"],
+                      "limite": limite_hoje(s), "limite_padrao": tokens_dia(),
                       "customizado": bool((s.get("orcamento_limite") or {}).get("limite")),
                       "jev": budget["jev_calls"] if budget else 0, "llm": budget["llm_calls"] if budget else 0},
         "saude": {
@@ -141,11 +142,6 @@ def _cerebros(s: Store) -> list[dict]:
         return cerebros(s)
     except Exception:  # noqa: BLE001
         return []
-
-
-def _limite(s: Store, policy: dict) -> int:
-    from .budget import limite_diario
-    return limite_diario(s, int(policy["budget"]["daily_token_limit"]))
 
 
 def conversa(s: Store, projeto: int | None, limite: int = 25) -> list[dict]:
@@ -560,18 +556,16 @@ def make_handler(db_path: str):
             if u.path == "/api/orcamento":
                 # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
                 from .budget import definir_limite
-                pol = store.one("SELECT body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")
-                padrao = int(json.loads(pol["body"])["budget"]["daily_token_limit"])
                 bruto = data.get("limite")
                 try:
-                    r = definir_limite(store, None if bruto in (None, "", "padrao") else int(bruto), padrao)
+                    r = definir_limite(store, None if bruto in (None, "", "padrao") else int(bruto), tokens_dia())
                 except (ValueError, TypeError) as exc:
                     return self._json({"erro": str(exc)}, 400)
                 def fmt(n):
                     return f"{n:,}".replace(",", ".")
                 store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
                         ("controle", f"Você mudou o limite diário da API: {fmt(r['antes'])} → {fmt(r['depois'])} tokens"
-                         + ("" if r["customizado"] else " (padrão da política)"), time.time(), kit_project_id(store, "circulo")))
+                         + ("" if r["customizado"] else " (padrão da configuração)"), time.time(), kit_project_id(store, "circulo")))
                 return self._json({"ok": True, **r})
             if u.path == "/api/frescor":
                 # o painel mede o próprio atraso (dado → tela) e o loop monitora como qualquer neurônio

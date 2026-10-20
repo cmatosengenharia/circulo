@@ -124,7 +124,7 @@ class Engine:
                           duracao_ms=int((time.time() - t0) * 1000), ok=False, erro=f"{type(exc).__name__}: {exc}", entrada=prompt)
             raise
         registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
-                      tokens=out.tokens, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
+                      uso=out, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
         self.ctx.budget.charge(out.tokens, "llm")
         with self._tokens_lock:
             res.tokens += out.tokens

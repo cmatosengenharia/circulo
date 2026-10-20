@@ -115,6 +115,25 @@ def registrar(ctx, event_id: int) -> str:
     return job
 
 
+def da_missao(store, project_id: int | None) -> str:
+    """O job a que o gasto de uma missão é atribuído: o do seu último pedido classificado, o que ela antecipa,
+    'evoluir_loop' para o próprio loop ou o tipo da missão quando ele é um job; senão 'desconhecido'."""
+    if project_id is None:
+        return DESCONHECIDO
+    ev = store.one("SELECT job FROM events WHERE json_extract(payload,'$.projeto')=? AND job IS NOT NULL AND job!=? "
+                   "ORDER BY id DESC LIMIT 1", (project_id, DESCONHECIDO))
+    if ev:
+        return ev["job"]
+    p = store.one("SELECT nome, tipo, kit FROM projects WHERE id=?", (project_id,))
+    if p is None:
+        return DESCONHECIDO
+    if p["nome"].startswith("antecipar:") and p["nome"][10:] in JOBS:
+        return p["nome"][10:]
+    if p["kit"] == "circulo":
+        return "evoluir_loop"
+    return p["tipo"] if p["tipo"] in JOBS else DESCONHECIDO
+
+
 def recorrentes(store, agora: float | None = None) -> dict[str, int]:
     agora = time.time() if agora is None else agora
     return {r["job"]: r["n"] for r in store.q(
