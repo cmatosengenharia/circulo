@@ -113,6 +113,21 @@ def test_adaptar_cortado_sem_o_item_novo_e_adotado_como_pedido(circle):
     assert item(circle, iid)["titulo"] == "Usar cache em todas as decisões do Jev"
 
 
+def test_narracao_com_chave_antes_do_json_nao_descarta_o_estudo(circle):
+    """Lição #22 (reincidente): com busca na web a LLM narra antes do JSON; um `{` na narração fazia o estudo inteiro,
+    completo ou cortado no "item", virar "resposta sem JSON válido"."""
+    narra = "Vou pesquisar o veto {constituição} no planejador e a causa de cada falha de abrir_pr.\n\n"
+    inteiro = json.dumps(resposta("adotar"), ensure_ascii=False)
+    for texto in (narra + inteiro, narra + inteiro[:inteiro.index('"detalhe"') + len('"detalhe')]):
+        iid = pedido(circle)
+        circle.ctx.dl.llm = Pesquisa(texto)
+        r = Estudo(circle.ctx).run()
+        assert r is not None and r["veredito"] == "adotar"
+        assert r["fontes"] == ["https://a.org/x", "https://b.org/y"]
+        assert item(circle, iid)["estudo"] is not None
+    assert circle.store.one("SELECT COUNT(*) n FROM licoes WHERE assinatura='estudo:saida_invalida'")["n"] == 0
+
+
 def test_erro_do_loop_nao_passa_pelo_estudo(circle):
     circle.store.x("UPDATE roadmap SET status='feito'")
     circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
