@@ -97,3 +97,27 @@ def test_painel_expoe_a_faixa_de_conexoes(circle, painel):  # noqa: F811
 
 
 from test_painel import painel  # noqa: E402,F401 — fixture do servidor do painel
+
+
+def test_403_esperado_do_check_runs_nao_e_falha_de_conexao(circle, monkeypatch):
+    """Token sem a permissão Checks: o gate cai para a API do Actions por desenho; a faixa não pode chamar isso de instável."""
+    import io
+    conexoes.instalar(circle.store)
+    gh = GitHubREST("x/y", "t")
+
+    def resposta(req, timeout):
+        if "check-runs" in req.full_url:
+            raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, io.BytesIO(b""))
+
+        class R(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        return R(json.dumps({"workflow_runs": []}).encode())
+    monkeypatch.setattr("urllib.request.urlopen", resposta)
+    assert gh.check_runs("abc1234") == []
+    g = next(x for x in conexoes.estado(circle.store)["servicos"] if x["servico"] == "github")
+    assert g["falhas_1h"] == 0 and g["chamadas_1h"] == 2 and g["estado"] == "ok"
+    GitHubREST.ouvinte = None

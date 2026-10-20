@@ -164,7 +164,7 @@ def test_sem_permissao_checks_le_os_jobs_pelo_actions(monkeypatch):
     from circulo.merge_gate import GitHubREST
     gh = GitHubREST("dono/repo", "t")
 
-    def req(method, path, body=None):
+    def req(method, path, body=None, **_):
         if "/check-runs" in path:
             raise urllib.error.HTTPError(path, 403, "Forbidden", {}, io.BytesIO(b"{}"))
         if path.startswith("/actions/runs?"):

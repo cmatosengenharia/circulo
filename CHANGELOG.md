@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.46.0 — 2026-10-20
+
+**O Desenvolvedor parou 45 min com um PR esperando conserto — deadlock entre o fatiador e o conserto.** O sub-item A
+(#91) tinha o PR #39 reprovado pelo CI ("Reprodução primeiro"); o sub-item B esperava A; o fatiador devolvia "nada"
+e o giro voltava sem chamar o Developer — então ninguém consertava o PR de A, e a fila normal (#85) também ficava
+parada. O SRE viu ("Item #85 pronto há 45 min", "11 giros sem avançar"), mas a causa era estrutural.
+
+- `loop`: com PR reprovado esperando conserto, `corrigir_codigo` chama o Developer direto (`consertar()` vem antes de
+  qualquer item novo), sem passar pelo fatiador.
+- `fatiador.proximo`: quando o sub-item seguinte ainda espera o anterior, devolve o próximo item da fila normal em vez de
+  nada — a divisão de um item não para o resto do roteiro.
+- Faixa de conexões: o 403 do `check-runs` com token sem a permissão Checks é esperado (o gate lê os jobs pela API do
+  Actions) e deixa de contar como falha do GitHub.
+
 ## 1.45.0 — 2026-10-20
 
 **Os gargalos medidos no Mac (24 h: 1,5 M tokens do Desenvolvedor para 7 itens entregues).**
