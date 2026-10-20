@@ -291,11 +291,13 @@ class Planejador:
         if item.get("dado") and item.get("base") in ("medido", "inferido"):
             # verificação pelo Jev (caso de uso da doc: conferir afirmações de IA contra a fonte): o dado existe na evidência?
             from .decision import SN
+            from .jev_lab import estado_dado
             v = self.ctx.dl.ask("dado_na_evidencia", Question(
                 "noul", "O dado citado pelo planejador aparece de fato na evidência do loop?",
-                SN("`dado` corresponde a um número ou fato presente em `evidencia` (mesmo arredondado)",
-                   "`dado` não está na evidência, ou contradiz o que ela mostra")),
-                {"dado": item["dado"], "evidencia": json.dumps({"pergunta": pergunta.evidencia, "geral": ev}, ensure_ascii=False, default=str)[:6000]})
+                SN("`fracao_encontrada` ≥ 0.5 (a maioria dos números de `dado` está em `numeros_na_evidencia`) e os `trechos_da_evidencia` "
+                   "falam do mesmo fato; ou `dado` não tem número e os trechos confirmam o fato",
+                   "`fracao_encontrada` < 0.5; ou `numeros_na_evidencia` está vazio com `evidencia_tem_numeros` true; ou os trechos contradizem o dado")),
+                estado_dado(str(item["dado"]), json.dumps({"pergunta": pergunta.evidencia, "geral": ev}, ensure_ascii=False, default=str)))
             if float(v.value) < 0.5 and v.source == "jev":
                 item["base"] = "chutado"
                 item["detalhe"] += f" (o Jev não achou o dado “{item['dado'][:80]}” na evidência)"

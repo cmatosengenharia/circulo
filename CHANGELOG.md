@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.47.0 — 2026-10-20
+
+**Passe do Jev lab nas quatro perguntas em que o Jev mais duvidava.** Medido em 20/10: `worth_spending` 0,49 de confiança
+(604×/dia), `should_evolve` 0,39, `dado_na_evidencia` 0,31, `indaga_pert` 0,38 — contra 0,82 em `vigia_acao` e 0,90 em
+`indaga_eixo`. A diferença era a pergunta: estado sem âncora (um `value_signal` solto e `budget_left_ratio` sempre 1,0
+no modo sem limite) ou grande demais (6 mil chars de evidência), e critério abstrato. O Jev classifica bem quando o
+estado tem as poucas features que decidem e o critério tem número.
+
+- **`worth_spending`**: estado medido (`jev_lab.estado_worth`): `custo_pct_dia` (custo relativo ao gasto de hoje),
+  `orcamento` (sem limite / % do dia / esgotado), `desbloqueia_fila`, `fila_do_developer`, `rodou_hoje_sem_render`
+  (a mesma ação já rodou hoje sem entregar). Critério: "≥ 0,7; ou ≥ 0,5 com custo < 5 %; ou destrava a fila…".
+- **`should_evolve`**: `occurrences`/`consistency` com limiar (≥ 3 e ≥ 0,8), `revertida_antes` e `aplicada_hoje` lidos
+  da tabela de propostas.
+- **`dado_na_evidencia`**: verificação mecânica antes do Jev (`estado_dado`): quais números do dado aparecem na evidência
+  (fração e trechos em volta) em vez de 6 mil chars de JSON.
+- **`indaga_pert`** (PO): por candidata, `base_medida`, `ja_perguntada_7d` (da memória do time) e
+  `item_parecido_em_andamento`; o estado da missão fica em 7 campos.
+- **Cache de estado idêntico** nas perguntas de rotina (`vigia_trava`/`vigia_acao`, `idle_task`, `medico_*`): mesma
+  pergunta com o mesmo estado em 10 min devolve a decisão anterior, marcada `cache`, sem chamada ao Jev (eram 353 + 357
+  por dia). Se todas as perguntas da chamada vêm do cache, não há chamada.
+- As variantes em inglês do laboratório acompanham os critérios novos (o A/B continua comparando igual com igual).
+- **Medição antes × depois** em Bastidores do giro → Jev: confiança média de cada uma das 4 perguntas nas 24 h anteriores
+  ao passe e desde então, e quantas respostas de rotina vieram do cache. Meta: tirar as 4 de ~0,4 para > 0,7.
+
 ## 1.46.0 — 2026-10-20
 
 **O Desenvolvedor parou 45 min com um PR esperando conserto — deadlock entre o fatiador e o conserto.** O sub-item A

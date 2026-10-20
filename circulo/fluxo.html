@@ -189,7 +189,10 @@ function renderJev(j) {
   const cobHtml = cob ? `<div class="nota" style="margin-bottom:10px"><b>Cobertura da API do Jev no código:</b> ${cob.total} perguntas ·
       critérios descritos ${Math.round(cob.por_regra.criterios * 100)}% · em inglês ${Math.round(cob.por_regra.ingles * 100)}% ·
       citam campos do estado ${Math.round(cob.por_regra.referencia_estado * 100)}%${cob.faltam.filter(f => f.falta.includes("criterios")).length ? ` · sem critérios: ${cob.faltam.filter(f => f.falta.includes("criterios")).map(f => esc(f.onde)).join(", ")}` : ""}</div>` : "";
-  $("#jevLab").innerHTML = cobHtml + `<b>Laboratório: melhores formas de perguntar</b>
+  const ps = j.passe && j.passe.perguntas ? j.passe.perguntas : [];
+  const passeHtml = ps.length ? `<div class="nota" style="margin-bottom:10px"><b>Passe ${esc(j.passe.versao)} nas perguntas em dúvida</b> (estado enxuto e medido, critério com número; ${j.cache_24h || 0} resposta(s) de rotina vindas do cache em 24 h):<br>` +
+      ps.map(p => `${esc(PERG[p.pergunta] || p.pergunta)}: ${p.antes_conf == null ? "—" : Math.round(p.antes_conf * 100) + "%"} (${p.antes_n}) → <b>${p.depois_conf == null ? "ainda sem resposta" : Math.round(p.depois_conf * 100) + "%"}</b>${p.depois_n ? ` (${p.depois_n})` : ""}`).join(" · ") + `</div>` : "";
+  $("#jevLab").innerHTML = cobHtml + passeHtml + `<b>Laboratório: melhores formas de perguntar</b>
     <div class="nota">A doc do Jev recomenda inglês e a condição explícita. Cada pergunta abaixo vai em dobro na mesma chamada (custo quase zero): a atual e a variante. Com ${j.min_n} pares e ganho de ${Math.round(j.ganho_min * 100)} pontos de confiança, a variante vira a oficial sozinha; se o ganho sumir, volta.</div>${labs}`;
 }
 
