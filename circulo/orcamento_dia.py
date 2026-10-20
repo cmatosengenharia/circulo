@@ -41,7 +41,10 @@ def tokens_por_job(store: Store, desde: float = 0.0) -> dict[str, int]:
 
 
 def avisar_marcos(store: Store, budget: Budget, reply: Callable[[str, str], None]) -> int | None:
-    """Avisa uma vez por marco cruzado no dia (e de novo se você mudar o limite). Devolve o marco avisado."""
+    """Avisa uma vez por marco cruzado no dia (e de novo se você mudar o limite). Devolve o marco avisado.
+    No modo ilimitado não há corte: nada a avisar (o consumo fica no painel, em "Consumo de tokens")."""
+    if budget.ilimitado:
+        return None
     b = budget.snapshot()
     usado, limite = int(b["tokens"]), int(b["limite"])
     pct = 100 * usado // limite if limite else 100

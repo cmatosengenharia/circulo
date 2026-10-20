@@ -46,6 +46,7 @@ def test_idle_evolution_sem_inputs(circle):
 
 def test_pausa_por_orcamento_e_retoma_no_dia_seguinte(tmp_path, clock):
     c = Circle(tmp_path, jev=LocalJev(), now=clock)
+    c.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     c.ctx.budget.charge(c.ctx.budget.limit, "llm")      # esgota o dia
     c.submit("38,90 ifood almoço", at=NOON.timestamp())
     assert c.tick().paused

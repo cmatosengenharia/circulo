@@ -490,6 +490,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
   <div data-aba="geral" class="about" id="about"></div>
   <div data-aba="geral" class="kpis" id="kpis" aria-label="Números ao vivo"></div>
   <form class="orc-form" id="orcForm" hidden>
+    <span class="seg" role="group" aria-label="Modo do orçamento"><button type="button" data-modo="ilimitado" aria-pressed="false">Sem limite (medindo)</button><button type="button" data-modo="limite" aria-pressed="false">Com limite diário</button></span>
     <label>Limite diário da API (tokens) <input type="number" id="orcLimite" min="10000" step="10000" required></label>
     <button class="btn primary" type="submit">Salvar</button>
     <button class="btn" type="button" id="orcPadrao">Voltar ao padrão</button>
@@ -567,6 +568,13 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <h2>Roteiro do loop</h2>
       <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Desenvolvedor pega daqui.</p>
       <div id="roadmap"></div>
+    </section>
+    <section data-aba="seguranca" class="panel c12" aria-label="Consumo de tokens">
+      <h2>Consumo de tokens: medindo para definir o limite</h2>
+      <p class="sub" style="margin:-6px 0 8px">Quanto a API gastou por dia, por papel e por hora do dia. No modo sem limite nada é cortado; estes números é que vão dizer qual limite faz sentido.</p>
+      <div class="indag-tot" id="consTot"></div>
+      <div class="cons-grid" id="consDias"></div>
+      <ul class="list" id="consPapeis"></ul>
     </section>
     <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Cérebros">
       <h2>Cérebros e neurônios</h2>
@@ -966,7 +974,9 @@ function renderKpis(s) {
   k.push([ult5 >= 10 ? Math.round(ult5) : ult5.toFixed(1), "decisões por minuto"]);
   k.push([(s.orcamento.llm || 0).toLocaleString("pt-BR"), `chamadas de LLM hoje <small>${s.orcamento.jev} ao Jev</small>`]);
   const O = s.orcamento, pct = O.limite ? Math.round(100 * O.tokens / O.limite) : 0;
-  k.push([`<button class="orc-btn" id="orcBtn" title="Mudar o limite diário da API"><b>${pct}%</b> ✎</button>`,
+  if (O.modo === "ilimitado") k.push([`<button class="orc-btn" id="orcBtn" title="Orçamento: medindo sem corte. Clique para mudar"><b>${(O.tokens / 1000).toFixed(0)} mil</b> ✎</button>`,
+    `tokens hoje <small>sem limite · medindo para definir o limite</small>`, true]);
+  else k.push([`<button class="orc-btn" id="orcBtn" title="Mudar o limite diário da API"><b>${pct}%</b> ✎</button>`,
     `da API hoje <small>${(O.tokens / 1000).toFixed(0)} mil de ${(O.limite / 1000).toFixed(0)} mil tokens${O.customizado ? " · limite seu" : ""}</small>`, true]);
   $("#kpis").innerHTML = k.map(([v, l, html]) => `<div class="kpi">${html ? v : `<b>${v}</b>`}<span>${l}</span></div>`).join("");
 }
@@ -1099,7 +1109,9 @@ function render(s) {
                     : meter("Eficiência", "—", 0, .9, "Nenhuma decisão nas últimas 24h ainda.")) +
     meter("Confiabilidade", h.erros_100 + " erros", errRate, .05, `Nos últimos ${h.giros_100} giros.`, true);
   const o = s.orcamento;
-  $("#budget").innerHTML = meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
+  $("#budget").innerHTML = o.modo === "ilimitado"
+    ? meter("Tokens de hoje (sem limite)", o.tokens.toLocaleString("pt-BR"), 0, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Modo ilimitado: nada é cortado; o consumo fica medido para você escolher o limite depois (veja "Consumo de tokens" em Segurança e confiança).`)
+    : meter("Orçamento de hoje", `${o.tokens.toLocaleString("pt-BR")} / ${o.limite.toLocaleString("pt-BR")}`,
     o.tokens / o.limite, null, `${o.jev} perguntas ao Jev · ${o.llm} chamadas de LLM. Ao esgotar, o círculo pausa e retoma à meia-noite.`);
 
   const A = s.autonomia;
@@ -1286,14 +1298,22 @@ setInterval(medirAtraso, 1000);
 setInterval(() => { if (piorAtraso != null) { const a = Math.round(piorAtraso); piorAtraso = null;
   fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a})}).catch(() => {}); } }, 10000);
 document.addEventListener("click", e => {
-  if (e.target.closest("#orcBtn")) { $("#orcForm").hidden = false; $("#orcLimite").value = S && S.orcamento ? S.orcamento.limite : ""; $("#orcLimite").focus(); }
+  if (e.target.closest("#orcBtn")) { $("#orcForm").hidden = false; $("#orcLimite").value = S && S.orcamento ? S.orcamento.limite : ""; document.querySelectorAll("[data-modo]").forEach(b => b.setAttribute("aria-pressed", S && S.orcamento && b.dataset.modo === S.orcamento.modo)); $("#orcLimite").focus(); }
 });
 $("#orcFechar").onclick = () => { $("#orcForm").hidden = true; };
 $("#ligar").onsubmit = async e => { e.preventDefault(); await post("/api/ligacoes", {a: Number(PID), b: Number($("#ligarCom").value), relacao: $("#ligarRel").value}); window._ckey = null; refresh(); };
 document.addEventListener("click", async e => { const b = e.target.closest("[data-separar]"); if (b) { b.disabled = true; await post("/api/ligacoes", {a: Number(PID), b: Number(b.dataset.separar), relacao: "nenhuma"}); window._ckey = null; refresh(); } });
 $("#paralelo").onchange = async () => { await post("/api/missao/paralelo", {id: Number(PID), n: Number($("#paralelo").value)}); refresh(); };
+async function salvarModo(modo) {
+  const r = await fetch("/api/orcamento", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({modo})});
+  const j = await r.json();
+  $("#orcMsg").textContent = r.ok ? (modo === "ilimitado" ? "Sem limite: nada é cortado; o consumo continua medido." : "Com limite: o limite diário abaixo volta a valer.") : (j.erro || "não foi possível salvar");
+  document.querySelectorAll("[data-modo]").forEach(b => b.setAttribute("aria-pressed", b.dataset.modo === modo));
+  if (r.ok) refresh();
+}
+document.querySelectorAll("[data-modo]").forEach(b => b.addEventListener("click", () => salvarModo(b.dataset.modo)));
 async function salvarLimite(limite) {
-  const r = await fetch("/api/orcamento", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({limite})});
+  const r = await fetch("/api/orcamento", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify({limite, modo: "limite"})});
   const j = await r.json();
   $("#orcMsg").textContent = r.ok ? `Limite agora: ${j.depois.toLocaleString("pt-BR")} tokens por dia${j.customizado ? "" : " (padrão)"}.` : (j.erro || "não foi possível salvar");
   if (r.ok) { setTimeout(() => { $("#orcForm").hidden = true; }, 1500); refresh(); }
@@ -1411,6 +1431,22 @@ async function refreshMemoria() {
   } catch {}
 }
 setInterval(refreshMemoria, 20000); refreshMemoria();
+async function refreshConsumo() {
+  try {
+    const j = await (await fetch("/api/consumo?dias=14")).json();
+    const f = n => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
+    $("#consTot").textContent = `modo ${j.modo === "ilimitado" ? "sem limite (medindo)" : "com limite"} · hoje ${f(j.hoje)} tokens · ${j.dias_completos} dia(s) completo(s) medido(s) · mediana ${f(j.mediana_dia)} · máximo ${f(j.maximo_dia)}` +
+      (j.sugestao_limite ? ` · sugestão de limite: ${f(j.sugestao_limite)} (p90)` : " · sugestão de limite: precisa de 3 dias completos");
+    const max = Math.max(1, ...j.por_dia.map(d => d.tokens));
+    const hoje = j.por_dia.length ? j.por_dia[j.por_dia.length - 1].dia : "";
+    $("#consDias").innerHTML = j.por_dia.map(d => `<div class="d ${d.dia === hoje ? "hoje" : ""}" title="${d.dia}: ${f(d.tokens)} tokens · ${d.llm} chamadas de LLM · ${d.jev} ao Jev"><b>${(d.tokens / 1000).toFixed(0)}k</b><i style="height:${Math.max(3, Math.round(70 * d.tokens / max))}px"></i><span>${d.dia.slice(8)}/${d.dia.slice(5, 7)}</span></div>`).join("") || "<span class=sub>sem dias medidos ainda</span>";
+    const pico = j.por_hora.indexOf(Math.max(...j.por_hora));
+    $("#consPapeis").innerHTML = Object.entries(j.por_papel).map(([p, v]) => `<li><span class="tag">${esc(p)}</span> ${f(v.tokens)} tokens em ${v.chamadas} chamada(s) · maior ${f(v.maior_chamada)}${v.falhas ? ` · ${v.falhas} falha(s)` : ""}</li>`).join("") +
+      (j.por_hora.some(x => x) ? `<li><span class="tag">hora de pico</span> ${pico}h–${pico + 1}h concentra ${f(j.por_hora[pico])} tokens nos últimos ${j.dias} dias</li>` : "");
+  } catch {}
+}
+setInterval(refreshConsumo, 30000); refreshConsumo();
+
 
 async function refreshCamadas() {
   if (!ZERO) return;

@@ -98,7 +98,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         },
         "orcamento": {"dia": budget["day"] if budget else day, "tokens": budget["tokens"] if budget else 0,
                       "limite": limite_hoje(s), "limite_padrao": tokens_dia(),
-                      "customizado": bool((s.get("orcamento_limite") or {}).get("limite")),
+                      "customizado": bool((s.get("orcamento_limite") or {}).get("limite")), "modo": _modo(s),
                       "jev": budget["jev_calls"] if budget else 0, "llm": budget["llm_calls"] if budget else 0},
         "saude": {
             "invariantes": violations,
@@ -142,6 +142,11 @@ def _cerebros(s: Store) -> list[dict]:
         return cerebros(s)
     except Exception:  # noqa: BLE001
         return []
+
+
+def _modo(s: Store) -> str:
+    from .budget import modo_orcamento
+    return modo_orcamento(s)
 
 
 def conversa(s: Store, projeto: int | None, limite: int = 25) -> list[dict]:
@@ -334,6 +339,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/revisor":
                 from .revisor import resumo as revis
                 self._json(revis(self._store()))
+            elif u.path == "/api/consumo":
+                from .budget import consumo
+                self._json(consumo(self._store(), int((q.get("dias") or ["14"])[0])))
             elif u.path == "/api/memoria":
                 from .memoria import Memoria
                 self._json(Memoria(self._store()).resumo())
@@ -555,10 +563,22 @@ def make_handler(db_path: str):
                 return self._json({"ok": True, **r})
             if u.path == "/api/orcamento":
                 # você decide quanto a API pode gastar por dia; vale na hora, para todo o loop
-                from .budget import definir_limite
+                from .budget import definir_limite, definir_modo
+                padrao = tokens_dia()
+                if "modo" in data and "limite" not in data:
+                    try:
+                        m = definir_modo(store, str(data.get("modo")))
+                    except ValueError as exc:
+                        return self._json({"erro": str(exc)}, 400)
+                    store.x("INSERT INTO alerts(kind,message,created_at,project_id) VALUES(?,?,?,?)",
+                            ("controle", f"Você mudou o orçamento para o modo {m['depois']}" + (" (medindo, sem corte)" if m["depois"] == "ilimitado" else " (o limite diário volta a valer)"),
+                             time.time(), kit_project_id(store, "circulo")))
+                    return self._json({"ok": True, **m})
                 bruto = data.get("limite")
                 try:
-                    r = definir_limite(store, None if bruto in (None, "", "padrao") else int(bruto), tokens_dia())
+                    r = definir_limite(store, None if bruto in (None, "", "padrao") else int(bruto), padrao)
+                    if data.get("modo"):
+                        definir_modo(store, str(data["modo"]))
                 except (ValueError, TypeError) as exc:
                     return self._json({"erro": str(exc)}, 400)
                 def fmt(n):

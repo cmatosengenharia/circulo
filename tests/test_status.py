@@ -20,6 +20,7 @@ def test_pausado_e_modo_seguro(circle):
 
 
 def test_pausado_por_orcamento(circle):
+    circle.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     circle.heartbeat()
     circle.ctx.budget.charge(circle.ctx.budget.limit)
     circle.tick()

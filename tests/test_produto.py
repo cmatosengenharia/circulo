@@ -31,6 +31,7 @@ def test_giros_em_paralelo_disputam_torneio_e_fica_a_melhor(motor):  # noqa: F81
 
 def test_paralelo_e_limitado_pelo_orcamento(motor):  # noqa: F811
     c, _, pid = motor
+    c.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     p = dict(c.store.one("SELECT * FROM projects WHERE id=?", (pid,)))
     p["paralelo"] = 4
     assert c.engine.giros_paralelos(p) == 4

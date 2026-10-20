@@ -17,6 +17,7 @@ class FakeLLM:
 
 def test_worth_spending_bloqueia_acima_do_orcamento(circle):
     dl = circle.ctx.dl
+    circle.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     assert dl.worth_spending("idle_evolution", {"est_tokens": 0, "value_signal": 0.6}).allowed
     g = dl.worth_spending("developer_feature", {"est_tokens": 10_000_000, "value_signal": 1.0})
     assert not g.allowed and "orçamento" in g.reason

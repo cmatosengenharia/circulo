@@ -246,7 +246,23 @@ def s_orcamento(s, now):
             "gravidade": 0.5, "sugestao": "subir o limite diário no painel, ou aceitar a pausa"}
 
 
+def s_consumo_alto(s, now):
+    """Modo ilimitado: ninguém corta, mas um dia 2× acima da mediana medida merece um aviso (informativo, não trava)."""
+    from .budget import consumo, modo_orcamento
+    if modo_orcamento(s) != "ilimitado":
+        return None
+    c = consumo(s, 8, now)
+    if c["mediana_dia"] is None or c["hoje"] < 200_000 or c["hoje"] < 2 * c["mediana_dia"]:
+        return None
+    return {"chave": "consumo_alto", "titulo": f"Consumo de hoje ({c['hoje']:,} tokens) já é {c['hoje'] / c['mediana_dia']:.1f}× a mediana dos últimos dias ({c['mediana_dia']:,})".replace(",", "."),
+            "evidencia": {"hoje": c["hoje"], "mediana_dia": c["mediana_dia"], "por_papel": {k: v["tokens"] for k, v in list(c["por_papel"].items())[:4]}, "base": "medido"},
+            "gravidade": 0.4, "sugestao": "ver qual papel puxou o gasto (Consumo de tokens, no painel); nada é cortado no modo ilimitado"}
+
+
 def s_orcamento_curto(s, now):
+    from .budget import modo_orcamento
+    if modo_orcamento(s) == "ilimitado":
+        return None
     """Há item esperando estudo e o que sobra do orçamento do dia não paga o estudo dele (medido na tabela budget).
     No Mac (19/10, 22 h): 392 mil de 400 mil gastos, estudo completo custando ~33 mil: a evolução parou sem ninguém dizer."""
     item = s.one("SELECT id, titulo, origem, evidencia FROM roadmap WHERE status='pendente' AND estudo IS NULL AND origem IN ('loop','pedido_cassio') "
@@ -276,7 +292,7 @@ def s_orcamento_curto(s, now):
 
 SONDAS: list[Callable] = [s_giro_travado, s_pergunta_valida_parada, s_porteiro_recusa, s_developer_parado, s_fila_seca, s_pr_preso,
                           s_corpo_atrasado, s_licao_bloqueia, s_jev_duvida, s_estagnacao, s_missao_sem_ciclo, s_claude_code_limite, s_orcamento,
-                          s_orcamento_curto]
+                          s_orcamento_curto, s_consumo_alto]
 
 
 def sondar(store, now: float | None = None) -> list[dict]:

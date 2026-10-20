@@ -39,6 +39,7 @@ def test_limite_escolhido_por_voce_no_painel_continua_valendo(circle):
 
 
 def test_avisa_em_50_e_80_por_cento_uma_vez_cada_antes_do_corte(circle):
+    circle.store.set("orcamento_modo", {"modo": "limite"})     # os marcos só existem com corte
     _gastar(circle, 499_000)
     circle.tick()
     assert _avisos(circle) == []
@@ -58,6 +59,7 @@ def test_avisa_em_50_e_80_por_cento_uma_vez_cada_antes_do_corte(circle):
 
 
 def test_salto_direto_ao_corte_ainda_avisa(circle):
+    circle.store.set("orcamento_modo", {"modo": "limite"})     # os marcos só existem com corte
     _gastar(circle, 1_000_000)
     assert circle.tick().paused
     assert len(_avisos(circle)) == 1 and "100%" in _avisos(circle)[0]

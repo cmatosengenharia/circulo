@@ -61,6 +61,7 @@ def test_missoes_evoluem_em_paralelo(eco):
 
 def test_paralelo_respeita_orcamento(eco):
     c, gen, *_ = eco
+    c.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     c.ctx.budget.charge(c.ctx.budget.limit - c.ctx.budget.reserve - 10_000)
     assert len(c.engine.run_parallel()) == 1                  # só cabe um ciclo no que sobrou
 

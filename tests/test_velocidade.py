@@ -286,6 +286,7 @@ def test_vigia_avisa_quando_o_orcamento_nao_paga_o_proximo_estudo(circle):
     from circulo import vigia
     from circulo.budget import TZ
     s = circle.store
+    s.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     agora = time.time()
     s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Pedido seu','d','pedido_cassio','pendente','pedido',1,?,?)", (agora, agora))
     s.set("orcamento_limite", {"limite": 400000})

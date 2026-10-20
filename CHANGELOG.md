@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.35.0 — 2026-10-20
+
+**Orçamento sem corte, medindo.** Medido no Mac: o loop bateu 393 mil de 400 mil tokens ontem e 383 mil às 9 h de
+hoje — e ia pausar até a meia-noite no meio do trabalho. Decisão do Cássio: neste primeiro momento não limitar os
+tokens da LLM, mas guardar as métricas para escolher o limite com dados.
+
+- **Modo do orçamento** (kv `orcamento_modo`): `ilimitado` (padrão a partir desta versão) ou `limite`. No modo
+  ilimitado `Budget.can_spend` é sempre verdadeiro, `exhausted` é falso, `left_ratio` é 1,0 e o loop nunca pausa
+  por orçamento; `charge` continua gravando cada token (tabela `budget` por dia; `llm_calls` por chamada e papel).
+  No modo `limite` tudo funciona como antes (porteiro do gasto, pausa até a meia-noite, piso e teto).
+- **`budget.consumo()` / `/api/consumo`**: tokens por dia (14 dias), por papel (chamadas, tokens, maior chamada,
+  falhas), por hora do dia, mediana e máximo dos dias completos e uma **sugestão de limite** = p90 dos dias
+  completos arredondado para cima em 50 mil (só com 3 dias completos; só dado, a escolha é sua).
+- **Painel**: o KPI mostra "N mil tokens hoje · sem limite · medindo"; o formulário do orçamento ganhou o seletor
+  "Sem limite (medindo) / Com limite diário"; card **Consumo de tokens** em Segurança e confiança com barras por
+  dia, papéis e hora de pico. `POST /api/orcamento {"modo": ...}` muda o modo e registra alerta de controle.
+- **SRE-Vigia**: no modo ilimitado a sonda "orçamento não paga o próximo estudo" fica muda; entra `consumo_alto`,
+  informativa (gravidade 0,4), quando o dia passa de 2× a mediana medida e de 200 mil tokens.
+- Convive com o PR #27 do próprio loop (padrão de 1 M/dia por `CIRCULO_TOKENS_DIA`, avisos em 50/80/100 % e uso
+  por entrada/saída/cache e por job em `llm_calls`): o padrão de 1 M vale quando o modo é `limite`; no ilimitado os
+  avisos de marco ficam mudos e a medição por job alimenta o consumo.
+- Testes: 5 novos em `test_orcamento` (padrão ilimitado não corta e segue medindo; `consumo` e p90; Vigia só avisa;
+  painel muda o modo e expõe o consumo; marcos mudos); os 9 testes que provam o corte passam a ligar o modo `limite`.
+
 ## 1.34.0 — 2026-10-19
 
 **Memória do time: RAG dentro do loop.** Medido no código: todo agente montava o prompt com SQL fixo. O Desenvolvedor

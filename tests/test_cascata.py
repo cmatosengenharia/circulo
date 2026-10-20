@@ -5,6 +5,7 @@ from circulo.policy import DEFAULT_POLICY, PolicyStore, PolicyViolation, guard
 
 def test_route_e_pick_model(circle):
     dl = circle.ctx.dl
+    circle.store.set("orcamento_modo", {"modo": "limite"})     # estes testes provam o corte: modo com limite
     assert dl.route("conferir formato", {"deterministic": True}).value == "regra"
     assert dl.route("escrever landing page", {"needs_generation": True, "complexity": "alta"}).value == "llm_grande"
     assert dl.pick_model("reflector") == "claude-haiku-5-5"
