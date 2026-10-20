@@ -158,6 +158,31 @@ def portoes_natos_pr(arquivos: list[dict], adicionadas: dict[str, list[str]] | N
     ]
 
 
+def cita_constituicao(texto: str) -> list[str]:
+    """Caminhos da constituição citados no texto, lidos da mesma lista do gate. O nome solto (`self_dev.py`) é
+    ambíguo e conta como suspeito."""
+    from .merge_gate import CONSTITUICAO, touches_constitution
+    nomes = {p.rsplit("/", 1)[-1] for p in CONSTITUICAO if not p.endswith("/")}
+    citados = []
+    for c in re.findall(r"[\w./-]+", texto or ""):
+        c = c.rstrip("./")
+        if (touches_constitution([c]) or c == ".github" or c in nomes) and c not in citados:
+            citados.append(c)
+    return citados
+
+
+def causa_da_falha(falhas: list[Resultado]) -> str:
+    """A causa normalizada de uma falha de abrir PR: constituição | conflito_main | ci | outra (nessa prioridade)."""
+    nomes = {f.portao for f in falhas}
+    if "constituição intacta" in nomes:
+        return "constituição"
+    if "sem marcador de conflito" in nomes:
+        return "conflito_main"
+    if any(f.aprendido or f.portao.startswith("lint e testes") for f in falhas):
+        return "ci"
+    return "outra"
+
+
 def registrar(ctx, neuronio: str, resultados: list[Resultado], sujeito: str = "") -> list[Resultado]:
     """Sinapse: cada portão avaliado fica no monitoramento. Portão aprendido que barra é prevenção funcionando."""
     from .licoes import registrar as monitorar

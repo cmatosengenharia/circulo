@@ -298,7 +298,8 @@ class DeveloperComReparo(SelfDeveloper):
     def portao_pr(self, wt: Path, base: str, item_id: int | None, titulo: str) -> tuple[bool, str]:
         from .licoes import assinatura_de
         from .licoes import registrar as monitorar
-        from .neuronios import ABRIR_PR, Resultado, avaliar_aprendidos, diff_do_worktree, portoes_natos_pr, registrar
+        from .neuronios import (ABRIR_PR, Resultado, avaliar_aprendidos, causa_da_falha, diff_do_worktree, portoes_natos_pr,
+                                registrar)
         self._base, self._item_id, self._repetida = base, item_id, False
         texto, rodada = "", None          # rodada = {"sig", "tokens"} depois que o agente reparou
         try:
@@ -343,7 +344,7 @@ class DeveloperComReparo(SelfDeveloper):
                     monitorar(self.ctx, REPARO, False, sujeito=titulo, assinatura=sig, licao=False,
                               motivo=f"o agente terminou com erro na rodada; {rodada['tokens']} tokens")
                     break
-            monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=texto)
+            monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=texto, causa=causa_da_falha(falhas))
             return False, texto
         finally:
             self._base = self._item_id = None
