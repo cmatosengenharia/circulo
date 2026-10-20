@@ -86,7 +86,7 @@ def _erro(exc: Exception) -> str:
     if corpo is None and hasattr(exc, "read"):
         try:
             corpo = exc.read().decode("utf-8", "replace")
-        except Exception:  # noqa: BLE001
+        except Exception:
             corpo = None
     if corpo and str(corpo)[:60] not in msg:
         msg += f" · {corpo}"
@@ -100,7 +100,7 @@ def _jev_ok() -> tuple[bool, str]:
             {"teste": "diagnóstico do círculo"}, {"ok": Question("noul", "Este é um teste de conexão?",
                                                                   SN("`teste` diz que é um diagnóstico ou teste", "é um pedido real de trabalho"))})
         return True, f"respondeu (noul {float(out['ok'].value):.2f})"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return False, f"falhou: {type(exc).__name__}: {str(exc)[:120]}"
 
 
@@ -111,8 +111,8 @@ def _llm_ok() -> tuple[bool, str]:
         modelo = DEFAULT_POLICY["harness"]["models"]["pequena"]
         r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model=modelo, max_tokens=5)
         return True, f"respondeu ({modelo}, {r.tokens} tokens)"
-    except Exception as exc:  # noqa: BLE001
-        dica = (" → crie a chave dentro de um workspace no Console, ou preencha ANTHROPIC_WORKSPACE_ID"
+    except Exception as exc:
+        dica =(" → crie a chave dentro de um workspace no Console, ou preencha ANTHROPIC_WORKSPACE_ID"
                 if "anthropic-workspace-id" in str(exc) else "")
         return False, f"falhou: {_erro(exc)}{dica}"
 
@@ -128,7 +128,7 @@ def _github_ok() -> tuple[bool, str]:
         etapa = "ler os checks da main (permissão Checks ou Actions, leitura)"
         checks = gh.check_runs("main")
         return True, f"acesso ao repo ok ({len(prs)} PR abertos, {len(checks)} checks na main)"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return False, f"falhou ao {etapa}: {_erro(exc)}"
 
 

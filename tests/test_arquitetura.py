@@ -24,7 +24,7 @@ CONSTITUICAO_PODE_IMPORTAR = {
 ATUADORES = {"self_dev", "merge_gate", "corpo", "loop"}
 SOBEM_O_LOOP = {"cli", "demo", "confianca"}       # confianca só lê uma constante (ESTAGNADO)
 MAX_LINHAS = 1000
-TETO_JARDIM = {"except_exception": 64, "noqa": 75, "funcoes_longas": 14, "modulos_grandes": 1, "todo": 8}
+TETO_JARDIM = {"except_exception": 64, "noqa": 51, "funcoes_longas": 14, "modulos_grandes": 1, "todo": 8}
 
 
 def grafo() -> dict[str, set[str]]:

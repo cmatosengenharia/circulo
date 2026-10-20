@@ -113,7 +113,7 @@ def preparar(store, jev, state: Mapping[str, Any], questions: Mapping[str, Any])
             continue
         try:
             v = f(q, state)
-        except Exception:  # noqa: BLE001 — o laboratório nunca atrapalha a decisão
+        except Exception:  # o laboratório nunca atrapalha a decisão
             continue
         if at.get(qid):
             enviar[qid], enviar[PREFIXO + qid] = v, q
@@ -133,7 +133,7 @@ def colher(store, out: dict, mapa: dict, modelo: str | None = None) -> dict:
         try:
             store.x("INSERT INTO jev_lab(pergunta,valor_pt,conf_pt,valor_en,conf_en,modelo,created_at) VALUES(?,?,?,?,?,?,?)",
                     (qid, str(pt.value), float(pt.confidence), str(en.value), float(en.confidence), modelo, time.time()))
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
     for k in [k for k in out if k.startswith(PREFIXO)]:
         out.pop(k)
@@ -193,20 +193,20 @@ def resumo(store, now: float | None = None) -> dict:
             "ROUND(AVG(CASE WHEN source='jev' THEN confidence END), 3) conf_jev FROM (SELECT CASE WHEN question LIKE 'indaga_%' "
             "THEN substr(question, 1, length(question) - length(substr(question, instr(substr(question, 8), '_') + 7))) ELSE question END pergunta, "
             "source, confidence FROM decisions WHERE created_at>=?) GROUP BY pergunta ORDER BY n DESC LIMIT 12", (now - 86400,))]
-    except Exception:  # noqa: BLE001
+    except Exception:
         perguntas = []
     at = ativas(store)
     lab = []
     for qid in VARIANTES:
         try:
             p = placar(store, qid)
-        except Exception:  # noqa: BLE001
+        except Exception:
             p = {"n": 0}
         lab.append({"pergunta": qid, "ativa": bool(at.get(qid)), **p})
     try:
         from .jev_cobertura import cobertura
         cob = cobertura()
-    except Exception:  # noqa: BLE001
+    except Exception:
         cob = None
     tot = sum(x["n"] for x in perguntas) or 0
     return {"modelo": store.get("jev_modelo"), "modelo_pedido": store.get("jev_modelo_pedido"), "ultimo_erro": store.get("jev_last_error"),

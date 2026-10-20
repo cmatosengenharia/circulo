@@ -216,7 +216,7 @@ class Conselho:
         for sinal in SINAIS:
             try:
                 ps = sinal(self.s, agora)
-            except Exception:  # noqa: BLE001 — um sinal quebrado não cala o conselho
+            except Exception:  # um sinal quebrado não cala o conselho
                 continue
             for p in ps:
                 if p.relevancia <= 0.05 or p.id in abertas:     # sem dor ou já em andamento: não pergunta de novo
@@ -419,7 +419,7 @@ def gerar(ctx) -> list[int]:
         import re
         d = json.loads(re.search(r"\{.*\}", texto, re.S).group(0))
         novas = d.get("perguntas") or []
-    except Exception:  # noqa: BLE001
+    except Exception:
         novas = []
     from .decision import norm
     ja = {norm(t) for t in existentes}
@@ -441,7 +441,7 @@ def gerar(ctx) -> list[int]:
         from .registro import registrar as reg
         reg(s, tick=s.tick, project_id=ctx.dl.project_id, papel="questionador", modelo=escolha["modelo"], escolha=escolha,
             tokens=tokens, ok=bool(ids), entrada="gerar perguntas", saida=texto)
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
     if ids:
         ctx.reply(f"O Questionador criou {len(ids)} pergunta(s) nova(s) para o conselho, cada uma presa a uma métrica medida.", "roteiro")
@@ -478,7 +478,7 @@ def personas_da_missao(ctx, tipo: str, pedido: str) -> dict[str, str]:
     try:
         import re
         lista = json.loads(re.search(r"\{.*\}", texto, re.S).group(0)).get("personas") or []
-    except Exception:  # noqa: BLE001
+    except Exception:
         lista = []
     agora = time.time()
     for p in lista[:4]:
