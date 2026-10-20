@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.41.0 — 2026-10-20
+
+**O Médico do loop: plano de controle que diagnostica gargalos por padrão medido e responde pela escada mais barata —
+desenhado para não virar ruído.** Motivação: em 20/10 o treino do aluno quebrou 8× seguidas (quarentena isolou, ninguém
+corrigiu), o Redator abriu 4 PRs em cadeia (para o loop, sucesso) e o Desenvolvedor ficou 30 min mudo (OAuth expirado)
+antes de alguém avisar. Quem achou os três foi uma pessoa lendo o banco.
+
+- **`circulo/medico.py`**, rodando na thread do SRE (em paralelo ao giro), uma passagem por minuto.
+- **Uma fonte só**: `incidents`/`run_errors`, `prs`, `alerts`, `llm_calls`. Três sondas de **padrão**: erro repetido
+  (mesma impressão digital ≥ 3× em 1 h), repetição sem progresso (PRs da mesma origem ou o mesmo item tentado ≥ 3×
+  em 1 h), agente mudo (Desenvolvedor com erro, 0 tokens e < 2 s, ≥ 3×). Evento isolado não é nada.
+- **Impressão digital**: um diagnóstico por causa; aberto, só conta `vezes`. Fecha pelo **sintoma** (30 min sem
+  ocorrência); se volta, reabre com reincidência.
+- **O Jev decide** com a evidência medida: bloqueia o progresso? (noul) · de quem é a causa? (choice: código do
+  loop / ambiente / humano / custo) · resposta segura? (score observar/conter/corrigir). Dúvida → observa.
+- **Escada**: observar → **conter** (determinístico, custo zero: pausa a tarefa que repete por 6 h; põe o
+  Desenvolvedor mudo em espera e avisa) → **corrigir** (item `origem='erro'`, "Urgente: …", na frente da fila, com o
+  trace; o Desenvolvedor pega antes de tudo; dispensado de estudo) → **escalar** (Precisa de você, prioridade 0).
+- **Orçamento**: 6 ações por dia (depois só escala) e 1 item urgente em voo. **Autoexclusão**: o que é sobre o
+  Médico, o SRE ou a constituição escala direto. **Contexto conhecido** (Desenvolvedor deslogado, loop pausado por
+  você, orçamento no limite) silencia as sondas de fila parada — a causa já está em Precisa de você.
+- **Medido**: `/api/medico` e card "Médico do loop" na aba Saúde e estado: abertos, fechados, reaberturas, ações do
+  dia, precisão das correções (itens urgentes feitos ÷ abertos), mediana até conter. O canal `#equipe` mostra cada
+  diagnóstico e ação.
+- Não entrou (de propósito): um segundo Desenvolvedor em thread. O item urgente passa à frente da fila; dois
+  Desenvolvedores disputando o mesmo Claude Code e o mesmo estado de worktree é risco maior que o ganho hoje.
+- Testes (`test_medico`, 8): os três casos do Mac, um diagnóstico por padrão, item urgente na frente da fila e um só
+  em voo, conter pausando a tarefa, escalada em Precisa de você, regras contra ruído (dúvida/custo/próprio/contexto),
+  orçamento de ações e fechamento pelo sintoma, SRE roda o Médico e o painel expõe.
+
 ## 1.40.2 — 2026-10-20
 
 **Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste:**

@@ -14,6 +14,7 @@ evidência de item ou num alerta já rolado. Fontes (cada uma com a ação que r
 """
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -52,6 +53,9 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
     if esp.get("precisa_de_voce") and float(esp.get("ate", 0)) > agora:
         out.append(_item("developer_parado", "Desenvolvedor parado: " + str(esp.get("motivo", "")), f"Nenhum item do roteiro anda até isso ser resolvido; o loop tenta de novo às {esp.get('hora', '?')}.",
                          None, [], 0, link="/loop"))
+    for chave, e in (store.get("medico_escalados") or {}).items():
+        out.append(_item("medico", f"Médico do loop escalou: {e.get('titulo', chave)}", f"Dono: {e.get('dono')}. Evidência: {json.dumps(e.get('evidencia', {}), ensure_ascii=False)[:300]}",
+                         e.get("em"), [], 0, ref=chave, link="/loop"))
     q = store.get("quarentena") or {}
     for etapa, v in q.items():
         if isinstance(v, dict) and int(v.get("ate_tick", 0)) > store.tick:

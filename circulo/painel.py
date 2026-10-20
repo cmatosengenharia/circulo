@@ -342,6 +342,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/aluno":
                 from .aluno import resumo as aluno_resumo
                 self._json(aluno_resumo(self._store()))
+            elif u.path == "/api/medico":
+                from .medico import resumo as medico_resumo
+                self._json(medico_resumo(self._store()))
             elif u.path == "/api/aprovacoes":
                 from .aprovacoes import resumo as aprov
                 r = aprov(self._store())

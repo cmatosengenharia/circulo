@@ -28,7 +28,7 @@ REGRA_HIDDEN = "[hidden]{display:none!important}"
 # o mapa de funcionalidades: tela → arquivo e o que ela tem de mostrar
 TELAS = (
     {"rota": "/", "arquivo": "home.html", "contem": ["Nova missão", "Equipe ao vivo", "Rastros e SLOs", "Integrações"]},
-    {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Saúde e estado", "Equipe ao vivo", "Segurança e confiança", "Memória do time", "Consumo de tokens", "Aluno do Jev"]},
+    {"rota": "/missao/{zero}", "arquivo": "painel.html", "contem": ["Pausar o loop", "Saúde e estado", "Equipe ao vivo", "Segurança e confiança", "Memória do time", "Consumo de tokens", "Aluno do Jev", "Médico do loop"]},
     {"rota": "/equipe", "arquivo": "equipe.html", "contem": ["Equipe ao vivo", "#equipe", "Quadro de entregas"]},
     {"rota": "/fluxo", "arquivo": "fluxo.html", "contem": ["Bastidores do giro", "Raias do giro", "Laboratório"]},
     {"rota": "/rastros", "arquivo": "rastros.html", "contem": ["Seguir o fio", "Objetivos de serviço", "Sinais de ouro"]},
@@ -45,6 +45,7 @@ APIS = (
     ("/api/consumo", ["modo", "por_dia", "por_papel", "sugestao_limite"]),
     ("/api/aluno", ["perguntas", "resumo", "criterios"]),
     ("/api/aprovacoes", ["total", "urgentes", "itens"]),
+    ("/api/medico", ["abertos", "acoes_24h", "precisao"]),
     ("/api/observabilidade", ["sinais", "slos", "rastros"]),
     ("/api/loop", None),
 )

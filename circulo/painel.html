@@ -425,6 +425,12 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <ul class="list" id="vigiaLista"></ul>
     <details class="vg-hist"><summary>Resolvidas recentemente</summary><ul class="list" id="vigiaHist"></ul></details>
   </section>
+  <section data-aba="geral" class="panel zero-only" hidden id="medico" aria-label="Médico do loop" style="margin:0 0 18px">
+    <h2 style="margin:0 0 6px">Médico do loop <span class="vg-chip" id="medicoChip">—</span></h2>
+    <p class="sub" style="margin:0 0 8px">Plano de controle: lê incidentes, erros e tentativas repetidas; um padrão medido (≥ 3 em 1 h) vira diagnóstico, o Jev diz se bloqueia e de quem é a causa, e a resposta sobe a escada mais barata — observar, conter (custo zero), corrigir (item urgente) ou escalar para você. Fecha só quando o sintoma para por 30 min. Ele mesmo é medido: precisão e ações do dia.</p>
+    <div class="indag-tot" id="medicoTot"></div>
+    <ul class="list" id="medicoLista"></ul>
+  </section>
   <div data-aba="geral" class="about" id="about"></div>
   <div data-aba="geral" class="kpis" id="kpis" aria-label="Números ao vivo"></div>
   <form class="orc-form" id="orcForm" hidden>
@@ -1164,6 +1170,19 @@ async function refreshAluno() {
   } catch {}
 }
 setInterval(refreshAluno, 30000); refreshAluno();
+async function refreshMedico() {
+  try {
+    const j = await (await fetch("/api/medico")).json();
+    const ab = j.abertos || [];
+    $("#medicoChip").textContent = ab.length ? `${ab.length} diagnóstico(s) aberto(s)` : "sem diagnóstico aberto";
+    $("#medicoTot").textContent = `${j.total || 0} diagnóstico(s) no total · ${j.fechados || 0} fechado(s) pelo sintoma · ${j.reaberturas || 0} reabertura(s) · ações em 24 h: ${j.acoes_24h}/${j.orcamento_dia}` +
+      (j.precisao != null ? ` · precisão das correções: ${Math.round(j.precisao * 100)}% (${j.corrigidos.feitos}/${j.corrigidos.itens})` : " · precisão: sem correção avaliada ainda");
+    $("#medicoLista").innerHTML = ab.map(d => `<li style="display:block"><span class="tag">${esc(d.status)}</span> <b>${esc(d.titulo)}</b> · ${d.vezes}× · ${esc(d.veredito.dono || "?")}${d.veredito.bloqueia ? " · bloqueia" : ""} → ${esc(d.acao || "")}${d.item_id ? ` · item #${d.item_id}` : ""}</li>`).join("")
+      || "<li class=\"sub\">Nenhum padrão aberto: erros isolados não viram diagnóstico; três iguais em uma hora, sim.</li>";
+  } catch {}
+}
+setInterval(refreshMedico, 20000); refreshMedico();
+
 
 async function refreshConsumo() {
   try {

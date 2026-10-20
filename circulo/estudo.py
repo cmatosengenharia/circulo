@@ -32,7 +32,7 @@ EST_TOKENS = 9000
 MAX_TOKENS = 2500
 MODOS = {"completo": {"buscas": 4, "max_tokens": MAX_TOKENS, "est": 30_000}, "leve": {"buscas": 1, "max_tokens": 1500, "est": 9_000},
          "dispensado": {"buscas": 0, "max_tokens": 0, "est": 0}}
-DISPENSA = ("Vigia (medido)", "medido pelo jardineiro", "lição", "licao")
+DISPENSA = ("Vigia (medido)", "Médico (medido)", "medido pelo jardineiro", "lição", "licao")
 
 
 def modo_do_estudo(item: dict) -> str:

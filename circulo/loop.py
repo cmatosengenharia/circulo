@@ -191,7 +191,6 @@ class Circle:
             return TickResult(s.tick, paused=True, pause_reason="orcamento")
         s.set("loop_status", "modo_seguro" if ctl["modo_seguro"] else "rodando")
         r = TickResult(s.next_tick())
-        # um ID por execução, gravado em cada etapa, erro e métrica: o painel localiza qualquer falha por ele
         r.run_id = uuid.uuid4().hex[:12]
         s.set("run_id", r.run_id)
         havia_trabalho = self.trabalho_pendente(ignorar_estagnacao=True)
@@ -439,8 +438,9 @@ class Circle:
         if self.controls()["modo_seguro"]:
             # só tarefas de baixo risco: nada de evoluir regras, gerar features ou mergear
             tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")]
+        from .medico import tarefa_pausada
         componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # (corrigir_codigo tem quarentena própria)
-        tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}")
+        tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}") and not tarefa_pausada(self.store, t)
                  and not (t in componente and self.incidents.isolated(componente[t]))]
         if not tasks:
             return None

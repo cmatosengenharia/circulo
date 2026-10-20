@@ -364,6 +364,8 @@ class Vigia:
     def __init__(self, ctx, intervalo: float = INTERVALO):
         self.ctx, self.s, self.intervalo = ctx, ctx.store, intervalo
         self.planejador = None           # o loop liga o Planejador: sem ele, a trava de pergunta só é alertada
+        from .medico import Medico
+        self.medico = Medico(ctx)        # o plano de controle roda na mesma thread, depois das travas
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -412,7 +414,8 @@ class Vigia:
                 if r["acao"] in ("abrir_item", "alertar"):
                     self.ctx.reply(f"Vigia: resolvido — {r['titulo']} (durou {int((now - r['primeira_em']) / 60)} min).", "saude")
         self.s.set("vigia_ultima", {"em": now, "achados": len(achados), "abertas": len([a for a in achados]), "agiu": agiu})
-        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou}
+        medico = self.medico.rodar(now)
+        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou, "medico": medico}
 
     def _drenar(self, achados: list[dict], now: float) -> dict | None:
         """Trava de pergunta validada além de DRENAR: o planejador responde só a mais antiga ainda não tentada, uma por
