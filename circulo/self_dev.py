@@ -162,11 +162,11 @@ class ClaudeCodeAgent:
         return shutil.which(self.cmd) is not None
 
     def run(self, task, workdir):
-        # O Claude Code usa o login da sua conta Claude. A ANTHROPIC_API_KEY do loop (créditos da API) só vai junto
-        # se CIRCULO_CODE_AGENT_USA_API=1; senão uma chave sem crédito derrubaria o Developer.
+        # Todo consumo do loop é pela API: o Claude Code recebe a ANTHROPIC_API_KEY e não depende do login da conta
+        # (sessão OAuth que expira sem ninguém para relogar). CIRCULO_CODE_AGENT_USA_API=0 volta ao login da assinatura.
         env = dict(os.environ)
         env.update(getattr(self, "ambiente_extra", None) or {})   # TRACEPARENT: o fio do item segue no Claude Code
-        if os.environ.get("CIRCULO_CODE_AGENT_USA_API") != "1":
+        if os.environ.get("CIRCULO_CODE_AGENT_USA_API", "1") == "0":
             env.pop("ANTHROPIC_API_KEY", None)
             env.pop("ANTHROPIC_WORKSPACE_ID", None)
         p = subprocess.run([self.cmd, "-p", task, "--output-format", "json", "--permission-mode", "acceptEdits",

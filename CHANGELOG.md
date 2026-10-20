@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.43.0 — 2026-10-20
+
+**Todo consumo do loop pela API, e qualquer API de IA.**
+
+- **Desenvolvedor pela API por padrão.** O Claude Code passa a receber a `ANTHROPIC_API_KEY` do loop em vez de depender do
+  login da conta (sessão OAuth que expira sem ninguém para relogar — foi o que parou o Desenvolvedor por horas em 20/10).
+  `CIRCULO_CODE_AGENT_USA_API=0` volta ao login da assinatura. Cada correção de código aparece no consumo por papel.
+- **Provedor de IA plugável** (`circulo/llm.py`): `CIRCULO_LLM_PROVEDOR` escolhe quem atende a LLM dos agentes —
+  `anthropic` (padrão, SDK, com busca na web) ou, no contrato OpenAI e só com a biblioteca padrão, `openai`, `gemini`,
+  `groq`, `mistral`, `deepseek`, `xai`, `openrouter`, `together`, `ollama` (local, sem chave) e `compat`
+  (`CIRCULO_LLM_BASE_URL` para qualquer outro, ex.: LM Studio, vLLM). Chave em `CIRCULO_LLM_API_KEY` ou na variável
+  própria do provedor. O harness continua pedindo por porte (pequena/grande) e o cliente traduz para o modelo do
+  provedor (`CIRCULO_LLM_MODELO_PEQUENA/GRANDE` sobrescrevem o padrão da tabela — confira os nomes no seu provedor).
+  Uso medido do mesmo jeito (entrada, saída, cache); sem busca na web fora da Anthropic, e o painel diz isso.
+- Diagnóstico (`circulo diagnostico`), Integrações (chaves novas no cofre) e a faixa de conexões mostram o provedor em uso.
+
 ## 1.42.0 — 2026-10-20
 
 **Conexões ao vivo na Gestão do loop.** Uma faixa logo abaixo do cabeçalho mostra, em tempo real (3 s), se cada

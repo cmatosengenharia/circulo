@@ -2,10 +2,22 @@
 
 `generate` é a interface rica (modelo por papel, busca na web, citações). `complete` continua
 existindo para os pontos antigos (fallback de classificação, Developer de ideias).
+
+**Qualquer API de IA.** O provedor é escolhido por `CIRCULO_LLM_PROVEDOR` (padrão: anthropic). Os outros falam o
+contrato OpenAI (`/v1/chat/completions`), que hoje é a língua franca: openai, gemini, groq, mistral, deepseek, xai,
+openrouter, together, ollama (local, sem chave) ou `compat` com `CIRCULO_LLM_BASE_URL` para qualquer um. A chave vem
+de `CIRCULO_LLM_API_KEY` (ou da variável própria do provedor, ex.: OPENAI_API_KEY). Os papéis pedem o modelo por
+porte (pequena/grande): `CIRCULO_LLM_MODELO_PEQUENA` e `CIRCULO_LLM_MODELO_GRANDE` escolhem o modelo de cada porte no
+provedor; sem isso vale o padrão da tabela PROVEDORES. Nenhum provedor compatível traz busca na web: o estudo segue
+sem citações, e o loop registra isso.
 """
 from __future__ import annotations
 
+import json
 import os
+import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -31,10 +43,48 @@ class Generator(Protocol):
     def generate(self, *, system: str, prompt: str, model: str, max_tokens: int, web_search: int = 0) -> LLMResult: ...
 
 
+# provedor → (base_url, variável da chave, modelo pequena, modelo grande). Base vazia = precisa de CIRCULO_LLM_BASE_URL.
+PROVEDORES: dict[str, tuple[str, str, str, str]] = {
+    "anthropic":  ("", "ANTHROPIC_API_KEY", "claude-haiku-5-5", "claude-sonnet-5-5"),
+    "openai":     ("https://api.openai.com/v1", "OPENAI_API_KEY", "gpt-5-mini", "gpt-5"),
+    "gemini":     ("https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_API_KEY", "gemini-2.5-flash", "gemini-2.5-pro"),
+    "groq":       ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"),
+    "mistral":    ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "mistral-small-latest", "mistral-large-latest"),
+    "deepseek":   ("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY", "deepseek-chat", "deepseek-reasoner"),
+    "xai":        ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4-fast", "grok-4"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "openai/gpt-5-mini", "anthropic/claude-sonnet-5-5"),
+    "together":   ("https://api.together.xyz/v1", "TOGETHER_API_KEY", "meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen3-235B-A22B-fp8"),
+    "ollama":     ("http://127.0.0.1:11434/v1", "", "llama3.2", "qwen3:32b"),
+    "compat":     ("", "CIRCULO_LLM_API_KEY", "", ""),
+}
+PORTE_ANTHROPIC = {"claude-haiku-5-5": "pequena", "claude-sonnet-5-5": "grande"}   # o harness pede nestes nomes
+
+
+def provedor() -> str:
+    return (os.environ.get("CIRCULO_LLM_PROVEDOR") or "anthropic").strip().lower()
+
+
+def chave_do_provedor(nome: str | None = None) -> str | None:
+    """Só o NOME da variável que o provedor usa; nunca o valor."""
+    nome = nome or provedor()
+    if nome not in PROVEDORES:
+        return "CIRCULO_LLM_API_KEY"
+    return PROVEDORES[nome][1] or None
+
+
+def modelos_do_provedor(nome: str | None = None) -> dict[str, str]:
+    nome = nome or provedor()
+    _, _, peq, gra = PROVEDORES.get(nome, PROVEDORES["compat"])
+    return {"pequena": os.environ.get("CIRCULO_LLM_MODELO_PEQUENA") or peq,
+            "grande": os.environ.get("CIRCULO_LLM_MODELO_GRANDE") or gra}
+
+
 class AnthropicLLM:
     """pip install circulo[llm]; ANTHROPIC_API_KEY no ambiente."""
 
     WEB_SEARCH_TOOL = "web_search_20250305"
+    nome = "anthropic"
+    busca_web = True
 
     def __init__(self, default_model: str | None = None):
         import anthropic  # import tardio: só exige o pacote quando a LLM é usada
@@ -68,10 +118,73 @@ class AnthropicLLM:
         return r.text, r.tokens
 
 
+class CompatLLM:
+    """Qualquer API no contrato OpenAI (chat/completions), só com a biblioteca padrão: sem SDK, sem dependência nova.
+    O modelo que o harness pede (nome da Anthropic, por porte) é traduzido para o modelo do provedor no mesmo porte."""
+
+    busca_web = False
+
+    def __init__(self, nome: str | None = None, base_url: str | None = None, api_key: str | None = None, timeout: float = 120.0):
+        self.nome = nome or provedor()
+        base, var, _, _ = PROVEDORES.get(self.nome, PROVEDORES["compat"])
+        self.base_url = (base_url or os.environ.get("CIRCULO_LLM_BASE_URL") or base).rstrip("/")
+        if not self.base_url:
+            raise ValueError(f"provedor {self.nome}: preencha CIRCULO_LLM_BASE_URL")
+        self.api_key = api_key or os.environ.get("CIRCULO_LLM_API_KEY") or (os.environ.get(var) if var else None) or ""
+        self.modelos = modelos_do_provedor(self.nome)
+        self.default_model = self.modelos["pequena"]
+        self.timeout = timeout
+
+    def traduzir(self, model: str) -> str:
+        return self.modelos.get(PORTE_ANTHROPIC.get(model, model), model) or model
+
+    def generate(self, *, system, prompt, model, max_tokens, web_search=0):
+        modelo = self.traduzir(model)
+        body = {"model": modelo, "max_tokens": int(max_tokens),
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        req = urllib.request.Request(f"{self.base_url}/chat/completions", data=json.dumps(body).encode(), headers=headers, method="POST")
+        for i in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    data = json.loads(r.read())
+                break
+            except urllib.error.HTTPError as e:
+                if e.code not in (429, 500, 502, 503, 529) or i == 2:
+                    raise
+                time.sleep(0.5 * 2 ** i)
+        texto = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        if isinstance(texto, list):                                   # alguns provedores devolvem partes
+            texto = "".join(p.get("text", "") for p in texto if isinstance(p, dict))
+        u = data.get("usage") or {}
+        cache = int(((u.get("prompt_tokens_details") or {}).get("cached_tokens")) or 0)
+        return LLMResult(texto, 0, data.get("model") or modelo, [], entrada=max(0, int(u.get("prompt_tokens", 0)) - cache),
+                         saida=int(u.get("completion_tokens", 0)), cache_lido=cache)
+
+    def complete(self, system, prompt, max_tokens):
+        r = self.generate(system=system, prompt=prompt, model=self.default_model, max_tokens=max_tokens)
+        return r.text, r.tokens
+
+
 def build_llm():
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
+    nome = provedor()
+    if nome == "anthropic":
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return None
+        try:
+            return AnthropicLLM()
+        except ImportError:
+            return None
     try:
-        return AnthropicLLM()
-    except ImportError:
+        return CompatLLM(nome)
+    except ValueError:
         return None
+
+
+def descricao() -> str:
+    """Para o painel e o diagnóstico: provedor e modelos em uso, sem chave."""
+    nome = provedor()
+    m = modelos_do_provedor(nome)
+    return f"{nome} · pequena {m['pequena'] or '?'} · grande {m['grande'] or '?'}" + ("" if nome == "anthropic" else " · sem busca na web")

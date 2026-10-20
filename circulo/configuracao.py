@@ -24,6 +24,11 @@ CHAVES = (
     ("TYPESAFE_API_KEY", "Jev real (TypeSafe). Sem ela: decisor local com o mesmo contrato."),
     ("ANTHROPIC_API_KEY", "LLM: motor das missões, pesquisa na web, evolução do harness."),
     ("ANTHROPIC_WORKSPACE_ID", "Só se a chave da Anthropic não for de um workspace: o ID do workspace (wrkspc_...). Chave criada dentro de um workspace não precisa."),
+    ("CIRCULO_LLM_PROVEDOR", "Opcional: qual API de IA a LLM usa — anthropic (padrão), openai, gemini, groq, mistral, deepseek, xai, openrouter, together, ollama ou compat."),
+    ("CIRCULO_LLM_API_KEY", "Opcional: chave do provedor escolhido (ou a variável própria dele, ex.: OPENAI_API_KEY). Ollama local não precisa."),
+    ("CIRCULO_LLM_BASE_URL", "Opcional: endereço da API no contrato OpenAI (obrigatório com provedor compat; ex.: http://127.0.0.1:1234/v1)."),
+    ("CIRCULO_LLM_MODELO_PEQUENA", "Opcional: modelo do porte pequeno no provedor escolhido (padrão por provedor)."),
+    ("CIRCULO_LLM_MODELO_GRANDE", "Opcional: modelo do porte grande no provedor escolhido (padrão por provedor)."),
     ("GITHUB_TOKEN", "Token fine-grained só do repo circulo (Contents, Pull requests, Checks: leitura e escrita)."),
     ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
     ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
@@ -106,11 +111,14 @@ def _jev_ok() -> tuple[bool, str]:
 
 def _llm_ok() -> tuple[bool, str]:
     try:
-        from .llm import AnthropicLLM
+        from .llm import build_llm
         from .policy import DEFAULT_POLICY
         modelo = DEFAULT_POLICY["harness"]["models"]["pequena"]
-        r = AnthropicLLM().generate(system="Responda só: ok", prompt="ok", model=modelo, max_tokens=5)
-        return True, f"respondeu ({modelo}, {r.tokens} tokens)"
+        llm = build_llm()
+        if llm is None:
+            return False, "provedor sem chave ou sem endereço"
+        r = llm.generate(system="Responda só: ok", prompt="ok", model=modelo, max_tokens=5)
+        return True, f"respondeu ({r.model}, {r.tokens} tokens)"
     except Exception as exc:
         dica =(" → crie a chave dentro de um workspace no Console, ou preencha ANTHROPIC_WORKSPACE_ID"
                 if "anthropic-workspace-id" in str(exc) else "")
@@ -152,7 +160,12 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
         import anthropic  # noqa: F401
     except ImportError:
         tem_sdk = False
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    from .llm import chave_do_provedor, descricao, provedor
+    prov, var = provedor(), chave_do_provedor()
+    if prov != "anthropic":
+        ok, det = _llm_ok() if testar_conexoes else (bool(not var or os.environ.get(var) or os.environ.get("CIRCULO_LLM_API_KEY")), descricao())
+        p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else f"Preencha {var or 'CIRCULO_LLM_BASE_URL'}."))
+    elif not os.environ.get("ANTHROPIC_API_KEY"):
         p.append(Peca("Motor das missões (LLM)", "parado", "sem ANTHROPIC_API_KEY: missões ficam registradas, sem construir",
                       "Preencha ANTHROPIC_API_KEY."))
     elif not tem_sdk:

@@ -88,7 +88,10 @@ def _servico(store: Store, chave: str, nome: str, papel: str, agora: float) -> d
     falhas = [x for x in p if not x["ok"]]
     lat = [x["ms"] for x in oks if x["ms"] is not None]
     estado, detalhe = _classificar(p, agora), ""
-    chave_env = {"jev": "TYPESAFE_API_KEY", "llm": "ANTHROPIC_API_KEY", "github": "GITHUB_TOKEN"}.get(chave)
+    from . import llm as _llm
+    if chave == "llm":
+        papel = _llm.provedor() if _llm.provedor() != "anthropic" else papel
+    chave_env = {"jev": "TYPESAFE_API_KEY", "llm": _llm.chave_do_provedor(), "github": "GITHUB_TOKEN"}.get(chave)
     if chave_env and not p and not os.environ.get(chave_env):      # com pulsos, o que vale é a resposta real
         estado, detalhe = "sem_chave", f"sem {chave_env}" + (": decisor local no lugar" if chave == "jev" else "")
     elif chave == "claude":
