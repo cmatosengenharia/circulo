@@ -70,8 +70,9 @@ def proximo(ctx, dev, planejador) -> int | None:
             (time.time(), pai["id"]))
     sub = sub_ativo(s)
     if sub is not None:
-        if not _liberado(sub):
-            return None                       # o anterior ainda não passou: o seguinte espera
+        if not _liberado(sub):                # o anterior ainda não passou: o seguinte espera, mas a fila normal não para
+            item = dev.pick()
+            return item["id"] if item else None
         motivo = motivo_de_dividir(s, sub["id"])
         if motivo:
             _descartar(ctx, sub, motivo)

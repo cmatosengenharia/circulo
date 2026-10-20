@@ -104,3 +104,26 @@ def test_ultimo_sub_item_feito_conclui_o_pai(circle, repo):  # noqa: F811
     circle.store.x("UPDATE roadmap SET status='feito' WHERE pai=?", (item,))
     assert fatiador.proximo(circle.ctx, dev, circle.planejador) is None
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "feito"
+
+
+# ------------------------------------------------------------ 1.46.0: o sub-item em andamento não trava o resto
+
+def test_sub_item_com_pr_aberto_nao_trava_o_conserto_nem_a_fila(circle, repo):  # noqa: F811
+    """No Mac (20/10, 45 min parado): o sub-item A tinha PR aberto reprovado pelo CI; o seguinte esperava A, o
+    fatiador devolvia None, o giro voltava sem chamar o Developer — e o conserto do PR de A nunca acontecia."""
+    item, dev, agent, llm = preparar(circle, repo)
+    falhar(circle, item, n=3)
+    fatiador.proximo(circle.ctx, dev, circle.planejador)
+    a, b = subs(circle, item)
+    circle.store.x("UPDATE roadmap SET status='em_andamento', evidencia='PR #42' WHERE id=?", (a["id"],))
+    outro = circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,estudo,ordem,created_at,updated_at) "
+                           "VALUES('Outro item do loop','d','loop','pendente','x','{}',900,0,0)")
+    assert fatiador.proximo(circle.ctx, dev, circle.planejador) == outro       # B espera A, mas a fila normal anda
+    agora = time.time()
+    circle.store.x("INSERT INTO prs(number,project_id,titulo,branch,status,item_id,conserto,consertos,created_at,updated_at) VALUES(42,2,'A','circulo/fix-a','aberto',?,?,0,?,?)",
+                   (a["id"], json.dumps({"sha": "abc", "motivo": "checks falhando: Reprodução primeiro"}), agora, agora))
+    assert dev._conserto() is not None and dev.tem_trabalho()
+    chamadas = []
+    dev.run_once = lambda item_id=None, autorizado=False: chamadas.append(item_id) or type("R", (), {"status": "consertado", "detalhe": ""})()
+    circle._run_idle_task("corrigir_codigo")
+    assert chamadas == [None]                                                  # consertar() vem antes de qualquer item novo

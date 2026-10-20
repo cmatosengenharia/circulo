@@ -709,8 +709,8 @@ class Circle:
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
             from . import fatiador
-            livre = not (self.self_dev.busy() or self.self_dev.em_espera())
-            # item com LIMITE falhas locais vira sub-itens: só o sub-item liberado roda, com o erro anterior
+            # conserto de PR reprovado vem antes de tudo (o sub-item seguinte esperava o PR que ninguém consertava: 45 min parado)
+            livre = not (self.self_dev.busy() or self.self_dev.em_espera()) and self.self_dev._conserto() is None
             item_id = fatiador.proximo(self.ctx, self.self_dev, self.planejador) if livre else None
             if livre and item_id is None:
                 return

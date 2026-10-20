@@ -333,7 +333,7 @@ class GitHubREST:
         self.token = token
         self.timeout = timeout
 
-    def _req(self, method: str, path: str, body: dict | None = None):
+    def _req(self, method: str, path: str, body: dict | None = None, tolerar: tuple[int, ...] = ()):
         req = urllib.request.Request(
             f"{self.API}/repos/{self.repo}{path}", method=method,
             data=json.dumps(body).encode() if body is not None else None,
@@ -347,7 +347,9 @@ class GitHubREST:
             return data
         finally:
             if GitHubREST.ouvinte:
-                GitHubREST.ouvinte(ok, (time.monotonic() - t0) * 1000, None if ok else f"{method} {path}: {sys.exc_info()[1]}"[:200])
+                exc = sys.exc_info()[1]
+                esperado = isinstance(exc, urllib.error.HTTPError) and exc.code in tolerar      # 403 sem Checks: a API do Actions cobre
+                GitHubREST.ouvinte(ok or esperado, (time.monotonic() - t0) * 1000, None if ok or esperado else f"{method} {path}: {exc}"[:200])
 
     def open_prs(self):
         return [{"number": p["number"], "head_sha": p["head"]["sha"], "head_ref": p["head"]["ref"],
@@ -359,7 +361,7 @@ class GitHubREST:
 
     def check_runs(self, sha):
         try:
-            return self._req("GET", f"/commits/{sha}/check-runs?per_page=100")["check_runs"]
+            return self._req("GET", f"/commits/{sha}/check-runs?per_page=100", tolerar=(403,))["check_runs"]
         except urllib.error.HTTPError as e:
             if e.code != 403:
                 raise
