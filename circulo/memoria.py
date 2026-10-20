@@ -19,6 +19,7 @@ import time
 import unicodedata
 from typing import Any
 
+from . import nomes
 from .state import Store
 
 DIA = 86400.0
@@ -279,4 +280,4 @@ class Memoria:
         hoje = self.s.one("SELECT COUNT(*) n, COALESCE(SUM(poupou_tokens),0) t, SUM(poupou_tokens>0) r FROM memoria_uso WHERE created_at>=?", (dia,))
         return {"fts": self.fts, "por_tipo": por_tipo, "total": sum(por_tipo.values()),
                 "usos_24h": int(hoje["n"] or 0), "reaproveitados_24h": int(hoje["r"] or 0), "tokens_poupados_24h": int(hoje["t"] or 0),
-                "ultimos": [{"agente": u["agente"], "assunto": u["assunto"], "hits": json.loads(u["hits"]), "poupou_tokens": u["poupou_tokens"], "em": u["created_at"]} for u in usos]}
+                "ultimos": [{"agente": u["agente"], "agente_nome": nomes.nome(u["agente"]), "assunto": u["assunto"], "hits": json.loads(u["hits"]), "poupou_tokens": u["poupou_tokens"], "em": u["created_at"]} for u in usos]}

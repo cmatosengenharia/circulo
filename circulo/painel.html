@@ -1405,7 +1405,7 @@ async function refreshMemoria() {
     const j = await (await fetch("/api/memoria")).json();
     const tipos = Object.entries(j.por_tipo || {}).map(([k, n]) => `${n} ${k}`).join(" · ");
     $("#memTot").textContent = `${j.total} lembrança(s)${tipos ? " (" + tipos + ")" : ""} · ${j.usos_24h} consulta(s) em 24 h · ${j.reaproveitados_24h} reaproveitamento(s) · ${j.tokens_poupados_24h.toLocaleString("pt-BR")} tokens poupados` + (j.fts ? "" : " · sem FTS5: busca simples");
-    $("#memUsos").innerHTML = (j.ultimos || []).map(u => `<li><span class="tag">${esc(u.agente)}</span> ${esc(u.assunto.slice(0, 90))} → ` +
+    $("#memUsos").innerHTML = (j.ultimos || []).map(u => `<li style="display:block"><span class="tag">${esc(u.agente_nome || u.agente)}</span> ${esc(u.assunto.slice(0, 90))} → ` +
       (u.hits.length ? u.hits.map(h => `${esc(h.tipo)} #${esc(String(h.ref).split(":")[0])}${h.resultado ? " (" + esc(h.resultado) + ")" : ""}`).join(", ") : "nada parecido") +
       (u.poupou_tokens ? ` <b>· poupou ~${u.poupou_tokens.toLocaleString("pt-BR")} tokens</b>` : "") + `</li>`).join("") || "<li class=\"sub\">Nenhuma consulta ainda: a memória entra em ação quando o Desenvolvedor, o Arquiteto ou o Gerente de produto pegam uma tarefa.</li>";
   } catch {}
