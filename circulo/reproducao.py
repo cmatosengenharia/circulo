@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import os
 import shutil
 import subprocess
@@ -76,6 +77,12 @@ def testes_novos(repo: str | Path, base: str, head: str | None = None) -> list[s
     return out
 
 
+def _site_packages(python: str, env: dict) -> list[str]:
+    cod = "import json, site; print(json.dumps(site.getsitepackages() + ([site.getusersitepackages()] if site.ENABLE_USER_SITE else [])))"
+    p = subprocess.run([python, "-c", cod], capture_output=True, text=True, env=env, check=True)
+    return json.loads(p.stdout)
+
+
 def reproduz(repo: str | Path, base: str, head: str | None = None, python: str | None = None,
              env: dict | None = None, timeout: int = 600) -> tuple[bool, str, list[str]]:
     """(ok, detalhe, testes_novos). ok=False quando todos os testes novos já passam no código antigo."""
@@ -96,8 +103,12 @@ def reproduz(repo: str | Path, base: str, head: str | None = None, python: str |
                 destino = wt / caminho
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 destino.write_bytes(subprocess.run(["git", "show", f"{head}:{caminho}"], cwd=repo, capture_output=True).stdout)
-        amb = {**(env or os.environ), "PYTHONPATH": str(wt), "PYTHONDONTWRITEBYTECODE": "1"}
-        p = subprocess.run([python or sys.executable, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", *novos],
+        python = python or sys.executable
+        amb = {**(env or os.environ), "PYTHONDONTWRITEBYTECODE": "1"}
+        # -S: sem os .pth do site, o `pip install -e` do checkout novo não resolve módulos novos para o código antigo;
+        # as dependências (pytest etc.) vêm dos site-packages desse mesmo interpretador, só como caminho
+        amb["PYTHONPATH"] = os.pathsep.join([str(wt), *_site_packages(python, amb)])
+        p = subprocess.run([python, "-S", "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", *novos],
                            cwd=wt, capture_output=True, text=True, timeout=timeout, env=amb)
         saida = (p.stdout + p.stderr)[-1500:]
         if p.returncode == 0:

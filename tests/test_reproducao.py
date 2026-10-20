@@ -1,5 +1,8 @@
 """Reprodução primeiro: o teste novo precisa falhar no código antigo e passar no novo."""
+import os
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -90,3 +93,51 @@ def test_developer_nao_abre_pr_com_teste_que_nao_reproduz(circle, tmp_path):
     gh = FakeGH()
     res = SelfDeveloper(circle.ctx, r, AgenteSemReproducao(), gh, test_cmd=TEST_CMD).run_once()
     assert res.status == "testes_falharam" and "reprodução primeiro" in res.detalhe and not gh.prs
+
+
+_FINDER_EDITAVEL = '''import sys
+from importlib.machinery import PathFinder
+
+MAPPING = {"pkg": %r}
+
+
+class _EditableFinder:  # como o __editable___*_finder.py que o setuptools instala no `pip install -e`
+    @classmethod
+    def find_spec(cls, fullname, path=None, target=None):
+        parent, _, _ = fullname.rpartition(".")
+        if parent in MAPPING:
+            return PathFinder.find_spec(fullname, path=[MAPPING[parent]])
+
+
+def install():
+    sys.meta_path.append(_EditableFinder)
+'''
+
+
+def test_instalacao_editavel_do_checkout_novo_nao_vaza_modulo_novo_para_o_codigo_antigo(tmp_path):
+    """No CI, o `pip install -e .` resolvia `pkg.modulo_novo` pelo checkout do PR mesmo com o código antigo no
+    PYTHONPATH: o teste novo passava no código antigo e o portão reprovava um PR que reproduzia (PR #39)."""
+    r = tmp_path / "r"
+    (r / "pkg").mkdir(parents=True)
+    git(r, "init", "-q", "-b", "main")
+    (r / "pkg" / "__init__.py").write_text("")
+    _commit(r, "base")
+    (r / "pkg" / "novo.py").write_text("def um():\n    return 1\n")
+    (r / "tests").mkdir()
+    (r / "tests" / "test_novo.py").write_text("from pkg.novo import um\n\ndef test_um():\n    assert um() == 1\n")
+    _commit(r, "módulo novo")
+
+    env = {**os.environ, "PYTHONUSERBASE": str(tmp_path / "userbase")}
+    ativo, usersite = subprocess.run(
+        [sys.executable, "-c", "import site; print(site.ENABLE_USER_SITE); print(site.getusersitepackages())"],
+        env=env, capture_output=True, text=True, check=True).stdout.split("\n")[:2]
+    if ativo != "True":
+        pytest.skip("interpretador sem site de usuário (venv): não dá para simular a instalação editável")
+    usersite = Path(usersite)
+    usersite.mkdir(parents=True)
+    (usersite / "__editable___pkg_finder.py").write_text(_FINDER_EDITAVEL % str(r / "pkg"))
+    (usersite / "__editable__.pkg.pth").write_text("import __editable___pkg_finder; __editable___pkg_finder.install()\n")
+
+    ok, det, novos = reproduz(r, "HEAD~1", "HEAD", env=env)
+    assert novos == ["tests/test_novo.py::test_um"]
+    assert ok and "reproduzido" in det
