@@ -48,7 +48,7 @@ ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnaç�
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
 # valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
-TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
+TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop em docs/", "analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
            "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
            "revisar_prs": "Revisando PRs abertos no gate", "evoluir_harness": "Testando prompts por A/B", "conectar_missoes": "Ligando missões que se complementam",
            "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código",
@@ -59,7 +59,7 @@ TAREFAS = {"analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_
            "checar_licoes": "Reexecutando no main os testes das lições para fechar ou reabrir",
            "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev",
            "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana"}
-IDLE_COST = {"analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
+IDLE_COST = {"documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
 @dataclass
@@ -247,8 +247,7 @@ class Circle:
                     self.incidents.record("idle", exc, circulo_pid)
         seguro(self.planejador.no_giro)          # pergunta reagendada após 5xx/timeout volta no giro em que vence
 
-        # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar).
-        #    Modo seguro congela os níveis 2 e 3: só a saúde continua rodando (e pode fazer rollback).
+        # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar). Modo seguro congela os níveis 2 e 3: só a saúde roda.
         stages = [("licoes", self.licoes.revisar), ("health", self.health.check)]
         if not ctl["modo_seguro"]:
             # só se autoevolui depois de corrigir os próprios erros: com lição de estrutura aberta, só o domínio evolui
@@ -280,9 +279,7 @@ class Circle:
             except Exception as exc:
                 r.errors.append(f"corpo:{exc!r}")
         self._record(r)
-        # traço tipado do giro (OTel GenAI) + painel de timeline/grafo; nunca levanta
         telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
-        # observabilidade: traços para o coletor OTLP (se configurado, em segundo plano) e o fio de cada entrega conferido
         try:
             from . import observabilidade, rastro
             observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
@@ -426,6 +423,9 @@ class Circle:
             tasks.append("indagar")
         if jobs.precisa(self.store) and "antecipar" not in tasks:
             tasks.append("antecipar")
+        from . import documentador
+        if self.gate is not None and documentador.precisa(self.store) and "documentar" not in tasks:
+            tasks.append("documentar")
         if self._dev_tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
@@ -444,8 +444,7 @@ class Circle:
                  and not (t in componente and self.incidents.isolated(componente[t]))]
         if not tasks:
             return None
-        # Cascata: regra antes do Jev. Trabalho real (missões, código, PRs) tem precedência e roda a cada giro
-        # enquanto existir; manutenção gira em rodízio (a mais esquecida primeiro). O Jev decide o gasto.
+        # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
         last = s.get("idle_last", {})
         staleness = {t: s.tick - int(last.get(t, -10**6)) for t in tasks}
         # recusado pelo porteiro do gasto: espera cada vez mais antes de tentar de novo (1, 2, 4… até 64 giros)
@@ -702,6 +701,9 @@ class Circle:
             self.estudo.run(autorizado=True)
         elif pick == "antecipar":
             jobs.antecipar(self.store)
+        elif pick == "documentar":
+            from . import documentador
+            documentador.rodar(self.ctx, gh=getattr(self.gate, "gh", None))
         elif pick == "atualizar_corpo":
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca

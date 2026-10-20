@@ -39,6 +39,7 @@ EQUIPE: dict[str, dict[str, str]] = {
     "jardinagem": {"grupo": "qualidade", "faz": "Mede padrões ruins crescendo no código e abre item para podar."},
     "meta_learner": {"grupo": "qualidade", "faz": "Aprende regras com as correções e testa a política candidata em shadow."},
     "evoluir_projeto": {"grupo": "produto", "faz": "Faz um ciclo nas missões suas: régua, versão nova, torneio e evidência."},
+    "documentar": {"grupo": "qualidade", "faz": "Gera a documentação em docs/ a partir do código, do banco e do CHANGELOG, com o Jev classificando cada entrega, e abre o PR."},
     "rotinas": {"grupo": "qualidade", "faz": "Regressão, padrões, resumo, prompts A/B e demais manutenções em rodízio."},
     "llm": {"grupo": "externos", "faz": "Gera texto e raciocina quando o Jev e a regra não bastam (custa tokens)."},
     "github": {"grupo": "externos", "faz": "Guarda o código, roda o CI e registra os PRs."},
@@ -220,6 +221,8 @@ def _de_alertas(store, c, out, limite):
             out.append(_msg(a["created_at"], "atualizar_corpo", "orquestrador", "entrega" if "evidenciado" in msg else "status", msg))
         elif k == "saude" and msg.startswith("Estagna"):
             out.append(_msg(a["created_at"], "saude", "orquestrador", "alerta", msg))
+        elif k == "docs":
+            out.append(_msg(a["created_at"], "documentar", "revisar_prs" if "PR #" in msg else "cassio", "entrega", msg))
         elif k == "duvida":
             out.append(_msg(a["created_at"], "estudar_pedido", "indagar", "entrega" if "agora valida" in msg else "status", msg))
         elif k == "roteiro" and msg.startswith("Estudei"):

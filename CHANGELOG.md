@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.40.0 — 2026-10-20
+
+**O Redator técnico: documentação profissional do loop, gerada da autoevolução e publicada por PR.**
+
+- **`circulo/documentador.py`** — agente novo (`documentar`, "Redator técnico") que gera `docs/` a partir de fontes
+  medidas: docstrings dos módulos (ast), perguntas ao Jev lidas do código (`jev_cobertura`), telas e APIs do mapa de
+  verificação, nomes e papéis dos agentes, tarefas do giro (lidas do fonte de `loop.py`), PRs mergeados com a
+  linhagem pergunta → item → PR, lições e o CHANGELOG. Sem LLM: texto derivado de dado é fiel e custa zero.
+- **O Jev classifica cada entrega** do loop (choice: funcionalidade, correção, velocidade, observabilidade, segurança,
+  documentação) e diz se ela muda o que o humano vê (noul) — uma vez por PR, em lote, com cache em kv.
+- **Documentos**: `docs/README.md` (índice), `agentes.md`, `arquitetura.md` (constituição, módulos, telas, APIs),
+  `decisoes.md` (catálogo Jev First), `evolucao.md` (versões + entregas do loop por tipo), `licoes.md`.
+- **Publicação segura**: branch `circulo/docs-<momento>` a partir de `origin/main`, commit como Círculo, PR aberto
+  pela API; o **gate aceita PR de documentação só se todos os arquivos estão em `docs/`** e o CI está verde (sem o
+  teto de 800 linhas, sem exigir teste), e recusa como fora do alcance se tocar código. Sem GitHub, escreve no clone.
+- **Quando roda**: tarefa ociosa de custo zero, quando há PR do loop mergeado desde a última doc, ou a cada 24 h;
+  um PR de docs por vez (a tabela `prs` diz quando o gate fechou o anterior). Aparece no canal `#equipe`.
+- Primeira versão de `docs/` já no repo (gerada agora; a próxima vem do Mac, com as entregas reais).
+- Arquitetura preservada: o gate não importa o Redator, o Redator não importa o loop; `loop.py` em 900 linhas.
+- Testes (`test_documentador`, 4): gera do código/banco/CHANGELOG com o Jev classificando uma vez; roda quando há
+  entrega nova e publica no local sem GitHub; gate aceita só docs/ e recusa código; PR de docs fechado libera o próximo.
+
 ## 1.39.0 — 2026-10-20
 
 **Sistema de design: o Círculo sobre o Primer (GitHub).** Escolha: entre os sistemas prontos que funcionam sem build

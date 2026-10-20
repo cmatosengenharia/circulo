@@ -37,6 +37,7 @@ HUMAN_LABEL = "aprovado-humano"             # legado: não é mais exigido
 AGENT_BRANCH_PREFIX = "circulo/"     # o gate só mergeia PRs abertos pelos agentes
 MAX_LINES = 800                       # PR maior que isso nunca entra sozinho
 DEVELOPER_BRANCH_PREFIX = "circulo/fix-"   # PRs do Developer precisam trazer teste novo
+DOCS_BRANCH_PREFIX = "circulo/docs-"       # PRs do Redator técnico: só docs/, nada de código por essa porta
 
 
 def tem_teste(files: list[str]) -> bool:
@@ -126,6 +127,12 @@ class MergeGate:
 
         files = self.gh.pr_files(n)
         names = [f["filename"] for f in files]
+        if pr.get("head_ref", "").startswith(DOCS_BRANCH_PREFIX):
+            fora = [f for f in names if not f.startswith("docs/")]
+            if fora:
+                return Verdict(n, sha, False, f"fora do alcance: PR de documentação toca código ({', '.join(fora[:5])})", {"fora_do_alcance": True})
+            ok, why = checks_ok(self.gh.check_runs(sha))
+            return Verdict(n, sha, ok, "documentação: só docs/ e CI verde" if ok else why, {"docs": True, "files": len(names)})
         const = touches_constitution(names)
         if const:   # recusa definitiva: não espera ninguém, não tenta de novo
             return Verdict(n, sha, False, f"fora do alcance: PR de agente altera a constituição ({', '.join(const)})",
