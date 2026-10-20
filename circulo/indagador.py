@@ -349,8 +349,9 @@ def candidatas_funil(store) -> list[dict]:
                     "texto": f"{f['prs_fechados']} PR(s) do Developer fecharam sem merge contra {f['prs_mergeados']} mesclado(s) em 24 h: "
                              "qual portão reprova mais e o que o Developer deveria checar antes de abrir o PR?",
                     "evidencia": {"prs_fechados": f["prs_fechados"], "prs_mergeados": f["prs_mergeados"], "base": "medido"}})
+    from .planejador import ESPERA, FILA_CHEIA
     motivo = f.get("planejador_motivo") or ""
-    if motivo and not motivo.startswith(("fila cheia", "intervalo")):
+    if motivo and not motivo.startswith((FILA_CHEIA, ESPERA)):
         out.append({"chave": "funil:planejador_parado", "persona": "operador", "relevancia": 0.8,
                     "texto": f"O Planejador não planeja porque “{motivo}”: essa trava é legítima agora, e o que a resolve sem esperar o humano?",
                     "evidencia": {"planejador_motivo": motivo, "base": "medido"}})

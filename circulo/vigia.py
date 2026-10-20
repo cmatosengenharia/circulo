@@ -24,7 +24,7 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
-from .planejador import ESPERA, GATE, MAX_TENTATIVAS, PORTEIRO, TENTATIVAS
+from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, TENTATIVAS
 
 INTERVALO = 60                   # segundos entre passagens da thread
 ESPERA_PERGUNTA = 30 * 60        # pergunta validada esperando mais que isso = trava
@@ -87,6 +87,8 @@ def s_pergunta_valida_parada(s, now):
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
     gate = _kv(s, GATE, {}) or {}
     motivo = gate.get("motivo") if now - float(gate.get("em", 0) or 0) < 30 * 60 else None
+    if motivo and motivo.startswith(FILA_CHEIA):
+        return None                          # contrapressão medida: o Developer tem trabalho; Developer parado é outra sonda
     tent = _kv(s, TENTATIVAS, {}) or {}
     ult = tent.get("ultima")
     if motivo and motivo.startswith(ESPERA):

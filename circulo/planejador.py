@@ -41,6 +41,7 @@ PORTEIRO = "porteiro_planejador"   # kv: decisão do porteiro worth_spending.idl
 HISTORICO = 20
 TENTATIVAS = "planejador_tentativas"   # kv: o resultado de cada tentativa real (envelope por pergunta e último progresso)
 ESPERA = "intervalo"        # prefixo do motivo de espera entre tentativas: não é causa de trava, a última tentativa é
+FILA_CHEIA = "fila cheia"   # prefixo do motivo de contrapressão: o Developer tem trabalho, a pergunta espera de propósito
 MAX_TENTATIVAS = 4          # tentativas com falha antes da quarentena
 IDADE_MAX = 3600            # pergunta mais velha que isso que falha vai para a quarentena
 PRAZO_PORTEIRO = 2 * 3600   # pergunta mais velha que isso que o porteiro recusa abaixo do limiar é descartada (destino explícito)
@@ -113,7 +114,7 @@ class Planejador:
         fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop') "
                           "AND evidencia NOT LIKE '%depende de você%'")["n"]
         if fila >= FOLGA:
-            return f"fila cheia ({fila} itens)"
+            return f"{FILA_CHEIA} ({fila} itens)"
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
             return "lição estrutural aberta: primeiro corrige, depois evolui"
