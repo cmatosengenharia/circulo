@@ -293,10 +293,17 @@ class Engine:
                 pass
 
     # ------------------------------------------------------------ pesquisa
+    def _memoria_time(self, p: dict) -> str:
+        from .memoria import do_ctx
+        mem = do_ctx(self.ctx)
+        bloco = mem.para("missao", f"{p.get('tipo', '')} {p.get('pedido', '')}") if mem else ""
+        return ("\n\n" + bloco) if bloco else ""
+
     def research(self, p: dict, res: CycleResult) -> int:
         lessons = self.mem.playbook(p["tipo"])
         prompt = (f"Tipo de solução: {p['tipo']}\nPedido: {p['pedido']}\nPropósito: {p['proposito']}\n"
                   f"O que já aprendemos neste tipo de pedido:\n" + "\n".join(f"- {x['text']}" for x in lessons) +
+                  self._memoria_time(p) +
                   "\n\nO pedido é uma hipótese, não uma ordem. Pesquise em fontes confiáveis (documentação oficial, empresas "
                   "reconhecidas, estudos) quais são as principais referências do mercado para isso e o que cada uma faz de melhor. "
                   "Liste de 5 a 10 achados sobre o que funciona melhor hoje, cada um com a fonte (URL). "

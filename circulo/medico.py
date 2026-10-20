@@ -153,15 +153,18 @@ def sondar(store: Store, now: float | None = None) -> list[dict]:
 
 
 # ------------------------------------------------------------------ o Jev decide
-def classificar(dl, achados: list[dict]) -> list[dict]:
+def classificar(dl, achados: list[dict], mem=None) -> list[dict]:
     if not achados:
         return []
     from .decision import SN, Question
-    qs, estado = {}, {"achados": [{"titulo": a["titulo"], "tipo": a["tipo"], "evidencia": a["evidencia"]} for a in achados]}
+    from .memoria import RECEITA
+    qs, estado = {}, {"achados": [{"titulo": a["titulo"], "tipo": a["tipo"], "evidencia": a["evidencia"],
+                                   "memoria": mem.lembrancas(a["titulo"], k=3, tipos=RECEITA["medico"][0]) if mem else []} for a in achados]}
     for i in range(len(achados)):
         qs[f"medico_bloqueia_{i}"] = Question("noul", f"Finding `achados.{i}.titulo` (evidence `achados.{i}.evidencia`) is blocking the loop's progress right now.",
                                               SN("the pattern stops items, PRs or stages from advancing, or repeats the same failed work",
-                                                 "the loop keeps delivering despite it; it is cosmetic, rare, or already explained"))
+                                                 "the loop keeps delivering despite it; it is cosmetic, rare, or already explained "
+                                                 f"(see `achados.{i}.memoria`: similar past diagnoses, incidents and lessons with their outcome)"))
         qs[f"medico_dono_{i}"] = Question("choice", f"Who owns the cause of `achados.{i}.titulo`, given `achados.{i}.evidencia`?", dict(DONOS))
         qs[f"medico_remedio_{i}"] = Question("score", f"What is the safe response to `achados.{i}.titulo` now?", REMEDIO)
     out = dl.ask_many(estado, qs)
@@ -240,7 +243,8 @@ class Medico:
         abertos = {r["chave"]: dict(r) for r in self.s.q("SELECT * FROM diagnosticos WHERE status!='fechado'")}
         novos = [a for a in achados if a["chave"] not in abertos]
         agiu = []
-        for a in classificar(self.ctx.dl, novos):
+        from .memoria import do_ctx
+        for a in classificar(self.ctx.dl, novos, do_ctx(self.ctx)):
             acao = decidir(a)
             did = self.s.x("INSERT INTO diagnosticos(chave,tipo,titulo,evidencia,vezes,status,veredito,acao,primeira_em,ultima_em) VALUES(?,?,?,?,1,?,?,?,?,?)",
                            (a["chave"], a["tipo"], a["titulo"][:200], json.dumps(a["evidencia"], ensure_ascii=False), "observando",

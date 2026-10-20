@@ -490,6 +490,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <h2>Memória do time: o que já aconteceu de parecido, na hora certa</h2>
       <p class="sub" style="margin:-6px 0 8px">Lições, itens feitos, estudos, revisões, gates, incidentes e episódios do Desenvolvedor num índice de texto (FTS5 do SQLite). Cada agente recebe só os trechos mais parecidos com a tarefa de agora, com o resultado que tiveram, em vez das mesmas 15 lições globais. O Arquiteto reaproveita um estudo recente de assunto parecido (0 tokens); o Gerente de produto não abre item que já existe com outras palavras.</p>
       <div class="indag-tot" id="memTot"></div>
+      <div class="sub" id="memAgentes"></div>
       <ul class="list" id="memUsos"></ul>
     </section>
 
@@ -1168,9 +1169,12 @@ async function refreshMemoria() {
     const j = await (await fetch("/api/memoria")).json();
     const tipos = Object.entries(j.por_tipo || {}).map(([k, n]) => `${n} ${k}`).join(" · ");
     $("#memTot").textContent = `${j.total} lembrança(s)${tipos ? " (" + tipos + ")" : ""} · ${j.usos_24h} consulta(s) em 24 h · ${j.reaproveitados_24h} reaproveitamento(s) · ${j.tokens_poupados_24h.toLocaleString("pt-BR")} tokens poupados` + (j.fts ? "" : " · sem FTS5: busca simples");
+    const pa = Object.values(j.por_agente || {});
+    $("#memAgentes").textContent = pa.length ? "Quem consultou em 24 h: " + pa.map(a => `${a.nome} ${a.consultas}× (${a.com_lembranca} com lembrança)`).join(" · ")
+      : "Compartilhada com toda a equipe: PO, Questionador, Gerente de produto, Arquiteto, Desenvolvedor, Revisor, Prompts A/B, Médico e as missões.";
     $("#memUsos").innerHTML = (j.ultimos || []).map(u => `<li style="display:block"><span class="tag">${esc(u.agente_nome || u.agente)}</span> ${esc(u.assunto.slice(0, 90))} → ` +
       (u.hits.length ? u.hits.map(h => `${esc(h.tipo)} #${esc(String(h.ref).split(":")[0])}${h.resultado ? " (" + esc(h.resultado) + ")" : ""}`).join(", ") : "nada parecido") +
-      (u.poupou_tokens ? ` <b>· poupou ~${u.poupou_tokens.toLocaleString("pt-BR")} tokens</b>` : "") + `</li>`).join("") || "<li class=\"sub\">Nenhuma consulta ainda: a memória entra em ação quando o Desenvolvedor, o Arquiteto ou o Gerente de produto pegam uma tarefa.</li>";
+      (u.poupou_tokens ? ` <b>· poupou ~${u.poupou_tokens.toLocaleString("pt-BR")} tokens</b>` : "") + `</li>`).join("") || "<li class=\"sub\">Nenhuma consulta ainda: a memória entra em ação a cada tarefa de qualquer agente da equipe.</li>";
   } catch {}
 }
 setInterval(refreshMemoria, 20000); refreshMemoria();

@@ -139,10 +139,14 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
             "noul", f"A pergunta `candidatas.{i}.texto` é pertinente ao contexto atual da missão `missao` (pedido `pedido`, "
                     f"critérios fracos `criterios_fracos`, lições abertas `licoes_abertas`, falhas `falhas_24h`)?",
             SN("a pergunta mira uma dor que os dados da missão mostram agora (`candidatas.%d.evidencia`) e respondê-la mudaria o próximo passo" % i,
-               "a pergunta é genérica, fala de algo que os dados não mostram, ou repete o que já está em andamento"))
+               "a pergunta é genérica, fala de algo que os dados não mostram, ou repete o que já está em andamento ou já foi "
+               "perguntado/entregue antes (`candidatas.%d.memoria`: perguntas e itens parecidos, com o resultado e há quantos dias)" % i))
         qs[f"indaga_eixo_{i}"] = Question("choice", f"O que a pergunta `candidatas.{i}.texto` faz evoluir, se respondida?", dict(EIXOS))
         qs[f"indaga_acao_{i}"] = Question("score", f"Quão acionável é a pergunta `candidatas.{i}.texto`?", ACAO)
-    state = {**ctxt, "candidatas": [{"texto": c["texto"], "persona": c["persona"], "evidencia": c["evidencia"]} for c in cands]}
+    from .memoria import RECEITA, do_ctx
+    mem = do_ctx(ctx)
+    state = {**ctxt, "candidatas": [{"texto": c["texto"], "persona": c["persona"], "evidencia": c["evidencia"],
+                                     "memoria": mem.lembrancas(c["texto"], k=3, tipos=RECEITA["indagar"][0]) if mem else []} for c in cands]}
     out = ctx.dl.ask_many(state, qs)
     res = []
     for i, c in enumerate(cands):

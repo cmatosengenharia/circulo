@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.44.0 — 2026-10-20
+
+**A memória do time (RAG) compartilhada com toda a equipe — a começar pelo Product owner.** Até aqui só o Desenvolvedor,
+o Arquiteto e o Gerente de produto consultavam a memória; o PO classificava perguntas sem saber o que já tinha sido
+perguntado ou entregue, e o Médico julgava um padrão sem ver os diagnósticos anteriores.
+
+- **Índice** ganha dois tipos: `pergunta` (texto, persona, status: validada/entregue/descartada/estudada) e `diagnostico`
+  (do Médico, com status/ação). Ao lado de lição, item, estudo, revisão, gate, incidente, episódio e PR.
+- **Uma receita por agente** (`memoria.RECEITA`): a mesma memória, no recorte que serve a cada papel — `Memoria.para(agente,
+  assunto)` para prompts de LLM e `Memoria.lembrancas(assunto)` (tipo, título, resultado, há quantos dias) para o estado
+  que vai ao Jev. Vazio quando não há nada parecido: nunca inventa contexto.
+- **Quem passou a consultar**: PO (cada candidata vai ao Jev com `memoria`: perguntas e itens parecidos e o que deu —
+  pergunta já entregue/descartada não é pertinente), Questionador (lições reincidentes sem pergunta), Gerente de produto
+  (pergunta → item e ao dividir: "se já foi feito ou contestado, proponha o próximo passo"), Prompts A/B, Médico (o Jev
+  vê diagnósticos/incidentes/lições parecidos antes de decidir bloqueia/dono/remédio), Revisor (revisões e gates
+  parecidos na evidência) e as missões (pesquisa com o que o time já viu daquele tipo de pedido).
+- Painel, cartão Memória do time: quem consultou em 24 h e quantas consultas acharam lembrança.
+- O PO já roda a cada giro em que há vaga de pergunta (5 min com fome, 30 min quando a última passagem não achou nada);
+  não mudou — mudou o que ele sabe quando pergunta.
+
 ## 1.43.0 — 2026-10-20
 
 **Todo consumo do loop pela API, e qualquer API de IA.**

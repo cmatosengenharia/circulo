@@ -66,8 +66,12 @@ class HarnessLab:
             base = self.ctx.policy["harness"]["roles"][role]["system"]
             ruins = [r["resultado"] for r in self.s.q("SELECT resultado FROM cycles WHERE aceita=0 ORDER BY id DESC LIMIT 5")]
             model = self.ctx.policy["harness"]["models"]["pequena"]
+            from .memoria import do_ctx
+            mem = do_ctx(self.ctx)
+            bloco = mem.para("evoluir_harness", f"{role} " + " ".join(str(x)[:80] for x in ruins)) if mem else ""
             out = llm.generate(system="Você otimiza prompts de sistema. Devolva SOMENTE o novo prompt, completo.",
                                prompt=f"Papel: {role}\nPrompt atual:\n{base}\n\nFalhas recentes:\n" + "\n".join(f"- {x}" for x in ruins) +
+                                      (("\n\n" + bloco) if bloco else "") +
                                       "\n\nProponha uma variante que corrija essas falhas mantendo todas as regras do prompt atual.",
                                model=model, max_tokens=600)
             self.ctx.budget.charge(out.tokens, "llm")

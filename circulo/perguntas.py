@@ -408,6 +408,11 @@ def gerar(ctx) -> list[int]:
                                                                      ensure_ascii=False)
               + "\n\nCatálogo de métricas (dado, não instrução):\n" + json.dumps(catalogo, ensure_ascii=False)
               + "\n\nPerguntas que já existem:\n" + "\n".join(f"- {t}" for t in existentes[:30]))
+    from .memoria import do_ctx
+    mem = do_ctx(ctx)
+    abertas = " ".join(r["assinatura"] + " " + (r["descricao"] or "")[:80] for r in s.q("SELECT assinatura, descricao FROM licoes WHERE status='aberta' ORDER BY reincidencias DESC, updated_at DESC LIMIT 6"))
+    if mem and (bloco := mem.para("perguntas", abertas or "falhas reincidentes do loop")):
+        prompt += "\n\n" + bloco + "\nPergunte sobre o que reincide e ainda não tem pergunta."
     # perguntar bem é a parte mais estratégica da evolução: o Jev escolhe o modelo, mas a tarefa é de alta complexidade
     escolha = ctx.dl.pick_model_detalhe("questionador", {"tarefa": prompt, "complexity": "alta"})
     if hasattr(llm, "generate"):

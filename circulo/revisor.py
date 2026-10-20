@@ -94,7 +94,7 @@ def classificar(dl, evidencia: dict) -> dict:
                  SN("sem conflito medido (`conflito_main`, `conflito_prs` falsos), testes passam na main atual (`testes_na_main`), "
                     "nenhum arquivo compartilhado com outro PR aberto (`compartilhados` vazio) e mudança pequena",
                     "há conflito, quebra de teste na main atual, arquivo compartilhado com PR aberto, ou a mudança é grande e toca módulos "
-                    "centrais que outro PR também toca"))
+                    "centrais que outro PR também toca (`memoria`: revisões e gates parecidos de antes, com o resultado)"))
     d = dl.ask("revisor_seguro", q, evidencia)
     return {"p": float(d.value), "conf": float(d.confidence), "fonte": d.source}
 
@@ -151,6 +151,10 @@ def antes_do_pr(ctx, wt: Path, item: dict, arquivos: list[str], autor: tuple[str
         if ev["conflito_prs"]:
             aguarda = ev["conflito_prs"][0]
             motivo = f"conflito simulado (git merge-tree) com o PR #{aguarda} ainda aberto"
+    from .memoria import RECEITA, do_ctx
+    mem = do_ctx(ctx)
+    if mem:
+        ev["memoria"] = mem.lembrancas(f"{item['titulo']} " + " ".join(arquivos)[:300], k=3, tipos=RECEITA["revisor"][0])
     jev = classificar(ctx.dl, ev)
     if not motivo and jev["p"] is not None and jev["p"] < SEGURO_MIN and jev["conf"] >= CONF_MIN and jev["fonte"] == "jev":
         motivo = f"Jev: risco de entrar junto com os PRs abertos (p={jev['p']:.2f}, confiança {jev['conf']:.2f})"

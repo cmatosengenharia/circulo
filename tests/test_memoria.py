@@ -122,3 +122,59 @@ def test_gerente_de_produto_nao_abre_item_que_ja_existe_com_outras_palavras(circ
     p = s.one("SELECT status, item_id FROM perguntas WHERE id=?", (pid,))
     assert p["status"] == "repetida" and p["item_id"] == existente
     assert s.one("SELECT COUNT(*) n FROM roadmap")["n"] == antes                 # nenhum item novo
+
+
+# ------------------------------------------------------------ 1.44.0: a memória compartilhada com toda a equipe
+
+def test_memoria_compartilhada_perguntas_e_diagnosticos_entram_e_cada_agente_tem_sua_receita(circle):
+    from circulo import memoria as mod
+    s, agora = circle.store, time.time()
+    s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,evidencia,created_at,updated_at) VALUES('economista:etapa_cara','economista','Qual é o jeito mais barato de obter o mesmo resultado na etapa que mais gasta (estudo)?','entregue','loop','{}',?,?)", (agora - 86400, agora - 3600))
+    s.x("CREATE TABLE IF NOT EXISTS diagnosticos(id INTEGER PRIMARY KEY, chave TEXT, tipo TEXT, titulo TEXT, evidencia TEXT, status TEXT, acao TEXT, vezes INTEGER DEFAULT 1, primeira_em REAL, ultima_em REAL)")
+    s.x("INSERT INTO diagnosticos(chave,tipo,titulo,evidencia,status,acao,vezes,primeira_em,ultima_em) VALUES('erro:meta','erro_repetido','JSONDecodeError em meta repetiu 8×','{}','fechado','corrigir',8,?,?)", (agora - 7200, agora - 600))
+    m = mod.Memoria(s)
+    n = m.reindexar(forcar=True)
+    assert n.get("perguntas") == 1 and n.get("diagnosticos") == 1
+    lem = m.lembrancas("etapa que mais gasta estudo", k=3, tipos=mod.RECEITA["indagar"][0])
+    assert lem and lem[0]["tipo"] == "pergunta" and lem[0]["resultado"] == "entregue" and lem[0]["ha_dias"] >= 0.9
+    assert set(lem[0]) == {"tipo", "titulo", "resultado", "ha_dias"}                      # só o que o Jev compara
+    bloco = m.para("medico", "JSONDecodeError em meta")
+    assert "diagnóstico #" in bloco and "fechado/corrigir" in bloco and "Memória do time" in bloco
+    assert m.para("revisor", "JSONDecodeError em meta") == ""                              # receita do revisor não inclui diagnósticos
+    assert m.para("indagar", "") == "" and m.lembrancas("   ") == []
+    assert set(mod.RECEITA) >= {"indagar", "perguntas", "planejar_roteiro", "corrigir_codigo", "revisor", "evoluir_harness", "medico", "missao"}
+    r = m.resumo()
+    assert "medico" in r["por_agente"] and r["por_agente"]["medico"]["consultas"] == 1 and r["equipe"]
+
+
+def test_po_leva_a_memoria_ao_jev_e_o_que_ja_foi_entregue_nao_e_pertinente(circle, monkeypatch):
+    from circulo import indagador
+    from circulo import memoria as mod
+    s, agora = circle.store, time.time()
+    s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,evidencia,created_at,updated_at) VALUES('x','usuario','Como usuário, qual componente do painel devo melhorar para facilitar a visualização das métricas?','entregue','loop','{}',?,?)", (agora - 86400, agora - 3600))
+    mod.Memoria(s).reindexar(forcar=True)
+    visto = {}
+    original = circle.ctx.dl.ask_many
+
+    def espiao(state, qs):
+        visto.update(state)
+        return original(state, qs)
+    monkeypatch.setattr(circle.ctx.dl, "ask_many", espiao)
+    cands = [{"chave": "usuario:painel_metricas", "texto": "Como usuário, qual componente do painel devo melhorar para facilitar a visualização das métricas?",
+              "persona": "usuario", "evidencia": {"falhas_painel_24h": 2}, "eixo": "produto"}]
+    indagador.classificar(circle.ctx, cands, {"missao": "loop", "pedido": "x"})
+    mem = visto["candidatas"][0]["memoria"]
+    assert mem and mem[0]["tipo"] == "pergunta" and mem[0]["resultado"] == "entregue"      # o Jev enxerga que já foi feita
+
+
+def test_medico_e_revisor_consultam_a_mesma_memoria(circle):
+    from circulo import medico
+    from circulo import memoria as mod
+    s = circle.store
+    m = mod.Memoria(s)
+    m.reindexar(forcar=True)
+    achados = [{"chave": "erro:meta:x", "tipo": "erro_repetido", "titulo": "JSONDecodeError em meta repetiu 8×", "evidencia": {"etapa": "meta"}}]
+    res = medico.classificar(circle.ctx.dl, achados, m)
+    assert res and "veredito" in res[0]
+    assert s.one("SELECT COUNT(*) n FROM memoria_uso")["n"] == 0                             # lembrancas() não conta como consulta de prompt
+    assert m.para("revisor", "ajuste no vigia circulo/vigia.py") == "" or "Memória do time" in m.para("revisor", "ajuste no vigia circulo/vigia.py")
