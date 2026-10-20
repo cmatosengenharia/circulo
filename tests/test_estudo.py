@@ -90,6 +90,29 @@ def test_resposta_invalida_vira_licao_e_nao_estuda(circle):
     assert circle.store.one("SELECT assinatura FROM licoes")["assinatura"] == "estudo:saida_invalida"
 
 
+def test_resposta_cortada_no_item_aproveita_o_veredito_e_os_achados(circle):
+    """Lição #22: o limite de tokens cortou a resposta dentro de "item" (depois de veredito, justificativa e achados
+    completos) e o estudo inteiro foi descartado como "resposta sem JSON válido". O que chegou inteiro vale."""
+    iid = pedido(circle)
+    inteiro = json.dumps(resposta("adotar"), ensure_ascii=False)
+    circle.ctx.dl.llm = Pesquisa(inteiro[:inteiro.index('"detalhe"') + len('"detalhe')])
+    r = Estudo(circle.ctx).run()
+    assert r is not None and r["veredito"] == "adotar" and r["cortado"]
+    assert r["fontes"] == ["https://a.org/x", "https://b.org/y"]
+    assert item(circle, iid)["estudo"] is not None
+    assert circle.store.one("SELECT COUNT(*) n FROM licoes WHERE assinatura='estudo:saida_invalida'")["n"] == 0
+
+
+def test_adaptar_cortado_sem_o_item_novo_e_adotado_como_pedido(circle):
+    """Lição #22: adaptar sem o item reescrito completo não reescreve nada: segue o pedido como está."""
+    iid = pedido(circle)
+    inteiro = json.dumps(resposta("adaptar"), ensure_ascii=False)
+    circle.ctx.dl.llm = Pesquisa(inteiro[:inteiro.index('"detalhe"') + 3])
+    r = Estudo(circle.ctx).run()
+    assert r["veredito"] == "adotar" and "cortad" in r["rebaixado"]
+    assert item(circle, iid)["titulo"] == "Usar cache em todas as decisões do Jev"
+
+
 def test_erro_do_loop_nao_passa_pelo_estudo(circle):
     circle.store.x("UPDATE roadmap SET status='feito'")
     circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
