@@ -313,7 +313,16 @@ class SelfDeveloper:
 
     def _licoes_txt(self, item_id: int | None = None) -> str:
         lic = getattr(self.ctx, "licoes", None)
-        txt = lic.contexto() if lic is not None else ""
+        mem = getattr(self.ctx, "memoria", None)
+        item = self.s.one("SELECT titulo, detalhe FROM roadmap WHERE id=?", (item_id,)) if item_id else None
+        txt = ""
+        if mem is not None and item is not None:
+            # memória por relevância: o que já aconteceu de parecido com ESTA tarefa (lições, episódios, revisões, gates)
+            txt = mem.contexto(f"{item['titulo']} {(item['detalhe'] or '')[:400]}", "corrigir_codigo", k=6, item_id=item_id)
+        if lic is not None:
+            # e as lições que mais reincidem, poucas, para o que a busca não alcança
+            geral = lic.contexto(limite=5 if txt else 15)
+            txt += ("\n" if txt and geral else "") + geral
         from .neuronios import ABRIR_PR, portoes
         ps = portoes(self.s, ABRIR_PR, item_id)
         if ps:
@@ -630,6 +639,7 @@ class SelfDeveloper:
             fechar(pr, f"Fechado pelo Developer do círculo: {MAX_CONSERTOS} consertos sem passar no gate ({motivo}). "
                        "A branch fica; o item volta para a fila.")
         self._salvar_pr(pr, status="fechado", conserto=None)
+        self._episodio(pr, "abandonado", f"abandonado após {MAX_CONSERTOS} consertos: {motivo[:160]}")
         self._set_item(item_id, "pendente", f"PR #{pr} fechado após {MAX_CONSERTOS} consertos: {motivo[:120]}")
         self.ctx.reply(f"Developer fechou o PR #{pr} (“{titulo}”) depois de {MAX_CONSERTOS} consertos; o item volta para a fila.", "saude")
         return DevResult(item_id, "abandonado", motivo[:200], pr)
@@ -657,6 +667,20 @@ class SelfDeveloper:
 
     def pr_closed(self, pr: int, merged: bool) -> None:
         self._salvar_pr(pr, status="mergeado" if merged else "fechado", conserto=None)
+        self._episodio(pr, "mergeado" if merged else "fechado", "entrou na main" if merged else "fechado sem entrar")
+
+    def _episodio(self, pr: int | None, resultado: str, detalhe: str) -> None:
+        """Caminho de escrita da memória: cada PR que termina vira um episódio recuperável nas próximas tarefas."""
+        mem = getattr(self.ctx, "memoria", None)
+        if mem is None:
+            return
+        r = self.s.one("SELECT p.item_id, p.titulo, p.arquivos, p.consertos, m.motivo FROM prs p LEFT JOIN revisoes m ON m.pr=p.number "
+                       "WHERE p.number=? ORDER BY m.id DESC LIMIT 1", (pr,)) if pr else None
+        if not r:
+            return
+        arquivos = json.loads(r["arquivos"]) if r["arquivos"] else []
+        texto = f"{detalhe}; consertos: {r['consertos'] or 0}" + (f"; última revisão: {r['motivo']}" if r["motivo"] else "")
+        mem.episodio(r["item_id"], pr, resultado, r["titulo"] or "", texto, arquivos)
 
 
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",

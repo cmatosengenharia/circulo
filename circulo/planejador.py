@@ -291,6 +291,14 @@ class Planejador:
         if norm(item["titulo"]) in existentes:
             conselho.marcar(pid, "repetida")
             return pid, "repetida", f"título repetido: {item['titulo'][:100]}", None
+        mem = getattr(self.ctx, "memoria", None)
+        par = mem.item_parecido(item["titulo"]) if mem is not None else None
+        if par is not None:
+            # mesma ideia com outras palavras: não abre um segundo item; a pergunta fica ligada ao que já existe
+            conselho.marcar(pid, "repetida", par["id"])
+            self.ctx.reply(f"Conselho ({pergunta.persona}): “{item['titulo'][:90]}” já existe como item #{par['id']} "
+                           f"({par['status']}, {int(par['parecido'] * 100)}% parecido). Não abri outro.", "roteiro")
+            return pid, "repetida", f"parecido com o item #{par['id']}: {par['titulo'][:90]}", None
         ordem = (self.s.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
         agora = time.time()
         detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (

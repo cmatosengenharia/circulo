@@ -78,7 +78,8 @@ def test_falha_de_sub_item_repete_so_ele_com_o_erro_anterior(circle, repo):  # n
     assert circle.store.one("SELECT detalhe FROM roadmap WHERE id=?", (b["id"],))["detalhe"].count(fatiador.MARCA) == 1
     r = dev.run_once(item_id=b["id"], autorizado=True)
     assert r.status == "proposto"
-    assert "Parte B" in agent.tasks[0] and "NameError" in agent.tasks[0] and "Parte A" not in agent.tasks[0]
+    tarefa = agent.tasks[0].split("Memória do time")[0]                        # a memória pode citar a Parte A feita; a tarefa, não
+    assert "Parte B" in tarefa and "NameError" in tarefa and "Parte A" not in tarefa
     assert len(llm.prompts) == 1                                             # não pede nova divisão
 
 

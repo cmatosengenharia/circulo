@@ -87,11 +87,11 @@ def cursor_inicial(store: Store, voltar_s: float = 0) -> dict:
     if not voltar_s:
         return {"perg": m("SELECT MAX(id) m FROM perguntas"), "road": agora, "merges": m("SELECT MAX(id) m FROM merges"),
                 "rev": m("SELECT MAX(id) m FROM revisoes"), "vig": m("SELECT MAX(id) m FROM vigia"), "vig_res": agora,
-                "al": m("SELECT MAX(id) m FROM alerts")}
+                "al": m("SELECT MAX(id) m FROM alerts"), "mem": agora}
     return {"perg": m("SELECT MAX(id) m FROM perguntas WHERE created_at < ?", (desde,)), "road": desde,
             "merges": m("SELECT MAX(id) m FROM merges WHERE created_at < ?", (desde,)), "rev": m("SELECT MAX(id) m FROM revisoes WHERE created_at < ?", (desde,)),
             "vig": m("SELECT MAX(id) m FROM vigia WHERE primeira_em < ?", (desde,)), "vig_res": desde,
-            "al": m("SELECT MAX(id) m FROM alerts WHERE created_at < ?", (desde,))}
+            "al": m("SELECT MAX(id) m FROM alerts WHERE created_at < ?", (desde,)), "mem": desde}
 
 
 # ------------------------------------------------------------------ mensagens
@@ -226,7 +226,24 @@ def _de_alertas(store, c, out, limite):
             out.append(_msg(a["created_at"], "planejar_roteiro", "indagar", "devolucao", msg))
 
 
-FONTES = (_de_perguntas, _de_roadmap, _de_merges, _de_revisoes, _de_vigia, _de_alertas)
+def _de_memoria(store, c, out, limite):
+    """Cada consulta à memória do time vira uma fala: o agente diz o que lembrou antes de começar."""
+    if not store.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memoria_uso'"):
+        return
+    for u in store.q("SELECT agente, assunto, hits, poupou_tokens, created_at FROM memoria_uso WHERE created_at > ? ORDER BY created_at LIMIT ?",
+                     (float(c.get("mem", 0)), limite)):
+        c["mem"] = float(u["created_at"])
+        hits = json.loads(u["hits"] or "[]")
+        if u["poupou_tokens"]:
+            h = hits[0] if hits else {}
+            out.append(_msg(u["created_at"], u["agente"], "orquestrador", "entrega",
+                            f"Assunto parecido com o item #{h.get('ref', '?')} já estudado: reaproveitei o estudo e poupei ~{int(u['poupou_tokens']):,} tokens.".replace(",", ".")))
+        elif hits:
+            resumo = ", ".join(f"{h['tipo']} #{str(h['ref']).split(':')[0]}" for h in hits[:4])
+            out.append(_msg(u["created_at"], u["agente"], "licoes", "status", f"Antes de começar “{u['assunto'][:70]}”, lembrei de {len(hits)} coisa(s) parecida(s): {resumo}."))
+
+
+FONTES = (_de_perguntas, _de_roadmap, _de_merges, _de_revisoes, _de_vigia, _de_alertas, _de_memoria)
 
 
 def mensagens(store: Store, cursor: dict, limite: int = 200) -> tuple[list[dict], dict]:

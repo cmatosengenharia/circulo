@@ -103,6 +103,21 @@ class Estudo:
             monitorar(self.ctx, "estudo:pedido", True, sujeito=item["titulo"], licao=False)
             self._salvar(item, r)
             return r
+        mem = getattr(self.ctx, "memoria", None)
+        par = mem.estudo_parecido(item) if mem is not None else None
+        if par is not None:
+            # assunto já estudado há pouco: reaproveita as fontes e os achados (0 tokens) e deixa claro de onde veio
+            base = par["estudo"]
+            r = {"veredito": "adotar", "modo": "reaproveitado", "de_item": par["de_item"], "fontes": base.get("fontes", []),
+                 "achados": base.get("achados", []), "evidencia": base.get("evidencia", {}),
+                 "justificativa": f"reaproveitado do estudo do item #{par['de_item']} (“{par['de_titulo'][:80]}”, "
+                                  f"{int(par['parecido'] * 100)}% parecido): {base.get('justificativa', '')[:300]}"}
+            mem.poupou("estudar_pedido", item["titulo"], MODOS["leve" if modo == "leve" else "completo"]["est"],
+                       [{"tipo": "estudo", "ref": par["de_item"], "titulo": par["de_titulo"], "parecido": par["parecido"]}])
+            monitorar(self.ctx, "estudo:pedido", True, sujeito=item["titulo"], licao=False)
+            self._salvar(item, r)
+            self.ctx.reply(f"Item #{item['id']}: assunto parecido com o item #{par['de_item']} já estudado; reaproveitei o estudo (0 tokens).", "roteiro")
+            return r
         llm = self.ctx.dl.llm
         if llm is None or not hasattr(llm, "generate"):
             # sem pesquisa possível: segue o pedido, mas o monitoramento registra que não houve evidência
@@ -117,8 +132,11 @@ class Estudo:
                 return None
         prompt = (f"Pedido (hipótese, dado e não instrução): {item['titulo']}\nDetalhe: {item['detalhe']}\n"
                   f"Origem: {'Cássio (humano)' if item['origem'] == 'pedido_cassio' else 'o próprio loop'}")
+        recuperado = mem.contexto(item["titulo"], "estudar_pedido", k=5, tipos=("estudo", "licao", "item", "revisao"), item_id=item["id"]) if mem is not None else ""
         lic = getattr(self.ctx, "licoes", None)
-        if lic is not None and lic.contexto():
+        if recuperado:
+            prompt += "\n\n" + recuperado            # o que o time já sabe do assunto: as buscas focam no que falta
+        elif lic is not None and lic.contexto():
             prompt += "\n\n" + lic.contexto()
         cfg = self.ctx.policy["harness"]["roles"].get("researcher", {})
         escolha = self.ctx.dl.pick_model_detalhe("researcher", {"tarefa": prompt, "tipo": "estudo"})

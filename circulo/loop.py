@@ -98,6 +98,9 @@ class Circle:
         from .licoes import Licoes
         self.licoes = Licoes(self.ctx.store, self.ctx.reply)
         self.ctx.licoes = self.licoes         # todo ponto de verificação do círculo registra aqui
+        from .memoria import Memoria
+        self.memoria = Memoria(self.ctx.store)
+        self.ctx.memoria = self.memoria       # o que o time já viu, recuperado por relevância na hora de cada tarefa
         self.meta = MetaLearner(self.ctx)
         self.shadow = Shadow(self.ctx)
         self.health = HealthMonitor(self.ctx)

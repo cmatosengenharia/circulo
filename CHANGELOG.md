@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.34.0 — 2026-10-19
+
+**Memória do time: RAG dentro do loop.** Medido no código: todo agente montava o prompt com SQL fixo. O Desenvolvedor
+recebia as mesmas 15 lições globais em qualquer tarefa (ordenadas por reincidência, não por parecença); o Arquiteto
+estudava do zero um assunto já estudado (28–40 mil tokens cada); o Gerente de produto só barrava título idêntico;
+nada do que o Desenvolvedor aprendia ao fechar um PR voltava para a próxima tarefa.
+
+- **`circulo/memoria.py`** — índice de texto com o FTS5 do próprio SQLite (sem dependência; sem FTS5 cai para um
+  BM25 em Python) sobre lições, itens feitos/contestados, estudos, revisões, recusas do gate, incidentes, PRs e
+  **episódios** do Desenvolvedor. Reindexação incremental por `updated_at` (no máximo a cada 60 s).
+- **Recuperação por relevância** (`buscar`): BM25 × peso do resultado (lição reincidente pesa mais; item contestado
+  pesa menos) × recência (meia-vida de 90 dias). `contexto()` monta um bloco *just-in-time* de até 1.600 caracteres
+  com o resultado de cada lembrança, exclui a própria tarefa e registra cada uso em `memoria_uso`.
+- **Desenvolvedor**: recebe o que já aconteceu de parecido com *esta* tarefa (lições, episódios, revisões, gates) e só
+  5 lições globais; cada PR mergeado, fechado ou abandonado vira episódio (arquivos, consertos, última revisão).
+- **Arquiteto**: assunto já estudado há menos de 30 dias com título ≥ 60 % parecido → **reaproveita o estudo (0
+  tokens)**, registra de onde veio e quanto poupou; senão, o prompt leva o que o time já sabe do assunto, para as
+  buscas focarem no que falta.
+- **Gerente de produto**: item com a mesma ideia em outras palavras (≥ 70 % dos termos) não é aberto; a pergunta
+  fica ligada ao item que já existe.
+- **Telas**: card "Memória do time" na aba Autoevolução (`/api/memoria`: lembranças por tipo, consultas, reaproveitamentos
+  e tokens poupados em 24 h, últimas consultas); no canal `#equipe` cada agente diz o que lembrou antes de começar e
+  quando reaproveitou um estudo.
+- Decidido **não** fazer agora: cache de chamadas idênticas de LLM (quase nenhum prompt se repete à letra; o ganho
+  real é o reaproveitamento de estudo) e embeddings (FTS5 cobre o volume atual sem rede nem dependência).
+- Testes: `test_memoria` (7: termos/parecença, índice com e sem FTS5, estudo e item parecidos, Arquiteto reaproveita
+  sem gastar, Desenvolvedor recebe memória e grava episódio, canal mostra o que lembrou, Gerente de produto não
+  duplica); `test_fatiador` passa a separar a tarefa do bloco de memória.
+
 ## 1.33.0 — 2026-10-19
 
 **A equipe ao vivo virou um canal de chat; o quadro anda em tempo real; a gestão do loop ocupa a tela toda; e os
