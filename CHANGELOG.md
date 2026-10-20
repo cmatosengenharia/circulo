@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.45.0 — 2026-10-20
+
+**Os gargalos medidos no Mac (24 h: 1,5 M tokens do Desenvolvedor para 7 itens entregues).**
+
+- **Desenvolvedor roda testes, lint e git de leitura sozinho.** O Claude Code em `-p` com `acceptEdits` só podia editar:
+  42 de 168 chamadas "ok" terminavam em "aprove os comandos", o item voltava barrado nos portões e tudo recomeçava
+  (~12 chamadas por PR). Agora vai com `--allowedTools` (`FERRAMENTAS`: pytest, ruff, python, git diff/status/log/stash/show,
+  ls/cat/grep/…; nada que saia do worktree). `CIRCULO_CODE_AGENT_FERRAMENTAS` sobrescreve.
+- **Portão aprendido com teste inexistente vira obsoleto.** A lição #27 (teste citado que já não existe) bloqueou 135
+  vezes com `pytest` exit 4; agora o portão é desativado, a lição marcada obsoleta e o PR segue. (Fecha o item #104.)
+- **Estudo sem texto tenta de novo sem busca.** 14 de 40 estudos voltaram vazios (~13 mil tokens cada, 0 bytes de
+  resposta): o teto de 2500 tokens era engolido pelas buscas. Teto 8000 (leve 4000) e, se ainda vier vazio, uma segunda
+  chamada sem busca com o mesmo teto. (Lição #22/#45.)
+- **Aviso de saúde igual não repete na mesma hora** (eram 372 por dia, 20× o mesmo texto).
+- **Espera vencida do Desenvolvedor some do banco**: não fica "Desenvolvedor parado" fantasma na faixa nem no "Precisa de você".
+
 ## 1.44.0 — 2026-10-20
 
 **A memória do time (RAG) compartilhada com toda a equipe — a começar pelo Product owner.** Até aqui só o Desenvolvedor,

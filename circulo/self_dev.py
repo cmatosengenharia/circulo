@@ -149,6 +149,14 @@ class CodeAgent(Protocol):
     def run(self, task: str, workdir: Path) -> dict: ...
 
 
+# O que o Claude Code pode rodar sem pedir aprovação (não há ninguém para aprovar em `-p`): testes, lint e git de
+# leitura no próprio worktree. Sem isto ele escrevia código e teste às cegas e pedia "aprove os comandos" — 25% das
+# chamadas de 20/10 terminaram assim, e o item voltava para a fila barrado nos portões.
+FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
+               "Bash(git log:*)", "Bash(git stash:*)", "Bash(git show:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)",
+               "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)")
+
+
 class ClaudeCodeAgent:
     """Claude Code em modo não interativo dentro do worktree."""
 
@@ -169,9 +177,10 @@ class ClaudeCodeAgent:
         if os.environ.get("CIRCULO_CODE_AGENT_USA_API", "1") == "0":
             env.pop("ANTHROPIC_API_KEY", None)
             env.pop("ANTHROPIC_WORKSPACE_ID", None)
+        ferramentas = os.environ.get("CIRCULO_CODE_AGENT_FERRAMENTAS") or ",".join(FERRAMENTAS)
         p = subprocess.run([self.cmd, "-p", task, "--output-format", "json", "--permission-mode", "acceptEdits",
-                            "--max-turns", str(self.max_turns)], cwd=workdir, capture_output=True, text=True, timeout=self.timeout,
-                           env=env)
+                            "--allowedTools", ferramentas, "--max-turns", str(self.max_turns)], cwd=workdir, capture_output=True,
+                           text=True, timeout=self.timeout, env=env)
         tokens = 0
         try:
             data = json.loads(p.stdout or "{}")
@@ -289,7 +298,11 @@ class SelfDeveloper:
         return len(self.abertos()) >= MAX_PRS_ABERTOS
 
     def em_espera(self) -> bool:
-        return float((self.s.get("self_dev_espera") or {}).get("ate", 0)) > time.time()
+        e = self.s.get("self_dev_espera") or {}
+        if e and float(e.get("ate", 0)) <= time.time():
+            self.s.set("self_dev_espera", None)      # venceu: some do painel e do "Precisa de você"
+            return False
+        return bool(e)
 
     def _conserto(self) -> dict | None:
         """O PR aberto mais antigo que o gate devolveu para conserto (mesma forma do estado antigo: item, pr, branch, conserto, consertos)."""

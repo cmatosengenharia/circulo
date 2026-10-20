@@ -36,6 +36,8 @@ class Ctx:
         return self.policies.get()
 
     def reply(self, message: str, kind: str = "resposta") -> None:
+        if kind == "saude" and self.store.one("SELECT 1 FROM alerts WHERE kind='saude' AND message=? AND created_at>?", (message, time.time() - 3600)):
+            return                                   # o mesmo aviso de saúde 20× por hora é ruído, não informação
         self.store.x("INSERT INTO alerts(kind,message,created_at,project_id,evento) VALUES(?,?,?,?,?)",
                      (kind, message, time.time(), self.dl.project_id, self.evento))
 

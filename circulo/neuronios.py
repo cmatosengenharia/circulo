@@ -110,6 +110,12 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                 argv[3:3] = alvos               # -m ruff check <alvos> --select ...
             cp = subprocess.run([sys.executable, *argv], cwd=wt, capture_output=True, text=True, timeout=900, env=env)
             ok, motivo = cp.returncode == 0, (cp.stdout + cp.stderr)[-800:]
+            if "pytest" in argv and cp.returncode == 4 and "not found" in motivo:     # o teste citado já não existe: portão obsoleto
+                store.x("UPDATE portoes SET ativo=0, updated_at=? WHERE id=?", (time.time(), p["id"]))
+                if p.get("licao_id"):
+                    store.x("UPDATE licoes SET status='obsoleta', updated_at=? WHERE id=? AND status IN ('aberta','evidenciada','reincidente')", (time.time(), p["licao_id"]))
+                res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", True, "alvo do pytest não existe mais: portão desativado (lição obsoleta)", p["id"]))
+                continue
         else:
             from .merge_gate import tem_teste
             em = spec.get("em", "")

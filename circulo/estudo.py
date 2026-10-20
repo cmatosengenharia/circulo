@@ -29,8 +29,8 @@ from .json_llm import objeto_ou_corte
 
 MIN_FONTES = 2
 EST_TOKENS = 9000
-MAX_TOKENS = 2500
-MODOS = {"completo": {"buscas": 4, "max_tokens": MAX_TOKENS, "est": 30_000}, "leve": {"buscas": 1, "max_tokens": 1500, "est": 9_000},
+MAX_TOKENS = 8000           # 2500 era engolido pelas buscas (14 de 40 estudos de 20/10 voltaram sem texto)
+MODOS = {"completo": {"buscas": 4, "max_tokens": MAX_TOKENS, "est": 30_000}, "leve": {"buscas": 1, "max_tokens": 4000, "est": 9_000},
          "dispensado": {"buscas": 0, "max_tokens": 0, "est": 0}}
 DISPENSA = ("Vigia (medido)", "Médico (medido)", "medido pelo jardineiro", "lição", "licao")
 
@@ -148,6 +148,9 @@ class Estudo:
             monitorar(self.ctx, "estudo:pedido", False, sujeito=item["titulo"], motivo=f"{type(exc).__name__}: {exc}")
             raise
         self.ctx.budget.charge(out.tokens, "llm")
+        if not out.text.strip() and MODOS[modo]["buscas"]:        # a busca comeu a resposta: uma vez sem busca, mesmo teto
+            out = llm.generate(system=SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=MODOS[modo]["max_tokens"], web_search=0)
+            self.ctx.budget.charge(out.tokens, "llm")
         r = _parse(out.text)
         if r is not None:
             r["modo"] = modo
