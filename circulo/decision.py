@@ -461,9 +461,8 @@ class LocalJev:
 
 
 # ---------------------------------------------------------------- replay do aprendiz worth_spending
-# Reaprende em lote com as decisões da regra (DAgger): meta = concordância em holdout de 20% e calibração (ECE).
-# Replay priorizado pela perda; N passes com parada antecipada; temperatura T por NLL se o ECE estiver alto;
-# o modelo só é adotado se não piorar a concordância de antes e ficar calibrado.
+# DAgger em lote: meta = concordância em holdout de 20% e calibração (ECE); replay priorizado pela perda, parada
+# antecipada, temperatura por NLL; só é adotado se não piorar a concordância e ficar calibrado.
 
 REPLAY_MAX_EXEMPLOS = 500
 REPLAY_MIN_EXEMPLOS = 40
@@ -567,8 +566,7 @@ def replay_worth(m: dict, l2: float = 1e-2) -> dict:
     def objetivo(w, a):
         return sum(a[i] * perda(w, i) for i in treino) + 0.5 * l2 * sum(wj * wj for wj in w)
 
-    # Cada passe é um passo de Newton (IRLS) sobre o treino, com peso maior onde a perda é maior (discordância e
-    # dúvida pesam mais). SGD com features sem escala oscilava e parava cedo, e o modelo saía fraco e em dúvida.
+    # Cada passe é um passo de Newton (IRLS) com peso maior onde a perda é maior (SGD sem escala oscilava e saía fraco).
     k = len(X[0])
     w, melhor, melhor_c, passes = list(w0), list(w0), concordancia(w0), 0
     for _ in range(REPLAY_PASSES):
@@ -648,7 +646,7 @@ class DecisionLayer:
         jev_fora, t0 = False, time.monotonic()
         try:
             enviar, mapa = jev_lab.preparar(self.s, self.jev, state, questions)
-            out, tokens = self.jev.ask_many(state, enviar)
+            out, tokens = self.jev.ask_many(state, enviar) if enviar else ({}, 0)   # tudo em cache: nenhuma chamada
             self.budget.charge_jev(max(1, tokens // 1000))  # Jev ~1000x mais barato que LLM
             modelo = getattr(self.jev, "ultimo_modelo", None)
             out = jev_lab.colher(self.s, dict(out), mapa, modelo)
@@ -801,15 +799,14 @@ class DecisionLayer:
     def worth_spending(self, action: str, context: Mapping[str, Any]) -> Gate:
         est = int(context.get("est_tokens", 0))
         thr = self._thr(f"worth_spending.{action}", self._thr("worth_spending.default"))
-        state = {"action": action, "est_tokens": est, "budget_left_ratio": round(self.budget.left_ratio(), 3),
-                 "value_signal": float(context.get("value_signal", 0.5)),
-                 **{k: v for k, v in context.items() if k not in ("est_tokens", "value_signal")}}
+        from .jev_lab import estado_worth
+        state = estado_worth(self.s, self.budget, action, est, context)
         d = self.ask("worth_spending", Question(
-            "noul", f"Vale a pena gastar ~{est} tokens agora na ação '{action}', dado o valor esperado e o orçamento restante?",
-            SN("a ação tem valor claro (`value_signal` alto) e o orçamento que sobra (`budget_left_ratio`) cobre o gasto com folga; "
-               "ou a ação destrava a fila (`desbloqueia_fila`: há pergunta validada `pergunta_validada` ou item esperando estudo "
-               "`item_esperando_estudo`) com o Developer parado (`fila_do_developer` = 0) e o orçamento cobre o gasto",
-               "o valor esperado é baixo, ou o orçamento restante está apertado para o que a ação custa")), state)
+            "noul", f"Vale a pena gastar ~{est} tokens agora na ação '{action}'?",
+            SN("`value_signal` ≥ 0.7; ou `value_signal` ≥ 0.5 e `custo_pct_dia` < 5; ou `desbloqueia_fila` é true e `fila_do_developer` = 0; "
+               "e em todos os casos `orcamento` não é 'esgotado' e `rodou_hoje_sem_render` < 3",
+               "`value_signal` < 0.4; ou `orcamento` = 'esgotado'; ou `rodou_hoje_sem_render` ≥ 3 (a mesma ação já rodou hoje três vezes sem entregar nada); "
+               "ou `custo_pct_dia` ≥ 20 sem `desbloqueia_fila`")), state)
         if est > 0 and not self.budget.can_spend(est):
             return Gate(False, d, thr, "orçamento insuficiente (hard limit)")
         return Gate(float(d.value) >= thr, d, thr)
@@ -817,11 +814,14 @@ class DecisionLayer:
     # --- pré-filtro de evolução
     def should_evolve(self, evolution_type: Literal["domain", "circle"], evidence: Mapping[str, Any]) -> Gate:
         thr = self._thr(f"should_evolve.{evolution_type}", 0.8)
+        from .jev_lab import estado_evolve
         d = self.ask("should_evolve", Question(
             "noul", f"A evidência justifica aplicar esta evolução de nível '{evolution_type}' agora?",
-            SN("o mesmo problema foi observado várias vezes (`occurrences`) e de forma consistente (`consistency` perto de 1)",
-               "poucas ocorrências, evidência inconsistente, ou a mudança é maior do que a evidência sustenta")),
-            {"evolution_type": evolution_type, **evidence})
+            SN("`occurrences` ≥ 3 e `consistency` ≥ 0.8 e `revertida_antes` = 0 (o mesmo problema, medido, repetiu e a mudança igual nunca foi desfeita); "
+               "ou `occurrences` ≥ 6 com `consistency` ≥ 0.6",
+               "`occurrences` < 3; ou `consistency` < 0.6; ou `revertida_antes` ≥ 1 (uma evolução igual já foi revertida); "
+               "ou `aplicada_hoje` ≥ 2 (a mesma evolução já entrou duas vezes hoje)")),
+            estado_evolve(self.s, evolution_type, evidence))
         return Gate(float(d.value) >= thr, d, thr)
 
     # --- escolha com fallback para LLM só quando o Jev estiver inseguro

@@ -136,17 +136,28 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
     qs = {}
     for i in range(len(cands)):
         qs[f"indaga_pert_{i}"] = Question(
-            "noul", f"A pergunta `candidatas.{i}.texto` é pertinente ao contexto atual da missão `missao` (pedido `pedido`, "
-                    f"critérios fracos `criterios_fracos`, lições abertas `licoes_abertas`, falhas `falhas_24h`)?",
-            SN("a pergunta mira uma dor que os dados da missão mostram agora (`candidatas.%d.evidencia`) e respondê-la mudaria o próximo passo" % i,
-               "a pergunta é genérica, fala de algo que os dados não mostram, ou repete o que já está em andamento ou já foi "
-               "perguntado/entregue antes (`candidatas.%d.memoria`: perguntas e itens parecidos, com o resultado e há quantos dias)" % i))
+            "noul", f"A pergunta `candidatas.{i}.texto` é pertinente agora para a missão `missao`?",
+            SN("`candidatas.%d.base_medida` é true, `candidatas.%d.ja_perguntada_7d` = 0 e `candidatas.%d.item_parecido_em_andamento` é false: "
+               "a dor está medida na evidência e ninguém já perguntou nem está tratando isso" % (i, i, i),
+               "`candidatas.%d.ja_perguntada_7d` ≥ 1 (a mesma pergunta já foi feita e virou item, foi entregue ou descartada); ou "
+               "`candidatas.%d.item_parecido_em_andamento` é true; ou `candidatas.%d.base_medida` é false (a evidência é chute)" % (i, i, i)))
         qs[f"indaga_eixo_{i}"] = Question("choice", f"O que a pergunta `candidatas.{i}.texto` faz evoluir, se respondida?", dict(EIXOS))
         qs[f"indaga_acao_{i}"] = Question("score", f"Quão acionável é a pergunta `candidatas.{i}.texto`?", ACAO)
     from .memoria import RECEITA, do_ctx
     mem = do_ctx(ctx)
-    state = {**ctxt, "candidatas": [{"texto": c["texto"], "persona": c["persona"], "evidencia": c["evidencia"],
-                                     "memoria": mem.lembrancas(c["texto"], k=3, tipos=RECEITA["indagar"][0]) if mem else []} for c in cands]}
+
+    def enxuta(c: dict) -> dict:
+        lem = mem.lembrancas(c["texto"], k=4, tipos=RECEITA["indagar"][0], dias=7) if mem else []
+        iguais = [m for m in lem if m["tipo"] == "pergunta" and m["resultado"] in ("virou_item", "entregue", "descartada", "estudada", "valida")]
+        andamento = any(m["tipo"] == "item" and m["resultado"] in ("pendente", "em_andamento") for m in lem)
+        ev = c.get("evidencia") or {}
+        return {"texto": c["texto"][:220], "persona": c["persona"], "evidencia": {k: v for k, v in ev.items() if k != "base"},
+                "base_medida": ev.get("base", "medido") == "medido", "ja_perguntada_7d": len(iguais),
+                "item_parecido_em_andamento": andamento, "memoria": lem[:3]}
+    state = {"missao": ctxt.get("missao"), "tipo": ctxt.get("tipo"), "pedido": str(ctxt.get("pedido") or "")[:200],
+             "criterios_fracos": [{"criterio": str(x.get("criterio", ""))[:80], "nota": x.get("nota")} for x in (ctxt.get("criterios_fracos") or [])][:5],
+             "itens_pendentes": ctxt.get("itens_pendentes"), "licoes_abertas": ctxt.get("licoes_abertas"), "falhas_24h": ctxt.get("falhas_24h"),
+             "candidatas": [enxuta(c) for c in cands]}
     out = ctx.dl.ask_many(state, qs)
     res = []
     for i, c in enumerate(cands):
