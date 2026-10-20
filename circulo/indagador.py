@@ -41,8 +41,7 @@ ACAO = ("a pergunta é tão ampla ou vaga que nenhum item pequeno a responde (ex
 PERTINENTE_MIN = 0.6
 ACAO_MIN = 1
 # Ritmo (1.30): o Indagador é um dos agentes mais atuantes. Com vaga na fila de válidas, volta a cada INTERVALO_FOME;
-# só espera INTERVALO quando a fila está cheia, e INTERVALO_VAZIO quando a última passagem não achou pergunta nova.
-INTERVALO = 3600              # fila de válidas cheia: volta em 1 h
+# espera INTERVALO_VAZIO quando a última passagem não achou pergunta nova, e com a fila cheia não indaga.
 INTERVALO_FOME = 300          # há vaga: volta em 5 min (cada passagem só custa uma chamada ao Jev)
 INTERVALO_VAZIO = 1800        # a última passagem não tinha candidata nova: 30 min até haver evidência nova
 MAX_VALIDAS = 5               # estoque de perguntas válidas esperando o planejador
@@ -367,7 +366,7 @@ def indagar(ctx, project: dict | None = None) -> dict:
     s, agora = ctx.store, time.time()
     cer = cerebro_de(project)
     cands = candidatas(ctx, project)
-    cands = [c for c in cands if c["chave"] not in ja_julgadas(s, cer, agora)]
+    cands = [c for c in cands if c["chave"] not in ja_julgadas(s, cer, agora)][:max(0, _vaga(s, cer))]
     res = classificar(ctx, cands, contexto(s, project))
     ids = []
     for c in res:
@@ -397,6 +396,11 @@ def indagar(ctx, project: dict | None = None) -> dict:
             "inconclusas": sum(c["veredito"] == "inconclusa" for c in res), "ids": ids}
 
 
+def _vaga(store, cer: str) -> int:
+    """Quantas perguntas válidas ainda cabem no estoque deste cérebro (MAX_VALIDAS é teto, não ritmo)."""
+    return MAX_VALIDAS - _um(store, "SELECT COUNT(*) FROM perguntas WHERE cerebro=? AND status='valida'", (cer,))
+
+
 def precisa(store, engine=None) -> bool:
     return proximo_cerebro(store, engine) is not None
 
@@ -413,10 +417,10 @@ def proximo_cerebro(store, engine=None) -> dict | None:
     for p in opcoes:
         cer = cerebro_de(p)
         em = float(marcas.get(cer, 0))
-        validas = _um(store, "SELECT COUNT(*) FROM perguntas WHERE cerebro=? AND status='valida'", (cer,))
+        if _vaga(store, cer) <= 0:
+            continue
         vazio = float((store.get("indagador_vazio") or {}).get(cer, 0))
-        espera = INTERVALO if validas >= MAX_VALIDAS else (INTERVALO_VAZIO if vazio >= em else INTERVALO_FOME)
-        if agora - em < espera:
+        if agora - em < (INTERVALO_VAZIO if vazio >= em else INTERVALO_FOME):
             continue
         if pior_em is None or em < pior_em:
             pior, pior_em = {"project": p}, em

@@ -145,3 +145,25 @@ def test_pergunta_validada_destrava_o_planejador_no_porteiro_do_gasto(circle):
     indagador.indagar(circle.ctx, p)
     v = indagador.espiar(circle.store, f"missao:{p['id']}")
     assert v and circle.store.one("SELECT status FROM perguntas WHERE id=?", (v["id"],))["status"] == "valida"   # espiar não consome
+
+
+def test_estoque_de_validas_e_teto_e_nao_intervalo(circle):
+    """Item #54: 13 perguntas validadas esperando 395 min com a fila cheia. Com o estoque em MAX_VALIDAS o Indagador
+    ainda voltava a cada hora e validava mais: o estoque crescia sem limite enquanto o planejador esperava de propósito."""
+    s, agora = circle.store, time.time()
+    for i in range(indagador.MAX_VALIDAS):
+        s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,created_at,updated_at) VALUES(?,'arquiteto','q?','valida','loop',0.5,?,?)",
+            (f"k{i}", agora, agora))
+    s.set("indagador", {"loop": agora - 6 * 3600})
+    assert indagador.proximo_cerebro(s) is None                           # estoque cheio: não indaga, nem horas depois
+
+
+def test_uma_passagem_nao_passa_do_estoque_de_validas(circle):
+    """Item #54: uma passagem rende até MAX_CANDIDATAS perguntas válidas; só cabe a vaga que sobra no estoque."""
+    p = _missao(circle)
+    cer, s, agora = f"missao:{p['id']}", circle.store, time.time()
+    for i in range(indagador.MAX_VALIDAS):
+        s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,created_at,updated_at) VALUES(?,'arquiteto','q?','valida',?,0.5,?,?)",
+            (f"k{i}", cer, agora, agora))
+    indagador.indagar(circle.ctx, p)
+    assert s.one("SELECT COUNT(*) n FROM perguntas WHERE cerebro=? AND status='valida'", (cer,))["n"] == indagador.MAX_VALIDAS
