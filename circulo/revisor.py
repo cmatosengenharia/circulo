@@ -186,3 +186,31 @@ def resumo(store, limite: int = 10) -> dict:
             "total": tot["n"] or 0, "rejeitadas": tot["r"] or 0, "antes_do_pr": tot["a"] or 0,
             "ultimas": [dict(r) for r in store.q("SELECT id, pr, item_id, momento, veredito, motivo, conf, fonte, created_at FROM revisoes "
                                                  "ORDER BY id DESC LIMIT ?", (limite,))]}
+
+
+# ------------------------------------------------------------ disjuntor do Developer
+DISJUNTOR_PRS = 3            # PRs seguidos abandonados pela mesma causa…
+DISJUNTOR_JANELA = 3 * 3600  # …dentro desta janela…
+DISJUNTOR_PAUSA = 2 * 3600   # …pausam o Developer por este tempo (o problema é o ambiente, não o item)
+
+
+def disjuntor_abandonos(store, reply, motivo: str) -> bool:
+    """DISJUNTOR_PRS PRs seguidos abandonados pela mesma causa (os mesmos checks, o mesmo motivo) em DISJUNTOR_JANELA:
+    o problema não é o item, é o ambiente — pausa o Developer por DISJUNTOR_PAUSA ("Precisa de você"). Sem isto, uma
+    noite de CI recusado (20→21/10) virou 31 PRs abertos e fechados em círculo. Devolve True quando desarmou."""
+    import re
+    from datetime import datetime
+    from .budget import TZ
+    causa = re.sub(r"\d+", "", motivo.split(":", 1)[0] if motivo.startswith(("checks falhando", "conflito")) else motivo)[:80]
+    agora = time.time()
+    hist = [h for h in (store.get("self_dev_abandonos") or []) if agora - float(h.get("em", 0)) < DISJUNTOR_JANELA] + [{"em": agora, "causa": causa}]
+    store.set("self_dev_abandonos", hist[-10:])
+    if len(hist) < DISJUNTOR_PRS or any(h["causa"] != causa for h in hist[-DISJUNTOR_PRS:]):
+        return False
+    hora = datetime.fromtimestamp(agora + DISJUNTOR_PAUSA, TZ).strftime("%H:%M")
+    store.set("self_dev_espera", {"ate": agora + DISJUNTOR_PAUSA, "hora": hora, "precisa_de_voce": True,
+                                  "motivo": f"Disjuntor: {DISJUNTOR_PRS} PRs seguidos abandonados por “{causa}” — o problema é o ambiente, não os itens"})
+    store.set("self_dev_abandonos", [])
+    reply(f"Disjuntor do Developer: {DISJUNTOR_PRS} PRs seguidos abandonados por “{causa}”. Pausei por "
+          f"{DISJUNTOR_PAUSA // 3600} h (até {hora}) para não gastar em círculo; veja o CI/GitHub.", "saude")
+    return True

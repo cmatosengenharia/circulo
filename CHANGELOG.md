@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.62.0 — 2026-10-21
+
+**Noite de 20→21/10: 31 PRs em círculo com o CI recusado. Dois freios.**
+
+- **"CI não iniciou" sem depender da anotação** (`merge_gate`): o token fine-grained do Mac não tem a permissão Checks,
+  então o gate não lia a anotação "job was not started… billing" da 1.58 e seguia tratando como "checks falhando".
+  Agora um job que falhou **sem executar nenhum passo** (nem "Set up job") conta como não iniciado — isso nunca é
+  defeito do código. Check-run sem passos consulta o job do Actions pelo mesmo id (permissão Actions, que o token tem).
+- **Disjuntor do Developer** (`revisor.disjuntor_abandonos`): 3 PRs seguidos abandonados pela mesma causa em 3 h pausam
+  o Developer por 2 h ("Precisa de você") e avisam — seja qual for a causa. O problema é o ambiente, não os itens.
+- `tests/test_ci_indisponivel.py`: +2 regressões.
+
 ## 1.61.0 — 2026-10-21
 
 **Auditoria de todo o código: 20 defeitos reais corrigidos (três revisões independentes, cada achado confirmado no código).**
