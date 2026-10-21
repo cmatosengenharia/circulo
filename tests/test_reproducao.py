@@ -60,6 +60,27 @@ def test_arvore_de_trabalho_sem_commit_e_codigo_que_ainda_nao_existe(repo):
     assert ok and novos == ["tests/test_novo.py::test_triplo"]   # no código antigo nem importa: reproduz
 
 
+def test_licao_2_teste_que_exige_o_erro_antigo_e_barrado_no_portao(repo):
+    """Lição #2 (corpo:validacao_falhou): o teste do PR #4 exigia que `Corpo(...).run()` ainda levantasse o erro do
+    incidente e depois que o mesmo `Corpo(...)` funcionasse pelo caminho livre. Quando outra correção tornou a troca
+    direta segura, o erro sumiu, o teste ficou vermelho na main e o corpo reprovou o código novo. Exigir o erro antigo
+    é trabalho do portão (teste novo roda no código antigo), não do teste: o portão barra o teste que faz isso."""
+    git(repo, "checkout", "-q", "-b", "fix")
+    (repo / "app.py").write_text((repo / "app.py").read_text()
+                                 + "\ndef seguro(f):\n    try:\n        return f()\n    except TypeError:\n        return 0\n")
+    (repo / "tests" / "test_seguro.py").write_text(
+        "import pytest\nfrom app import dobro, seguro\n\n"
+        "def test_seguro():\n    with pytest.raises(TypeError):\n        dobro(None) + 1\n"
+        "    assert seguro(lambda: dobro(None) + 1) == 0\n"
+        "\ndef test_validacao_com_outra_entrada_pode():\n    with pytest.raises(TypeError):\n        dobro(None) + 1\n"
+        "    assert dobro(2) + 1 == 5 and seguro(lambda: 1) == 1\n")
+    _commit(repo, "teste que exige o erro antigo")
+    ok, det, novos = reproduz(repo, "main", "HEAD")
+    assert not ok and "lição #2" in det and "test_seguro.py::test_seguro" in det
+    assert "test_validacao_com_outra_entrada_pode" not in det
+    assert main(["--repo", str(repo), "--base", "main"]) == 1
+
+
 def test_sem_teste_novo_nao_trava(repo):
     (repo / "app.py").write_text("def soma(a, b):\n    return a + b\n\ndef dobro(x):\n    return 2 * x\n")
     ok, det, novos = reproduz(repo, "HEAD", None)
