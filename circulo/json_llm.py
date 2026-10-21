@@ -2,11 +2,16 @@
 
 A resposta nem sempre começa no objeto: com busca na web, a LLM narra antes ("Vou pesquisar {tema}...") e um `{` da
 narração fazia o leitor de cada módulo (o primeiro `{`, ou `\\{.*\\}` guloso) descartar a resposta inteira como "sem JSON
-válido". Aqui cada `{` do texto é um começo possível, e vale o primeiro objeto que tem a chave que o papel pede.
+válido". Aqui cada `{` do texto é um começo possível, e vale o primeiro objeto que o próprio papel aceita: ler por uma
+chave devolvia o rascunho largado antes de mais uma busca, ou o formato ecoado ("adotar|adaptar"), e o papel descartava
+a resposta boa que vinha depois.
 """
 from __future__ import annotations
 
 import json
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
 
 
 def _comecos(texto: str):
@@ -45,22 +50,22 @@ def _ate_o_corte(s: str):
     return None
 
 
-def objeto(texto: str, chave: str) -> dict | None:
-    """O primeiro objeto JSON inteiro do texto que tem `chave`."""
+def objeto(texto: str, aceita: Callable[[dict], T | None]) -> T | None:
+    """O que `aceita` devolve para o primeiro objeto JSON inteiro do texto que ele não recusa (None)."""
     for s in _comecos(texto):
         d = _inteiro(s)
-        if isinstance(d, dict) and chave in d:
-            return d
+        if isinstance(d, dict) and (r := aceita(d)) is not None:
+            return r
     return None
 
 
-def objeto_ou_corte(texto: str, chave: str) -> tuple[dict | None, bool]:
-    """Como `objeto`, e se nenhum veio inteiro, o primeiro cortado pelo limite de tokens que tem `chave` (e True)."""
-    d = objeto(texto, chave)
-    if d is not None:
-        return d, False
+def objeto_ou_corte(texto: str, aceita: Callable[[dict, bool], T | None]) -> T | None:
+    """Como `objeto`, e se nenhum inteiro serve, o primeiro cortado pelo limite de tokens que `aceita(d, True)` não recusa."""
+    r = objeto(texto, lambda d: aceita(d, False))
+    if r is not None:
+        return r
     for s in _comecos(texto):
         d = _ate_o_corte(s)
-        if isinstance(d, dict) and chave in d:
-            return d, True
-    return None, False
+        if isinstance(d, dict) and (r := aceita(d, True)) is not None:
+            return r
+    return None

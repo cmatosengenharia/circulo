@@ -46,8 +46,11 @@ def _marcar(store, pergunta_id: int, estudo: dict) -> None:
 
 
 def _parse(texto: str) -> dict | None:
-    d = objeto(texto, "pertinente")
-    if d is None:
+    return objeto(texto, _aceita)
+
+
+def _aceita(d: dict) -> dict | None:
+    if "pertinente" not in d:
         return None
     d["evidencia"] = [e for e in d.get("evidencia") or [] if isinstance(e, dict) and e.get("fato")]
     d["fontes"] = [f for f in d.get("fontes") or [] if isinstance(f, str)][:6]

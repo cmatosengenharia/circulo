@@ -128,6 +128,24 @@ def test_narracao_com_chave_antes_do_json_nao_descarta_o_estudo(circle):
     assert circle.store.one("SELECT COUNT(*) n FROM licoes WHERE assinatura='estudo:saida_invalida'")["n"] == 0
 
 
+def test_rascunho_ou_eco_do_formato_antes_da_resposta_nao_descarta_o_estudo(circle):
+    """Lição #22 (reincidiu 2x): o extrator devolvia o primeiro objeto com "veredito" e o papel só validava depois; um
+    rascunho largado antes de mais uma busca, ou o formato ecoado ("adotar|adaptar"), escondia a resposta cortada no
+    "item" e o estudo virava "resposta sem JSON válido"."""
+    inteiro = json.dumps(resposta("adotar"), ensure_ascii=False)
+    cortado = inteiro[:inteiro.index('"detalhe"') + len('"detalhe')]
+    antes = ('{"veredito": "adaptar", "justificativa": "Preciso conferir mais uma fonte',
+             'O formato pedido é {"veredito": "adotar|adaptar|contestar"}. ')
+    for texto in (a + "\n\nVou buscar mais uma fonte.\n\n" + r for a in antes for r in (inteiro, cortado)):
+        iid = pedido(circle)
+        circle.ctx.dl.llm = Pesquisa(texto)
+        r = Estudo(circle.ctx).run()
+        assert r is not None and r["veredito"] == "adotar"
+        assert r["justificativa"] == "porque as referências mostram outro caminho"
+        assert item(circle, iid)["estudo"] is not None
+    assert circle.store.one("SELECT COUNT(*) n FROM licoes WHERE assinatura='estudo:saida_invalida'")["n"] == 0
+
+
 def test_erro_do_loop_nao_passa_pelo_estudo(circle):
     circle.store.x("UPDATE roadmap SET status='feito'")
     circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
