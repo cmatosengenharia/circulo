@@ -26,6 +26,8 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    emprestada, também reabre se o teste sumir do main ou mudar de corpo (impressão do AST no sha do main).
 9. Lição de erro de coleta do pytest (`coleta:<arquivo>:<exceção>[:nome]`, ou a antiga com o banner '=== ERRORS ==='):
    fecha (evidenciada) com UM `pytest --collect-only -q` de exit 0 no main; reabre se a mesma chave voltar no main.
+10. TTL da lição de estrutura (pergunta #52): aberta há mais de TTL_ESTRUTURA, vira `obsoleta` se o caminho dela foi
+   exercitado na janela sem a assinatura voltar e sem o incidente vinculado crescer; reincide se a assinatura voltar.
 """
 from __future__ import annotations
 
@@ -48,6 +50,8 @@ AMBIENTE_RECORRENTE = 5     # ocorrências de erro de ambiente em 24h que pedem 
 MAX_VERIFICACOES = 20_000   # janela do monitoramento
 VERDES_PARA_FECHAR = 2      # execuções seguidas com exit 0 no main
 NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
+TTL_ESTRUTURA = 6 * 3600   # lição de estrutura sem reincidir por tanto tempo, com o caminho exercitado, fica obsoleta
+PASSAGENS_PARA_EXPIRAR = 3  # passagens pelo caminho na janela: silêncio sem exposição não prova a correção
 ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
 NODE_ID = re.compile(r"teste:(tests/[\w./-]+\.py::\S+)")
 DO_ITEM = re.compile(r"(?:\.circulo-wt-|roteiro #)(\d+)$")   # o worktree e o rótulo do Developer levam o id do item
@@ -321,6 +325,31 @@ def alvo_inexistente(store, repo: str | Path | None, motivo: str) -> str | None:
     return arquivo
 
 
+def expiradas(licoes: list[dict], verificacoes: list[dict], incidentes: dict[str, float], now: float, tick: int) -> list[int]:
+    """Ids das lições de estrutura abertas há mais de TTL_ESTRUTURA cuja assinatura não reincidiu na janela, cujo
+    incidente vinculado não cresceu (`incidentes`: fingerprint → last_seen) e cujo caminho passou PASSAGENS_PARA_EXPIRAR
+    vezes nela: verificações do mesmo ponto ou, na lição de incidente, giros desde a última ocorrência. A lição aberta
+    trava a evolução, então o silêncio sozinho pode ser só falta de tentativa."""
+    desde = now - TTL_ESTRUTURA
+    janela = [v for v in verificacoes if v["created_at"] >= desde]
+    out = []
+    for lic in licoes:
+        if lic["created_at"] > desde:
+            continue
+        sigs = set(json.loads(lic.get("origens") or "[]")) | {lic["assinatura"]}
+        if any(not v["ok"] and v["assinatura"] in sigs for v in janela):
+            continue
+        if lic["assinatura"].startswith("incidente:"):
+            if incidentes.get(lic["assinatura"].removeprefix("incidente:"), 0) >= desde:
+                continue
+            passagens = tick - (lic.get("ultima_tick") or 0)
+        else:
+            passagens = sum(v["ponto"] == lic["ponto"] for v in janela)
+        if passagens >= PASSAGENS_PARA_EXPIRAR:
+            out.append(lic["id"])
+    return out
+
+
 class Licoes:
     def __init__(self, store, reply=None, repo: str | Path | None = None):
         self.s = store
@@ -372,7 +401,8 @@ class Licoes:
         if sig not in origens:
             self.s.x("UPDATE licoes SET origens=? WHERE id=?", (json.dumps(origens + [sig]), lic["id"]))
         # lição de teste só reincide pela reexecução no main (checar_testes), não pelo worktree de um Developer
-        reincidiu = lic["status"] in ("validada", "evidenciada") and not alvo_de(lic)
+        reincidiu = (lic["status"] in ("validada", "evidenciada") or (lic["status"], lic["classe"]) == ("obsoleta", "estrutural")) \
+            and not alvo_de(lic)
         if reincidiu:
             self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ocorrencias=ocorrencias+1, "
                      "ultima_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
@@ -635,6 +665,28 @@ class Licoes:
             self.reply(f"Lição #{r['id']} reclassificada: era erro de ambiente, não do loop; não trava mais a evolução.", "licao")
             ids.append(r["id"])
         return ids
+
+    def expirar_estruturais(self, now: float | None = None) -> list[str]:
+        """TTL (função `expiradas`): a lição de estrutura que o caminho exercitou sem reincidir fica obsoleta."""
+        now = now or time.time()
+        abertas = [dict(r) for r in self.s.q("SELECT id, assinatura, ponto, created_at, ultima_tick, origens FROM licoes "
+                                             "WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente') "
+                                             "AND created_at <= ?", (now - TTL_ESTRUTURA,))]
+        if not abertas:
+            return []
+        pontos = sorted({lic["ponto"] for lic in abertas})
+        vs = [dict(r) for r in self.s.q(f"SELECT ponto, ok, assinatura, created_at FROM verificacoes WHERE created_at >= ? "
+                                        f"AND ponto IN ({','.join('?' * len(pontos))})", (now - TTL_ESTRUTURA, *pontos))]
+        incidentes = {r["fingerprint"]: r["last_seen"] for r in self.s.q("SELECT fingerprint, last_seen FROM incidents")}
+        log = []
+        for lid in expiradas(abertas, vs, incidentes, now, self.s.tick):
+            self.s.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=?",
+                     (f"Obsoleta por TTL: {TTL_ESTRUTURA // 3600} h sem reincidir com o caminho exercitado; "
+                      "reincide se a assinatura voltar", now, lid))
+            log.append(f"lição #{lid} obsoleta por TTL")
+            self.reply(f"Lição #{lid} obsoleta: {TTL_ESTRUTURA // 3600} h sem reincidir com o caminho exercitado. "
+                       "Se a assinatura voltar, ela reincide.", "licao")
+        return log
 
     def bloqueia_evolucao(self) -> bool:
         """Lição de estrutura ainda não corrigida: primeiro corrige, depois evolui."""
