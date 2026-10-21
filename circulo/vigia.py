@@ -25,6 +25,7 @@ import time
 from typing import Any, Callable
 
 from .decision import SN, Decision, Question, norm
+from .licoes import Licoes
 from .metrics import seguro
 from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
 
@@ -180,6 +181,7 @@ def s_corpo_atrasado(s, now):
 
 
 def s_licao_bloqueia(s, now):
+    Licoes(s).expirar_estruturais(now)
     r = s.one("SELECT COUNT(*) n, MIN(created_at) em FROM licoes WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente')")
     if not r["n"] or now - float(r["em"] or now) < LICAO_BLOQUEIA:
         return None
