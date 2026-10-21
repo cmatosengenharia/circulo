@@ -24,6 +24,8 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    em um sha posterior ao do fechamento; falhar no worktree de um Developer não é falhar no main.
 8. Lição sem node id cuja causa está em causas.py herda o node id do alias e o mesmo ciclo; como a checagem é
    emprestada, também reabre se o teste sumir do main ou mudar de corpo (impressão do AST no sha do main).
+9. Lição de erro de coleta do pytest (`coleta:<arquivo>:<exceção>[:nome]`, ou a antiga com o banner '=== ERRORS ==='):
+   fecha (evidenciada) com UM `pytest --collect-only -q` de exit 0 no main; reabre se a mesma chave voltar no main.
 """
 from __future__ import annotations
 
@@ -83,6 +85,9 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", legivel)))
     if codigos and re.search(r"ruff|lint|\.py:\d+:\d+", legivel, re.I):
         return f"{ponto}:lint:{','.join(codigos[:3])}"
+    erros_de_coleta = coletas(legivel)
+    if erros_de_coleta:
+        return f"{ponto}:coleta:{erros_de_coleta[0]}"
     falhos = re.findall(r"FAILED (tests/[\w/]+\.py::\w+)", legivel)
     if falhos:
         return f"{ponto}:teste:{falhos[0]}"
@@ -93,6 +98,36 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     if causa:
         return f"{ponto}:{causa}"
     return f"{ponto}:{normalizar(legivel, 50) or 'saida_ilegivel'}"
+
+
+# Lição #9: o erro de coleta do pytest é o módulo que não importou e a exceção dele, não o banner '=== ERRORS ==='.
+# O cabeçalho `ERROR collecting <arquivo>` abre o bloco; sem ele (saída focada), vale o resumo `ERROR <arquivo>`.
+CABECALHO_COLETA = re.compile(r"ERROR collecting (\S+\.py)")
+RESUMO_COLETA = re.compile(r"^ERROR (\S+\.py)(?: - (.*))?$", re.M)
+EXCECAO_COLETA = re.compile(r"^E\s+(?:[\w.]+\.)?([A-Z]\w*(?:Error|Exception))\b:?\s*(.*)$", re.M)
+LICAO_DE_COLETA = re.compile(r":coleta:|:errors(?![a-z])")
+BANNER_ERROS = re.compile(r"=+ ERRORS =+")
+
+
+def _chave_coleta(arquivo: str, trecho: str) -> str:
+    arquivo = re.sub(r"^.*/\.circulo-wt-[^/]+/", "", arquivo)
+    m = EXCECAO_COLETA.search(trecho or "")
+    if not m:
+        return arquivo
+    nome = re.search(r"'([^']+)'", m.group(2))
+    return f"{arquivo}:{m.group(1)}" + (f":{nome.group(1)}" if nome else "")
+
+
+def coletas(saida: str) -> list[str]:
+    """`arquivo:Exceção[:nome]` de cada módulo que o pytest não conseguiu coletar, sem o caminho do worktree."""
+    texto = saida or ""
+    blocos = list(CABECALHO_COLETA.finditer(texto))
+    if blocos:
+        fim = [b.start() for b in blocos[1:]] + [len(texto)]
+        return sorted({_chave_coleta(b.group(1), re.split(r"^=+ short test summary", texto[b.end():f], flags=re.M)[0])
+                       for b, f in zip(blocos, fim, strict=True)})
+    resumo = RESUMO_COLETA.findall(texto)
+    return sorted({_chave_coleta(a, f"E   {msg}" if msg else texto if len(resumo) == 1 else "") for a, msg in resumo})
 
 
 # O log do Claude Code vem em JSON (um evento por linha): o erro está no evento `type:"result"` com `is_error:true`,
@@ -206,24 +241,38 @@ def impressao_no_main(repo: str | Path, sha: str, node_id: str) -> str | None:
 def reexecutar_no_main(repo: str | Path, node_ids: list[str], sha: str | None = None, python: str | None = None,
                        timeout: int = 600) -> tuple[str, dict[str, int]]:
     """(sha do main, {node id: exit code}). Roda num worktree descartável: o clone principal não troca de branch."""
+    sha, rodadas = _pytest_no_main(repo, {node: [node] for node in node_ids}, sha, python, timeout)
+    return sha, {node: p.returncode for node, p in rodadas.items()}
+
+
+def coletar_no_main(repo: str | Path, sha: str | None = None, python: str | None = None,
+                    timeout: int = 600) -> tuple[str, int | None, str]:
+    """(sha do main, exit code, saída bruta) do `pytest --collect-only -q` no main. Lição #9: o veredito é o exit code
+    (qualquer um diferente de 0 é erro de coleta), nunca o resumo; None = sem resultado (timeout)."""
+    sha, rodadas = _pytest_no_main(repo, {"coleta": ["--collect-only"]}, sha, python, timeout)
+    p = rodadas.get("coleta")
+    return sha, (p.returncode if p else None), (p.stdout + p.stderr if p else "")
+
+
+def _pytest_no_main(repo, argumentos: dict[str, list[str]], sha, python, timeout) -> tuple[str, dict]:
     repo = Path(repo)
     sha = sha or sha_do_main(repo)
     tmp = Path(tempfile.mkdtemp(prefix="circulo-licao-"))
     wt = tmp / "main"
-    codigos = {}
+    rodadas = {}
     try:
         _git(repo, "worktree", "add", "--detach", "-q", str(wt), sha)
         amb = {**os.environ, "PYTHONPATH": str(wt), "PYTHONDONTWRITEBYTECODE": "1"}
-        for node in node_ids:
+        for chave, args in argumentos.items():
             try:
-                codigos[node] = subprocess.run([python or sys.executable, "-m", "pytest", "-q", node, "-p", "no:cacheprovider"],
-                                               cwd=wt, capture_output=True, text=True, timeout=timeout, env=amb).returncode
+                rodadas[chave] = subprocess.run([python or sys.executable, "-m", "pytest", "-q", *args, "-p", "no:cacheprovider"],
+                                                cwd=wt, capture_output=True, text=True, timeout=timeout, env=amb)
             except subprocess.TimeoutExpired:
                 pass                      # sem exit code não há prova nem para fechar nem para reabrir
     finally:
         _git(repo, "worktree", "remove", "--force", str(wt), check=False)
         shutil.rmtree(tmp, ignore_errors=True)
-    return sha, codigos
+    return sha, rodadas
 
 
 def classificar(ponto: str, motivo: str) -> str:
@@ -488,11 +537,45 @@ class Licoes:
         """Giro ocioso: reexecuta no main os node ids das lições de teste e fecha, marca obsoleta ou reabre."""
         self.unir_duplicatas()
         sha = sha_do_main(repo)
+        log = self.checar_coleta(sha, *coletar_no_main(repo, sha)[1:]) if self._de_coleta() else []
         nodes = sorted({alvo_de(lic) for lic in self._a_rodar(sha)})
         if not nodes:
-            return []
+            return log
         _, codigos = reexecutar_no_main(repo, nodes, sha)
-        return self.checar_testes(sha, codigos.get, lambda node: impressao_no_main(repo, sha, node))
+        return log + self.checar_testes(sha, codigos.get, lambda node: impressao_no_main(repo, sha, node))
+
+    def a_checar_no_main(self) -> bool:
+        return bool(self.testes_a_checar()) or any(lic["status"] != "evidenciada" for lic in self._de_coleta())
+
+    # ------------------------------------------------------------ lição #9: fechar erro de coleta pelo collect-only
+    def _de_coleta(self) -> list[dict]:
+        return [lic for lic in map(dict, self.s.q("SELECT * FROM licoes WHERE status!='unida' ORDER BY id"))
+                if LICAO_DE_COLETA.search(lic["assinatura"] or "") or BANNER_ERROS.search(lic["descricao"] or "")]
+
+    def checar_coleta(self, sha: str, code: int | None, saida: str = "") -> list[str]:
+        """`pytest --collect-only -q` no main em `sha`: exit 0 evidencia toda lição de coleta (a coleta é determinística
+        para o mesmo commit, uma execução basta); exit != 0 reabre só a lição fechada cuja chave arquivo+exceção voltou."""
+        if code is None:
+            return []
+        tick, agora, log = self.s.tick, time.time(), []
+        voltaram = [f":coleta:{c}" for c in coletas(saida)] if code else []
+        for lic in self._de_coleta():
+            checagens = (json.loads(lic.get("checagens") or "[]") + [{"sha": sha, "exit": int(code), "tick": tick,
+                                                                      "em": agora, "teste": "--collect-only"}])[-10:]
+            if code == 0 and lic["status"] != "evidenciada":
+                self.s.x("UPDATE licoes SET status='evidenciada', corrigida_tick=COALESCE(corrigida_tick, ?), evidenciada_tick=?, "
+                         "checagens=?, prevencao=?, updated_at=? WHERE id=?",
+                         (tick, tick, json.dumps(checagens), f"Fechada: pytest --collect-only verde no main (sha {sha[:12]}, "
+                          f"exit 0); não repetir: {lic['descricao']}", agora, lic["id"]))
+                log.append(f"lição #{lic['id']} evidenciada no sha {sha[:12]}")
+                self.reply(f"Lição #{lic['id']} evidenciada: a coleta do pytest passou no main {sha[:12]} (exit 0).", "licao")
+            elif code and lic["status"] in ("validada", "evidenciada") and any(lic["assinatura"].endswith(v) for v in voltaram):
+                self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ultima_tick=?, checagens=?, "
+                         "updated_at=? WHERE id=?", (tick, json.dumps(checagens), agora, lic["id"]))
+                log.append(f"lição #{lic['id']} reaberta no sha {sha[:12]}")
+                self.reply(f"REINCIDÊNCIA da lição #{lic['id']}: a coleta voltou a falhar no main {sha[:12]} "
+                           f"(exit {code}).", "saude")
+        return log
 
     def checar_testes(self, sha: str, rodar, impressao=None) -> list[str]:
         """`rodar(node_id)` devolve o exit code do pytest no main em `sha` (None = sem resultado);
@@ -599,6 +682,10 @@ def _descricao(ponto: str, motivo: str) -> str:
     causa, legivel = causa_de_json(motivo or ""), erro_legivel(motivo or "")
     if causa:                                              # log JSON do agente: a causa em palavras, não o trecho cru
         return f"{ponto}: {causa.replace('_', ' ')}" + (f" — {legivel[:160]}" if legivel else "")
+    erros_de_coleta = coletas(legivel)
+    if erros_de_coleta:
+        arquivo, _, excecao = erros_de_coleta[0].partition(":")
+        return f"{ponto}: erro de coleta em {arquivo}" + (f" ({excecao.replace(':', ': ')})" if excecao else "")
     m = legivel.splitlines()
     linha = next((x for x in m if re.search(r"error|erro|falh|FAILED|\.py:\d+", x, re.I)), m[0] if m else "")
     return f"{ponto}: {linha.strip()[:200]}" if linha else f"{ponto}: saida ilegivel"
