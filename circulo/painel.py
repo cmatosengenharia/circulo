@@ -342,6 +342,24 @@ def make_handler(db_path: str):
             elif u.path == "/api/aluno":
                 from .aluno import resumo as aluno_resumo
                 self._json(aluno_resumo(self._store()))
+            elif u.path == "/api/jev":
+                from .jev_lab import resumo as jev_resumo
+                self._json(jev_resumo(self._store()))
+            elif u.path == "/api/jev/decisao":
+                from .jev_lab import pergunta_completa
+                st = self._store()
+                did = int((q.get("id") or ["0"])[0])
+                r = st.one("SELECT id, tick, question, value, confidence, source, created_at, probabilidades, estado FROM decisions WHERE id=?", (did,))
+                if not r:
+                    self._json({"erro": "decisão não encontrada"}, 404)
+                else:
+                    d = dict(r)
+                    for k in ("probabilidades", "estado"):
+                        try:
+                            d[k] = json.loads(d[k]) if d[k] else None
+                        except (TypeError, ValueError):
+                            pass
+                    self._json({**d, "pergunta": pergunta_completa(st, d["question"])})
             elif u.path == "/api/conexoes":
                 from . import conexoes
                 self._json(conexoes.estado(self._store()))
@@ -574,6 +592,11 @@ def make_handler(db_path: str):
                         (f"Você {'separou' if r['relacao'] == 'nenhuma' else 'ligou'} as missões #{r['a']} e #{r['b']}"
                          + ("" if r["relacao"] == "nenhuma" else f" ({r['relacao'].replace('_', ' ')})") + ".", time.time(), r["a"]))
                 return self._json({"ok": True, **r})
+            if u.path == "/api/aluno/treinar":
+                from . import aluno
+                rel = aluno.treinar(self._store())
+                self._json({"ok": True, "treinado_em": rel.get("em"), "resumo": rel.get("resumo")})
+                return
             if u.path == "/api/aprovacoes/acao":
                 from .aprovacoes import agir
                 r = agir(store, str(data.get("acao", "")), data.get("ref"), getattr(self.server, "circle", None))

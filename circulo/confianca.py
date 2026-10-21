@@ -122,13 +122,19 @@ def confianca(store: Store, now: float | None = None) -> dict:
     bud = s.one("SELECT * FROM budget ORDER BY day DESC LIMIT 1")
     if bud:
         from .orcamento_dia import limite_hoje
+        from .budget import modo_orcamento
         limite = limite_hoje(s)
         usado = int(bud["tokens"] or 0)
         frac = usado / limite
-        ck.append(_c("orcamento", "agora", "Saturação (orçamento de hoje)", "ok" if frac < .8 else "atencao" if frac < 1 else "falha",
-                     f"{frac:.0%} ({usado:,} de {limite:,} tokens)".replace(",", "."),
-                     f"{s.pending_count()} pedido(s) na fila", now,
-                     projecao="no fim do orçamento o loop pausa sozinho até a meia-noite"))
+        if modo_orcamento(s) == "ilimitado":                     # sem limite: medindo, nada satura
+            ck.append(_c("orcamento", "agora", "Consumo de hoje (sem limite)", "ok", f"{usado:,} tokens".replace(",", "."),
+                         "modo medindo: nada é cortado; o limite será definido com os dados", now,
+                         projecao="ver Consumo de tokens para a sugestão de limite (p90)"))
+        else:
+            ck.append(_c("orcamento", "agora", "Saturação (orçamento de hoje)", "ok" if frac < .8 else "atencao" if frac < 1 else "falha",
+                         f"{frac:.0%} ({usado:,} de {limite:,} tokens)".replace(",", "."),
+                         f"{s.pending_count()} pedido(s) na fila", now,
+                         projecao="no fim do orçamento o loop pausa sozinho até a meia-noite"))
     fr = [r["atraso_ms"] for r in s.q("SELECT atraso_ms FROM frescor WHERE em>=?", (now - 86400,))]
     if fr:
         f99 = p99(fr)

@@ -91,3 +91,12 @@ def test_api_do_dash_em_camadas(circle, painel):
     assert code == 200 and x["run_id"] == r.run_id
     assert get(painel + "/api/execucao/nao-existe")[0] == 404
     assert get(painel + "/api/execucao/abc123")[0] == 404
+
+
+def test_saude_traz_entregas_e_fila_das_ultimas_24h(circle):
+    from circulo.camadas import visao
+    agora = time.time()
+    circle.store.x("INSERT INTO prs(number,project_id,titulo,branch,status,created_at,updated_at) VALUES(7,2,'x','b','mergeado',?,?)", (agora, agora))
+    circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('a','d','loop','pendente','',1,?,?)", (agora, agora))
+    H = visao(circle.store)["saude"]
+    assert H["entregas_24h"]["prs"] == 1 and H["fila"]["pendentes"] >= 1 and "reincidencias_24h" in H

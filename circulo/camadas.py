@@ -132,8 +132,16 @@ def visao(s: Store, now: float | None = None, n: int = 30) -> dict:
     ) if x)
     ok = [r["dur"] for r in fechadas if not r["erros"]]
     ruim = [r["dur"] for r in fechadas if r["erros"]]
+    d24 = now - 86400
+    um = lambda sql, a=(): int((s.one(sql, a) or {"n": 0})["n"] or 0)  # noqa: E731
     saude = {"cor": cor, "frase": frase, "estado": st["estado"], "titulo": st["titulo"], "etapa_atual": etapa_atual,
              "ultimo_pr": dict(pr) if pr else None, "erros_24h": total_24h, "ultima_falhou": ultima_falhou,
+             "entregas_24h": {"prs": um("SELECT COUNT(*) n FROM prs WHERE status='mergeado' AND updated_at>=?", (d24,)),
+                              "itens": um("SELECT COUNT(*) n FROM roadmap WHERE status='feito' AND updated_at>=?", (d24,))},
+             "fila": {"pendentes": um("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0"),
+                      "em_andamento": um("SELECT COUNT(*) n FROM roadmap WHERE status='em_andamento'"),
+                      "prs_abertos": um("SELECT COUNT(*) n FROM prs WHERE status='aberto'")},
+             "reincidencias_24h": um("SELECT COALESCE(SUM(reincidencias),0) n FROM licoes WHERE updated_at>=?", (d24,)),
              # sinal de ouro: latência das falhas separada da dos sucessos
              "dur_ok": median(ok) if ok else None, "dur_falha": median(ruim) if ruim else None}
 

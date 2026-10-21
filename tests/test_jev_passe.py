@@ -100,3 +100,22 @@ def test_painel_mede_antes_e_depois_do_passe(circle):
     assert w["antes_n"] == 2 and w["antes_conf"] == 0.4 and w["depois_n"] == 1 and w["depois_conf"] == 0.9
     jev_lab.marcar_passe(s, jev_lab.PASSE_VERSAO)
     assert float(s.get("jev_passe")["em"]) == em                                 # uma vez por versão
+
+
+def test_painel_mostra_a_pergunta_inteira_que_foi_ao_jev(circle, painel):  # noqa: F811
+    """1.49.0: clicar numa decisão abre a pergunta como foi enviada (texto, critérios, tipo) e o estado."""
+    import urllib.request
+    s = circle.store
+    circle.ctx.dl.worth_spending("estudar_pedido", {"est_tokens": 100, "value_signal": 0.9})
+    d = s.one("SELECT id FROM decisions WHERE question='worth_spending' ORDER BY id DESC LIMIT 1")
+    j = json.loads(urllib.request.urlopen(painel + f"/api/jev/decisao?id={d['id']}", timeout=5).read())
+    assert j["question"] == "worth_spending" and j["pergunta"]["tipo"] == "noul" and "Vale a pena gastar" in j["pergunta"]["texto"]
+    assert "≥ 0.7" in j["pergunta"]["criterios"]["true"] and j["estado"]["action"] == "estudar_pedido"
+    assert urllib.request.urlopen(painel + "/api/jev", timeout=5).status == 200
+    req = urllib.request.Request(painel + "/api/aluno/treinar", data=b"{}", method="POST", headers={"Content-Type": "application/json", "X-Circulo": "1"})
+    assert json.loads(urllib.request.urlopen(req, timeout=10).read())["ok"] is True
+    html = urllib.request.urlopen(painel + "/loop", timeout=5).read().decode()
+    assert 'id="decDet"' in html and 'id="alunoTreinar"' in html and 'id="saudeTravas"' in html and 'id="rtFiltros"' in html
+
+
+from test_painel import painel  # noqa: E402,F401 — fixture do servidor do painel

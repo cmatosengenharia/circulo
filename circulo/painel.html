@@ -15,7 +15,7 @@ button,input{font:inherit;color:inherit}
 .wrap{max-width:none;margin:0;padding:16px clamp(16px,2vw,40px) 48px}
 /* tela cheia: em monitores largos as duas primeiras seções da aba "Saúde e estado" ficam lado a lado */
 @media (min-width:1440px){.wrap{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:0 16px;align-items:start}
-  .wrap>*{grid-column:1/-1;min-width:0}.wrap>#camadas{grid-column:1}.wrap>#vigia{grid-column:2;margin-bottom:18px}}
+  .wrap>*{grid-column:1/-1;min-width:0}}
 @media (min-width:1800px){.grid{gap:20px}.panel{padding:20px 24px}}
 
 header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:18px}
@@ -157,7 +157,7 @@ form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--
 /* faixa de giros: cada barra é um giro, cada pedaço uma etapa, largura = tempo */
 
 /* dash em camadas: semáforo no topo, etapas do ciclo, detalhe de uma execução pelo run_id */
-.camadas{margin:0 0 18px;display:flex;flex-direction:column;gap:14px}
+
 .semaforo{display:flex;gap:12px;align-items:center}
 .semaforo .luz{flex:none;width:18px;height:18px;border-radius:50%;background:var(--idle)}
 .semaforo[data-c="verde"] .luz{background:var(--ok)}
@@ -344,6 +344,30 @@ details.feitos > summary{cursor:pointer;font-weight:700;font-size:14px;margin:14
 .cx .cxserie{display:flex;align-items:flex-end;gap:2px;height:18px;flex:none}
 .cx .cxserie i{display:block;width:3px;min-height:3px;border-radius:1px;background:var(--ok);opacity:.85}.cx .cxserie i[data-ok="0"]{background:var(--bad);height:18px!important}
 @media (max-width:720px){.cx{min-width:150px;flex-basis:150px}.cx .cxserie{display:none}}
+.kpis4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0 14px}
+.kpis4>div{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;min-width:0}
+.kpis4 b{display:block;font-size:22px;line-height:1.1;font-weight:600;color:var(--ink)}.kpis4 span{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}
+.kpis4 b.bad{color:var(--bad)}.kpis4 b.ok{color:var(--ok)}.kpis4 b.warn{color:var(--llm)}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media (max-width:900px){.duas{grid-template-columns:1fr}}
+.h3{font-size:13px;font-weight:600;margin:8px 0 6px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}.h3 .sub{font-weight:400}
+.mini{font-size:12px;font-weight:400;color:var(--accent);text-decoration:none}.mini:hover{text-decoration:underline}
+.lista{list-style:none;margin:0;padding:0}.lista>li{display:flex;gap:10px;align-items:flex-start;padding:7px 4px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.35;cursor:default}
+.lista>li:last-child{border-bottom:0}.lista>li>.pt{flex:none;width:8px;height:8px;border-radius:50%;background:var(--idle);margin-top:6px}
+.lista>li>.pt[data-e=ok]{background:var(--ok)}.lista>li>.pt[data-e=bad],.lista>li>.pt[data-e=fora]{background:var(--bad)}.lista>li>.pt[data-e=warn],.lista>li>.pt[data-e=instavel]{background:var(--llm)}.lista>li>.pt[data-e=jev]{background:var(--jev)}
+.lista>li>.tx{flex:1;min-width:0;overflow-wrap:anywhere}.lista>li>.tx b{font-weight:600}.lista>li>.tx small{display:block;color:var(--muted);font-size:12px}
+.lista>li>.dir{flex:none;color:var(--muted);font-size:12px;white-space:nowrap}.lista>li.vazio{color:var(--muted)}
+.lista>li.abre{cursor:pointer}.lista>li.abre:hover{background:var(--bg)}.lista>li .det{display:none;margin-top:6px;font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+.lista>li[data-aberto="1"] .det{display:block}.lista>li .det .acoes{margin-top:6px}
+.lista .bar{display:inline-block;width:90px;height:6px;border-radius:3px;background:var(--border);vertical-align:middle;overflow:hidden}.lista .bar i{display:block;height:100%;background:var(--jev)}.lista .bar i.ok{background:var(--ok)}.lista .bar i.warn{background:var(--llm)}
+details.mais{margin-top:10px}details.mais>summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;padding:6px 0}details.mais[open]>summary{color:var(--ink)}
+.funil{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:14px}.funil b{font-size:22px;font-weight:600}.funil .seta{color:var(--muted)}.funil small{display:block;font-size:12px;color:var(--muted)}
+.dec{cursor:pointer}.dec:hover{background:var(--bg)}.dec[data-sel="1"]{outline:2px solid var(--jev);outline-offset:-2px;border-radius:6px}
+.pergunta-jev{font-size:13px;line-height:1.45}.pergunta-jev h4{margin:10px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.pergunta-jev pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px;margin:0;font-size:12px;max-height:220px;overflow:auto}
+.pergunta-jev .sim{border-left:3px solid var(--ok);padding-left:8px;margin:4px 0}.pergunta-jev .nao{border-left:3px solid var(--bad);padding-left:8px;margin:4px 0}
+.filtros .filtro[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+.cons-grid{display:flex;align-items:flex-end;gap:6px;margin:8px 0 12px;height:96px}.cons-grid .d{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;font-size:11px;color:var(--muted);min-width:0}
+.cons-grid .d b{font-size:11px;font-weight:600;color:var(--ink)}.cons-grid .d i{display:block;width:70%;background:var(--jev);border-radius:3px 3px 0 0;opacity:.75}.cons-grid .d.hoje i{opacity:1}.cons-grid .d span{white-space:nowrap}
 /*TEMA:ini*/
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:14px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -414,41 +438,16 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <button type="button" data-aba="seguranca" aria-pressed="false" title="Constituição, guardrails, orçamento e o botão de parada">Segurança e confiança</button>
   </nav>
 
-  <section data-aba="geral" class="panel camadas zero-only" hidden id="camadas" aria-label="Estado do loop">
-    <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
-    <div class="sinais" id="sinais"></div>
-    <div><h2 style="margin:0 0 6px">Etapas do ciclo <small class="sub">clique numa etapa para abrir a última execução dela</small></h2>
-      <div class="etapas" id="etapas" role="list"></div></div>
-    <div><h2 style="margin:0 0 6px">Execuções <small class="sub">altura = duração · vermelho = falhou · linha verde = PR mergeado · linha vermelha = incidente</small></h2>
-      <svg class="execs" id="execs" viewBox="0 0 600 70" preserveAspectRatio="none" role="img" aria-label="Duração das últimas execuções"></svg></div>
-    <div class="exec-det" id="execDet" hidden></div>
-    <details><summary class="sub">Saturação (fila de pedidos, tempo ocioso)</summary><div class="sinais" id="saturacao" style="margin-top:8px"></div></details>
-  </section>
-
-  <section data-aba="seguranca" class="panel zero-only" hidden id="confianca" style="margin:0 0 18px" aria-label="Posso confiar no loop agora?">
+  <section data-aba="seguranca" class="panel zero-only" hidden id="confianca" aria-label="Posso confiar no loop agora?">
     <div class="cf-veredito" id="cfVeredito" data-v=""><div class="selo" id="cfSelo">…</div>
       <div><h2 id="cfTitulo">Posso confiar no loop agora?</h2><p id="cfFrase">Conferindo cada verificação…</p></div></div>
-    <div class="cf-cols">
-      <div class="cf-col"><h3>Perceber · estado e sinais de ouro</h3><ul id="cfAgora"></ul></div>
-      <div class="cf-col"><h3>Entender · por que agiu e qual regra decidiu</h3><ul id="cfSeg"></ul></div>
-      <div class="cf-col"><h3>Projetar · próximo passo e risco</h3><ul id="cfProx"></ul></div>
-    </div>
+    <div class="kpis4" id="segKpis"></div>
+    <h3 class="h3">Verificações que pedem atenção</h3>
+    <ul class="lista" id="cfAtencao"></ul>
+    <details class="mais"><summary id="cfOkResumo">Verificações ok</summary><ul class="lista" id="cfOk"></ul></details>
+    <ul hidden id="cfAgora"></ul><ul hidden id="cfSeg"></ul><ul hidden id="cfProx"></ul>
   </section>
-  <section data-aba="geral" class="panel vigia zero-only" hidden id="vigia" aria-label="SRE: vigia da autoevolução">
-    <div class="vg-cab"><h2 style="margin:0">SRE · vigia da autoevolução <span class="vg-chip" id="vigiaChip">—</span></h2>
-      <span class="vg-meta" id="vigiaMeta"></span></div>
-    <p class="sub" style="margin:6px 0 8px">Um agente paralelo ao giro mede, a cada minuto, se a evolução está andando: pergunta validada sem item, Desenvolvedor parado com fila, PR preso, corpo atrás do GitHub, giro travado, Jev em dúvida crônica, fila seca. Cada achado passa pelo Jev; com confiança alta ele abre item ou alerta, com média só alerta, em dúvida observa e mede de novo.</p>
-    <ul class="list" id="vigiaLista"></ul>
-    <details class="vg-hist"><summary>Resolvidas recentemente</summary><ul class="list" id="vigiaHist"></ul></details>
-  </section>
-  <section data-aba="geral" class="panel zero-only" hidden id="medico" aria-label="Médico do loop" style="margin:0 0 18px">
-    <h2 style="margin:0 0 6px">Médico do loop <span class="vg-chip" id="medicoChip">—</span></h2>
-    <p class="sub" style="margin:0 0 8px">Plano de controle: lê incidentes, erros e tentativas repetidas; um padrão medido (≥ 3 em 1 h) vira diagnóstico, o Jev diz se bloqueia e de quem é a causa, e a resposta sobe a escada mais barata — observar, conter (custo zero), corrigir (item urgente) ou escalar para você. Fecha só quando o sintoma para por 30 min. Ele mesmo é medido: precisão e ações do dia.</p>
-    <div class="indag-tot" id="medicoTot"></div>
-    <ul class="list" id="medicoLista"></ul>
-  </section>
-  <div data-aba="geral" class="about" id="about"></div>
-  <div data-aba="geral" class="kpis" id="kpis" aria-label="Números ao vivo"></div>
+  <div id="about" hidden></div><div id="kpis" hidden></div>
   <form class="orc-form" id="orcForm" hidden>
     <span class="seg" role="group" aria-label="Modo do orçamento"><button type="button" data-modo="ilimitado" aria-pressed="false">Sem limite (medindo)</button><button type="button" data-modo="limite" aria-pressed="false">Com limite diário</button></span>
     <label>Limite diário da API (tokens) <input type="number" id="orcLimite" min="10000" step="10000" required></label>
@@ -458,15 +457,37 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <span class="sub" id="orcMsg">Vale na hora para todo o loop. O porteiro do gasto passa a decidir com esse limite; ao chegar nele, o loop pausa até a meia-noite.</span>
   </form>
   <div class="grid">
-    <section data-aba="geral" class="panel c7 agora" aria-label="O que o loop está fazendo agora">
+  <section data-aba="geral" class="panel c7 zero-only" hidden id="camadas" aria-label="Estado do loop">
+    <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
+    <div class="kpis4" id="sinais"></div>
+    <div class="duas">
+      <div><h3 class="h3">Quem está fazendo o quê <a class="mini" href="/equipe">Equipe ao vivo →</a></h3><ul class="lista" id="saudeFazendo"></ul></div>
+      <div><h3 class="h3">O que está travando <small class="sub">SRE · Médico do loop · Precisa de você</small></h3><ul class="lista" id="saudeTravas"></ul></div>
+    </div>
+    <details class="mais"><summary>Etapas do ciclo, execuções e últimos passos</summary>
+      <div class="etapas" id="etapas" role="list" style="margin-top:8px"></div>
+      <p class="sub" style="margin:10px 0 4px">Execuções · altura = duração · vermelho = falhou · linha verde = PR mergeado · linha vermelha = incidente</p>
+      <svg class="execs" id="execs" viewBox="0 0 600 70" preserveAspectRatio="none" role="img" aria-label="Duração das últimas execuções"></svg>
+      <div class="exec-det" id="execDet" hidden></div>
+      <div class="sinais" id="saturacao" style="margin-top:8px"></div>
+    </details>
+  </section>
+    <section data-aba="geral" class="panel c7 agora so-missao" aria-label="O que o loop está fazendo agora">
       <h2>Agora</h2>
       <div class="tarefa"><span class="marca" id="agoraMarca"></span>
         <div><h3 id="agoraTitulo">Conectando…</h3><p id="agoraDetalhe"></p></div></div>
       <ul class="passos" id="passos" aria-live="polite"></ul>
     </section>
 
+    <section data-aba="jev" class="panel c12 zero-only" hidden aria-label="Jev em números">
+      <div class="kpis4" id="jevKpis"></div>
+      <div class="duas">
+        <div><h3 class="h3">Perguntas em 24 h <small class="sub">barra = confiança média do Jev; abaixo de 25% a regra decide</small></h3><ul class="lista" id="jevPerguntas"></ul></div>
+        <div><h3 class="h3">Passe nas perguntas em dúvida <small class="sub" id="jevPasseMeta"></small></h3><ul class="lista" id="jevPasse"></ul></div>
+      </div>
+    </section>
     <section data-aba="jev" class="panel c7" aria-label="Decisões ao vivo">
-      <div class="cabeca"><div><h2>Decisões ao vivo</h2><p class="sub" style="margin:2px 0 0">Toda pergunta que o loop faz antes de gastar ou de mudar algo.</p></div>
+      <div class="cabeca"><div><h2>Decisões ao vivo</h2><p class="sub" style="margin:2px 0 0">Clique numa decisão para ver a pergunta inteira que foi ao Jev, os critérios e o estado.</p></div>
         <div class="resumo-dec" id="resumoDec"></div></div>
       <div class="filtros" role="group" aria-label="Filtrar decisões">
         <button class="filtro" data-f="" aria-pressed="true">Todas</button>
@@ -477,72 +498,58 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       </div>
       <div class="console" id="feed"><p class="empty">Esperando a próxima decisão…</p></div>
     </section>
-
-    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Revisor">
-      <h2>Revisor: vários PRs em paralelo, sem conflito</h2>
-      <p class="sub" style="margin:-6px 0 8px">O Desenvolvedor abre até <span id="revMax">3</span> PRs ao mesmo tempo. Antes de cada um, o Revisor de código traz a main de agora para a branch e roda os testes, compara os arquivos com os outros PRs abertos e simula o merge entre eles; no gate, confere de novo. O Jev classifica cada revisão. Rejeitado, o PR não entra (ou é fechado) e o item volta para a fila, esperando o PR que ele cruza.</p>
-      <div class="indag-tot" id="revTot"></div>
-      <ul class="list" id="revAbertos"></ul>
-      <ul class="list" id="revLista"></ul>
+    <section data-aba="jev" class="panel c5 zero-only" hidden aria-label="Pergunta ao Jev" id="decDet">
+      <h2>A pergunta, inteira</h2>
+      <div id="decDetCorpo"><p class="empty">Clique numa decisão ao lado.</p></div>
     </section>
 
-    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Memória do time">
-      <h2>Memória do time: o que já aconteceu de parecido, na hora certa</h2>
-      <p class="sub" style="margin:-6px 0 8px">Lições, itens feitos, estudos, revisões, gates, incidentes e episódios do Desenvolvedor num índice de texto (FTS5 do SQLite). Cada agente recebe só os trechos mais parecidos com a tarefa de agora, com o resultado que tiveram, em vez das mesmas 15 lições globais. O Arquiteto reaproveita um estudo recente de assunto parecido (0 tokens); o Gerente de produto não abre item que já existe com outras palavras.</p>
-      <div class="indag-tot" id="memTot"></div>
-      <div class="sub" id="memAgentes"></div>
-      <ul class="list" id="memUsos"></ul>
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Funil da autoevolução">
+      <div class="funil" id="evoFunil"></div>
+      <div class="kpis4" id="evoKpis"></div>
     </section>
-
-    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Product owner">
-      <h2>Product owner: as perguntas de onde a evolução parte</h2>
-      <p class="sub" style="margin:-6px 0 8px">O agente da autoevolução levanta perguntas a partir do contexto de cada missão (a do loop e as suas) e o Jev classifica cada uma: pertinente ao momento, qual eixo faz evoluir (arquitetura, missão, operação) e se cabe num item medível. Só a validada vira ponto de partida; em dúvida, volta depois; a descartada fica registrada. Seus pedidos entram pela mesma porta, sem nunca serem descartados.</p>
-      <div class="indag-tot" id="indagTot"></div>
-      <div class="indag-tot" id="indagFunil" aria-label="Funil da autoevolução"></div>
-      <ul class="list" id="indag"></ul>
-    </section>
-    <section data-aba="evolucao" class="panel c7 zero-only" hidden>
-      <h2>Roteiro do loop</h2>
-      <p class="sub" style="margin:-6px 0 8px">Os seus pedidos que criaram o loop, mais os erros que ele mesmo registrou para corrigir. O Desenvolvedor pega daqui.</p>
+    <section data-aba="evolucao" class="panel c7 zero-only" hidden aria-label="Roteiro do loop">
+      <div class="cabeca"><div><h2>Roteiro</h2><p class="sub" style="margin:2px 0 0">O Desenvolvedor pega na ordem. Clique num item para abrir.</p></div>
+        <div class="filtros" role="group" aria-label="Filtrar o roteiro" id="rtFiltros"></div></div>
       <div id="roadmap"></div>
     </section>
-    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Consumo de tokens">
-      <h2>Consumo de tokens: medindo para definir o limite</h2>
-      <p class="sub" style="margin:-6px 0 8px">Quanto a API gastou por dia, por papel e por hora do dia. No modo sem limite nada é cortado; estes números é que vão dizer qual limite faz sentido.</p>
-      <div class="indag-tot" id="consTot"></div>
+    <section data-aba="evolucao" class="panel c5 zero-only" hidden aria-label="Product owner">
+      <div class="cabeca"><div><h2>Perguntas do PO</h2><p class="sub" style="margin:2px 0 0">De onde a evolução parte. Clique para ver a evidência.</p></div>
+        <div class="filtros" role="group" aria-label="Filtrar perguntas" id="poFiltros"></div></div>
+      <div class="indag-tot" id="indagTot" hidden></div>
+      <div class="sub" id="indagFunil" style="margin:0 0 8px"></div>
+      <ul class="lista" id="indag"></ul>
+    </section>
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Bastidores da evolução">
+      <details class="mais"><summary id="revResumo">Revisor de código</summary>
+        <div class="indag-tot" id="revTot"></div><ul class="list" id="revAbertos"></ul><ul class="list" id="revLista"></ul><span hidden id="revMax">3</span></details>
+      <details class="mais"><summary id="memResumo">Memória do time</summary>
+        <div class="indag-tot" id="memTot"></div><div class="sub" id="memAgentes"></div><ul class="list" id="memUsos"></ul></details>
+    </section>
+    <section data-aba="seguranca" class="panel c7 zero-only" hidden aria-label="Consumo de tokens">
+      <div class="cabeca"><div><h2>Consumo de tokens</h2><p class="sub" style="margin:2px 0 0" id="consTot"></p></div><button class="btn" type="button" id="orcBtn">Orçamento ✎</button></div>
       <div class="cons-grid" id="consDias"></div>
-      <ul class="list" id="consPapeis"></ul>
+      <ul class="lista" id="consPapeis"></ul>
     </section>
-    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Cérebros">
-      <h2>Cérebros e neurônios</h2>
-      <p class="sub" style="margin:-6px 0 8px">Cada ponto do fluxo é um neurônio: Jev primeiro, ação, e a saída só segue se todos os portões aprovarem.
-        Portões aprendidos nascem das lições (neurogênese) e barram o erro antes de ele se repetir. Últimas 24 h.</p>
-      <div id="cerebros" class="cerebros"></div>
-    </section>
-    <section data-aba="seguranca" class="panel c12 zero-only" hidden aria-label="Lições">
-      <h2>Lições: erros que o loop não pode repetir</h2>
-      <p class="sub" style="margin:-6px 0 8px">Todo ponto de verificação é monitorado. Falha vira lição; erro de estrutura vira item na primeira vez.
-        A lição fecha só com duas provas: <b>validada</b> (a correção entrou) e <b>evidenciada</b> (o erro não voltou). Com lição de estrutura aberta, o loop corrige antes de evoluir.</p>
+    <section data-aba="seguranca" class="panel c5 zero-only" hidden aria-label="Lições e erros">
+      <h2>Lições e erros abertos</h2>
       <div class="rt-leg" id="licoesResumo"></div>
-      <ul class="list" id="licoes"></ul>
-      <details class="feitos"><summary>Verificações nas últimas 24 h</summary><ul class="list" id="verificacoes"></ul></details>
+      <ul class="lista" id="licoes"></ul>
+      <ul class="lista" id="incidents"></ul>
+      <details class="mais"><summary>Todas as lições, verificações e neurônios (24 h)</summary>
+        <ul class="list" id="licoesTodas"></ul>
+        <ul class="list" id="verificacoes"></ul>
+        <div id="cerebros" class="cerebros"></div></details>
     </section>
-    <section data-aba="seguranca" class="panel c5 zero-only" hidden>
-      <h2>Erros registrados</h2>
-      <p class="sub" style="margin:-6px 0 8px">Todo erro vira incidente. Repetiu numa etapa isolável: o círculo isola a etapa e segue.</p>
-      <ul class="list" id="incidents"></ul>
-    </section>
-    <section data-aba="jev" class="panel c12 zero-only" hidden aria-label="Aluno do Jev">
-      <h2>Aluno do Jev: um modelo local aprendendo com as respostas dele (em sombra)</h2>
-      <p class="sub" style="margin:-6px 0 8px">Destilação: para cada pergunta, um modelo treinado nas decisões confiantes do Jev palpita em paralelo; a decisão continua sendo do Jev. Quando a concordância em sombra passar de 95 % em 300 palpites, a pergunta fica "pronta para decidir" — e só uma chave sua liga o degrau na cascata (regra → aluno → Jev → LLM).</p>
+    <section data-aba="jev" class="panel c7 zero-only" hidden aria-label="Aluno do Jev">
+      <div class="cabeca"><div><h2>Aluno do Jev</h2><p class="sub" style="margin:2px 0 0">Um modelo local aprende com as respostas confiantes do Jev e palpita em sombra; a decisão continua sendo do Jev. Clique numa pergunta.</p></div>
+        <button class="btn" type="button" id="alunoTreinar" title="Treina agora com as decisões gravadas (normalmente a cada 6 h ou 200 decisões novas)">Treinar agora</button></div>
       <div class="indag-tot" id="alunoTot"></div>
-      <ul class="list" id="alunoLista"></ul>
+      <ul class="lista" id="alunoLista"></ul>
     </section>
-    <section data-aba="jev" class="panel c7" aria-label="Modelos de IA">
-      <h2>Modelos escolhidos pelo Jev</h2>
-      <p class="sub" style="margin:-6px 0 10px">Antes de cada chamada, o Jev escolhe o modelo pelo papel, pelo orçamento e por como cada modelo se saiu antes. Tudo fica registrado.</p>
+    <section data-aba="jev" class="panel c5" aria-label="Modelos de IA">
+      <h2>Modelos de IA <small class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">o Jev escolhe o porte por tarefa</small></h2>
       <div class="modelos" id="modelos"></div>
-      <div id="chamadas"></div>
+      <details class="mais"><summary>Últimas chamadas</summary><div id="chamadas"></div></details>
     </section>
 
     <div class="c5 stack">
@@ -559,9 +566,8 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       </section>
       <section data-aba="seguranca" class="panel">
         <h2>Autonomia</h2>
-        <p class="sub" style="margin:-6px 0 8px">Nada aqui espera você. O que o loop não pode fazer, ele recusa e segue por outro caminho.</p>
         <div class="auto-nums" id="autoNums"></div>
-        <ul class="list" id="waiting"></ul>
+        <details class="mais"><summary>Resolvido sozinho, recusado e configuração</summary><ul class="list" id="waiting"></ul></details>
       </section>
     </div>
 
@@ -605,8 +611,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <ul class="list" id="pesquisa"></ul>
     </section>
     <section data-aba="seguranca" class="panel c7">
-      <h2>Versões da política</h2>
-      <ul class="list" id="versions"></ul>
+      <details class="mais"><summary>Versões da política</summary><ul class="list" id="versions"></ul></details>
     </section>
   </div>
 </div>
@@ -632,7 +637,10 @@ const QUEST = {input_type:"Que tipo de mensagem é?", category:"Qual categoria?"
   transfer_lesson:"Levar a lição para outra missão?", verify_formato:"Saída no formato certo?", verify_injecao:"Saída livre de manipulação?",
   verify_dados:"Saída sem dados sensíveis?", verify_pedido:"Saída responde ao pedido?", meets_bar:"Quanto atende a régua?"};
 const PREF = [["crit_","Critério da régua"],["rel_","Trecho relevante?"],["ach_","Achado da pesquisa vale?"],["val_","Vale o ganho?"],["mens_","Mensagem entendida?"]];
-const pergunta = q => QUEST[q] || (q.startsWith("llm:") ? "Chamar LLM: " + (PAPEL[q.slice(4)] || q.slice(4)) : (PREF.find(([k]) => q.startsWith(k)) || [, q.replace(/_/g, " ")])[1]);
+const PREF2 = [["vigia_trava", "SRE: é trava mesmo?"], ["vigia_acao", "SRE: que ação?"], ["indaga_pert", "PO: pergunta pertinente?"], ["indaga_eixo", "PO: que eixo evolui?"], ["indaga_acao", "PO: dá para agir?"],
+  ["dado_na_evidencia", "O dado está na evidência?"], ["revisor_seguro", "Revisor: PR seguro?"], ["medico_bloqueia", "Médico: bloqueia o loop?"], ["medico_dono", "Médico: de quem é a causa?"], ["medico_remedio", "Médico: qual remédio?"],
+  ["doc_tipo", "Redator: tipo da entrega"], ["doc_visivel", "Redator: visível ao leitor?"], ["estudo_", "Arquiteto: estudo"], ["evidencia_sustenta", "A evidência sustenta?"]];
+const pergunta = q => QUEST[q] || (q.startsWith("llm:") ? "Chamar LLM: " + (PAPEL[q.slice(4)] || q.slice(4)) : (PREF.find(([k]) => q.startsWith(k)) || PREF2.find(([k]) => q.startsWith(k)) || [, q.replace(/_/g, " ")])[1]);
 
 /* ---------- o círculo ---------- */
 const STAGES = [["orquestrador","Tech lead"],["pedido","Pedido"],["idle","Evolução natural"],["projeto","Construindo missões"],
@@ -700,7 +708,7 @@ function renderDecs() {
     const v = typeof d.value === "number" ? d.value.toFixed(2) : String(d.value).replace(/^"|"$/g, "").replace(/_/g, " ");
     const perg = pergunta(d.question);
     const miss = ZERO && d.project_id && String(d.project_id) !== PID ? nomeMissao(d.project_id) : "";
-    h += `<div class="dec ${esc(d.source)} ${d._novo ? "new" : ""}"><span class="t">${hora(d.created_at)}</span>
+    h += `<div class="dec ${esc(d.source)} ${d._novo ? "new" : ""}" data-id="${d.id}" data-sel="${d.id === DEC_SEL ? 1 : 0}" title="ver a pergunta inteira"><span class="t">${hora(d.created_at)}</span>
       <span class="q" title="${esc(perg)}">${esc(perg)}${miss ? ` <span class="mission">${esc(miss)}</span>` : ""}</span>
       <span class="v" title="${esc(v)}">${esc(v)}</span>
       <span class="c"><i style="--w:${pct(d.confidence)}"></i>${pct(d.confidence)}</span>
@@ -711,6 +719,29 @@ function renderDecs() {
 document.querySelectorAll(".filtro[data-f]").forEach(b => b.onclick = () => {
   filtro = b.dataset.f; document.querySelectorAll(".filtro[data-f]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderDecs();
 });
+let DEC_SEL = null;
+$("#feed").addEventListener("click", e => { const r = e.target.closest(".dec[data-id]"); if (r) abrirDecisao(Number(r.dataset.id)); });
+async function abrirDecisao(id) {
+  DEC_SEL = id; renderDecs();
+  const box = $("#decDetCorpo"); if (!box) return;
+  box.innerHTML = `<p class="empty">Carregando…</p>`;
+  try {
+    const d = await (await fetch("/api/jev/decisao?id=" + id)).json();
+    const q = d.pergunta, v = typeof d.value === "number" ? d.value.toFixed(2) : String(d.value).replace(/^"|"$/g, "");
+    const crit = q && q.criterios;
+    const critHtml = !crit ? "" : Array.isArray(crit) ? `<h4>Escala</h4><ol style="margin:0;padding-left:18px">${crit.map(c => `<li>${esc(c)}</li>`).join("")}</ol>`
+      : (crit.true !== undefined || crit.false !== undefined) ? `<h4>Critérios</h4><div class="sim"><b>sim</b> quando: ${esc(crit.true)}</div><div class="nao"><b>não</b> quando: ${esc(crit.false)}</div>`
+      : `<h4>Opções</h4>${Object.entries(crit).map(([k, t]) => `<div class="${k === String(d.value).replace(/^"|"$/g, "") ? "sim" : ""}" style="margin:3px 0"><b>${esc(k)}</b>: ${esc(t)}</div>`).join("")}`;
+    const probs = d.probabilidades && Object.keys(d.probabilidades).filter(k => !k.startsWith("_")).length ? Object.entries(d.probabilidades).filter(([k]) => !k.startsWith("_")).map(([k, p]) => `${esc(k)} ${typeof p === "number" ? pct(p) : esc(String(p))}`).join(" · ") : "";
+    box.innerHTML = `<div class="pergunta-jev">
+      <div><span class="src ${esc(d.source)}" style="margin-right:6px">${d.source === "jev" ? "Jev" : d.source === "local" ? "regra" : "LLM"}</span><b>${esc(pergunta(d.question))}</b> <span class="sub">· ${esc(d.question)} · giro ${d.tick} · ${hora(d.created_at)}</span></div>
+      <h4>Pergunta enviada${q ? ` (${esc(q.tipo)})` : ""}</h4>${q ? `<div>${esc(q.texto)}</div>` : `<div class="sub">O texto desta pergunta ainda não foi catalogado (passa a ser gravado a cada pergunta nova a partir da 1.49.0).</div>`}
+      ${critHtml}
+      <h4>Resposta</h4><div><b>${esc(v)}</b> · confiança ${pct(d.confidence)}${probs ? ` · ${probs}` : ""}${d.probabilidades && d.probabilidades.cache ? " · do cache" : ""}</div>
+      <h4>Estado que foi junto</h4>${d.estado ? `<pre>${esc(JSON.stringify(d.estado, null, 1))}</pre>` : `<div class="sub">sem estado gravado</div>`}
+    </div>`;
+  } catch { box.innerHTML = `<p class="empty">Não deu para carregar esta decisão.</p>`; }
+}
 $("#congelar").onclick = e => { congelado = !congelado; e.target.setAttribute("aria-pressed", congelado); e.target.textContent = congelado ? "Continuar ao vivo" : "Congelar lista"; if (!congelado) renderDecs(); };
 function sparkline(serie) {
   const w = 120, h = 30, max = Math.max(1, ...serie), n = serie.length;
@@ -758,10 +789,7 @@ function renderKpis(s) {
   k.push([ult5 >= 10 ? Math.round(ult5) : ult5.toFixed(1), "decisões por minuto"]);
   k.push([(s.orcamento.llm || 0).toLocaleString("pt-BR"), `chamadas de LLM hoje <small>${s.orcamento.jev} ao Jev</small>`]);
   const O = s.orcamento, pct = O.limite ? Math.round(100 * O.tokens / O.limite) : 0;
-  if (O.modo === "ilimitado") k.push([`<button class="orc-btn" id="orcBtn" title="Orçamento: medindo sem corte. Clique para mudar"><b>${(O.tokens / 1000).toFixed(0)} mil</b> ✎</button>`,
-    `tokens hoje <small>sem limite · medindo para definir o limite</small>`, true]);
-  else k.push([`<button class="orc-btn" id="orcBtn" title="Mudar o limite diário da API"><b>${pct}%</b> ✎</button>`,
-    `da API hoje <small>${(O.tokens / 1000).toFixed(0)} mil de ${(O.limite / 1000).toFixed(0)} mil tokens${O.customizado ? " · limite seu" : ""}</small>`, true]);
+  k.push([O.modo === "ilimitado" ? `${(O.tokens / 1000).toFixed(0)} mil` : `${pct}%`, O.modo === "ilimitado" ? "tokens hoje (sem limite)" : `da API hoje (${(O.tokens / 1000).toFixed(0)} de ${(O.limite / 1000).toFixed(0)} mil)`]);
   $("#kpis").innerHTML = k.map(([v, l, html]) => `<div class="kpi">${html ? v : `<b>${v}</b>`}<span>${l}</span></div>`).join("");
 }
 
@@ -771,27 +799,28 @@ function comLinks(txt, url) {
   const e = esc(txt);
   return url ? e.replace(/\b([0-9a-f]{7,10})\b/g, `<a href="${url}/commit/$1" target="_blank" rel="noopener">$1</a>`) : e;
 }
+let RT_FILTRO = "ativos", RT_ABERTO = null;
+const RT_ST = {em_andamento: ["em andamento", "warn"], pendente: ["na fila", ""], feito: ["entregue", "ok"], contestado: ["contestado", "bad"], observacao: ["em observação", "jev"], parcial: ["parcial", "jev"], dividido: ["dividido", ""]};
 function renderRoteiro(s) {
   const itens = s.roteiro || [], dev = s.developer && !s.developer.fechado ? s.developer.item : null;
-  const n = st => itens.filter(r => r.status === st && !r.desativado).length, tot = itens.filter(r => !r.desativado).length || 1;
-  const card = r => `<li style="--rc:${RCOR[r.status]}" class="${r.id === dev ? "agora-dev" : ""} ${r.desativado ? "off" : ""}"><div class="top"><strong>${esc(r.titulo)}</strong>
-      <span class="origem ${r.origem === "erro" ? "erro" : /depende de você/.test(r.evidencia) ? "voce" : ""}">${r.origem === "erro" ? "erro que o loop achou" : /depende de você/.test(r.evidencia) ? "depende de você" : r.origem === "pedido_cassio" ? "seu pedido" : "do loop"}</span></div>
-      ${r.detalhe && r.detalhe !== r.titulo ? `<p>${esc(r.detalhe)}</p>` : ""}${r.evidencia && r.evidencia !== "depende de você" ? `<div class="ev">${r.id === dev ? "Desenvolvedor trabalhando nisto agora · " : ""}${comLinks(r.evidencia, s.repo_url)}</div>` : ""}
-      <div class="ev"><a href="/rastros#item%20${r.id}" title="Da origem até a evidência no código rodando">Rastro do item #${r.id} →</a></div>
-      ${r.status === "contestado" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="1" title="O estudo contestou com evidência; você decide seguir mesmo assim">Executar mesmo assim</button></div>`
-        : r.status !== "feito" ? `<div class="acoes"><button class="toggle" data-item="${r.id}" data-ativo="${r.desativado ? 1 : 0}" title="${r.desativado ? "Volta para a fila do Desenvolvedor" : "O loop não vai evoluir este item até você reativar"}">${r.desativado ? "Reativar" : "Desativar"}</button></div>` : ""}</li>`;
-  const ativos = itens.filter(r => !r.desativado), off = itens.filter(r => r.desativado);
-  const grupo = (tit, sub, st) => { const l = ativos.filter(r => st.includes(r.status)).sort((a, b) => /depende de você/.test(a.evidencia) - /depende de você/.test(b.evidencia)); return l.length ? `<div class="rt-grupo">${tit} <small>${sub} · ${l.length}</small></div><ul class="rt">${l.map(card).join("")}</ul>` : ""; };
-  const feitos = itens.filter(r => r.status === "feito" && !r.desativado);
-  $("#roadmap").innerHTML = `<div class="rt-prog" role="img" aria-label="${n("feito")} de ${itens.length} itens feitos">${["feito","parcial","em_andamento","pendente"].map(st => `<span style="width:${n(st) / tot * 100}%;background:${RCOR[st]}"></span>`).join("")}</div>
-    <div class="rt-leg"><span><b>${n("feito")}</b> feitos</span><span><b>${n("parcial")}</b> parciais</span><span><b>${n("em_andamento")}</b> em andamento</span><span><b>${n("pendente")}</b> na fila</span>${itens.some(r => r.desativado) ? `<span><b>${itens.filter(r => r.desativado).length}</b> desativados por você</span>` : ""}</div>` +
-    grupo("Em andamento", "sendo feito agora", ["em_andamento"]) + grupo("Na fila", "o Desenvolvedor pega na ordem; os que dependem de você ficam de lado", ["pendente"]) +
-    grupo("Em observação", "o código parece corrigido; vira entregue quando o erro parar de acontecer", ["observacao"]) +
-    grupo("Contestados pelo estudo", "a evidência contradiz o pedido; não serão executados a menos que você mande", ["contestado"]) +
-    grupo("Parciais", "entregue em parte", ["parcial"]) +
-    (off.length ? `<div class="rt-grupo">Desativados por você <small>o loop não mexe nestes · ${off.length}</small></div><ul class="rt">${off.map(card).join("")}</ul>` : "") +
-    (feitos.length ? `<details class="feitos"><summary>Entregues · ${feitos.length}</summary><ul class="rt">${feitos.map(card).join("")}</ul></details>` : "");
+  const ativos = itens.filter(r => !r.desativado && !["feito", "descartado"].includes(r.status));
+  const grupos = {ativos: ativos, feitos: itens.filter(r => r.status === "feito" && !r.desativado), off: itens.filter(r => r.desativado), voce: itens.filter(r => !r.desativado && /depende de você/.test(r.evidencia || ""))};
+  $("#rtFiltros").innerHTML = [["ativos", `Ativos ${grupos.ativos.length}`], ["feitos", `Entregues ${grupos.feitos.length}`], ["voce", `Dependem de você ${grupos.voce.length}`], ["off", `Desativados ${grupos.off.length}`]]
+    .map(([k, t]) => `<button class="filtro" data-rt="${k}" aria-pressed="${RT_FILTRO === k}">${t}</button>`).join("");
+  const ordem = {em_andamento: 0, contestado: 1, pendente: 2, observacao: 3, parcial: 3, dividido: 4};
+  const lista = grupos[RT_FILTRO].slice().sort((a, b) => (ordem[a.status] ?? 9) - (ordem[b.status] ?? 9) || (a.ordem ?? 0) - (b.ordem ?? 0));
+  const origem = r => r.origem === "erro" ? "erro que o loop achou" : /depende de você/.test(r.evidencia || "") ? "depende de você" : r.origem === "pedido_cassio" ? "seu pedido" : r.origem === "sub_item" ? "sub-item" : "do loop";
+  const pr = r => (String(r.evidencia || "").match(/PR #(\d+)/) || [])[1];
+  $("#roadmap").innerHTML = lista.length ? `<ul class="lista">` + lista.map(r => { const [st, cor] = RT_ST[r.status] || [r.status, ""]; const n = pr(r);
+    return `<li class="abre ${r.id === dev ? "agora-dev" : ""}" data-rt-id="${r.id}" data-aberto="${RT_ABERTO === r.id ? 1 : 0}"><span class="pt" data-e="${r.id === dev ? "ok" : cor}"></span>
+      <div class="tx"><b>#${r.id} ${esc(r.titulo.slice(0, 110))}${r.titulo.length > 110 ? "…" : ""}</b><small>${esc(origem(r))} · ${st}${r.id === dev ? " · Desenvolvedor nisto agora" : ""}${n ? ` · PR #${n}` : ""}</small>
+        <div class="det">${esc(r.detalhe && r.detalhe !== r.titulo ? r.detalhe.slice(0, 900) : "")}${r.evidencia ? `\n\nEvidência: ${esc(r.evidencia.slice(0, 300))}` : ""}
+          <div class="acoes"><a class="mini" href="/rastros#item%20${r.id}">Rastro do item →</a> &nbsp; ${r.status === "contestado" ? `<button class="btn toggle" data-item="${r.id}" data-ativo="1">Executar mesmo assim</button>` : r.status !== "feito" ? `<button class="btn toggle" data-item="${r.id}" data-ativo="${r.desativado ? 1 : 0}">${r.desativado ? "Reativar" : "Desativar"}</button>` : ""}</div></div></div>
+      <span class="dir">${r.ordem != null && r.status === "pendente" ? `ordem ${r.ordem}` : ""}</span></li>`; }).join("") + `</ul>`
+    : `<p class="empty">Nada neste grupo.</p>`;
 }
+$("#rtFiltros").addEventListener("click", e => { const b = e.target.closest("[data-rt]"); if (!b) return; RT_FILTRO = b.dataset.rt; window._rkey = null; if (S) renderRoteiro(S); });
+$("#roadmap").addEventListener("click", e => { if (e.target.closest("button, a")) return; const li = e.target.closest("li[data-rt-id]"); if (!li) return; const id = Number(li.dataset.rtId); RT_ABERTO = RT_ABERTO === id ? null : id; document.querySelectorAll("#roadmap li[data-rt-id]").forEach(x => x.dataset.aberto = Number(x.dataset.rtId) === RT_ABERTO ? 1 : 0); });
 
 /* agrupa renders no próximo quadro: rajadas de eventos não travam a página */
 const pend = new Set();
@@ -848,12 +877,13 @@ function render(s) {
   }
   const zero = P && P.kit === "circulo";
   document.querySelectorAll(".zero-only").forEach(e => e.hidden = !zero);
+  document.querySelectorAll(".so-missao").forEach(e => e.hidden = !!zero);
   if (zero) {
     const rkey = JSON.stringify([s.roteiro, s.developer]);
     if (rkey !== window._rkey) { window._rkey = rkey; renderRoteiro(s); }
     const IS = {aberto:"aberto", isolado:"isolado", resolvido:"resolvido"};
-    $("#incidents").innerHTML = (s.incidentes || []).length ? s.incidentes.map(i => `<li><span>${esc(i.kind)} em ${esc(i.stage)} · ${i.count}x<span class="meta">${esc(i.message)}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</span></span><span class="chip ${esc(i.status)}">${IS[i.status] || esc(i.status)}</span></li>`).join("")
-      : `<li class="empty">Nenhum erro registrado até agora.</li>`;
+    const inc = (s.incidentes || []).filter(i => i.status !== "resolvido");
+    $("#incidents").innerHTML = inc.map(i => `<li><span class="pt" data-e="${i.status === "isolado" ? "bad" : "warn"}"></span><div class="tx"><b>${esc(i.kind)} em ${esc(i.stage)}</b> · ${i.count}x · ${IS[i.status] || esc(i.status)}<small>${esc(i.message.slice(0, 140))}${i.resolution ? " · " + esc(i.resolution) : ""} · último no giro ${i.last_tick}</small></div></li>`).join("");
     $("#cerebros").innerHTML = (s.cerebros || []).map(c => `<div class="cerebro"><div class="top"><strong>${esc(c.cerebro)}</strong>
       <span class="meta">${c.disparos} disparos · ${c.falhas} barrados${(c.portoes_aprendidos || []).length ? ` · ${c.portoes_aprendidos.reduce((a, p) => a + p.portoes, 0)} portões aprendidos` : ""}</span></div>
       <ul class="list">${c.neuronios.sort((a, b) => b.falhas - a.falhas || b.disparos - a.disparos).slice(0, 14).map(n => `<li><span>${esc(n.neuronio)}<span class="meta">${n.disparos} disparos · ${n.falhas} barrados</span></span><span class="chip ${n.falhas ? "aberto" : "resolvido"}">${Math.round(100 * (n.disparos - n.falhas) / n.disparos)}% ok</span></li>`).join("")}</ul></div>`).join("")
@@ -862,8 +892,11 @@ function render(s) {
     const LS = {aberta:"aberta", em_correcao:"em correção", validada:"validada", evidenciada:"evidenciada", reincidente:"REINCIDENTE"};
     $("#licoesResumo").innerHTML = `<span><b>${LC.reincidencias || 0}</b> reincidências</span><span><b>${LC.abertas_estruturais || 0}</b> de estrutura abertas</span>` +
       Object.keys(LS).map(k => `<span><b>${ps[k] || 0}</b> ${LS[k]}</span>`).join("");
-    $("#licoes").innerHTML = (LC.ultimas || []).length ? LC.ultimas.map(l => `<li><span>#${l.id} ${esc(l.descricao)}<span class="meta">${esc(l.assinatura)} · ${esc(l.classe)} · ${l.ocorrencias}x${l.reincidencias ? ` · reincidiu ${l.reincidencias}x` : ""}${l.camada ? ` · prevenção: ${{revisao: "revisão", regra: "regra", ci: "CI", arquitetura: "arquitetura"}[l.camada] || esc(l.camada)}` : ""}${l.item_id ? ` · item #${l.item_id}` : ""}${l.pr ? ` · PR #${l.pr}` : ""}</span></span><span class="chip ${esc(l.status)}">${LS[l.status] || esc(l.status)}</span></li>`).join("")
-      : `<li class="empty">Nenhuma lição ainda.</li>`;
+    const lic = l => `<li><span>#${l.id} ${esc(l.descricao)}<span class="meta">${esc(l.assinatura)} · ${esc(l.classe)} · ${l.ocorrencias}x${l.reincidencias ? ` · reincidiu ${l.reincidencias}x` : ""}${l.camada ? ` · prevenção: ${{revisao: "revisão", regra: "regra", ci: "CI", arquitetura: "arquitetura"}[l.camada] || esc(l.camada)}` : ""}${l.item_id ? ` · item #${l.item_id}` : ""}${l.pr ? ` · PR #${l.pr}` : ""}</span></span><span class="chip ${esc(l.status)}">${LS[l.status] || esc(l.status)}</span></li>`;
+    const abertas = (LC.ultimas || []).filter(l => ["aberta", "reincidente", "em_correcao"].includes(l.status));
+    $("#licoes").innerHTML = abertas.slice(0, 8).map(l => `<li><span class="pt" data-e="${l.status === "reincidente" ? "bad" : l.status === "em_correcao" ? "jev" : "warn"}"></span><div class="tx"><b>#${l.id}</b> ${esc(l.descricao.slice(0, 120))}<small>${LS[l.status]} · ${l.ocorrencias}x${l.reincidencias ? ` · reincidiu ${l.reincidencias}x` : ""}${l.item_id ? ` · item #${l.item_id}` : ""}${l.pr ? ` · PR #${l.pr}` : ""}</small></div></li>`).join("")
+      || `<li><span class="pt" data-e="ok"></span><div class="tx">Nenhuma lição aberta.</div></li>`;
+    $("#licoesTodas").innerHTML = (LC.ultimas || []).map(lic).join("") || `<li class="empty">Nenhuma lição ainda.</li>`;
     $("#verificacoes").innerHTML = (LC.verificacoes_24h || []).map(v => `<li><span>${esc(v.ponto)}<span class="meta">${v.total} verificações · ${v.falhas || 0} falhas</span></span><span class="chip ${v.falhas ? "aberto" : "resolvido"}">${v.total ? Math.round(100 * (v.total - (v.falhas || 0)) / v.total) : 100}% ok</span></li>`).join("") || `<li class="empty">Nenhuma verificação ainda.</li>`;
   }
   renderKpis(s); renderAgora(); renderRitmo(s.ritmo); renderModelos(s.llm);
@@ -1001,6 +1034,8 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-send
 let CF = null, ultimoDado = 0, atrasoMs = null;
 const VTXT = {confiavel: ["✓", "Pode confiar"], atencao: ["!", "Em observação"], falha: ["×", "Atenção"], parado: ["■", "Loop parado"]};
 function ha(ts) { if (!ts) return "—"; const s = Math.max(0, Date.now() / 1000 - ts); return s < 60 ? `há ${s.toFixed(0)} s` : s < 3600 ? `há ${(s / 60).toFixed(0)} min` : `há ${(s / 3600).toFixed(1)} h`; }
+let CF_ABERTO = null;
+document.addEventListener("click", e => { const li = e.target.closest("li[data-cf]"); if (!li) return; CF_ABERTO = CF_ABERTO === li.dataset.cf ? null : li.dataset.cf; renderConfianca(); });
 function renderConfianca() {
   if (!CF) return;
   const [selo, curto] = VTXT[CF.veredito] || ["?", CF.veredito];
@@ -1013,8 +1048,22 @@ function renderConfianca() {
     return `<li data-e="${c.estado}"><div class="t"><span>${esc(c.titulo)}</span><span class="${velho ? "velho" : ""}" title="quando a fonte produziu este dado">${velho ? "dado velho · " : ""}${ha(c.dado_em)}</span></div>
       <div class="v">${esc(String(c.valor))}</div>${c.porque ? `<div class="p">${esc(c.porque)}</div>` : ""}${c.projecao ? `<div class="pj">${esc(c.projecao)}</div>` : ""}
       <div class="idade ${obsoleto ? "obsoleto" : ""}" title="idade da leitura que está na tela">${obsoleto ? "obsoleto · " : ""}lido há ${lido.toFixed(1)} s</div></li>`; };
-  const grupo = g => CF.checks.filter(c => c.grupo === g).map(item).join("") || `<li data-e="info"><div class="p">Nada aqui agora.</div></li>`;
-  $("#cfAgora").innerHTML = grupo("agora"); $("#cfSeg").innerHTML = grupo("seguranca"); $("#cfProx").innerHTML = grupo("proximo");
+  const E_PT = {ok: "ok", bom: "ok", atencao: "warn", aviso: "warn", falha: "bad", erro: "bad", info: ""};
+  const linha = c => { const velho = c.fresco_s && c.dado_em && Date.now() / 1000 - c.dado_em > c.fresco_s;
+    return `<li class="abre" data-cf="${esc(c.titulo)}" data-aberto="${CF_ABERTO === c.titulo ? 1 : 0}"><span class="pt" data-e="${E_PT[c.estado] ?? ""}"></span>
+      <div class="tx"><b>${esc(c.titulo)}</b> ${esc(String(c.valor))}${c.porque ? `<small>${esc(c.porque)}</small>` : ""}<div class="det">${c.projecao ? "→ " + esc(c.projecao) : ""}${c.grupo ? `\n(${{agora: "perceber: estado e sinais", seguranca: "entender: por que agiu", proximo: "projetar: próximo passo e risco"}[c.grupo] || c.grupo})` : ""}</div></div>
+      <span class="dir ${velho ? "velho" : ""}">${velho ? "dado velho · " : ""}${ha(c.dado_em)}</span></li>`; };
+  const ruins = CF.checks.filter(c => !["ok", "bom", "info"].includes(c.estado)), bons = CF.checks.filter(c => ["ok", "bom", "info"].includes(c.estado));
+  $("#cfAtencao").innerHTML = ruins.map(linha).join("") || `<li><span class="pt" data-e="ok"></span><div class="tx">Todas as verificações passaram.</div></li>`;
+  $("#cfOkResumo").textContent = `${bons.length} verificação(ões) ok`; $("#cfOk").innerHTML = bons.map(linha).join("");
+  const ach = n => (CF.checks.find(c => c.titulo === n) || {}).valor || "—";
+  const S0 = S || {}, O = S0.orcamento || {};
+  $("#segKpis").innerHTML = [
+    [esc(String(ach("Quem decide (24 h)")).split("·")[0].trim() || "—"), "das decisões são do Jev · LLM só em dúvida", ""],
+    [O.tokens != null ? `${(O.tokens / 1000).toFixed(0)} mil` : "—", `tokens hoje · ${O.modo === "ilimitado" ? "sem limite, medindo" : `limite ${((O.limite || 0) / 1000).toFixed(0)} mil`}`, ""],
+    [esc(String(ach("Erros repetidos")).split(" ")[0]), "reincidência(s): erro já corrigido que voltou", String(ach("Erros repetidos")).startsWith("0") ? "ok" : "bad"],
+    [esc(String(ach("Código rodando")).slice(0, 7)), `código em produção · ${esc(String(ach("CI da main")))} na main`, ""],
+  ].map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
   renderParada(CF.parada);
 }
 /* parada verificável: o botão só diz "parado" quando o loop confirmou e nenhuma ação começou depois */
@@ -1089,15 +1138,16 @@ async function abrirExecucao(rid, chave) {
     ${x.decisoes.length ? `<details><summary class="sub">${x.decisoes.length} decisões neste giro</summary><ul class="list">${x.decisoes.map(d => `<li><span>${esc(QUEST[d.question] || d.question)} → ${esc(JSON.stringify(d.value))}</span><span class="chip">${esc(d.source)}</span></li>`).join("")}</ul></details>` : ""}`;
 }
 function renderCamadas(v) {
+  window._camadas = v; renderFunil();
   const H = v.saude, a = H.etapa_atual, pr = H.ultimo_pr;
   $("#semaforo").dataset.c = H.cor; $("#semFrase").textContent = H.frase;
+  const E = H.entregas_24h || {}, F = H.fila || {}, apr = window._aprov || {};
   $("#sinais").innerHTML = [
-    ["Loop", H.titulo],
-    ["Etapa atual", a ? `${a.nome} · ${dur(a.ha)}` : "entre giros"],
-    ["Último PR", pr ? `#${pr.number} ${pr.status} · ${pr.titulo}` : "nenhum ainda"],
-    ["Erros em 24 h", String(H.erros_24h) + (H.dur_falha != null ? ` · falha leva ${dur(H.dur_falha)}` : "")],
-    ["Giro típico", H.dur_ok != null ? dur(H.dur_ok) : "—"],
-  ].map(([k, val]) => `<div><span>${k}</span><b title="${esc(val)}">${esc(val)}</b></div>`).join("");
+    [`${E.prs || 0}`, `PR(s) mergeado(s) em 24 h · ${E.itens || 0} item(ns) entregue(s)`, E.prs ? "ok" : ""],
+    [`${F.pendentes || 0}`, `na fila · ${F.em_andamento || 0} em andamento · ${F.prs_abertos || 0} PR(s) no CI`, ""],
+    [`${H.erros_24h}`, `erro(s) em 24 h${H.reincidencias_24h ? ` · ${H.reincidencias_24h} reincidência(s)` : ""}${H.dur_ok != null ? ` · giro típico ${dur(H.dur_ok)}` : ""}`, H.erros_24h ? "warn" : "ok"],
+    [`${apr.total || 0}`, apr.total ? `<a class="mini" href="/aprovacoes">esperando você${apr.urgentes ? ` · ${apr.urgentes} urgente(s)` : ""} →</a>` : "nada esperando você", apr.urgentes ? "bad" : apr.total ? "warn" : "ok"],
+  ].map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
   $("#etapas").innerHTML = v.etapas.map(e =>
     `<button class="etapa" role="listitem" data-s="${e.status}" data-run="${esc(e.run_id || "")}" data-chave="${e.chave}" ${e.run_id ? "" : "disabled"}
        title="${esc(e.nome)}: ${ST_ETAPA[e.status]}${e.run_id ? " · execução " + esc(e.run_id) : ""}">
@@ -1116,19 +1166,33 @@ function renderCamadas(v) {
 }
 $("#etapas").addEventListener("click", ev => { const b = ev.target.closest(".etapa"); if (b && b.dataset.run) abrirExecucao(b.dataset.run, b.dataset.chave); });
 $("#execs").addEventListener("click", ev => { const r = ev.target.closest("rect"); if (r) abrirExecucao(r.dataset.run); });
-async function refreshVigia() {
+async function refreshFazendo() {
   try {
-    const j = await (await fetch("/api/vigia")).json();
-    const chip = $("#vigiaChip"); if (!chip) return;
-    chip.dataset.s = j.estado; chip.textContent = j.estado === "livre" ? "sem travas" : j.estado === "travado" ? `${j.travas} trava(s)` : "observando";
-    $("#vigiaMeta").textContent = j.ultima_em ? `última passagem ${new Date(j.ultima_em * 1000).toLocaleTimeString("pt-BR")} · ${j.sondas.length} sondas a cada ${j.intervalo_s} s` : "ainda não passou";
-    const rot = {abrir_item: "abriu item", alertar: "alertou", observar: "observando", ignorar: "ignorado"};
-    const ver = {trava: "trava", em_duvida: "Jev em dúvida", nao_trava: "não é trava"};
-    $("#vigiaLista").innerHTML = (j.abertas || []).map(a => `<li><span class="g" data-v="${esc(a.veredito)}"></span><b>${esc(a.titulo)}</b><br>
-      <span style="color:var(--muted)">${esc(ver[a.veredito] || a.veredito)} (${Math.round((a.conf || 0) * 100)}%) · ${esc(rot[a.acao] || a.acao)}${a.item_id ? ` · item #${a.item_id}` : ""} · desde ${new Date(a.primeira_em * 1000).toLocaleTimeString("pt-BR")} · visto ${a.vezes}×<br>${esc(a.sugestao || "")}</span></li>`).join("")
-      || `<li style="color:var(--muted)">Nenhuma trava aberta. A evolução está andando.</li>`;
-    $("#vigiaHist").innerHTML = (j.resolvidas || []).map(r => `<li>${esc(r.titulo)} <span style="color:var(--muted)">· ${esc(rot[r.acao] || r.acao)} · resolvida ${new Date(r.resolvida_em * 1000).toLocaleTimeString("pt-BR")}</span></li>`).join("") || "<li style=\"color:var(--muted)\">Nenhuma ainda.</li>";
+    const r = await (await fetch("/api/equipe")).json();
+    const ul = $("#saudeFazendo"); if (!ul) return;
+    const ativos = (r.membros || []).filter(m => m.estado === "trabalhando" && !["jev", "llm", "github", "cassio"].includes(m.id));
+    ul.innerHTML = ativos.map(m => { const f = m.fazendo || {}; const p = (f.passos || []).slice(-1)[0];
+      return `<li><span class="pt" data-e="ok"></span><div class="tx"><b>${esc(m.nome)}</b> ${esc(f.o_que || m.agora || "trabalhando")}${p ? `<small>${esc(p.texto)}</small>` : ""}</div><span class="dir">${f.ha_s != null ? (f.ha_s < 60 ? `há ${f.ha_s} s` : `há ${Math.round(f.ha_s / 60)} min`) : ""}</span></li>`; }).join("")
+      || `<li class="vazio">${r.rodando ? "Entre giros: ninguém com tarefa neste instante." : "O loop não está rodando."}</li>`;
   } catch {}
+}
+setInterval(refreshFazendo, 4000); refreshFazendo();
+let TRAVAS = {vigia: null, medico: null, aprov: null};
+function renderTravas() {
+  const ul = $("#saudeTravas"); if (!ul) return;
+  const v = TRAVAS.vigia || {}, m = TRAVAS.medico || {}, a = TRAVAS.aprov || {};
+  const rot = {abrir_item: "abriu item", alertar: "alertou", observar: "observando", ignorar: "ignorado"};
+  const linhas = [];
+  for (const x of (a.itens || []).filter(i => i.prioridade <= 1).slice(0, 4))
+    linhas.push(`<li><span class="pt" data-e="bad"></span><div class="tx"><b>Precisa de você:</b> ${esc(x.titulo)}<small>${esc((x.detalhe || "").slice(0, 140))}</small></div><span class="dir"><a class="mini" href="/aprovacoes">agir →</a></span></li>`);
+  for (const d of (m.abertos || []))
+    linhas.push(`<li><span class="pt" data-e="${d.acao === "escalar" ? "bad" : "warn"}"></span><div class="tx"><b>Médico do loop:</b> ${esc(d.titulo)}<small>${d.vezes}× · causa: ${esc(d.veredito.dono || "?")} → ${esc(d.acao || "")}${d.item_id ? ` · item #${d.item_id}` : ""}</small></div></li>`);
+  for (const t of (v.abertas || []))
+    linhas.push(`<li><span class="pt" data-e="${(t.gravidade || 0) >= 0.7 ? "bad" : "warn"}"></span><div class="tx"><b>SRE:</b> ${esc(t.titulo)}<small>${esc(rot[t.acao] || t.acao)}${t.item_id ? ` · item #${t.item_id}` : ""} · desde ${new Date(t.primeira_em * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}${t.sugestao ? " · " + esc(t.sugestao.slice(0, 120)) : ""}</small></div></li>`);
+  ul.innerHTML = linhas.join("") || `<li><span class="pt" data-e="ok"></span><div class="tx">Nada travando: a evolução está andando.</div></li>`;
+}
+async function refreshVigia() {
+  try { TRAVAS.vigia = await (await fetch("/api/vigia")).json(); renderTravas(); } catch {}
 }
 setInterval(refreshVigia, 15000); refreshVigia();
 async function refreshRevisor() {
@@ -1138,30 +1202,49 @@ async function refreshRevisor() {
     if (!t || !ab || !ul) return;
     $("#revMax").textContent = j.max_abertos;
     t.textContent = `${(j.abertos || []).length} de ${j.max_abertos} vagas em uso · ${j.total} revisões · ${j.rejeitadas} rejeitadas · ${j.antes_do_pr} antes do PR`;
+    $("#revResumo").textContent = `Revisor de código · ${(j.abertos || []).length}/${j.max_abertos} PRs abertos · ${j.total} revisões, ${j.rejeitadas} rejeitadas`;
     ab.innerHTML = (j.abertos || []).map(p => `<li><span class="tag">PR #${p.number}</span> item #${p.item_id} · <code>${esc(p.branch || "")}</code> · ${(p.arquivos || []).length} arquivo(s): ${esc((p.arquivos || []).slice(0, 5).join(", "))}</li>`).join("") || "<li>Nenhum PR do Desenvolvedor aberto agora.</li>";
     ul.innerHTML = (j.ultimas || []).map(r => `<li><b class="${r.veredito === "rejeitado" ? "bad" : "ok"}">${esc(r.veredito)}</b> · ${esc(r.momento.replace("_", " "))} · ${r.pr ? "PR #" + r.pr : "item #" + r.item_id} · Jev ${r.conf == null ? "—" : Math.round(r.conf * 100) + "%"} (${esc(r.fonte || "")})<br>${esc(r.motivo || "")}</li>`).join("") || "<li>Nenhuma revisão ainda.</li>";
   } catch {}
 }
 setInterval(refreshRevisor, 15000); refreshRevisor();
+let PO_FILTRO = "", PO_ABERTO = null, PO_J = null;
+const PO_ROT = {valida: ["válida", "ok"], feita: ["em uso", "jev"], virou_item: ["virou item", "ok"], entregue: ["entregue", "ok"], descartada: ["descartada", ""], inconclusa: ["em dúvida", "warn"], contestada: ["contestada", "bad"], repetida: ["repetida", ""], estudada: ["estudada", "jev"]};
+function renderPO() {
+  const j = PO_J; if (!j) return;
+  const ul = $("#indag"); if (!ul) return;
+  const todas = j.ultimas || [], cont = {};
+  todas.forEach(p => cont[p.status] = (cont[p.status] || 0) + 1);
+  $("#poFiltros").innerHTML = [["", `Todas ${todas.length}`], ...Object.keys(PO_ROT).filter(k => cont[k]).map(k => [k, `${PO_ROT[k][0]} ${cont[k]}`])]
+    .map(([k, t]) => `<button class="filtro" data-po="${k}" aria-pressed="${PO_FILTRO === k}">${t}</button>`).join("");
+  const lista = todas.filter(p => !PO_FILTRO || p.status === PO_FILTRO).slice(0, 30);
+  ul.innerHTML = lista.map((p, i) => { const [r, c] = PO_ROT[p.status] || [p.status, ""]; const ev = p.evidencia ? (typeof p.evidencia === "string" ? p.evidencia : JSON.stringify(p.evidencia, null, 1)) : "";
+    return `<li class="abre" data-po-i="${i}" data-aberto="${PO_ABERTO === p.texto ? 1 : 0}"><span class="pt" data-e="${c}"></span><div class="tx">${esc(p.texto)}<small>${r} · ${esc(p.cerebro === "loop" ? "loop" : p.cerebro.replace("missao:", "missão #"))} · eixo ${esc(p.eixo || "?")} · pertinência ${Math.round((p.pertinencia || 0) * 100)}%${p.item_id ? ` · item #${p.item_id}` : ""}</small><div class="det">${ev ? esc(ev.slice(0, 700)) : "sem evidência gravada"}</div></div></li>`; }).join("")
+    || `<li class="vazio">Nenhuma pergunta neste filtro.</li>`;
+}
+$("#poFiltros").addEventListener("click", e => { const b = e.target.closest("[data-po]"); if (!b) return; PO_FILTRO = b.dataset.po; renderPO(); });
+$("#indag").addEventListener("click", e => { const li = e.target.closest("li[data-po-i]"); if (!li) return; const t = (PO_J.ultimas.filter(p => !PO_FILTRO || p.status === PO_FILTRO)[Number(li.dataset.poI)] || {}).texto; PO_ABERTO = PO_ABERTO === t ? null : t; renderPO(); });
 async function refreshIndagador() {
   try {
     const j = await (await fetch("/api/indagador")).json();
-    const t = $("#indagTot"), ul = $("#indag");
-    if (!t || !ul) return;
+    PO_J = j; renderPO();
     const d = j.duvidas || {};
-    t.textContent = j.total ? `${j.total} classificadas · ${j.validas} válidas esperando · ${j.usadas} viraram ponto de partida · ${j.descartadas} descartadas pelo Jev · ${j.inconclusas} em dúvida` +
-      (d.estudadas ? ` · dúvidas estudadas pelo Arquiteto: ${d.estudadas} (${d.viraram_validas || 0} viraram válidas)` : " · dúvidas vão para o Arquiteto antes de voltar ao Jev") : "O Indagador ainda não passou por nenhuma missão.";
-    const f = j.funil, fu = $("#indagFunil");
-    if (f && fu) {
-      const nome = {pergunta_para_item: "pergunta → item", item_para_pr: "item → PR", pr_para_merge: "PR → merge"};
-      const partes = Object.entries(f.etapas || {}).map(([k, e]) => e.mediana_min == null ? `${nome[k]}: sem medida` :
-        `${nome[k]}: <b${e.atraso > 1 ? ' style="color:var(--bad)"' : ''}>${Math.round(e.mediana_min)} min</b> (alvo ${e.alvo_min}, ${e.amostras} caso${e.amostras === 1 ? "" : "s"})`);
-      fu.innerHTML = `Funil 24 h (medido): ${partes.join(" · ")} · PRs ${f.prs_mergeados} mesclado(s) / ${f.prs_fechados} fechado(s)` +
-        (f.planejador_motivo ? ` · Gerente de produto parado: <b>${esc(f.planejador_motivo)}</b>` : " · Gerente de produto livre");
-    }
-    const rot = {valida: "válida", feita: "em uso", virou_item: "virou item", entregue: "entregue", descartada: "descartada", inconclusa: "em dúvida", contestada: "contestada", repetida: "repetida"};
-    ul.innerHTML = (j.ultimas || []).map(p => `<li><span class="tag">${esc(p.cerebro === "loop" ? "loop" : p.cerebro.replace("missao:", "missão #"))}</span> <b>${esc(rot[p.status] || p.status)}</b> · eixo ${esc(p.eixo)} · pertinência ${Math.round((p.pertinencia || 0) * 100)}% · acionável ${p.acionavel ?? "?"}/2<br>${esc(p.texto)}</li>`).join("") || "<li>Nenhuma pergunta ainda.</li>";
+    $("#indagTot").textContent = `${j.total || 0} classificadas · ${j.validas || 0} válidas · ${j.usadas || 0} usadas · ${j.descartadas || 0} descartadas · ${j.inconclusas || 0} em dúvida`;
+    const f = j.funil || {}, et = f.etapas || {}, min = k => et[k] && et[k].mediana_min != null ? `${Math.round(et[k].mediana_min)} min` : "—";
+    $("#indagFunil").innerHTML = `Tempo mediano (24 h): pergunta → item <b>${min("pergunta_para_item")}</b> · item → PR <b>${min("item_para_pr")}</b> · PR → merge <b>${min("pr_para_merge")}</b>` + (f.planejador_motivo ? ` · Gerente de produto: <b>${esc(f.planejador_motivo)}</b>` : "") + (d.estudadas ? ` · dúvidas estudadas pelo Arquiteto: ${d.estudadas}` : "");
+    renderFunil();
   } catch {}
+}
+function renderFunil() {
+  { const j = PO_J || {}, f = j.funil || {};
+    const F = $("#evoFunil"); if (F) {
+      const H = (window._camadas || {}).saude || {}, E = H.entregas_24h || {}, Fi = H.fila || {};
+      const seta = `<span class="seta">→</span>`;
+      F.innerHTML = `<div><b>${j.validas_24h ?? j.validas ?? 0}</b><small>perguntas válidas</small></div>${seta}<div><b>${j.usadas_24h ?? j.usadas ?? 0}</b><small>viraram item</small></div>${seta}<div><b>${Fi.prs_abertos || 0}</b><small>PR(s) no CI</small></div>${seta}<div><b>${E.prs || 0}</b><small>mergeados em 24 h</small></div>${seta}<div><b>${E.itens || 0}</b><small>itens entregues em 24 h</small></div>`;
+      $("#evoKpis").innerHTML = [[`${Fi.pendentes || 0}`, "na fila do Desenvolvedor", ""], [`${Fi.em_andamento || 0}`, "em andamento agora", ""], [`${f.prs_mergeados || 0}`, `PR(s) mesclado(s) · ${f.prs_fechados || 0} fechado(s)`, ""], [esc(f.planejador_motivo ? "parado" : "livre"), f.planejador_motivo ? `Gerente de produto: ${esc(f.planejador_motivo)}` : "Gerente de produto livre", f.planejador_motivo ? "warn" : "ok"]]
+        .map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
+    }
+  }
 }
 setInterval(refreshIndagador, 15000); refreshIndagador();
 async function refreshMemoria() {
@@ -1169,6 +1252,7 @@ async function refreshMemoria() {
     const j = await (await fetch("/api/memoria")).json();
     const tipos = Object.entries(j.por_tipo || {}).map(([k, n]) => `${n} ${k}`).join(" · ");
     $("#memTot").textContent = `${j.total} lembrança(s)${tipos ? " (" + tipos + ")" : ""} · ${j.usos_24h} consulta(s) em 24 h · ${j.reaproveitados_24h} reaproveitamento(s) · ${j.tokens_poupados_24h.toLocaleString("pt-BR")} tokens poupados` + (j.fts ? "" : " · sem FTS5: busca simples");
+    $("#memResumo").textContent = `Memória do time · ${j.total} lembranças · ${j.usos_24h} consultas em 24 h · ${(j.tokens_poupados_24h || 0).toLocaleString("pt-BR")} tokens poupados`;
     const pa = Object.values(j.por_agente || {});
     $("#memAgentes").textContent = pa.length ? "Quem consultou em 24 h: " + pa.map(a => `${a.nome} ${a.consultas}× (${a.com_lembranca} com lembrança)`).join(" · ")
       : "Compartilhada com toda a equipe: PO, Questionador, Gerente de produto, Arquiteto, Desenvolvedor, Revisor, Prompts A/B, Médico e as missões.";
@@ -1178,30 +1262,57 @@ async function refreshMemoria() {
   } catch {}
 }
 setInterval(refreshMemoria, 20000); refreshMemoria();
+async function refreshJev() {
+  try {
+    const j = await (await fetch("/api/jev")).json();
+    const k = $("#jevKpis"); if (!k) return;
+    const per = j.perguntas || [], tot = j.decisoes_24h || 0;
+    const conf = per.reduce((a, p) => a + (p.conf_jev || 0) * (p.jev || 0), 0) / Math.max(1, per.reduce((a, p) => a + (p.jev || 0), 0));
+    k.innerHTML = [
+      [tot.toLocaleString("pt-BR"), "decisões em 24 h", ""],
+      [j.sem_llm_24h == null ? "—" : pct(j.sem_llm_24h), "sem chamar a LLM", j.sem_llm_24h >= 0.9 ? "ok" : ""],
+      [tot ? pct(conf) : "—", "confiança média do Jev", conf >= 0.6 ? "ok" : conf >= 0.4 ? "warn" : "bad"],
+      [(j.cache_24h || 0).toLocaleString("pt-BR"), "respostas de rotina do cache (sem chamada)", ""],
+      [esc(j.modelo || "—"), "versão do Jev em uso", ""],
+    ].map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
+    $("#jevPerguntas").innerHTML = per.slice(0, 10).map(p => { const c = p.conf_jev || 0;
+      return `<li><span class="pt" data-e="${c >= 0.6 ? "ok" : c >= 0.4 ? "warn" : "bad"}"></span><div class="tx"><b>${esc(pergunta(p.pergunta))}</b><small>${p.n}× · Jev ${p.jev || 0} · regra ${p.regra || 0}${p.llm ? ` · LLM ${p.llm}` : ""}</small></div><span class="dir"><span class="bar"><i class="${c >= 0.6 ? "ok" : c >= 0.4 ? "warn" : ""}" style="width:${Math.round(c * 100)}%"></i></span> ${pct(c)}</span></li>`; }).join("") || `<li class="vazio">Nenhuma decisão nas últimas 24 h.</li>`;
+    const ps = j.passe && j.passe.perguntas ? j.passe.perguntas : [];
+    $("#jevPasseMeta").textContent = ps.length ? `versão ${j.passe.versao}: antes → depois` : "";
+    $("#jevPasse").innerHTML = ps.map(p => { const d = p.depois_conf, a = p.antes_conf;
+      return `<li><span class="pt" data-e="${d == null ? "" : d >= 0.7 ? "ok" : d > (a || 0) ? "warn" : "bad"}"></span><div class="tx"><b>${esc(pergunta(p.pergunta))}</b><small>${a == null ? "—" : pct(a)} (${p.antes_n}) → ${d == null ? "ainda sem resposta" : pct(d)}${p.depois_n ? ` (${p.depois_n})` : ""} · meta 70%</small></div></li>`; }).join("")
+      || `<li class="vazio">As 4 perguntas reescritas aparecem aqui assim que o loop responder com a versão nova.</li>`;
+  } catch {}
+}
+setInterval(refreshJev, 20000); refreshJev();
+let ALUNO_SEL = null;
 async function refreshAluno() {
   try {
     const j = await (await fetch("/api/aluno")).json();
-    const pct = x => (x == null ? "—" : Math.round(x * 100) + "%");
-    $("#alunoTot").textContent = j.treinado_em ? `treinado ${new Date(j.treinado_em * 1000).toLocaleString("pt-BR")} · ${j.resumo.perguntas} pergunta(s) · ${j.resumo.prontas} pronta(s) para sombra · ${(j.resumo.exemplos || 0).toLocaleString("pt-BR")} exemplos · ${j.decide ? "decidindo" : "só sombra"}` : "ainda não treinou: precisa de decisões do Jev com o estado gravado (a partir da 1.37.0)";
-    $("#alunoLista").innerHTML = (j.perguntas || []).map(p => `<li style="display:block"><span class="tag">${esc(p.pergunta)}</span> ${p.exemplos} exemplos · ${p.classes || 0} classe(s) · ` +
-      (p.acuracia != null ? `acurácia ${pct(p.acuracia)} (maioria ${pct(p.baseline)})` : esc(p.status.replace(/_/g, " "))) +
-      (p.sombra_n ? ` · sombra: concorda ${pct(p.sombra_concorda)} em ${p.sombra_n}` : " · sombra: ainda sem palpites") +
-      (p.pronta_para_decidir ? ` <b style="color:var(--ok)">· pronta para decidir</b>` : "") + `</li>`).join("") || "<li class=\"sub\">Nenhuma pergunta com exemplos suficientes ainda.</li>";
+    const pct = x => (x == null ? "—" : Math.round(x * 100) + "%"), C = j.criterios || {};
+    $("#alunoTot").textContent = j.treinado_em ? `treinado ${new Date(j.treinado_em * 1000).toLocaleString("pt-BR", {hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit"})} · ${j.resumo.perguntas} pergunta(s) · ${j.resumo.prontas} pronta(s) para sombra · ${(j.resumo.exemplos || 0).toLocaleString("pt-BR")} exemplos` : "ainda não treinou: precisa de decisões do Jev com o estado gravado";
+    const ST = {poucos_exemplos: "juntando exemplos", pronto_para_sombra: "palpitando em sombra", fraco: "ainda fraco (abaixo da maioria)", sem_ganho: "não ganha da maioria"};
+    $("#alunoLista").innerHTML = (j.perguntas || []).map(p => { const prog = Math.min(1, p.exemplos / (C.min_exemplos || 120)); const ok = p.status === "pronto_para_sombra";
+      return `<li class="abre" data-q="${esc(p.pergunta)}" data-aberto="${ALUNO_SEL === p.pergunta ? 1 : 0}"><span class="pt" data-e="${p.pronta_para_decidir ? "ok" : ok ? "jev" : ""}"></span>
+        <div class="tx"><b>${esc(pergunta(p.pergunta))}</b> <span class="sub">${esc(p.pergunta)}</span><small>${esc(ST[p.status] || p.status.replace(/_/g, " "))}${p.acuracia != null ? ` · acurácia ${pct(p.acuracia)} (maioria ${pct(p.baseline)})` : ""}${p.sombra_n ? ` · sombra concorda ${pct(p.sombra_concorda)} em ${p.sombra_n}` : ""}${p.pronta_para_decidir ? " · <b>pronta para decidir</b>" : ""}</small>
+          <div class="det">Exemplos: ${p.exemplos} de ${C.min_exemplos} para treinar${p.classes ? ` · ${p.classes} classe(s)` : ""}.
+Critérios para decidir no lugar do Jev: acurácia ≥ ${pct(C.acuracia_min)} e ganho ≥ ${pct(C.ganho_min)} sobre a maioria; concordância em sombra ≥ ${pct(C.concordancia_min)} em ${C.min_sombra} palpites.
+Hoje: ${p.sombra_n ? `${p.sombra_n} palpite(s) em sombra, ${pct(p.sombra_concorda)} iguais ao Jev` : "ainda sem palpites em sombra"}.${p.pronta_para_decidir ? "\nPronta: só uma chave sua liga o degrau na cascata (regra → aluno → Jev → LLM)." : ""}</div></div>
+        <span class="dir"><span class="bar"><i class="${ok ? "ok" : ""}" style="width:${Math.round(prog * 100)}%"></i></span> ${p.exemplos}/${C.min_exemplos}</span></li>`; }).join("")
+      || `<li class="vazio">Nenhuma pergunta com exemplos ainda.</li>`;
   } catch {}
 }
+$("#alunoLista").addEventListener("click", e => { const li = e.target.closest("li.abre"); if (!li) return; ALUNO_SEL = ALUNO_SEL === li.dataset.q ? null : li.dataset.q; document.querySelectorAll("#alunoLista li.abre").forEach(x => x.dataset.aberto = x.dataset.q === ALUNO_SEL ? 1 : 0); });
+$("#alunoTreinar").onclick = async e => { const b = e.target; b.disabled = true; b.textContent = "Treinando…"; try { await post("/api/aluno/treinar", {}); } catch {} await refreshAluno(); b.disabled = false; b.textContent = "Treinar agora"; };
 setInterval(refreshAluno, 30000); refreshAluno();
 async function refreshMedico() {
-  try {
-    const j = await (await fetch("/api/medico")).json();
-    const ab = j.abertos || [];
-    $("#medicoChip").textContent = ab.length ? `${ab.length} diagnóstico(s) aberto(s)` : "sem diagnóstico aberto";
-    $("#medicoTot").textContent = `${j.total || 0} diagnóstico(s) no total · ${j.fechados || 0} fechado(s) pelo sintoma · ${j.reaberturas || 0} reabertura(s) · ações em 24 h: ${j.acoes_24h}/${j.orcamento_dia}` +
-      (j.precisao != null ? ` · precisão das correções: ${Math.round(j.precisao * 100)}% (${j.corrigidos.feitos}/${j.corrigidos.itens})` : " · precisão: sem correção avaliada ainda");
-    $("#medicoLista").innerHTML = ab.map(d => `<li style="display:block"><span class="tag">${esc(d.status)}</span> <b>${esc(d.titulo)}</b> · ${d.vezes}× · ${esc(d.veredito.dono || "?")}${d.veredito.bloqueia ? " · bloqueia" : ""} → ${esc(d.acao || "")}${d.item_id ? ` · item #${d.item_id}` : ""}</li>`).join("")
-      || "<li class=\"sub\">Nenhum padrão aberto: erros isolados não viram diagnóstico; três iguais em uma hora, sim.</li>";
-  } catch {}
+  try { TRAVAS.medico = await (await fetch("/api/medico")).json(); renderTravas(); } catch {}
 }
 setInterval(refreshMedico, 20000); refreshMedico();
+async function refreshAprov() {
+  try { const j = await (await fetch("/api/aprovacoes")).json(); TRAVAS.aprov = j; window._aprov = j; renderTravas(); } catch {}
+}
+setInterval(refreshAprov, 15000); refreshAprov();
 // --- conexões ao vivo: Jev, Claude Code, LLM, GitHub e o batimento do loop, pulso a pulso
 const ROTULO_CX = {ok: "respondendo", instavel: "instável", fora: "fora", parado: "parado", limite: "no limite", ocioso: "sem chamada na última hora", sem_chave: "sem chave"};
 function cxHa(t, agora) { if (t == null) return ""; const d = Math.max(0, agora - t); return d < 60 ? `há ${Math.round(d)} s` : d < 3600 ? `há ${Math.round(d / 60)} min` : `há ${Math.round(d / 3600)} h`; }
@@ -1236,18 +1347,19 @@ setInterval(refreshConexoes, 3000); refreshConexoes();
 
 
 
+const PAPEL_NOME = {developer: "Desenvolvedor", estudo: "Arquiteto (estudo)", estudo_duvida: "Arquiteto (dúvidas)", planejador: "Gerente de produto", questionador: "Questionador", researcher: "Pesquisador", builder: "Construtor", improver: "Melhorador", rubric: "Régua", reflector: "Reflexão"};
 async function refreshConsumo() {
   try {
     const j = await (await fetch("/api/consumo?dias=14")).json();
     const f = n => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
-    $("#consTot").textContent = `modo ${j.modo === "ilimitado" ? "sem limite (medindo)" : "com limite"} · hoje ${f(j.hoje)} tokens · ${j.dias_completos} dia(s) completo(s) medido(s) · mediana ${f(j.mediana_dia)} · máximo ${f(j.maximo_dia)}` +
-      (j.sugestao_limite ? ` · sugestão de limite: ${f(j.sugestao_limite)} (p90)` : " · sugestão de limite: precisa de 3 dias completos");
+    $("#consTot").textContent = `${j.modo === "ilimitado" ? "sem limite (medindo)" : "com limite"} · hoje ${f(j.hoje)} tokens · mediana ${f(j.mediana_dia)}/dia em ${j.dias_completos} dia(s)`;
     const max = Math.max(1, ...j.por_dia.map(d => d.tokens));
     const hoje = j.por_dia.length ? j.por_dia[j.por_dia.length - 1].dia : "";
     $("#consDias").innerHTML = j.por_dia.map(d => `<div class="d ${d.dia === hoje ? "hoje" : ""}" title="${d.dia}: ${f(d.tokens)} tokens · ${d.llm} chamadas de LLM · ${d.jev} ao Jev"><b>${(d.tokens / 1000).toFixed(0)}k</b><i style="height:${Math.max(3, Math.round(70 * d.tokens / max))}px"></i><span>${d.dia.slice(8)}/${d.dia.slice(5, 7)}</span></div>`).join("") || "<span class=sub>sem dias medidos ainda</span>";
     const pico = j.por_hora.indexOf(Math.max(...j.por_hora));
-    $("#consPapeis").innerHTML = Object.entries(j.por_papel).map(([p, v]) => `<li><span class="tag">${esc(p)}</span> ${f(v.tokens)} tokens em ${v.chamadas} chamada(s) · maior ${f(v.maior_chamada)}${v.falhas ? ` · ${v.falhas} falha(s)` : ""}</li>`).join("") +
-      (j.por_hora.some(x => x) ? `<li><span class="tag">hora de pico</span> ${pico}h–${pico + 1}h concentra ${f(j.por_hora[pico])} tokens nos últimos ${j.dias} dias</li>` : "");
+    const tot = Object.values(j.por_papel).reduce((a, v) => a + (v.tokens || 0), 0) || 1;
+    $("#consPapeis").innerHTML = Object.entries(j.por_papel).sort((a, b) => b[1].tokens - a[1].tokens).slice(0, 5).map(([p, v]) => `<li><span class="pt" data-e="${v.falhas ? "warn" : "ok"}"></span><div class="tx"><b>${esc(PAPEL_NOME[p] || p)}</b> ${f(v.tokens)} tokens · ${v.chamadas} chamada(s)${v.falhas ? ` · ${v.falhas} falha(s)` : ""}</div><span class="dir"><span class="bar"><i style="width:${Math.round(100 * v.tokens / tot)}%"></i></span> ${Math.round(100 * v.tokens / tot)}%</span></li>`).join("") +
+      (j.por_hora.some(x => x) ? `<li class="vazio">Pico: ${pico}h–${pico + 1}h concentra ${f(j.por_hora[pico])} tokens em ${j.dias} dias${j.sugestao_limite ? ` · limite sugerido ${f(j.sugestao_limite)} (p90)` : ""}</li>` : "");
   } catch {}
 }
 setInterval(refreshConsumo, 30000); refreshConsumo();

@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.49.0 — 2026-10-20
+
+**Gestão do loop redesenhada: as quatro abas com o mesmo padrão — uma frase do que importa agora, quatro números,
+uma lista principal interativa e o resto recolhido.**
+
+- **Saúde e estado**: semáforo + 4 números (entregas em 24 h, fila, erros/reincidências, "esperando você"), *quem está
+  fazendo o quê* (dos passos ao vivo da equipe) e *o que está travando* (SRE, Médico do loop e aprovações numa lista
+  só, ou "nada travando"). Etapas do ciclo, execuções e saturação ficam recolhidas. O chat com o loop ao lado.
+- **Decisões (Jev First)**: 5 números (decisões, % sem LLM, confiança média, respostas do cache, versão do Jev),
+  perguntas das 24 h com barra de confiança, antes × depois do passe 1.47.0; **clicar numa decisão abre a pergunta
+  inteira que foi ao Jev** (texto, critérios sim/não ou opções, tipo), a resposta com probabilidades e o estado que foi
+  junto (`jev_lab.catalogar` grava o texto de cada pergunta ao perguntar; `GET /api/jev/decisao?id=`). Aluno do Jev
+  interativo: barra de progresso até os 120 exemplos, clique abre os critérios e a sombra, botão **Treinar agora**
+  (`POST /api/aluno/treinar`). Modelos de IA reduzidos aos 4 cartões, com as chamadas recolhidas.
+- **Autoevolução**: funil (perguntas válidas → itens → PRs no CI → mergeados → entregues) + 4 números; roteiro
+  compacto com filtros (ativos, entregues, dependem de você, desativados) e um clique abre detalhe, evidência, rastro e
+  o botão; perguntas do PO em uma linha com filtros por status e evidência ao clicar; Revisor e Memória do time viram
+  linhas recolhidas com o resumo no título.
+- **Segurança e confiança**: veredito + 4 números (Jev decide %, tokens hoje, reincidências, código em produção);
+  verificações que pedem atenção em cima, as ok recolhidas ("22 verificações ok"); consumo com barras por dia, os 5
+  papéis que mais gastam e o botão do orçamento; só lições e erros **abertos** à vista, o resto (todas as lições,
+  verificações, cérebros e neurônios) recolhido; autonomia e versões da política recolhidas.
+- Verificação "Saturação (orçamento)" no modo sem limite deixava de fazer sentido (226 % de um limite que não vale):
+  agora "Consumo de hoje (sem limite)", ok, com a sugestão de limite nos dados.
+- `/api/loop` traz entregas e fila das 24 h; nomes amigáveis para as perguntas do SRE, PO, Médico e Revisor.
+
 ## 1.48.0 — 2026-10-20
 
 **Equipe ao vivo mostra o que cada agente está fazendo, não só quem está trabalhando.**

@@ -141,9 +141,35 @@ def guardar(qid: str, q, state: Mapping[str, Any], decisao, jev=None, agora: flo
     _cache[_chave(qid, q, state, jev)] = (agora or time.time(), decisao)
 
 
+CATALOGO = "jev_catalogo"
+CATALOGO_MAX = 400
+
+
+def catalogar(store, questions: Mapping[str, Any]) -> None:
+    """A pergunta inteira como foi ao Jev (instrução, critérios, tipo), por nome: o painel mostra o texto completo."""
+    cat = dict(store.get(CATALOGO) or {})
+    mudou = False
+    for qid, q in questions.items():
+        crit = q.criteria if isinstance(q.criteria, dict) else (list(q.criteria) if q.criteria else None)
+        ent = {"tipo": q.kind, "texto": str(q.instructions)[:1200], "criterios": crit, "em": time.time()}
+        if cat.get(qid, {}).get("texto") != ent["texto"] or cat.get(qid, {}).get("criterios") != crit:
+            cat[qid] = ent
+            mudou = True
+    if mudou:
+        if len(cat) > CATALOGO_MAX:
+            cat = dict(sorted(cat.items(), key=lambda kv: -float(kv[1].get("em", 0)))[:CATALOGO_MAX])
+        store.set(CATALOGO, cat)
+
+
+def pergunta_completa(store, qid: str) -> dict | None:
+    cat = store.get(CATALOGO) or {}
+    return cat.get(qid)
+
+
 def preparar(store, jev, state: Mapping[str, Any], questions: Mapping[str, Any]) -> tuple[dict, dict]:
     """Perguntas a enviar (com as variantes em dobro) e o mapa {pergunta: variante_é_a_oficial}; respostas em cache
     saem do envio e voltam em `colher`."""
+    catalogar(store, questions)
     if getattr(jev, "source", "") != "jev":
         return dict(questions), {}
     at = ativas(store)
