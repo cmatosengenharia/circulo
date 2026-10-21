@@ -174,6 +174,8 @@ class CompatLLM:
 
 
 PISO_SAIDA = 8192            # teto mínimo de saída pedido ao Claude Code (ele erra em vez de cortar)
+TETO_SAIDA = 32_768          # até onde o teto sobe quando a resposta ainda passa dele
+ESTOUROU_TETO = re.compile(r"exceeded the \d+ output token maximum")
 
 
 class ContaDeslogada(RuntimeError):
@@ -197,18 +199,24 @@ class AssinaturaLLM:
         import tempfile
         from .conta import ambiente, erro_de_login
         env = ambiente()
-        # a API corta a resposta em max_tokens; o Claude Code ERRA ("exceeded the N output token maximum"). Por isso o
-        # teto vai folgado (nunca abaixo de PISO_SAIDA) e o texto é cortado aqui, por tamanho, como a API faria.
-        env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(PISO_SAIDA, 4 * int(max_tokens)))
         ferramentas = ["--allowedTools", "WebSearch,WebFetch", "--max-turns", str(2 * int(web_search) + 2)] if web_search \
             else ["--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch,Task,NotebookEdit", "--max-turns", "1"]
-        with tempfile.TemporaryDirectory(prefix="circulo-llm-") as vazio:
-            p = subprocess.run([self.cmd, "-p", "--output-format", "json", "--model", model, "--system-prompt", system, *ferramentas],
-                               input=prompt, capture_output=True, text=True, timeout=self.timeout, cwd=vazio, env=env)
-        try:
-            d = json.loads(p.stdout or "{}")
-        except json.JSONDecodeError:
-            d = {}
+        # a API corta a resposta em max_tokens; o Claude Code ERRA ("exceeded the N output token maximum"). Por isso o
+        # teto vai folgado (nunca abaixo de PISO_SAIDA), dobra até TETO_SAIDA se ainda estourar, e o texto é cortado
+        # aqui, por tamanho, como a API faria.
+        teto = min(TETO_SAIDA, max(PISO_SAIDA, 4 * int(max_tokens)))
+        while True:
+            env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(teto)
+            with tempfile.TemporaryDirectory(prefix="circulo-llm-") as vazio:
+                p = subprocess.run([self.cmd, "-p", "--output-format", "json", "--model", model, "--system-prompt", system, *ferramentas],
+                                   input=prompt, capture_output=True, text=True, timeout=self.timeout, cwd=vazio, env=env)
+            try:
+                d = json.loads(p.stdout or "{}")
+            except json.JSONDecodeError:
+                d = {}
+            if teto >= TETO_SAIDA or not ESTOUROU_TETO.search(str(d.get("result") or p.stderr or "")):
+                break
+            teto = min(TETO_SAIDA, 2 * teto)
         texto = str(d.get("result") or "")[: 6 * int(max_tokens)]          # ~4 caracteres por token, com folga
         if p.returncode != 0 or d.get("is_error") or not d:
             motivo = (texto or p.stderr or p.stdout or f"saída {p.returncode}")[-300:]
