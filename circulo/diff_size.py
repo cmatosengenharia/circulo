@@ -1,9 +1,11 @@
-"""Tamanho de um diff a partir do texto de `git diff --numstat`, sem chamar git: total de linhas e a causa
-dominante (categoria e arquivo que mais pesam)."""
+"""Tamanho de um diff a partir do texto de `git diff --numstat`: total de linhas e a causa dominante (categoria e
+arquivo que mais pesam). Só `numstat_contra_base` chama git; o resto é puro."""
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 from .merge_gate import MAX_LINES
 
@@ -66,6 +68,14 @@ def parse_numstat(texto: str) -> Tamanho:
         categoria_dominante=max(por_categoria, key=por_categoria.__getitem__, default=None),
         arquivo_dominante=maior.caminho if maior else None,
     )
+
+
+def numstat_contra_base(base: str, repo: str | Path = ".") -> str:
+    """`git diff --numstat` de HEAD contra o merge-base com `base`: só o que a branch mudou, não o que a base andou."""
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True).stdout
+
+    return git("diff", "--numstat", git("merge-base", base, "HEAD").strip(), "HEAD")
 
 
 @dataclass(frozen=True)
