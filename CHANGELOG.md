@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.58.0 — 2026-10-21
+
+**Falhas que não são do código deixam de reprovar código: CI bloqueado por cobrança e worktree órfão.**
+
+- **CI que nem começa** (`merge_gate`): job que falha em segundos, sem passos, com a anotação do GitHub "was not
+  started… spending limit / payments have failed" é marcado `nao_iniciado`. Se todos os checks falhos são assim,
+  o gate devolve "CI não iniciou", sem pedir conserto: antes o Developer consertava às cegas (PRs #48 e #49 fechados
+  depois de 2 consertos cada, e mais 4 rodadas `sem_mudanca`). O gate põe o Developer em espera (`self_dev_espera`,
+  1 h, "Precisa de você", sem atropelar espera mais importante), avisa uma vez e pede ao GitHub para refazer os jobs
+  do PR no máximo uma vez por hora — quando a cobrança volta, o PR anda sozinho. Main com CI não iniciado não vira
+  a lição "main vermelha".
+- **Erro pré-existente não reprova versão nova** (`corpo`): na prova dos primeiros giros, um erro cuja mensagem
+  (só letras, sem números e caminhos) já apareceu em `run_errors` nos 300 giros antes da troca não conta contra o
+  código novo. Era o que reprovou e1c3d1a e e9a1e1f: o erro vinha do worktree órfão, não deles. Erro novo continua
+  contando.
+- **Worktree órfão** (`self_dev._liberar_worktree`): diretório `.circulo-wt-N` que o git não reconhece mais fazia o
+  `git worktree add` falhar em todo giro (item 95, 5 vezes, etapa em quarentena). Agora `remove --force`, e se
+  sobrar, o diretório é movido para `.circulo-wt-orfaos/` (nunca apagado) e o `prune` limpa o registro.
+- `tests/test_ci_indisponivel.py`: 6 testes de regressão.
+
 ## 1.57.0 — 2026-10-21
 
 **Escala do aprendizado: decisor local destilado, itens por módulo e memória entre repositórios.**
