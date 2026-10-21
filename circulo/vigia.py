@@ -421,6 +421,11 @@ class Vigia:
         higiene.rodar(self.s, now)                               # expira "depende de você", encurta títulos, une lições iguais
         from . import capacidade
         cap = capacidade.rodar(self.s, self.ctx.dl, now)        # quem está sobrecarregado; sobe/desce trabalhadores
+        from . import conta
+        try:
+            conta.vigiar(self.s, self.ctx.reply, now)              # assinatura: sessão do Claude de pé, relogin quando cai
+        except (OSError, ValueError) as exc:
+            self.s.set("conta_sessao_erro", {"em": now, "erro": str(exc)[:200]})
         return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou, "medico": medico,
                 "capacidade": {"gargalo": (cap["gargalo"] or {}).get("agente"), "acoes": cap["acoes"]}}
 

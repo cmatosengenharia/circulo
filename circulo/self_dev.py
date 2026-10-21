@@ -193,9 +193,9 @@ class ClaudeCodeAgent:
         # Todo consumo do loop é pela API: o Claude Code recebe a ANTHROPIC_API_KEY e não depende do login da conta (sessão OAuth que expira sem ninguém para relogar). CIRCULO_CODE_AGENT_USA_API=0 volta ao login da assinatura.
         env = dict(os.environ)
         env.update(getattr(self, "ambiente_extra", None) or {})   # TRACEPARENT: o fio do item segue no Claude Code
-        if os.environ.get("CIRCULO_CODE_AGENT_USA_API", "1") == "0":
-            env.pop("ANTHROPIC_API_KEY", None)
-            env.pop("ANTHROPIC_WORKSPACE_ID", None)
+        if os.environ.get("CIRCULO_CODE_AGENT_USA_API", "1") == "0" or os.environ.get("CIRCULO_CONTA", "").lower() in ("max", "pro", "assinatura") or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+            for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):     # na assinatura (CIRCULO_CONTA=max) a chave da API venceria o login
+                env.pop(k, None)
         ferramentas = os.environ.get("CIRCULO_CODE_AGENT_FERRAMENTAS") or ",".join(FERRAMENTAS)
         # stream-json: cada ferramenta que o Claude Code usa chega na hora e vira um passo visível na Equipe ao vivo (`ouvinte`); o evento final `result` tem os mesmos campos do `--output-format json` de antes.
         # sessão contínua: a tentativa seguinte do mesmo item retoma a conversa do Claude Code (`--resume`) em vez de recomeçar do zero — ele já leu os arquivos, já sabe o que tentou. CIRCULO_CODE_AGENT_RESUME=0 desliga.
@@ -870,7 +870,7 @@ class SelfDeveloper:
 
 
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",
-            "CIRCULO_REPO", "CIRCULO_REPO_DIR")
+            "CIRCULO_REPO", "CIRCULO_REPO_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CIRCULO_CONTA")
 
 
 def ambiente_isolado() -> dict:

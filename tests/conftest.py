@@ -21,7 +21,7 @@ class Clock:
 def no_keys(monkeypatch):
     # testes são herméticos: nada de chave, repositório ou GitHub de verdade, mesmo rodando na máquina do loop
     for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",
-              "CIRCULO_REPO", "CIRCULO_REPO_DIR"):
+              "CIRCULO_REPO", "CIRCULO_REPO_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CIRCULO_CONTA", "CIRCULO_LLM_PROVEDOR"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("CIRCULO_SEM_DEVELOPER", "1")
 

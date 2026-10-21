@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.59.0 — 2026-10-21
+
+**O loop roda na assinatura do Claude (Max), sem a API, e cuida sozinho da sessão.**
+
+- **`CIRCULO_CONTA=max`** (`circulo/conta.py`): um interruptor só. Toda chamada de LLM passa a ser um `claude -p` com
+  o login da conta (`llm.AssinaturaLLM`, provedor `assinatura`, que vence o `CIRCULO_LLM_PROVEDOR`), e o Developer
+  também. A `ANTHROPIC_API_KEY` sai do ambiente desses processos, porque no Claude Code ela tem precedência sobre a
+  assinatura. Prompt pelo stdin, pasta vazia, sem ferramentas; quando o papel pede busca na web, só
+  WebSearch/WebFetch, e as URLs citadas viram citações. Um `CLAUDE_CODE_OAUTH_TOKEN` cadastrado também liga o modo.
+- **Guardião da sessão** (`conta.vigiar`, a cada passagem do SRE): roda `claude auth status` a cada 5 min, ou na hora
+  se o Developer acusou "deslogado". A primeira queda só é reconferida 1 min depois, porque o Claude Code costuma
+  renovar sozinho. Se continua caída, abre no Mac um Terminal com `claude auth login` (ou `claude setup-token`
+  quando o que venceu foi o token de 1 ano), no máximo a cada 2 h, e põe o pedido em "Precisa de você". Quando o
+  login volta, libera o Developer e avisa, sem ninguém mexer. Falso alarme do Developer (sessão de pé) libera na hora.
+- **Token de 1 ano**: `CLAUDE_CODE_OAUTH_TOKEN` (gerado por `claude setup-token`) entra no cadastro do painel. O
+  loop guarda só a impressão (sha256, 12 caracteres) e a data em que apareceu, e avisa 30 dias antes de vencer.
+- O diagnóstico mostra "assinatura do Claude · login <método>". Os testes do Developer e a suíte não herdam
+  `CLAUDE_CODE_OAUTH_TOKEN`, `CIRCULO_CONTA` nem `CIRCULO_LLM_PROVEDOR`.
+- `tests/test_conta.py`: 9 testes, com um `claude` falso no PATH.
+
 ## 1.58.0 — 2026-10-21
 
 **Falhas que não são do código deixam de reprovar código: CI bloqueado por cobrança e worktree órfão.**

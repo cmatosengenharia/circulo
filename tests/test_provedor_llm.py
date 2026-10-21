@@ -61,7 +61,7 @@ def test_provedor_compativel_traduz_o_porte_e_mede_o_uso(servidor_compat, monkey
 
 def test_provedores_conhecidos_tem_endereco_e_chave_proprios(monkeypatch):
     for nome, (base, var, peq, gra) in mod.PROVEDORES.items():
-        if nome in ("anthropic", "compat"):
+        if nome in ("anthropic", "compat", "assinatura"):     # assinatura: `claude -p`, sem endereço nem chave (test_conta)
             continue
         monkeypatch.setenv("CIRCULO_LLM_PROVEDOR", nome)
         monkeypatch.delenv("CIRCULO_LLM_BASE_URL", raising=False)

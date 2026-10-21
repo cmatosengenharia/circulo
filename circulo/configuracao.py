@@ -22,6 +22,8 @@ from pathlib import Path
 ENV_FILE = Path(os.environ.get("CIRCULO_ENV", Path.home() / ".config" / "circulo" / "env"))
 CHAVES = (
     ("TYPESAFE_API_KEY", "Jev real (TypeSafe). Sem ela: decisor local com o mesmo contrato."),
+    ("CIRCULO_CONTA", "Opcional: 'max' roda tudo na assinatura do Claude (Max/Pro) pelo Claude Code, sem a API; o loop cuida do login."),
+    ("CLAUDE_CODE_OAUTH_TOKEN", "Assinatura sem queda de sessão: rode `claude setup-token` no Mac (vale 1 ano) e cole aqui."),
     ("ANTHROPIC_API_KEY", "LLM: motor das missões, pesquisa na web, evolução do harness."),
     ("ANTHROPIC_WORKSPACE_ID", "Só se a chave da Anthropic não for de um workspace: o ID do workspace (wrkspc_...). Chave criada dentro de um workspace não precisa."),
     ("CIRCULO_LLM_PROVEDOR", "Opcional: qual API de IA a LLM usa — anthropic (padrão), openai, gemini, groq, mistral, deepseek, xai, openrouter, together, ollama ou compat."),
@@ -164,7 +166,12 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
         tem_sdk = False
     from .llm import chave_do_provedor, descricao, provedor
     prov, var = provedor(), chave_do_provedor()
-    if prov != "anthropic":
+    if prov == "assinatura":
+        from . import conta
+        st = conta.status() if testar_conexoes else {"logado": True, "metodo": "não testado (use --testar)"}
+        p.append(Peca("Motor das missões (LLM)", "ligado" if st["logado"] else "parado", f"assinatura do Claude · login {st['metodo']}",
+                      "" if st["logado"] else "Rode `claude auth login` no Mac, ou `claude setup-token` e cole o token no painel."))
+    elif prov != "anthropic":
         ok, det = _llm_ok() if testar_conexoes else (bool(not var or os.environ.get(var) or os.environ.get("CIRCULO_LLM_API_KEY")), descricao())
         p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else f"Preencha {var or 'CIRCULO_LLM_BASE_URL'}."))
     elif not os.environ.get("ANTHROPIC_API_KEY"):

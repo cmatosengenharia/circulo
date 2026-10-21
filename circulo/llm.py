@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -56,11 +57,15 @@ PROVEDORES: dict[str, tuple[str, str, str, str]] = {
     "together":   ("https://api.together.xyz/v1", "TOGETHER_API_KEY", "meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen3-235B-A22B-fp8"),
     "ollama":     ("http://127.0.0.1:11434/v1", "", "llama3.2", "qwen3:32b"),
     "compat":     ("", "CIRCULO_LLM_API_KEY", "", ""),
+    "assinatura": ("", "", "claude-haiku-5-5", "claude-sonnet-5-5"),     # `claude -p` com o login da conta (Max/Pro)
 }
 PORTE_ANTHROPIC = {"claude-haiku-5-5": "pequena", "claude-sonnet-5-5": "grande"}   # o harness pede nestes nomes
 
 
 def provedor() -> str:
+    from .conta import assinatura
+    if assinatura():          # CIRCULO_CONTA=max vence o provedor configurado: nada passa pela API
+        return "assinatura"
     return (os.environ.get("CIRCULO_LLM_PROVEDOR") or "anthropic").strip().lower()
 
 
@@ -168,8 +173,58 @@ class CompatLLM:
         return r.text, r.tokens
 
 
+class ContaDeslogada(RuntimeError):
+    """O `claude` respondeu que a sessão caiu: o guardião da conta (conta.vigiar) cuida do login."""
+
+
+class AssinaturaLLM:
+    """LLM pela assinatura: cada chamada é um `claude -p` com o login da conta, sem a chave da API no ambiente.
+    O prompt vai pelo stdin (sem limite de linha de comando); roda numa pasta vazia, sem ferramentas, exceto a busca
+    na web quando o papel pede (WebSearch/WebFetch do próprio Claude Code). As URLs citadas no texto viram citações."""
+
+    nome = "assinatura"
+    busca_web = True
+
+    def __init__(self, cmd: str = "claude", timeout: float = 600.0):
+        self.cmd, self.timeout = cmd, timeout
+        self.default_model = modelos_do_provedor("assinatura")["pequena"]
+
+    def generate(self, *, system, prompt, model, max_tokens, web_search=0):
+        import subprocess
+        import tempfile
+        from .conta import ambiente, erro_de_login
+        env = ambiente()
+        env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(int(max_tokens))
+        ferramentas = ["--allowedTools", "WebSearch,WebFetch", "--max-turns", str(2 * int(web_search) + 2)] if web_search \
+            else ["--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch,Task,NotebookEdit", "--max-turns", "1"]
+        with tempfile.TemporaryDirectory(prefix="circulo-llm-") as vazio:
+            p = subprocess.run([self.cmd, "-p", "--output-format", "json", "--model", model, "--system-prompt", system, *ferramentas],
+                               input=prompt, capture_output=True, text=True, timeout=self.timeout, cwd=vazio, env=env)
+        try:
+            d = json.loads(p.stdout or "{}")
+        except json.JSONDecodeError:
+            d = {}
+        texto = str(d.get("result") or "")
+        if p.returncode != 0 or d.get("is_error") or not d:
+            motivo = (texto or p.stderr or p.stdout or f"saída {p.returncode}")[-300:]
+            raise (ContaDeslogada if erro_de_login(motivo) else RuntimeError)(f"claude -p: {motivo}")
+        uso = d.get("usage") or {}
+        urls = list(dict.fromkeys(x.rstrip(".,;:!?") for x in re.findall(r"https?://[^\s)\]>\"']+", texto))) if web_search else []
+        return LLMResult(texto, 0, model, [{"url": x, "title": "", "cited_text": ""} for x in urls[:20]],
+                         entrada=int(uso.get("input_tokens", 0)), saida=int(uso.get("output_tokens", 0)),
+                         cache_lido=int(uso.get("cache_read_input_tokens", 0) or 0),
+                         cache_escrito=int(uso.get("cache_creation_input_tokens", 0) or 0))
+
+    def complete(self, system, prompt, max_tokens):
+        r = self.generate(system=system, prompt=prompt, model=self.default_model, max_tokens=max_tokens)
+        return r.text, r.tokens
+
+
 def build_llm():
     nome = provedor()
+    if nome == "assinatura":
+        import shutil
+        return AssinaturaLLM() if shutil.which("claude") else None
     if nome == "anthropic":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return None
@@ -187,4 +242,4 @@ def descricao() -> str:
     """Para o painel e o diagnóstico: provedor e modelos em uso, sem chave."""
     nome = provedor()
     m = modelos_do_provedor(nome)
-    return f"{nome} · pequena {m['pequena'] or '?'} · grande {m['grande'] or '?'}" + ("" if nome == "anthropic" else " · sem busca na web")
+    return f"{nome} · pequena {m['pequena'] or '?'} · grande {m['grande'] or '?'}" + ("" if nome in ("anthropic", "assinatura") else " · sem busca na web")
