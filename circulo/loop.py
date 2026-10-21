@@ -22,6 +22,7 @@ from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from . import guardrails
 from .engine import Engine
+from .estagnacao import anotar_giro, causa_provavel
 from .graph import MissionGraph
 from .harness_lab import HarnessLab
 from .reparo import build_developer
@@ -586,20 +587,20 @@ class Circle:
 
     def _vigiar_progresso(self, havia_trabalho: bool, antes: tuple, r) -> None:
         """Girar sem avançar é um erro de estrutura, não "tudo bem". Havia trabalho e nada mudou por ESTAGNADO giros:
-        vira lição (com a causa: as recusas de gasto), a confiança do painel cai e o ritmo vai para o descanso longo."""
+        vira lição (com a causa medida em estagnacao), a confiança do painel cai e o ritmo vai para o descanso longo."""
         s = self.store
         st = s.get("progresso") or {"sem": 0}
         if not havia_trabalho or self._progresso() != antes:
             if st.get("sem", 0) >= ESTAGNADO:
                 from .licoes import registrar as monitorar
                 monitorar(self.ctx, "loop:progresso", True, sujeito=f"voltou a avançar depois de {st['sem']} giros")
-            s.set("progresso", {"sem": 0, "ultimo_avanco_em": time.time(), "recusas": {}})
+            s.set("progresso", {"sem": 0, "ultimo_avanco_em": time.time(), "recusas": {}, "rodou": {}})
             return
         st["sem"] = int(st.get("sem", 0)) + 1
         st.setdefault("desde", time.time())
+        anotar_giro(st, r)
         if st["sem"] in (ESTAGNADO, ESTAGNADO * 5, ESTAGNADO * 25):
-            rec = st.get("recusas") or {}
-            causa = ", ".join(f"{t} recusado {n}x" for t, n in sorted(rec.items(), key=lambda kv: -kv[1])) or "sem recusa registrada"
+            causa = causa_provavel(st)
             from .licoes import registrar as monitorar
             monitorar(self.ctx, "loop:progresso", False, sujeito=f"{st['sem']} giros sem avançar",
                       motivo=f"havia trabalho pendente e nada avançou em {st['sem']} giros; causa provável: {causa}",
