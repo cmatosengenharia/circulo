@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.51.0 — 2026-10-21
+
+**Desfecho por decisão: o Jev passa a ver o que cada "sim" rendeu.**
+
+- **`circulo/desfecho.py`**, tabela `desfechos`: cada decisão de gastar (`worth_spending`) e de evoluir (`should_evolve`)
+  ganha depois o desfecho medido — PR proposto → entregue (quando o merge entra), estudo adotar/adaptar/contestar/
+  dispensado, item criado, aplicada/revertida, nada, falhou — com tokens gastos e duração. Fecha ao fim de cada
+  tarefa do giro (`intencoes.executar`), e o Developer, o estudo, o merge e a evolução enriquecem.
+- **O aluno do Jev treina no desfecho** quando ele existe: o rótulo medido ("rendeu"/"não rendeu") vence o rótulo do
+  Jev — de destilação para otimização.
+- **Tokens por PR mergeado** no topo da Saúde, com tendência contra ontem e quantas decisões já têm desfecho;
+  `GET /api/desfechos` (custo por resultado e taxa de acerto do "sim" por ação, hoje × ontem).
+- Teto de custo por item já existia (100 mil tokens → o fatiador divide; dividido duas vezes → descartado): agora o
+  desfecho registra o que esse custo rendeu, que é o número para calibrar o teto.
+
 ## 1.50.0 — 2026-10-20
 
 **O Escalador: quem está sobrecarregado, e mais trabalhadores em paralelo para quem pode.**

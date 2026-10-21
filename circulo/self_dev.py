@@ -120,9 +120,13 @@ def limite_ate(log: str, agora: float) -> float | None:
 
 def concluir_mergeados(store) -> int:
     n = 0
-    for r in store.q("SELECT number FROM prs WHERE status='mergeado'"):
-        n += store.run("UPDATE roadmap SET status='feito', evidencia=?, updated_at=? WHERE status='em_andamento' AND evidencia=?",
-                       (f"PR #{r['number']} mergeado", time.time(), f"PR #{r['number']}"))
+    for r in store.q("SELECT number, item_id FROM prs WHERE status='mergeado'"):
+        k = store.run("UPDATE roadmap SET status='feito', evidencia=?, updated_at=? WHERE status='em_andamento' AND evidencia=?",
+                      (f"PR #{r['number']} mergeado", time.time(), f"PR #{r['number']}"))
+        if k and store.one("SELECT 1 FROM sqlite_master WHERE name='desfechos'"):     # o "proposto" rendeu: virou entrega
+            store.x("UPDATE desfechos SET resultado='entregue', rendeu=1, updated_at=? WHERE acao='corrigir_codigo' AND (pr=? OR item_id=?) AND resultado IN ('proposto','nada')",
+                    (time.time(), r["number"], r["item_id"]))
+        n += k
     return n
 
 
@@ -601,6 +605,7 @@ class SelfDeveloper:
                     return DevResult(item["id"], "limite", f"limite de uso do Claude Code; volta às {hora}")
                 self._set_item(item["id"], "pendente", "o agente parou no meio; trabalho parcial guardado para continuar"
                                if guardado else "o agente terminou com erro sem produzir nada")
+                self._desfecho("falhou", item["id"])
                 return DevResult(item["id"], "agente_falhou", str(out.get("log", ""))[-300:])
             if not _git(["status", "--porcelain"], wt):
                 if item["origem"] == "erro":
@@ -673,6 +678,7 @@ class SelfDeveloper:
             self._retrato()
             self._set_item(item["id"], "em_andamento", f"PR #{pr}" if pr else f"commit na branch {branch} (sem remoto)")
             self.ctx.reply(f"Developer abriu correção para “{item['titulo']}”" + (f" (PR #{pr})." if pr else "."), "merge")
+            self._desfecho("proposto", item["id"], pr)
             return DevResult(item["id"], "proposto", ", ".join(changed), pr)
         finally:
             _git(["worktree", "remove", "--force", str(wt)], self.repo, check=False)
@@ -768,6 +774,23 @@ class SelfDeveloper:
                   motivo="" if sessoes < MAX_SESSOES else f"{sessoes} sessões sem terminar: o item é grande demais para uma sessão",
                   assinatura=None if sessoes < MAX_SESSOES else "developer:item_grande_demais", classe="trabalho")
         return True
+
+    def _desfecho(self, resultado: str, item_id: int, pr: int | None = None) -> None:
+        """O que a decisão de gastar com este item rendeu (tabela `desfechos`, mesmo contrato de desfecho.atualizar; o
+        Developer é constituição e grava direto)."""
+        agora = time.time()
+        if not self.s.one("SELECT 1 FROM sqlite_master WHERE name='desfechos'"):
+            return
+        tokens = int((self.s.one("SELECT COALESCE(SUM(tokens),0) t FROM llm_calls WHERE papel='developer' AND created_at>=? AND entrada LIKE ?",
+                                 (agora - 6 * 3600, f"%{(self.s.one('SELECT titulo FROM roadmap WHERE id=?', (item_id,)) or {'titulo': ''})['titulo'][:60]}%")) or {"t": 0})["t"] or 0)
+        r = self.s.one("SELECT id FROM desfechos WHERE acao='corrigir_codigo' AND (item_id=? OR (item_id IS NULL AND created_at>=?)) ORDER BY id DESC LIMIT 1", (item_id, agora - 120))
+        rendeu = 1 if resultado in ("proposto", "entregue") else 0
+        if r:
+            self.s.x("UPDATE desfechos SET resultado=?, item_id=?, pr=COALESCE(?, pr), tokens=?, rendeu=?, updated_at=? WHERE id=?", (resultado, item_id, pr, tokens, rendeu, agora, r["id"]))
+        else:
+            d = self.s.one("SELECT id, created_at FROM decisions WHERE question='worth_spending' AND estado LIKE '%\"action\": \"corrigir_codigo\"%' AND created_at>=? ORDER BY id DESC LIMIT 1", (agora - 7200,))
+            self.s.x("INSERT INTO desfechos(decision_id,question,acao,item_id,pr,resultado,tokens,duracao_s,rendeu,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                     (d["id"] if d else None, "worth_spending", "corrigir_codigo", item_id, pr, resultado, tokens, int(agora - d["created_at"]) if d else None, rendeu, agora, agora))
 
     def _set_item(self, item_id: int, status: str, evidencia: str) -> None:
         self.s.x("UPDATE roadmap SET status=?, evidencia=?, updated_at=? WHERE id=?", (status, evidencia, time.time(), item_id))

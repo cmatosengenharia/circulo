@@ -216,6 +216,8 @@ class Estudo:
         monitorar(self.ctx, "estudo:pedido", len(r["fontes"]) >= MIN_FONTES, sujeito=item["titulo"],
                   motivo="" if len(r["fontes"]) >= MIN_FONTES else f"só {len(r['fontes'])} fonte(s)", licao=False)
         self._salvar(item, r)
+        from . import desfecho
+        desfecho.atualizar(self.s, "estudar_pedido", r["veredito"], item_id=item["id"], tokens=int(out.tokens or 0))
         return r
 
     # ------------------------------------------------------------ aplicar o veredito

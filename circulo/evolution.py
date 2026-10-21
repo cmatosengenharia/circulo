@@ -267,6 +267,8 @@ class MetaLearner:
             return None
 
         pid = self._upsert(c, level, fp, "shadow" if verdict == "shadow" else "applied", json.dumps(review))
+        from . import desfecho
+        desfecho.evolucao(s, "applied", c.description)
         self.ctx.policies.add_version(new, "shadow" if verdict == "shadow" else "active", c.description, pid)
         if verdict != "shadow":
             self.ctx.policies.rebase_shadow(c.patch)  # shadow não pode perder o que o ativo aprendeu
@@ -387,6 +389,8 @@ class HealthMonitor:
             if violations or float(d.value) >= policy["thresholds"]["rollback"]:
                 restored = self.ctx.policies.rollback(f"saúde: viol={len(violations)} correção={rate:.0%} antes={rate_before:.0%}")
                 m["rolled_back"] = restored
+                from . import desfecho
+                desfecho.registrar(self.ctx.store, "should_evolve", "evoluir", "revertida")
                 self.ctx.reply(f"Rollback automático da política v{version} → v{restored}.", "saude")
                 from .licoes import registrar as monitorar
                 monitorar(self.ctx, "saude:rollback", False, sujeito=f"política v{version}",

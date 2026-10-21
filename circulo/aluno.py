@@ -176,8 +176,10 @@ class Modelo:
 # ------------------------------------------------------------------ treino
 def exemplos_de(store: Store, desde: float = 0.0, limite: int = 20000) -> dict[str, list[tuple[dict[int, float], str, float]]]:
     """Por pergunta: (features, rótulo do Jev, quando). Só decisões do Jev confiante e com o estado gravado."""
+    from .desfecho import rotulos
     por_q: dict[str, list] = {}
-    for r in store.q("SELECT question, value, estado, created_at FROM decisions WHERE source='jev' AND confidence>=? AND estado IS NOT NULL "
+    medidos = {q: rotulos(store, q, desde) for q in ("worth_spending", "should_evolve")}   # o que deu certo, quando se sabe
+    for r in store.q("SELECT id, question, value, estado, created_at FROM decisions WHERE source='jev' AND confidence>=? AND estado IS NOT NULL "
                      "AND created_at>? ORDER BY id DESC LIMIT ?", (CONF_PROFESSOR, desde, limite)):
         q = pergunta(r["question"])
         if q.startswith(IGNORAR):
@@ -185,7 +187,8 @@ def exemplos_de(store: Store, desde: float = 0.0, limite: int = 20000) -> dict[s
         estado = _estado(r["estado"])
         if not estado:
             continue
-        por_q.setdefault(q, []).append((features(estado), rotulo(json.loads(r["value"])), float(r["created_at"])))
+        medido = medidos.get(r["question"], {}).get(int(r["id"]))
+        por_q.setdefault(q, []).append((features(estado), medido if medido is not None else rotulo(json.loads(r["value"])), float(r["created_at"])))
     for q in por_q:
         por_q[q].sort(key=lambda e: e[2])        # do mais antigo ao mais novo: o holdout é o fim
     return por_q

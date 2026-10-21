@@ -1148,6 +1148,7 @@ function renderCamadas(v) {
     [`${E.prs || 0}`, `PR(s) mergeado(s) em 24 h · ${E.itens || 0} item(ns) entregue(s)`, E.prs ? "ok" : ""],
     [`${F.pendentes || 0}`, `na fila · ${F.em_andamento || 0} em andamento · ${F.prs_abertos || 0} PR(s) no CI`, ""],
     [`${H.erros_24h}`, `erro(s) em 24 h${H.reincidencias_24h ? ` · ${H.reincidencias_24h} reincidência(s)` : ""}${H.dur_ok != null ? ` · giro típico ${dur(H.dur_ok)}` : ""}`, H.erros_24h ? "warn" : "ok"],
+    [window._desf && window._desf.hoje.tokens_por_pr ? `${Math.round(window._desf.hoje.tokens_por_pr / 1000)} mil` : "—", `tokens por PR mergeado (24 h)${window._desf && window._desf.tendencia != null ? ` · ${window._desf.tendencia <= 0 ? "▼" : "▲"} ${Math.abs(Math.round(window._desf.tendencia * 100))}% vs ontem` : ""}${window._desf ? ` · ${window._desf.decisoes_com_desfecho} decisões com desfecho` : ""}`, window._desf && window._desf.tendencia != null ? (window._desf.tendencia <= 0 ? "ok" : "warn") : ""],
     [`${apr.total || 0}`, apr.total ? `<a class="mini" href="/aprovacoes">esperando você${apr.urgentes ? ` · ${apr.urgentes} urgente(s)` : ""} →</a>` : "nada esperando você", apr.urgentes ? "bad" : apr.total ? "warn" : "ok"],
   ].map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
   $("#etapas").innerHTML = v.etapas.map(e =>
@@ -1174,6 +1175,8 @@ function renderCapacidade(c) {
   el.innerHTML = (g ? `<b>Gargalo:</b> ${esc(g.nome)} — ocupado ${Math.round(g.ocupacao * 100)}% da última hora, ${g.fila} na fila${g.espera_s ? `, espera ${Math.round(g.espera_s / 60)} min` : ""}${g.sobrecarregado ? ` · <b style="color:var(--bad)">sobrecarregado</b>${g.escalavel ? "" : " (não escala: " + esc(g.porque) + ")"}` : ""}` : "<b>Escalador:</b> ninguém sobrecarregado")
     + (par.length ? ` · em paralelo: ${par.map(m => `${esc(m.nome)} ×${m.trabalhadores}`).join(", ")}` : "") + (c.acoes && c.acoes.length ? ` · agora: ${c.acoes.map(a => `${esc(a.agente)} ${a.acao === "subir" ? "↑" : "↓"}${a.para}`).join(", ")}` : "");
 }
+async function refreshDesfechos() { try { window._desf = await (await fetch("/api/desfechos")).json(); } catch {} }
+setInterval(refreshDesfechos, 30000); refreshDesfechos();
 async function refreshCapacidade() { try { renderCapacidade(await (await fetch("/api/capacidade")).json()); } catch {} }
 refreshCapacidade();
 async function refreshFazendo() {
