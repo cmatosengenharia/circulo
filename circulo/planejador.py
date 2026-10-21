@@ -21,6 +21,7 @@ Limites:
 from __future__ import annotations
 
 import json
+import re
 import random
 import sqlite3
 import time
@@ -69,13 +70,16 @@ arquiteto, auditor, cético, financeiro). Responda à pergunta com UM item de ro
 - caiba em um PR pequeno (até ~300 linhas) com teste de regressão;
 - tenha um critério de sucesso mensurável nos dados do próprio loop;
 - não altere nem cite a constituição (""" + ", ".join(CONSTITUICAO) + """): item que cita um desses caminhos é vetado;
-- não repita um item que já está no roteiro.
+- não repita um item que já está no roteiro;
+- diga o MÓDULO principal que muda (um caminho, ex.: "circulo/estudo.py"): o Developer escalado trabalha em paralelo
+  só em módulos distintos; item que mexe em muitos módulos deve ser dividido — proponha só a primeira parte.
 
 Marque a base do problema que o item resolve: "medido" (um número da evidência do loop mostra o problema), "inferido"
 (conclusão a partir da evidência) ou "chutado" (sem evidência). Inconclusivo não passa: item chutado é descartado.
 
 Responda só com JSON numa linha, sem markdown: {"titulo": "até 100 caracteres", "detalhe": "até 3 frases: o que mudar e onde",
-"sucesso": "métrica e alvo", "base": "medido|inferido|chutado", "dado": "o número da evidência que mostra o problema"}
+"sucesso": "métrica e alvo", "base": "medido|inferido|chutado", "dado": "o número da evidência que mostra o problema",
+"modulo": "circulo/arquivo.py"}
 Se a resposta já existe ou exige mexer na constituição, responda {"sem_item": "por quê, em 1 frase"}."""
 
 
@@ -324,9 +328,10 @@ class Planejador:
         detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (
             f"\nEvidência ({item['base']}): {item['dado']}" if item.get("dado") else "")
         detalhe = f"Pergunta do conselho #{pid} ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
-        rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
-                       "VALUES(?,?,'loop','pendente',?,?,?,?)",
-                       (titulo_curto(item["titulo"]), detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora))
+        rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo) "
+                       "VALUES(?,?,'loop','pendente',?,?,?,?,?)",
+                       (titulo_curto(item["titulo"]), detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora,
+                        modulo_de(item)))
         conselho.marcar(pid, "virou_item", rid)
         marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")
@@ -392,8 +397,17 @@ def _parse(texto: str) -> dict | None:
 
 
 def _item(d: dict) -> dict | None:
-    item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado")}
+    item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado", "modulo")}
     return item if item["titulo"] and item["detalhe"] else None
+
+
+_MODULO = re.compile(r"\b((?:circulo|fabrica|tests)/[\w/]+\.py)\b")
+
+
+def modulo_de(item: dict) -> str | None:
+    """O módulo principal do item: o que o Planejador declarou ou, faltando, o primeiro caminho citado no texto."""
+    m = _MODULO.search(item.get("modulo") or "") or _MODULO.search(f"{item.get('titulo', '')} {item.get('detalhe', '')}")
+    return m.group(1) if m else None
 
 
 def _status_http(exc: BaseException) -> int | None:

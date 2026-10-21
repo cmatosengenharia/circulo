@@ -633,7 +633,7 @@ class DecisionLayer:
         self.policy = policy
         self.budget = budget
         self.jev = jev or LocalJev()
-        self.local = LocalJev()
+        self.local = __import__("circulo.aluno_jev", fromlist=["AlunoJev"]).AlunoJev(self.s)   # reserva: aluno onde provou, regra no resto
         self.llm = llm
         self._local = threading.local()        # missão em atendimento, por thread (missões rodam em paralelo)
         self._default_project: int | None = None
@@ -992,9 +992,9 @@ DecisionLayer.remember = _remember
 
 def build_jev() -> JevClient:
     key = os.environ.get("TYPESAFE_API_KEY") or os.environ.get("JEV_API_KEY")
-    if key:
+    if key and os.environ.get("CIRCULO_DECISOR", "jev") != "aluno":
         return JevHttpClient(key, model=os.environ.get("JEV_MODEL", "jev-latest"))
-    return LocalJev()
+    return LocalJev()           # sem chave (ou CIRCULO_DECISOR=aluno): a reserva do DecisionLayer (aluno + regra) decide
 
 
 from .llm import AnthropicLLM, build_llm  # noqa: E402,F401 — reexport (compatibilidade)

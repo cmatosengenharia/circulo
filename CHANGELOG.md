@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.57.0 — 2026-10-21
+
+**Escala do aprendizado: decisor local destilado, itens por módulo e memória entre repositórios.**
+
+- **Aluno como decisor** (`circulo/aluno_jev.py`): a reserva do `DecisionLayer` passa a ser `AlunoJev` — nas
+  perguntas em que o aluno provou em sombra (concordância ≥ 95 % em ≥ 300 palpites) e com confiança ≥ 0,7, ele
+  responde (`source="aluno"`); nas outras, a regra determinística (`LocalJev`) responde como antes. Cascata
+  regra → aluno → Jev → LLM. `CIRCULO_DECISOR=aluno` liga o decisor local mesmo com a chave do Jev; sem chave, é o
+  padrão. O aluno nunca derruba uma decisão: qualquer erro dele cai na regra.
+- **Planejar por módulo**: o Planejador declara o módulo principal de cada item (`roadmap.modulo`, com o caminho
+  citado no texto como reserva — `modulo_de`) e divide item que mexe em muitos módulos. O Developer escalado
+  (`picks(n)`) não pega dois itens do mesmo módulo nem um módulo que um PR aberto já toca: paralelo sem conflito
+  na esteira.
+- **Memória entre repositórios** (`CIRCULO_MEMORIA_EXTERNA`: caminhos de `circulo.db` de outros loops): lições,
+  itens feitos e estudos deles entram no índice da memória do time em modo só leitura (`ref ext:<nome>:<id>`,
+  título com `[nome]`, peso ×0,7, cursor por banco). Um loop que cuida de vários repositórios aprende com todos;
+  banco indisponível não quebra o reindexar.
+- Configuração: `CIRCULO_DECISOR` e `CIRCULO_MEMORIA_EXTERNA` documentadas no `circulo configurar`.
+
 ## 1.56.0 — 2026-10-21
 
 **Produtização: o motor cuidando de qualquer repositório, container, e a Equipe como porta de entrada.**

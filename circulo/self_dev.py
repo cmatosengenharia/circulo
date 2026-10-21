@@ -371,18 +371,19 @@ class SelfDeveloper:
         return None
 
     def picks(self, n: int) -> list[dict]:
-        """Até n itens distintos da fila, na mesma ordem de prioridade do `pick`, sem repetir o que já está em andamento."""
-        out, vistos = [], set()
+        """Até n itens distintos da fila, na ordem do `pick`, sem repetir o que está em andamento e sem dois no MESMO
+        módulo (coluna `modulo`, que o Planejador grava) nem num módulo que um PR aberto já toca: paralelo sem conflito."""
+        out, ocupados = [], {a for pr in self.abertos() for a in json.loads(pr.get("arquivos") or "[]")}
         while len(out) < n:
-            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR +
-                            (f" AND id NOT IN ({','.join(str(i) for i in vistos)})" if vistos else "") + " ORDER BY ordem LIMIT 1")
+            vistos, args = {int(i["id"]) for i in out}, tuple(ocupados)
+            fora = (f" AND id NOT IN ({','.join(map(str, vistos))})" if vistos else "") + (" AND COALESCE(modulo,'') NOT IN (%s)" % ",".join("?" * len(args)) if args else "")
+            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + fora + " ORDER BY ordem LIMIT 1", args)
                  or self.s.one("SELECT * FROM roadmap WHERE origem IN ('pedido_cassio','loop') AND status='pendente' AND COALESCE(desativado,0)=0 "
-                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR +
-                               (f" AND id NOT IN ({','.join(str(i) for i in vistos)})" if vistos else "") + " ORDER BY ordem LIMIT 1"))
+                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + fora + " ORDER BY ordem LIMIT 1", args))
             if not r:
                 break
             out.append(dict(r))
-            vistos.add(int(r["id"]))
+            ocupados |= {r["modulo"]} if r["modulo"] else set()
         return out
 
     def run_paralelo(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:

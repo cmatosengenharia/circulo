@@ -32,6 +32,8 @@ CHAVES = (
     ("GITHUB_TOKEN", "Token fine-grained só do repo circulo (Contents, Pull requests, Checks: leitura e escrita)."),
     ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
     ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
+    ("CIRCULO_DECISOR", "Opcional: 'aluno' faz o decisor local (aluno destilado onde provou + regra) responder mesmo com a chave do Jev."),
+    ("CIRCULO_MEMORIA_EXTERNA", "Opcional: caminhos (vírgula) de circulo.db de outros loops; lições, itens e estudos deles entram na memória do time (só leitura)."),
     ("OTEL_EXPORTER_OTLP_ENDPOINT", "Opcional: coletor OpenTelemetry (ex.: Grafana Cloud, Tempo, Jaeger) que recebe os traços dos giros por OTLP/HTTP."),
     ("OTEL_EXPORTER_OTLP_HEADERS", "Opcional: cabeçalhos do coletor no formato do OpenTelemetry (ex.: Authorization=Basic%20...)."),
 )
