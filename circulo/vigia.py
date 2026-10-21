@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import threading
 import time
 from typing import Any, Callable
@@ -371,6 +372,12 @@ class Vigia:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def _registrar_erro(self, exc: BaseException) -> None:
+        try:
+            self.s.set("vigia_erro", {"em": time.time(), "erro": repr(exc)[:300], "seguidos": int((self.s.get("vigia_erro") or {}).get("seguidos", 0)) + 1})
+        except (sqlite3.Error, OSError, ValueError):
+            pass
+
     # --- uma passagem
     def rodar(self, now: float | None = None) -> dict:
         now = now or time.time()
@@ -517,8 +524,9 @@ class Vigia:
             while not self._stop.wait(self.intervalo):
                 try:
                     self.rodar()
-                except Exception:  # noqa: BLE001 — o Vigia nunca derruba o loop
-                    pass
+                    self.s.set("vigia_erro", None)
+                except Exception as exc:  # noqa: BLE001 — o Vigia nunca derruba o loop, mas o erro fica visível
+                    self._registrar_erro(exc)
         self._thread = threading.Thread(target=laco, name="vigia", daemon=True)
         self._thread.start()
 

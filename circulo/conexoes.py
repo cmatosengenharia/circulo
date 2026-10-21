@@ -46,9 +46,9 @@ def preparar(store: Store) -> None:
 def pulso(store: Store, servico: str, ok: bool, ms: float | None = None, erro: str | None = None) -> None:
     """Uma chamada externa aconteceu. Nunca grava chave: só o texto do erro, cortado."""
     preparar(store)
-    store.x("INSERT INTO conexoes(servico,ok,ms,erro,created_at) VALUES(?,?,?,?,?)",
-            (servico, 1 if ok else 0, int(ms) if ms is not None else None, (erro or None) and str(erro)[:200], time.time()))
-    if store.db.execute("SELECT COUNT(*) FROM conexoes").fetchone()[0] % 500 == 0:
+    rid = store.x("INSERT INTO conexoes(servico,ok,ms,erro,created_at) VALUES(?,?,?,?,?)",
+                  (servico, 1 if ok else 0, int(ms) if ms is not None else None, (erro or None) and str(erro)[:200], time.time()))
+    if rid % 500 == 0:          # pelo rowid (sem COUNT na conexão compartilhada fora do lock: duas threads chamam isto)
         store.x("DELETE FROM conexoes WHERE created_at<?", (time.time() - GUARDA_DIAS * 86400,))
 
 

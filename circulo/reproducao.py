@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -169,3 +170,34 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ------------------------------------------------------------ ambiente e worktree (usados pelo Developer, pelo corpo e pelo reparo)
+SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",
+            "CIRCULO_REPO", "CIRCULO_REPO_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CIRCULO_CONTA")
+
+
+def ambiente_isolado() -> dict:
+    """Ambiente dos testes do Developer: sem chaves, sem repositório e com o Developer desligado.
+    Sem isso, um teste que cria um loop acordaria outro Developer de verdade (Claude Code dentro de Claude Code)."""
+    env = {k: v for k, v in os.environ.items() if k not in SEGREDOS}
+    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0"})
+    return env
+
+
+def git_silencioso(args: list, cwd, check: bool = False) -> str:
+    p = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+    if check and p.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {(p.stdout + p.stderr).strip()[-500:]}")
+    return p.stdout.strip()
+
+
+def liberar_worktree(repo: Path, wt: Path) -> None:
+    """Caminho do worktree livre; diretório que o git não reconhece (sobra de rollback) vai para `.circulo-wt-orfaos/`, nunca apagado."""
+    if wt.exists():
+        git_silencioso(["worktree", "remove", "--force", str(wt)], repo, check=False)
+    if wt.exists():
+        (wt.parent / ".circulo-wt-orfaos").mkdir(exist_ok=True)
+        shutil.move(str(wt), str(wt.parent / ".circulo-wt-orfaos" / f"{wt.name}-{int(time.time() * 1000)}"))
+    git_silencioso(["worktree", "prune"], repo, check=False)
+

@@ -83,10 +83,18 @@ def proximo(ctx, dev, planejador) -> int | None:
     if item is None:
         return None
     motivo = motivo_de_dividir(s, item["id"])
-    if motivo and planejador is not None:
-        partes = planejador.dividir(item, ultimo_erro(s, item["id"]) or motivo)
+    if motivo:
+        partes = planejador.dividir(item, ultimo_erro(s, item["id"]) or motivo) if planejador is not None else []
         if partes:
             return _dividir(ctx, item, partes, motivo)
+        # precisa dividir e ninguém dividiu (sem LLM, JSON inválido): o item sai da fila com o motivo, em vez de ser
+        # pego a cada giro, cortado sem chamar o agente e devolvido (gastava uma divisão por tentativa, ou travava a fila)
+        s.x("UPDATE roadmap SET status='pendente', evidencia=?, desativado=1, updated_at=? WHERE id=?",
+            (f"depende de você: precisa ser dividido ({motivo[:160]}) e o Planejador não conseguiu", time.time(), item["id"]))
+        if callable(getattr(ctx, "reply", None)):
+            ctx.reply(f"Developer: “{item['titulo'][:80]}” precisa ser dividido ({motivo[:100]}) e o Planejador não conseguiu; "
+                      "o item ficou desativado para você decidir.", "saude")
+        return None
     return item["id"]
 
 

@@ -231,12 +231,15 @@ class MergeGate:
         self._vigiar_main()
         for pr in abertos:
             self._passo(f"PR #{pr['number']}: conferindo CI, revisor e tamanho")
-            v = self.evaluate(pr)
+            try:
+                v = self.evaluate(pr)
+                if v.merge:
+                    merged, msg = self.gh.merge(v.number, v.sha, pr.get("title", f"PR #{v.number}"))
+                    if not merged:
+                        v = Verdict(v.number, v.sha, False, f"GitHub recusou o merge: {msg}", v.details)
+            except (urllib.error.URLError, OSError, ValueError, KeyError) as exc:   # um PR com erro de API não bloqueia os outros
+                v = Verdict(pr["number"], pr.get("head_sha", ""), False, f"erro ao avaliar: {exc}"[:200], {"erro_api": True})
             self._passo(f"PR #{v.number}: {'merge' if v.merge else v.reason[:90]}")
-            if v.merge:
-                merged, msg = self.gh.merge(v.number, v.sha, pr.get("title", f"PR #{v.number}"))
-                if not merged:
-                    v = Verdict(v.number, v.sha, False, f"GitHub recusou o merge: {msg}", v.details)
             self._log(v)
             out.append(v)
         return out

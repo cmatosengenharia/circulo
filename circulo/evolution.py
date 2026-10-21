@@ -80,6 +80,8 @@ class MetaLearner:
             if n < 2 or cat not in policy["categories"]:
                 continue
             with_tok = [r for r in resolved if tok in tokens_of(r["description"])]
+            if not with_tok:                 # token só em receitas corrigidas: nada resolvido para medir (antes: ZeroDivisionError a cada giro)
+                continue
             consistency = sum(r["category"] == cat for r in with_tok) / len(with_tok)
             already = all((LocalJev.match_rule(r["description"], policy["rules"]) or {}).get("category") == cat for r in with_tok)
             if already or consistency < 0.75:

@@ -518,7 +518,8 @@ class Store:
         # Uma conexão compartilhada entre as threads do loop (missões evoluem em paralelo):
         # toda operação passa pelo mesmo lock, e uma transação segura o lock do começo ao fim.
         self.lock = threading.RLock()
-        self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
+        # timeout 30 s: o painel/SRE em processo próprio escreve enquanto o loop segura uma transação (antes, 5 s → "database is locked")
+        self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False, timeout=30.0)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
@@ -558,6 +559,9 @@ class Store:
             if col not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         self.db.execute("CREATE INDEX IF NOT EXISTS trail_run ON trail(run_id)")
+        # `decisions` cresce uma linha por pergunta e é varrida por pergunta/data em toda passagem (indagador, perguntas, jev_lab)
+        self.db.execute("CREATE INDEX IF NOT EXISTS decisions_q_em ON decisions(question, created_at)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS decisions_em ON decisions(created_at)")
 
     # ---------- utilidades ----------
     def tx(self):
@@ -648,15 +652,24 @@ class _Tx:
 
     def __enter__(self):
         self.lock.acquire()
-        self.nested = self.db.in_transaction
-        if not self.nested:
-            self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self.nested = self.db.in_transaction
+            if not self.nested:
+                self.db.execute("BEGIN IMMEDIATE")
+        except BaseException:          # BEGIN falhou (outro processo segura a escrita): o lock não pode vazar
+            self.lock.release()
+            raise
         return self
 
     def __exit__(self, exc_type, exc, tb):
         try:
             if not self.nested:
-                self.db.execute("ROLLBACK" if exc_type else "COMMIT")
+                try:
+                    self.db.execute("ROLLBACK" if exc_type else "COMMIT")
+                except sqlite3.Error:
+                    if self.db.in_transaction:      # COMMIT falhou (disco, I/O): não deixa a transação aberta para sempre
+                        self.db.execute("ROLLBACK")
+                    raise
         finally:
             self.lock.release()
         return False

@@ -34,7 +34,14 @@ class AlunoJev:
                 p = None
             if p and float(p[1]) >= self.conf_min:
                 rot, conf = p
-                valor: Any = rot if q.kind == "choice" else (float(rot) if q.kind == "score" else (0.5 + conf / 2 if rot == "true" else 0.5 - conf / 2))
+                if q.kind == "choice":
+                    valor: Any = rot
+                elif q.kind == "score":
+                    valor = float(rot)
+                elif rot in ("true", "false"):           # rótulo de desfecho
+                    valor = 0.5 + conf / 2 if rot == "true" else 0.5 - conf / 2
+                else:                                     # noul comum: o aluno prevê a probabilidade ("0.9"), não "true"
+                    valor = float(rot)
                 out[qid] = Decision(qid, q.kind, valor, float(conf), "aluno", {"_aluno": True})
                 self.respondidas += 1
             else:

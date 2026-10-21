@@ -74,11 +74,14 @@ class TickResult:
 class Circle:
     def __init__(self, data_dir: str | Path = "data", jev: JevClient | None = None, llm: LLMClient | None = None,
                  now: Callable[[], datetime] | None = None, db_path: str | None = None,
-                 gate: MergeGate | None = None, self_dev: SelfDeveloper | None = None, metricas: Metricas | None = None):
-        self.data_dir = Path(data_dir)
+                 gate: MergeGate | None = None, self_dev: SelfDeveloper | None = None, metricas: Metricas | None = None,
+                 dono: bool = True):
+        """`dono=False`: segundo processo sobre o mesmo banco (controle, `circulo dev`): não recupera eventos, não devolve
+        itens do Developer à fila nem restaura snapshot — isso é do loop que roda (antes, reinício do controle duplicava PR)."""
+        self.data_dir, self.dono = Path(data_dir), dono
         self.metricas = metricas if metricas is not None else METRICAS
         from .guardrails import restaurar_se_pedido
-        restaurado = restaurar_se_pedido(self.data_dir, Path(db_path or (self.data_dir / "circulo.db")))   # rollback de dados pedido pelo corpo
+        restaurado = restaurar_se_pedido(self.data_dir, Path(db_path or (self.data_dir / "circulo.db"))) if dono else None   # rollback de dados pedido pelo corpo
         store = Store(db_path or (self.data_dir / "circulo.db"))
         if restaurado:
             store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('saude',?,?,0)", (f"Banco restaurado do snapshot {Path(restaurado['snapshot']).name} ({restaurado['motivo']}).", time.time()))
@@ -115,7 +118,7 @@ class Circle:
         self.engine.graph = self.graph
         self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
         self.self_dev = self_dev if self_dev is not None else build_developer(self.ctx)
-        if self.self_dev is not None:
+        if self.self_dev is not None and dono:
             self.self_dev.recuperar()
             self.self_dev.concluir_mergeados()
         from .budget import tirar_assinatura_do_orcamento
@@ -134,7 +137,7 @@ class Circle:
         self.incidents.licoes = self.licoes
         finance.base(store)
         ensure_seed(store)
-        recovered = store.recover_interrupted()
+        recovered = store.recover_interrupted() if dono else []
         if recovered:
             store.set("last_recovery", {"events": recovered, "at": time.time()})
         self._stop = threading.Event()
@@ -203,8 +206,7 @@ class Circle:
             guardrails.check_stagnation(s, ctx.reply)
         finance.age_open_transactions(s)
 
-        # 1) pedido (prioridade) ou 2) evolução natural
-        ev = s.claim_next_event()
+        ev = s.claim_next_event()   # 1) pedido (prioridade) ou 2) evolução natural
         if ev:
             r.handled_event = ev["id"]
             payload = json.loads(ev["payload"])
@@ -215,8 +217,7 @@ class Circle:
             seguro(jobs.registrar, ctx, ev["id"])   # o job do pedido: regra calibrada; 'desconhecido' antes da LLM
             seq = None
             try:
-                # write-ahead: a intenção entra na trilha antes; sem registro, o pedido não é executado
-                seq = intencoes.registrar(s, f"pedido:{ev['kind']}", "pedido seu na fila vem antes da evolução natural",
+                seq = intencoes.registrar(s, f"pedido:{ev['kind']}", "pedido seu na fila vem antes da evolução natural",   # write-ahead: a intenção entra na trilha antes; sem registro, o pedido não é executado
                                           {"evento": ev["id"], "texto": str(payload.get("text") or payload.get("pedido") or "")[:200]},
                                           regra="regra: a fila de pedidos tem prioridade")
                 with s.tx():
@@ -244,8 +245,7 @@ class Circle:
                     self.incidents.record("idle", exc, circulo_pid)
         seguro(self.planejador.no_giro)          # pergunta reagendada após 5xx/timeout volta no giro em que vence
 
-        # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar). Modo seguro congela os níveis 2 e 3: só a saúde roda.
-        stages = [("licoes", self.licoes.revisar), ("health", self.health.check)]
+        stages = [("licoes", self.licoes.revisar), ("health", self.health.check)]   # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar). Modo seguro congela os níveis 2 e 3: só a saúde roda.
         if not ctl["modo_seguro"]:
             self.meta.so_dominio = self.licoes.bloqueia_evolucao()
             stages = [("meta", self.meta.step), ("shadow", self.shadow.evaluate)] + stages
@@ -299,8 +299,7 @@ class Circle:
         pid = self.ctx.dl.project_id
         proj = self.store.one("SELECT kit, nome FROM projects WHERE id=?", (pid,)) if pid else None
         if proj is not None and proj["kit"] == "circulo":
-            # falar com o loop: vira pedido seu no roteiro do próprio loop
-            now = time.time()
+            now = time.time()   # falar com o loop: vira pedido seu no roteiro do próprio loop
             ordem = (self.store.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
             item = self.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                                 (payload["text"][:160], payload["text"][:600], "pedido_cassio", "pendente", "pedido pelo painel", ordem, now, now))

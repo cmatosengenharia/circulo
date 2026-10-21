@@ -36,7 +36,12 @@ from typing import Protocol
 from .agents import Ctx
 from .budget import TZ
 from .merge_gate import protegidos
+from .reproducao import SEGREDOS, ambiente_isolado, liberar_worktree
+
 from .revisor import MAX_PRS_ABERTOS
+
+_liberar_worktree = liberar_worktree
+__all__ = ["SEGREDOS", "ambiente_isolado", "SelfDeveloper", "DevResult", "build_self_dev"]   # reexport para corpo e reparo
 
 EST_TOKENS = 40_000
 # item rejeitado pelo Revisor por cruzar com um PR aberto espera aquele PR fechar antes de voltar à fila do Developer
@@ -240,6 +245,10 @@ class ClaudeCodeAgent:
                             pass
             err = p.stderr.read() if p.stderr else ""
             p.wait()
+        except BaseException:                 # erro lendo o stream: o Claude Code não pode continuar editando um worktree que vai sumir
+            p.kill()
+            p.wait()
+            raise
         finally:
             morto.cancel()
         return data, "".join(linhas) + (err or "")
@@ -267,16 +276,6 @@ def _git_env() -> dict:
 
 
 _REPO_LOCK = threading.RLock()     # fetch/worktree no repositório principal: um de cada vez (trabalhadores em paralelo)
-
-
-def _liberar_worktree(repo: Path, wt: Path) -> None:
-    """Caminho do worktree livre; diretório que o git não reconhece (sobra de rollback) vai para `.circulo-wt-orfaos/`, nunca apagado."""
-    if wt.exists():
-        _git(["worktree", "remove", "--force", str(wt)], repo, check=False)
-    if wt.exists():
-        (wt.parent / ".circulo-wt-orfaos").mkdir(exist_ok=True)
-        shutil.move(str(wt), str(wt.parent / ".circulo-wt-orfaos" / f"{wt.name}-{int(time.time() * 1000)}"))
-    _git(["worktree", "prune"], repo, check=False)
 
 
 def _git(args: list[str], cwd: Path, check: bool = True) -> str:
@@ -556,10 +555,12 @@ class SelfDeveloper:
         self.agent.ouvinte = lambda txt: _fazendo(self.s, passo=txt)
         sessao = self._sessao(item_id)
         _fazendo(self.s, passo="Claude Code: retomando a sessão anterior deste item" if sessao else "Claude Code: começando a sessão")
+        import inspect
         try:
-            out = self.agent.run(task, wt, sessao=sessao) if sessao else self.agent.run(task, wt)
-        except TypeError:                                   # agente antigo/falso sem o parâmetro
-            out = self.agent.run(task, wt)
+            aceita_sessao = "sessao" in inspect.signature(self.agent.run).parameters
+        except (TypeError, ValueError):
+            aceita_sessao = False
+        out = self.agent.run(task, wt, sessao=sessao) if (sessao and aceita_sessao) else self.agent.run(task, wt)
         if isinstance(out, dict):
             if out.get("sessao"):
                 self._guardar_sessao(item_id, out["sessao"])
@@ -733,10 +734,18 @@ class SelfDeveloper:
                          (pr, kit_project_id(self.s, "circulo"), item["titulo"], branch, "aberto", item["id"],
                           json.dumps(changed), time.time(), time.time()))
             self._retrato()
-            self._set_item(item["id"], "em_andamento", f"PR #{pr}" if pr else f"commit na branch {branch} (sem remoto)")
+            if pr:
+                self._set_item(item["id"], "em_andamento", f"PR #{pr}")
+            elif has_remote:                 # remoto sem GitHub configurado: "em andamento" para sempre não; volta à fila com o motivo
+                self._set_item(item["id"], "pendente", f"depende de você: commit na branch {branch} sem PR (configure GITHUB_TOKEN e CIRCULO_REPO)")
+            else:
+                self._set_item(item["id"], "em_andamento", f"commit na branch {branch} (sem remoto)")
             self.ctx.reply(f"Developer abriu correção para “{item['titulo']}”" + (f" (PR #{pr})." if pr else "."), "merge")
             self._desfecho("proposto", item["id"], pr)
             return DevResult(item["id"], "proposto", ", ".join(changed), pr)
+        except Exception as exc:             # timeout dos testes, GitHub 4xx depois do push…: o item volta à fila, não fica preso
+            self._set_item(item["id"], "pendente", f"falha interna do Developer: {exc!r}"[:300])
+            raise
         finally:
             _git(["worktree", "remove", "--force", str(wt)], self.repo, check=False)
 
@@ -867,18 +876,6 @@ class SelfDeveloper:
         arquivos = json.loads(r["arquivos"]) if r["arquivos"] else []
         texto = f"{detalhe}; consertos: {r['consertos'] or 0}" + (f"; última revisão: {r['motivo']}" if r["motivo"] else "")
         mem.episodio(r["item_id"], pr, resultado, r["titulo"] or "", texto, arquivos)
-
-
-SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "TYPESAFE_API_KEY", "JEV_API_KEY", "GITHUB_TOKEN",
-            "CIRCULO_REPO", "CIRCULO_REPO_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CIRCULO_CONTA")
-
-
-def ambiente_isolado() -> dict:
-    """Ambiente dos testes do Developer: sem chaves, sem repositório e com o Developer desligado.
-    Sem isso, um teste que cria um loop acordaria outro Developer de verdade (Claude Code dentro de Claude Code)."""
-    env = {k: v for k, v in os.environ.items() if k not in SEGREDOS}
-    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0"})
-    return env
 
 
 def build_self_dev(ctx: Ctx) -> SelfDeveloper | None:

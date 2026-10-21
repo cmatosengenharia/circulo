@@ -31,6 +31,14 @@ def _rows(rows):
     return [dict(r) for r in rows]
 
 
+def _int(q: dict, nome: str, padrao: int) -> int:
+    """Parâmetro inteiro da query; lixo vira o padrão (antes: `int("x")` derrubava a requisição sem resposta)."""
+    try:
+        return int((q.get(nome) or [padrao])[0])
+    except (TypeError, ValueError):
+        return padrao
+
+
 def estado(store: Store, projeto: int | None = None) -> dict:
     s = store
     now = time.time()
@@ -55,7 +63,8 @@ def estado(store: Store, projeto: int | None = None) -> dict:
     violations = finance.check_invariants(s)
 
     snap = finance.snapshot(s)
-    kit = s.one("SELECT kit FROM projects WHERE id=?", (projeto,))["kit"] if projeto else "financas"
+    linha_kit = s.one("SELECT kit FROM projects WHERE id=?", (projeto,)) if projeto else None
+    kit = (linha_kit["kit"] if linha_kit else None) if projeto else "financas"      # projeto inexistente: tela vazia, não 500
     projetos = [] if kit != "financas" else [{
         "nome": "Finanças da família",
         "kit": "financas",
@@ -250,6 +259,8 @@ def make_handler(db_path: str):
             self.wfile.write(body)
 
         def do_GET(self):
+            if not self._host_local():            # DNS rebinding: nenhuma rota (estado, execuções, memória) sai para outro Host
+                return self._json({"erro": "proibido"}, 403)
             u = urlparse(self.path)
             q = parse_qs(u.query)
             projeto = int(q["projeto"][0]) if q.get("projeto", [""])[0].isdigit() else None
@@ -355,7 +366,7 @@ def make_handler(db_path: str):
             elif u.path == "/api/jev/decisao":
                 from .jev_lab import pergunta_completa
                 st = self._store()
-                did = int((q.get("id") or ["0"])[0])
+                did = _int(q, "id", 0)
                 r = st.one("SELECT id, tick, question, value, confidence, source, created_at, probabilidades, estado FROM decisions WHERE id=?", (did,))
                 if not r:
                     self._json({"erro": "decisão não encontrada"}, 404)
@@ -379,7 +390,7 @@ def make_handler(db_path: str):
                 self._json({"total": r["total"], "urgentes": r["urgentes"]} if q.get("so") == ["n"] else r)
             elif u.path == "/api/consumo":
                 from .budget import consumo
-                self._json(consumo(self._store(), int((q.get("dias") or ["14"])[0])))
+                self._json(consumo(self._store(), max(1, min(_int(q, "dias", 14), 365))))
             elif u.path == "/api/memoria":
                 from .memoria import Memoria
                 self._json(Memoria(self._store()).resumo())
@@ -400,7 +411,7 @@ def make_handler(db_path: str):
                 ex = execucao(self._store(), u.path.rsplit("/", 1)[1])
                 self._json(ex if ex else {"erro": "execução não encontrada"}, 200 if ex else 404)
             elif u.path == "/api/eventos":
-                self._sse(int(q.get("desde", ["0"])[0] or 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
+                self._sse(_int(q, "desde", 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
                 self._json({"erro": "não encontrado"}, 404)
 
@@ -520,12 +531,16 @@ def make_handler(db_path: str):
             # Proteção contra outro site no seu navegador mandando comandos: exige cabeçalho próprio
             # (força preflight CORS, que este servidor nunca aprova) e origem local.
             origin = self.headers.get("Origin", "")
-            if self.headers.get("X-Circulo") != "1" or (origin and not origin.startswith(("http://127.0.0.1", "http://localhost"))):
+            origem_local = not origin or urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1")   # não `startswith`: localhost.evil.com
+            if self.headers.get("X-Circulo") != "1" or not origem_local or not self._host_local():
                 return self._json({"erro": "proibido"}, 403)
             try:
-                data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0) or b"{}")
-            except json.JSONDecodeError:
+                tamanho = int(self.headers.get("Content-Length") or 0)
+                data = json.loads(self.rfile.read(min(tamanho, 1_000_000)) or b"{}")
+            except (json.JSONDecodeError, ValueError):
                 return self._json({"erro": "json inválido"}, 400)
+            if not isinstance(data, dict):
+                return self._json({"erro": "corpo precisa ser um objeto"}, 400)
             store = self._store()
             u = urlparse(self.path)
             if u.path in ("/api/controle", "/api/parada"):

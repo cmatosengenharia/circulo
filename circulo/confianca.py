@@ -333,18 +333,27 @@ def registrar_frescor(store: Store, atraso_ms: float) -> bool:
     e o SLO é o p99 das últimas 24 h, não a média nem a última leitura. A verificação roda no máximo 1 vez por
     minuto; p99 acima de FRESCOR_MAX_MS vira lição."""
     now = time.time()
-    if atraso_ms == atraso_ms:            # NaN não é medição
-        sid = store.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (max(0.0, float(atraso_ms)), now))
-        if sid % 500 == 0:
-            store.x("DELETE FROM frescor WHERE em < ?", (now - 2 * 86400,))
+    import math
+    try:
+        atraso_ms = float(atraso_ms)
+    except (TypeError, ValueError):
+        return False
+    if not math.isfinite(atraso_ms) or atraso_ms < 0 or atraso_ms > 600_000:
+        return False                      # NaN/inf/negativo ou aba parada por mais de 10 min (Mac dormiu): não é medição do painel
+    sid = store.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso_ms, now))
+    if sid % 500 == 0:
+        store.x("DELETE FROM frescor WHERE em < ?", (now - 2 * 86400,))
     ultimo = store.get("painel_frescor_em") or 0
     if now - float(ultimo) < 60:
         return False
     store.set("painel_frescor_em", now)
     from .licoes import Licoes
-    f99 = p99([r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=?", (now - 86400,))]) or 0
-    ok = 0 <= atraso_ms and f99 <= FRESCOR_MAX_MS
+    amostras = [r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=?", (now - 86400,))]
+    if len(amostras) < 100:
+        return False                      # com poucas amostras o p99 é o máximo: uma aba em segundo plano viraria lição
+    f99 = p99(amostras) or 0
+    ok = f99 <= FRESCOR_MAX_MS
     Licoes(store).verificar("painel:frescor", ok, sujeito=f"p99 24 h {f99:.0f} ms",
                             motivo="" if ok else f"painel atrasado: p99 {f99:.0f} ms em 24 h (meta {FRESCOR_MAX_MS} ms)",
-                            assinatura=None if ok else "painel:frescor_atrasado", classe="estrutural")
+                            assinatura=None if ok else "painel:frescor_atrasado", classe="ambiente")
     return True
