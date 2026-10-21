@@ -173,6 +173,9 @@ class CompatLLM:
         return r.text, r.tokens
 
 
+PISO_SAIDA = 8192            # teto mínimo de saída pedido ao Claude Code (ele erra em vez de cortar)
+
+
 class ContaDeslogada(RuntimeError):
     """O `claude` respondeu que a sessão caiu: o guardião da conta (conta.vigiar) cuida do login."""
 
@@ -194,7 +197,9 @@ class AssinaturaLLM:
         import tempfile
         from .conta import ambiente, erro_de_login
         env = ambiente()
-        env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(int(max_tokens))
+        # a API corta a resposta em max_tokens; o Claude Code ERRA ("exceeded the N output token maximum"). Por isso o
+        # teto vai folgado (nunca abaixo de PISO_SAIDA) e o texto é cortado aqui, por tamanho, como a API faria.
+        env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(PISO_SAIDA, 4 * int(max_tokens)))
         ferramentas = ["--allowedTools", "WebSearch,WebFetch", "--max-turns", str(2 * int(web_search) + 2)] if web_search \
             else ["--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch,Task,NotebookEdit", "--max-turns", "1"]
         with tempfile.TemporaryDirectory(prefix="circulo-llm-") as vazio:
@@ -204,7 +209,7 @@ class AssinaturaLLM:
             d = json.loads(p.stdout or "{}")
         except json.JSONDecodeError:
             d = {}
-        texto = str(d.get("result") or "")
+        texto = str(d.get("result") or "")[: 6 * int(max_tokens)]          # ~4 caracteres por token, com folga
         if p.returncode != 0 or d.get("is_error") or not d:
             motivo = (texto or p.stderr or p.stdout or f"saída {p.returncode}")[-300:]
             raise (ContaDeslogada if erro_de_login(motivo) else RuntimeError)(f"claude -p: {motivo}")
