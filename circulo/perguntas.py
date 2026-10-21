@@ -421,7 +421,7 @@ def gerar(ctx) -> list[int]:
     else:
         texto, tokens = llm.complete(GERAR_SYSTEM, prompt, 1200)
     ctx.budget.charge(tokens, "llm")
-    novas = (objeto(texto, "perguntas") or {}).get("perguntas") or []
+    novas = objeto(texto, lambda d: d["perguntas"] if isinstance(d.get("perguntas"), list) and d["perguntas"] else None) or []
     from .decision import norm
     ja = {norm(t) for t in existentes}
     ids = []
@@ -476,7 +476,7 @@ def personas_da_missao(ctx, tipo: str, pedido: str) -> dict[str, str]:
     else:
         texto, tokens = llm.complete(PERSONAS_MISSAO_SYSTEM, prompt, 500)
     ctx.budget.charge(tokens, "llm")
-    lista = (objeto(texto, "personas") or {}).get("personas") or []
+    lista = objeto(texto, lambda d: d["personas"] if isinstance(d.get("personas"), list) and d["personas"] else None) or []
     agora = time.time()
     for p in lista[:4]:
         chave = str(p.get("chave") or "").strip().lower().replace(" ", "_")[:40]

@@ -238,8 +238,11 @@ class Estudo:
 
 
 def _parse(texto: str) -> dict | None:
-    d, cortado = objeto_ou_corte(texto, "veredito")
-    if d is None or d.get("veredito") not in ("adotar", "adaptar", "contestar"):
+    return objeto_ou_corte(texto, _aceita)
+
+
+def _aceita(d: dict, cortado: bool) -> dict | None:
+    if d.get("veredito") not in ("adotar", "adaptar", "contestar"):
         return None
     if cortado:
         if not d.get("justificativa"):
