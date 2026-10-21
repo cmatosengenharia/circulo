@@ -41,3 +41,39 @@ def test_higiene_expira_dependentes_encurta_titulos_e_une_licoes(circle):
     assert s.one("SELECT status FROM licoes WHERE id=?", (b,))["status"] == "unida" and s.one("SELECT ocorrencias FROM licoes WHERE id=?", (a,))["ocorrencias"] == 21
     assert higiene.rodar(s) is None                                                  # uma vez por hora
     assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'Higiene:%'")["n"] == 1
+
+
+INCIDENTE_42 = ('d_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"background":0,"foreground":0,"unset":0},'
+                '"started_in_background":0,"max_depth":0,"spawned_by_subagents":0,"completed":0,"failed":0,"killed":{"parent":0,'
+                '"user":0,"system":0},"refused":{"depth_limit":0,"concurrency_limit":0,"budget":0},"by_type":{}},"is_error":true,'
+                '"num_turns":1,"subtype":"success","api_error_status":null,"result":"Failed to authenticate: OAuth session expired '
+                'and could not be refreshed","type":"result","duration_ms":37,"uuid":"8585be98-286f-4d47-9ea9-12e2d2845dae",'
+                '"queued_turn_count":0,"result_index":0}')
+CHAVES_DO_JSON = ("d_reason", "subagent_stats", "sdk_opt_in", "fast_mode", "spawned", "requested", "num_turns", "uuid")
+
+
+def test_licao_42_nenhum_corte_do_log_json_do_agente_vira_assinatura_crua():
+    """Lição #42: o log do Claude Code cortado em qualquer ponto (sem a aspa inicial, sem o `is_error`) virava uma
+    lição por posição do corte. Toda janela do log tem de dar uma causa classificada, nunca chaves do JSON."""
+    for tam in (60, 120, 200, 300, 600):
+        for ini in range(0, len(INCIDENTE_42) - tam + 1, 7):
+            janela = INCIDENTE_42[ini:ini + tam]
+            sig = assinatura_de("developer:agente", janela)
+            assert not any(k in sig for k in CHAVES_DO_JSON), (janela, sig)
+            if "Failed to authenticate" in janela:
+                assert sig == "developer:agente:deslogado", (janela, sig)
+    fast = 's","fast_mode_state":"off","fast_mode_disabled_reason":"sdk_opt_in_required","subagent_stats":{"spawned":0,"requested":{"background":0,"foregr'
+    assert causa_de_json(fast, "developer:agente") == "agente_falhou"                 # a lição #18: o mesmo erro, outro corte
+    estudo = 'resposta sem JSON válido: tps://x/556","base":"inferido"}]'             # JSON de outro ponto não vira causa do agente
+    assert assinatura_de("estudo:pedido", estudo) == "estudo:pedido:resposta sem json válido: tps://x/n base:inferido"
+
+
+def test_licao_42_higiene_une_a_licao_cuja_descricao_perdeu_a_aspa_inicial(circle):
+    s = circle.store
+    agora = time.time()
+    dona = s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,created_at,updated_at) VALUES('developer:agente:agente_falhou','developer:agente','trabalho','developer:agente: agente falhou','p','aberta',2,0,?,?)", (agora, agora))
+    velha = s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,created_at,updated_at) VALUES(?,'developer:agente','trabalho',?,'p','em_correcao',18,0,?,?)",
+                ('developer:agente:d_reason:sdk_opt_in_required subagent_stats: spawn', "developer:agente: " + INCIDENTE_42[:200], agora, agora))
+    assert higiene.rodar(s, forcar=True)["licoes_unidas"] == 1
+    assert s.one("SELECT status FROM licoes WHERE id=?", (velha,))["status"] == "unida"
+    assert s.one("SELECT ocorrencias FROM licoes WHERE id=?", (dona,))["ocorrencias"] == 20
