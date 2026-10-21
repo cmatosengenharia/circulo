@@ -17,13 +17,9 @@ from test_estudo import Pesquisa, pedido  # noqa: F401
 def test_desenvolvedor_pode_rodar_testes_lint_e_git_de_leitura_sozinho(monkeypatch, tmp_path):
     visto = {}
 
-    def falso_run(cmd, **kw):
-        visto["cmd"] = cmd
-
-        class P:
-            returncode, stdout, stderr = 0, '{"usage":{"input_tokens":1,"output_tokens":1}}', ""
-        return P()
-    monkeypatch.setattr("subprocess.run", falso_run)
+    from test_fazendo import RESULT, FakePopen
+    FakePopen.eventos = [RESULT]
+    monkeypatch.setattr("circulo.self_dev.subprocess.Popen", lambda cmd, **kw: visto.update(cmd=cmd) or FakePopen(cmd, **kw))
     monkeypatch.delenv("CIRCULO_CODE_AGENT_FERRAMENTAS", raising=False)
     ClaudeCodeAgent().run("tarefa", tmp_path)
     i = visto["cmd"].index("--allowedTools")

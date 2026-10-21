@@ -62,3 +62,36 @@ def resumo(store: Store, projeto: int | None = None) -> list[dict]:
     return [dict(r) for r in store.q(
         f"SELECT modelo, COUNT(*) chamadas, SUM(tokens) tokens, SUM(decidido_por='jev') pelo_jev, SUM(aceita=1) aceitas, "
         f"SUM(aceita IS NOT NULL) avaliadas, SUM(ok=0) falhas, AVG(duracao_ms) ms FROM llm_calls{pf} GROUP BY modelo ORDER BY chamadas DESC", pa)]
+
+
+# ---------------------------------------------------------------- o Claude Code em streaming: cada ferramenta vira um passo
+def passo_do_evento(ev: dict) -> str | None:
+    """Traduz um evento `stream-json` do Claude Code num passo legível (ou None se não é um passo)."""
+    if ev.get("type") != "assistant":
+        return None
+    for b in (ev.get("message") or {}).get("content") or []:
+        if b.get("type") != "tool_use":
+            continue
+        nome, inp = str(b.get("name") or ""), b.get("input") or {}
+        arq = str(inp.get("file_path") or inp.get("path") or inp.get("pattern") or "")
+        arq = arq.rsplit("/.circulo-wt-", 1)[-1].split("/", 1)[-1] if ".circulo-wt-" in arq else arq
+        if nome in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+            return f"Claude Code: {'escrevendo' if nome == 'Write' else 'editando'} {arq}"
+        if nome == "Read":
+            return f"Claude Code: lendo {arq}"
+        if nome in ("Grep", "Glob"):
+            return f"Claude Code: procurando {arq or inp.get('pattern', '')}"
+        if nome == "Bash":
+            cmd = str(inp.get("command") or "")
+            if "pytest" in cmd:
+                return "Claude Code: rodando os testes"
+            if "ruff" in cmd:
+                return "Claude Code: rodando o lint"
+            if cmd.startswith("git "):
+                return f"Claude Code: git {cmd.split()[1] if len(cmd.split()) > 1 else ''}"
+            return f"Claude Code: {cmd[:60]}"
+        return f"Claude Code: {nome}"
+    for b in (ev.get("message") or {}).get("content") or []:
+        if b.get("type") == "text" and str(b.get("text") or "").strip():
+            return "Claude Code: " + str(b["text"]).strip().splitlines()[0][:100]
+    return None

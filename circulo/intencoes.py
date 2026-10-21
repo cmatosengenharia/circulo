@@ -52,12 +52,16 @@ def concluir(store: Store, seq: int, ok: bool, detalhe: str = "") -> int:
 def executar(store: Store, acao: str, fn: Callable[[], Any], motivo: str, entradas: Any = None, ator: str = "loop",
              regra: str = "") -> Any:
     seq = registrar(store, acao, motivo, entradas, ator, regra)      # se isto falhar, a ação não roda
+    from . import fazendo
+    fazendo.marcar(store, acao, motivo)                               # a Equipe ao vivo vê o que começou
     try:
         out = fn()
     except Exception as exc:
         concluir(store, seq, False, repr(exc))
+        fazendo.terminar(store, acao, f"falhou: {type(exc).__name__}")
         raise
     concluir(store, seq, True)
+    fazendo.terminar(store, acao, "ok")
     return out
 
 

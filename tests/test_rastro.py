@@ -139,14 +139,12 @@ def test_developer_grava_elos_e_leva_o_traceparent(circle, repo):  # noqa: F811
 
 
 def test_claude_code_recebe_o_traceparent_no_ambiente(monkeypatch, tmp_path):
-    import subprocess as sp
     from circulo.self_dev import ClaudeCodeAgent
     visto = {}
 
-    def fake_run(*a, **k):
-        visto.update(k["env"])
-        return sp.CompletedProcess(a, 0, stdout="{}", stderr="")
-    monkeypatch.setattr("circulo.self_dev.subprocess.run", fake_run)
+    from test_fazendo import RESULT, FakePopen
+    FakePopen.eventos = [RESULT]
+    monkeypatch.setattr("circulo.self_dev.subprocess.Popen", lambda cmd, **k: visto.update(k["env"]) or FakePopen(cmd, **k))
     ag = ClaudeCodeAgent()
     ag.ambiente_extra = {"TRACEPARENT": traceparent("item:1")}
     ag.run("x", tmp_path)
