@@ -23,7 +23,7 @@ CONSTITUICAO_PODE_IMPORTAR = {
     "self_dev": {"agents", "licoes", "neuronios", "projects", "rastro", "registro", "reproducao", "revisor"},
 }
 ATUADORES = {"self_dev", "merge_gate", "corpo", "loop"}
-SOBEM_O_LOOP = {"cli", "demo", "confianca"}       # confianca só lê uma constante (ESTAGNADO)
+SOBEM_O_LOOP = {"cli", "demo", "confianca", "controle"}   # confianca só lê uma constante (ESTAGNADO); controle é um ponto de entrada (painel + SRE em processo próprio)
 MAX_LINHAS = 1000
 TETO_JARDIM = {"except_exception": 64, "noqa": 51, "funcoes_longas": 14, "modulos_grandes": 1, "todo": 8}
 

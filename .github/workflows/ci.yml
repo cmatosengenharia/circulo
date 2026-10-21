@@ -123,3 +123,11 @@ jobs:
           CIRCULO_PROP_N: ${{ steps.n.outputs.n }}
           CIRCULO_PROP_SEED: ${{ github.run_id }}
         run: pytest -q tests/test_propriedades_financeiras.py
+
+  container:
+    name: Container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Imagem constrói (sem rodar; sem chaves)
+        run: docker build -q -t circulo:ci . >/dev/null

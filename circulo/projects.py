@@ -96,9 +96,13 @@ def ensure_seed(store: Store) -> None:
     if not store.one("SELECT 1 FROM projects WHERE kit='financas'"):
         store.x("INSERT INTO projects(nome,pedido,tipo,kit,status,proposito,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 ("Finanças da família", FINANCAS_PEDIDO, "financas", "financas", "ativo", PROPOSITO["financas"], now, now))
+    import os
+    nome_kit, pedido_kit = os.environ.get("CIRCULO_NOME"), os.environ.get("CIRCULO_PEDIDO")
     if not store.one("SELECT 1 FROM projects WHERE kit='circulo'"):
         store.x("INSERT INTO projects(nome,pedido,tipo,kit,status,proposito,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                ("O Loop", CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
+                (nome_kit or "O Loop", pedido_kit or CIRCULO_PEDIDO, "circulo", "circulo", "ativo", PROPOSITO["circulo"], now, now))
+    elif nome_kit:                                          # `circulo init` de outro repositório: o projeto zero é ele
+        store.x("UPDATE projects SET nome=?, pedido=COALESCE(?, pedido) WHERE kit='circulo'", (nome_kit, pedido_kit))
     store.x("UPDATE projects SET nome='O Loop' WHERE kit='circulo' AND nome='O próprio círculo'")
     # projetos criados antes do motor genérico passam a ser atendidos por ele
     store.x("UPDATE projects SET kit='geral', status='ativo' WHERE status='aguardando_kit'")

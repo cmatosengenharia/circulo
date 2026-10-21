@@ -127,7 +127,9 @@ def confianca(store: Store, now: float | None = None) -> dict:
         usado = int(bud["tokens"] or 0)
         frac = usado / limite
         if modo_orcamento(s) == "ilimitado":                     # sem limite: medindo, nada satura
-            ck.append(_c("orcamento", "agora", "Consumo de hoje (sem limite)", "ok", f"{usado:,} tokens".replace(",", "."),
+            escolhido = (s.get("orcamento_limite") or {}).get("limite")
+            ref = f" (referência escolhida: {int(escolhido):,})" if escolhido else ""
+            ck.append(_c("orcamento", "agora", "Consumo de hoje (sem limite)", "ok", f"{usado:,} tokens{ref}".replace(",", "."),
                          "modo medindo: nada é cortado; o limite será definido com os dados", now,
                          projecao="ver Consumo de tokens para a sugestão de limite (p90)"))
         else:

@@ -273,7 +273,7 @@ class DeveloperComReparo(SelfDeveloper):
         self._base_quebrada = f"base quebrada: {causa} já falha na main; nenhuma chamada ao agente"
         return self._base_quebrada
 
-    def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
+    def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer", item_id: int | None = None) -> dict:
         if self._rodada == 0 and papel == "developer" and not self._consertando and not PREFIXO_TITULO.match(titulo):
             quebrada = self._preflight(wt, titulo)
             if quebrada:
@@ -285,7 +285,7 @@ class DeveloperComReparo(SelfDeveloper):
         self._rodada += 1
         modos = self._travar(wt)
         try:
-            return super()._agente(task, wt, titulo, papel)
+            return super()._agente(task, wt, titulo, papel, item_id=item_id)
         finally:
             self._destravar(modos)
             self._reverter(wt, titulo)
@@ -416,4 +416,4 @@ class DeveloperComReparo(SelfDeveloper):
 def build_developer(ctx) -> DeveloperComReparo | None:
     """O Developer do loop, com o reparo limitado. Mesmas condições do `build_self_dev` (nunca dentro de testes)."""
     dev = build_self_dev(ctx)
-    return None if dev is None else DeveloperComReparo(ctx, dev.repo, dev.agent, dev.gh)
+    return None if dev is None else DeveloperComReparo(ctx, dev.repo, dev.agent, dev.gh, test_cmd=dev.test_cmd, lint_cmd=dev.lint_cmd)

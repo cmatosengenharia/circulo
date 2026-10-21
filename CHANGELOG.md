@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.56.0 — 2026-10-21
+
+**Produtização: o motor cuidando de qualquer repositório, container, e a Equipe como porta de entrada.**
+
+- **`circulo init <pasta>`** (`circulo/kit.py`): lê o "kit" do repositório em `[tool.circulo]` do `pyproject.toml` dele
+  (nome, `protegidos` = constituição, `testes`, `lint`, `checks` do gate, `pedido`) ou usa padrões; descobre o remoto
+  do GitHub; escreve no repositório o workflow de CI (job `Testes`, se não houver nenhum) e o CODEOWNERS da
+  constituição; grava as variáveis no arquivo de configuração do loop sem tocar nas chaves; diz os próximos passos
+  (`configurar`, `diagnostico`, `instalar`).
+- O motor lê a constituição e os checks do repositório cuidado (`merge_gate.protegidos()`, `required_checks()`,
+  `CIRCULO_PROTEGIDOS`, `CIRCULO_REQUIRED_CHECKS`), e o Developer roda os testes e o lint dele (`CIRCULO_TEST_CMD`,
+  `CIRCULO_LINT_CMD`); o projeto zero ganha o nome e o pedido do kit (`CIRCULO_NOME`, `CIRCULO_PEDIDO`).
+- **Container**: `Dockerfile` (python 3.12 + Claude Code), `ops/entrypoint.sh` (equivalente ao launchd/systemd:
+  `circulo --data /dados run --painel`), `docker-compose.yml` (chaves por `env_file`, nunca na imagem; dados em
+  volume; repositório montado em `/repo`). Construído no CI; o Mac continua como está.
+- **Equipe ao vivo como entrada** (`CIRCULO_ENTRADA=equipe`, que o `init` já grava): `/` abre a equipe; a Gestão do
+  loop fica como cockpit do operador no menu.
+- Correção: o Developer de produção (`DeveloperComReparo`) passa `item_id` ao agente — a sessão contínua da 1.52.0
+  vale também lá.
+- Correção: na Segurança e confiança, com orçamento sem limite, a verificação de consumo mostra o limite de
+  referência que você escolheu no painel (antes o valor escolhido sumia).
+
 ## 1.55.0 — 2026-10-21
 
 **Plano de controle em processo próprio.** Painel, SRE (travas), Médico, Higiene e Escalador saem do processo do

@@ -41,6 +41,17 @@ DEVELOPER_BRANCH_PREFIX = "circulo/fix-"   # PRs do Developer precisam trazer te
 DOCS_BRANCH_PREFIX = "circulo/docs-"       # PRs do Redator técnico: só docs/, nada de código por essa porta
 
 
+def protegidos() -> tuple[str, ...]:
+    """A constituição do repositório que o loop cuida: a deste repo por padrão; `CIRCULO_PROTEGIDOS` (vírgulas) para outro."""
+    v = os.environ.get("CIRCULO_PROTEGIDOS", "").strip()
+    return tuple(x.strip() for x in v.split(",") if x.strip()) or CONSTITUICAO
+
+
+def required_checks() -> tuple[str, ...]:
+    v = os.environ.get("CIRCULO_REQUIRED_CHECKS", "").strip()
+    return tuple(x.strip() for x in v.split(",") if x.strip()) or REQUIRED_CHECKS
+
+
 def tem_teste(files: list[str]) -> bool:
     return any(f.startswith("tests/") or f.split("/")[-1].startswith("test_") for f in files)
 
@@ -71,7 +82,7 @@ def touches_protected(files: list[str]) -> list[str]:
 
 
 def touches_constitution(files: list[str]) -> list[str]:
-    return _match(files, CONSTITUICAO)
+    return _match(files, protegidos())
 
 
 def touches_money(files: list[str]) -> list[str]:
@@ -85,7 +96,7 @@ def checks_ok(runs: list[dict]) -> tuple[bool, str]:
         prev = latest.get(r["name"])
         if prev is None or (r.get("id", 0) > prev.get("id", 0)):
             latest[r["name"]] = r
-    missing = [n for n in REQUIRED_CHECKS if n not in latest]
+    missing = [n for n in required_checks() if n not in latest]
     if missing:
         return False, f"checks ausentes: {', '.join(missing)}"
     pending = [n for n, r in latest.items() if r.get("status") != "completed"]
@@ -94,7 +105,7 @@ def checks_ok(runs: list[dict]) -> tuple[bool, str]:
     bad = [n for n, r in latest.items() if r.get("conclusion") not in ("success", "skipped", "neutral")]
     if bad:
         return False, f"checks falhando: {', '.join(bad)}"
-    if any(latest[n].get("conclusion") != "success" for n in REQUIRED_CHECKS):
+    if any(latest[n].get("conclusion") != "success" for n in required_checks()):
         return False, "check obrigatório não passou com sucesso"
     return True, "ok"
 

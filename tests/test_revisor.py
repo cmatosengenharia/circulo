@@ -137,8 +137,8 @@ def test_main_que_andou_e_quebra_o_pr_e_rejeitada_antes_de_empurrar(circle, repo
     dev = SelfDeveloper(circle.ctx, repo, QuebraNaMainNova(), gh, test_cmd=cmd)
     original = dev._agente
 
-    def agente_e_main_anda(task, wt, titulo):
-        out = original(task, wt, titulo)
+    def agente_e_main_anda(task, wt, titulo, **kw):
+        out = original(task, wt, titulo, **kw)
         # ...mas enquanto o agente trabalhava a main corrigiu soma (a + b): o PR quebra na main de agora
         (repo / "app.py").write_text("def soma(a, b):\n    return a + b\n")
         git(repo, "add", "-A")

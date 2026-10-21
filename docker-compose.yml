@@ -1,0 +1,12 @@
+# docker compose up -d  →  painel em http://127.0.0.1:8765
+services:
+  circulo:
+    build: .
+    ports: ["127.0.0.1:8765:8765"]
+    env_file: [circulo.env]          # TYPESAFE_API_KEY, ANTHROPIC_API_KEY, GITHUB_TOKEN, CIRCULO_REPO (nunca comitado)
+    volumes:
+      - circulo-dados:/dados
+      - ${CIRCULO_REPO_DIR:-./}:/repo
+    restart: unless-stopped
+volumes:
+  circulo-dados:

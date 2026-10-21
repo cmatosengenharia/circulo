@@ -263,7 +263,8 @@ def make_handler(db_path: str):
                 self.end_headers()
                 return
             if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes") or u.path.startswith(("/projeto/", "/missao/")):
-                body = _page({"/": "home.html", "/integracoes": "integracoes.html", "/rastros": "rastros.html",
+                inicio = "equipe.html" if os.environ.get("CIRCULO_ENTRADA") == "equipe" else "home.html"   # produto: a equipe é a porta de entrada
+                body = _page({"/": inicio, "/integracoes": "integracoes.html", "/rastros": "rastros.html",
                               "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")

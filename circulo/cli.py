@@ -30,6 +30,12 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
     sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
     sub.add_parser("configurar", help="cria o arquivo de configuração única (chaves) com permissão 600")
+    ini = sub.add_parser("init", help="prepara QUALQUER repositório para o loop cuidar dele (kit: constituição, testes, CI, pedido)")
+    ini.add_argument("pasta", help="clone local do repositório (com remoto no GitHub)")
+    ini.add_argument("--pedido", default=None, help="o pedido inicial do loop para esse repositório")
+    ini.add_argument("--nome", default=None)
+    ini.add_argument("--sem-ci", action="store_true", help="não escreve o workflow de CI no repositório")
+    ini.add_argument("--json", action="store_true")
     dg = sub.add_parser("diagnostico", help="mostra o que está ligado, o que está parado e por quê")
     dg.add_argument("--testar", action="store_true", help="chama as APIs de verdade (gasta um pouquinho)")
     dg.add_argument("--json", action="store_true")
@@ -59,6 +65,21 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "configurar":
         path = cfg.configurar()
         print(f"Arquivo criado: {path}\nAbra, preencha as chaves e salve. Depois: circulo diagnostico && circulo instalar")
+        return
+    if args.cmd == "init":
+        from . import kit
+        r = kit.init(args.pasta, pedido=args.pedido, nome=args.nome, escrever_ci=not args.sem_ci)
+        if args.json:
+            print(kit.resumo_json(r))
+        else:
+            k = r["kit"]
+            print(f"Kit: {k['nome']} ({k['repo'] or 'sem remoto'}) em {k['pasta']}")
+            print(f"  constituição: {', '.join(k['protegidos'])}\n  testes: {k['testes']}\n  checks do gate: {', '.join(k['checks'])}")
+            for a in r["arquivos"]:
+                print(f"  escrito no repositório: {a}")
+            for a in k["avisos"]:
+                print(f"  aviso: {a}")
+            print("Próximos passos:\n  " + "\n  ".join(r["proximos"]))
         return
     if args.cmd == "diagnostico":
         pecas = cfg.diagnostico(testar_conexoes=args.testar)
