@@ -11,8 +11,8 @@ from circulo import aluno, fatiador, higiene, jev_lab
 from circulo.corpo import MAX_ERROS_NA_VALIDACAO, Corpo
 from circulo.medico import SILENCIO, Medico
 from circulo.state import Store
-from tests.test_medico import _erro_meta
-from tests.test_painel import painel  # noqa: F401
+from test_medico import _erro_meta
+from test_painel import painel  # noqa: F401
 
 
 def test_transacao_que_nao_abre_nao_vaza_o_lock(tmp_path):

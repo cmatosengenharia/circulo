@@ -193,6 +193,8 @@ class MergeGate:
             self._ci_indisponivel(why)
             self._tentar_de_novo(n, sha)
             return Verdict(n, sha, False, why, {"ci_indisponivel": True})
+        if not why.startswith("checks ausentes"):
+            self._ci_voltou()                     # os jobs rodaram (verdes ou não): a espera por "CI não iniciou" acabou
         if not ok:
             reprovado = why.startswith("checks falhando") or why.startswith("check obrigatório")
             return Verdict(n, sha, False, why, {"conserto": True} if reprovado else {})
@@ -260,6 +262,15 @@ class MergeGate:
             self.ctx.reply("GitHub Actions não está iniciando os jobs (cobrança ou limite de gasto). O Developer pausa "
                            "PRs até o CI voltar; nada é consertado à toa. Ajuste em github.com/settings/billing.", "saude")
 
+    def _ci_voltou(self) -> None:
+        """O CI executou jobs de novo: tira a espera de "CI não iniciou" na hora, em vez de deixar o Developer parado
+        até o prazo de 1 h (em 21/10 o repo virou público às 10:47 e a espera velha segurou o Developer até 11:47)."""
+        s = self.ctx.store
+        e = s.get("self_dev_espera") or {}
+        if str(e.get("motivo", "")).startswith(CI_NAO_INICIOU):
+            s.set("self_dev_espera", None)
+            self.ctx.reply("GitHub Actions voltou a executar os jobs: o Developer retoma.", "saude")
+
     def _tentar_de_novo(self, n: int, sha: str) -> None:
         """Pede ao GitHub para rodar de novo os jobs que nem começaram, no máximo uma vez por ESPERA_CI por PR:
         quando a cobrança volta, o PR anda sozinho (enquanto não volta, o pedido é recusado sem custo)."""
@@ -293,6 +304,7 @@ class MergeGate:
             if why.startswith(CI_NAO_INICIOU):     # main não está quebrada: o CI nem rodou; reavalia depois
                 self._ci_indisponivel(why)
                 return
+        self._ci_voltou()
         s.set("main_ci_visto", sha)
         from .licoes import registrar as monitorar
         monitorar(self.ctx, "gate:main", conclusao == "success", sujeito=sha[:12],

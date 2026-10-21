@@ -107,6 +107,14 @@ def test_licao_2_nenhum_teste_exige_o_erro_antigo_e_depois_o_conserto():
     assert not fazem, f"o teste exige o erro antigo e depois o conserto na mesma chamada (o portão já roda o teste no código antigo): {fazem}"
 
 
+def test_testes_importam_vizinhos_sem_o_prefixo_tests():
+    """21/10: `from tests.test_medico import …` funcionava com PYTHONPATH=. e quebrava a coleta no CI (`tests` não é
+    pacote): a suíte inteira saía com código 2 e todo PR ficava vermelho. Vizinho se importa pelo nome do módulo."""
+    proibido = re.compile(r"^\s*(from tests[.\s]|import tests\b)", re.M)
+    usam = [p.name for p in Path(__file__).parent.glob("*.py") if proibido.search(p.read_text(encoding="utf-8"))]
+    assert not usam, f"import com o prefixo tests. (use `from test_x import …`): {usam}"
+
+
 def test_testes_nao_usam_a_data_local_da_maquina():
     """lição #48: o orçamento conta o dia em America/Sao_Paulo; `date.today()` no teste dá o dia do fuso da máquina
     (UTC no CI), e das 21 h à meia-noite de Brasília o "ontem" do teste vira o "hoje" do orçamento. Use o NOON do conftest."""

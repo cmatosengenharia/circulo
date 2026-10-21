@@ -147,3 +147,22 @@ def test_disjuntor_pausa_o_developer_depois_de_tres_abandonos_iguais(circle):
     assert e["precisa_de_voce"] and e["motivo"].startswith("Disjuntor") and e["ate"] > time.time() + 3600 and avisos
     assert circle.store.get("self_dev_abandonos") == []                   # recomeça a contar depois de desarmar
     assert not disjuntor_abandonos(circle.store, lambda m, k: None, "conflito com a main")   # causa diferente não soma
+
+
+def test_espera_de_ci_nao_iniciado_cai_assim_que_os_jobs_rodam(circle):
+    """21/10: o repo virou público e o CI voltou, mas a espera velha segurou o Developer por mais 1 h."""
+    gh = GH(_nao_iniciados())
+    MergeGate(circle.ctx, gh, human="h").run()
+    assert circle.store.get("self_dev_espera")["motivo"].startswith(CI_NAO_INICIOU)
+    gh.runs = [{"id": 10 + i, "name": n, "status": "completed", "conclusion": "failure" if i == 0 else "success"}
+               for i, n in enumerate(REQUIRED_CHECKS)]                       # rodou de verdade (e um teste falhou)
+    MergeGate(circle.ctx, gh, human="h").run()
+    assert circle.store.get("self_dev_espera") is None
+
+
+def test_espera_mais_importante_nao_e_tirada_quando_o_ci_volta(circle):
+    circle.store.set("self_dev_espera", {"ate": time.time() + 600, "motivo": "limite de uso", "hora": "23:00"})
+    gh = GH([{"id": i, "name": n, "status": "completed", "conclusion": "failure" if i == 0 else "success"}
+             for i, n in enumerate(REQUIRED_CHECKS)])                         # CI rodou de verdade (um teste falhou)
+    MergeGate(circle.ctx, gh, human="h").run()
+    assert circle.store.get("self_dev_espera")["motivo"] == "limite de uso"
