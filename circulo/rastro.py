@@ -30,6 +30,8 @@ PREFIXO_BRANCH = "circulo/fix-"
 SEM_VERSAO_S = 1800          # mergeado há mais de 30 min sem chegar ao código rodando: lacuna
 SEM_EVIDENCIA_S = 7200       # código novo rodando há mais de 2 h sem a evidência dos primeiros giros: lacuna
 PONTO = "rastro:cadeia"
+SEM_PERGUNTA_ORIGEM = "sem_pergunta_origem"   # causa tipada: item do loop sem a pergunta do conselho (lição #15)
+LACUNA_SEM_PERGUNTA = "item planejado pelo loop sem a pergunta do conselho que o originou"
 
 
 # ------------------------------------------------------------------ identidade W3C
@@ -160,7 +162,7 @@ def cadeia_item(store: Store, item_id: int, now: float | None = None) -> dict | 
             passos.append(_passo("origem", "Planejado pelo loop", "ok", it["created_at"], it["evidencia"]))
             primeira = store.one("SELECT MIN(created_at) m FROM perguntas")["m"]
             if it["origem"] == "loop" and primeira and it["created_at"] >= primeira:
-                lacunas.append("item planejado pelo loop sem a pergunta do conselho que o originou")
+                lacunas.append(LACUNA_SEM_PERGUNTA)
 
     # 2. estudo (pedido seu e itens do loop passam por estudo antes de executar)
     if it["estudo"]:
@@ -434,6 +436,7 @@ def verificar(ctx, now: float | None = None) -> list[int]:
         from .licoes import registrar as monitorar
         monitorar(ctx, PONTO, not c["lacunas"], sujeito=f"item #{i}", motivo="; ".join(c["lacunas"]),
                   assinatura="rastro:lacuna" if c["lacunas"] else None, classe="trabalho",
+                  causa=SEM_PERGUNTA_ORIGEM if LACUNA_SEM_PERGUNTA in c["lacunas"] else None,
                   titulo="Fio de rastreabilidade com lacuna", detalhe_item=f"Item #{i}: {c['titulo'][:120]}.")
         vistos.add(i)
         conferidos.append(i)
