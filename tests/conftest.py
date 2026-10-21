@@ -27,6 +27,13 @@ def no_keys(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def env_file_isolado(monkeypatch, tmp_path):
+    # o arquivo de configuração real muda com o loop rodando: o descanso dos testes acordava no 1º pedaço (5 s)
+    from circulo import configuracao
+    monkeypatch.setattr(configuracao, "ENV_FILE", tmp_path / "circulo-env")
+
+
+@pytest.fixture(autouse=True)
 def sem_espera_do_retry(monkeypatch):
     # a única nova tentativa do Planejador espera segundos com jitter; nos testes, a espera é instantânea
     from circulo import planejador
