@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.48.0 — 2026-10-20
+
+**Equipe ao vivo mostra o que cada agente está fazendo, não só quem está trabalhando.**
+
+- **`circulo/fazendo.py`**: um registro por agente (`marcar` o que começou, `passo` o passo em curso, `terminar` com o
+  resultado), com os últimos 8 passos. Vários agentes ao mesmo tempo (o SRE e o Médico rodam em paralelo ao giro; o
+  Developer é um subprocesso). Registro parado há 15 min some sozinho (processo morto).
+- Toda tarefa do giro marca começo e fim (em `intencoes.executar`); o Arquiteto diz item e modo ("modo completo,
+  pesquisando, até 4 buscas"); o QA/gate diz PR a PR o que conferiu e o veredito; o Developer diz item, worktree,
+  portões, PR e conserto.
+- **Claude Code em streaming** (`--output-format stream-json`): cada ferramenta que ele usa vira um passo na hora —
+  "lendo circulo/merge_gate.py", "escrevendo tests/test_diff_size.py", "editando circulo/diff_size.py", "rodando os
+  testes", "rodando o lint", "git diff" — e a primeira frase do que ele pensa. O evento final `result` tem os mesmos
+  campos de antes (tokens, modelo, is_error), então limite, deslogado e falha continuam detectados do mesmo jeito.
+- Equipe ao vivo: no cartão de quem está fazendo algo, o que é e o passo atual ("item #91: Parser puro… · Claude Code:
+  rodando os testes · há 40 s") e a lista dos últimos passos; quem terminou mostra "último: … → ok/adotar/falhou".
+
 ## 1.47.0 — 2026-10-20
 
 **Passe do Jev lab nas quatro perguntas em que o Jev mais duvidava.** Medido em 20/10: `worth_spending` 0,49 de confiança

@@ -95,7 +95,10 @@ class Estudo:
         if not item:
             return None
         from .licoes import registrar as monitorar
+        from . import fazendo
         modo = modo_do_estudo(item)
+        fazendo.marcar(self.s, "estudar_pedido", f"item #{item['id']}: {item['titulo'][:90]}", item=item["id"],
+                       passo="dispensado: a evidência já é medida" if modo == "dispensado" else f"modo {modo}: pesquisando em fontes confiáveis (até {MODOS[modo]['buscas']} busca(s))")
         if modo == "dispensado":
             # a evidência do item já é medida pelo próprio loop (Vigia, jardineiro, lição): estudar seria gastar para confirmar
             r = {"veredito": "adotar", "justificativa": f"estudo dispensado: evidência interna medida ({str(item.get('evidencia'))[:80]})",

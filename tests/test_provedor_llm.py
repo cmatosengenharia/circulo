@@ -89,13 +89,9 @@ def test_desenvolvedor_gasta_pela_api_por_padrao(monkeypatch, tmp_path):
     from circulo.self_dev import ClaudeCodeAgent
     ambientes = []
 
-    def falso_run(cmd, **kw):
-        ambientes.append(kw["env"])
-
-        class P:
-            returncode, stdout, stderr = 0, '{"usage":{"input_tokens":1,"output_tokens":1}}', ""
-        return P()
-    monkeypatch.setattr("subprocess.run", falso_run)
+    from test_fazendo import RESULT, FakePopen
+    FakePopen.eventos = [RESULT]
+    monkeypatch.setattr("circulo.self_dev.subprocess.Popen", lambda cmd, **kw: ambientes.append(kw["env"]) or FakePopen(cmd, **kw))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k-de-teste")
     monkeypatch.delenv("CIRCULO_CODE_AGENT_USA_API", raising=False)
     ClaudeCodeAgent().run("tarefa", tmp_path)
