@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.62.2 — 2026-10-21
+
+**A main estava vermelha no CI desde a 1.61: a coleta do pytest quebrava.**
+
+- `tests/test_auditoria.py` importava `from tests.test_medico …`; `tests` não é pacote. Localmente o `PYTHONPATH=.`
+  escondia o erro; no CI a coleta falhava e `pytest` saía com código 2. A suíte inteira ficava vermelha, e todo PR do
+  Developer reprovava em "Testes (3.11/3.12/3.13)" sem culpa dele. Agora importa pelo nome do módulo, e
+  `test_arquitetura` proíbe o prefixo `tests.`.
+- `merge_gate._ci_voltou`: quando os jobs voltam a executar, a espera de "CI não iniciou" cai na hora (em vez de
+  segurar o Developer até o prazo de 1 h depois que o repositório virou público).
+- `tests/test_ci_indisponivel.py`: +2 regressões.
+
 ## 1.62.1 — 2026-10-21
 
 - **LLM pela assinatura**: o Claude Code ERRA quando a resposta passa de `CLAUDE_CODE_MAX_OUTPUT_TOKENS` (a API só
