@@ -2,6 +2,7 @@
 da troca de código (worktree órfão) não reprova a versão nova; o worktree órfão é movido, nunca apagado."""
 import subprocess
 import time
+import urllib.error
 
 from circulo import self_dev
 from circulo.corpo import MAX_ERROS_NA_VALIDACAO, Corpo
@@ -72,6 +73,7 @@ def test_cliente_marca_jobs_sem_passos_pela_anotacao(monkeypatch):
     monkeypatch.setattr(gh, "_req", lambda m, p, *a, **k: [{"message": COBRANCA}] if "annotations" in p else {})
     runs = gh.check_runs("abc")
     assert runs[0]["nao_iniciado"].startswith("The job was not started") and "nao_iniciado" not in runs[1]
+    jobs[0]["steps"] = [{"name": "Set up job"}, {"name": "pytest"}]       # falha de verdade: tem passos
     monkeypatch.setattr(gh, "_req", lambda m, p, *a, **k: [{"message": "Process completed with exit code 1."}])
     assert "nao_iniciado" not in gh.check_runs("abc")[0]
 
@@ -112,3 +114,36 @@ def test_worktree_orfao_e_movido_e_o_caminho_fica_livre(tmp_path):
     assert len(orfaos) == 1 and (orfaos[0] / "sobra.txt").read_text() == "trabalho antigo\n"   # movido, não apagado
     git(repo, "worktree", "add", "-q", "-b", "circulo/fix-95-1", str(wt), "HEAD")
     assert (wt / "a.py").exists()
+
+
+def test_job_sem_nenhum_passo_conta_como_ci_nao_iniciado_mesmo_sem_a_anotacao(monkeypatch):
+    """Noite de 20→21/10: o token sem a permissão Checks não lê a anotação; 31 PRs em círculo. Sem passos = não iniciou."""
+    gh = GitHubREST("o/r", "t")
+    jobs = [{"id": 1, "name": "Testes", "status": "completed", "conclusion": "failure", "sem_passos": True},
+            {"id": 2, "name": "Lint", "status": "completed", "conclusion": "failure", "started_at": "2026-10-21T01:00:00Z", "completed_at": "2026-10-21T01:00:04Z"}]
+    monkeypatch.setattr(gh, "_check_runs", lambda sha: [dict(j) for j in jobs])
+
+    def req(m, p, *a, **k):
+        if "annotations" in p:
+            raise urllib.error.HTTPError(p, 403, "sem Checks", {}, None)
+        if p.startswith("/actions/jobs/2"):
+            return {"id": 2, "steps": []}
+        return {}
+    monkeypatch.setattr(gh, "_req", req)
+    runs = gh.check_runs("abc")
+    assert all(r.get("nao_iniciado") for r in runs)
+    ok, why = checks_ok([{**r, "name": n} for r, n in zip(runs * 4, REQUIRED_CHECKS, strict=False)])
+    assert not ok and why.startswith(CI_NAO_INICIOU)
+
+
+def test_disjuntor_pausa_o_developer_depois_de_tres_abandonos_iguais(circle):
+    from circulo.revisor import DISJUNTOR_PRS, disjuntor_abandonos
+    avisos = []
+    motivo = "checks falhando: Container, Testes (Python 3.12), Constituição"
+    for _ in range(DISJUNTOR_PRS - 1):
+        assert not disjuntor_abandonos(circle.store, lambda m, k: avisos.append(m), motivo)
+    assert disjuntor_abandonos(circle.store, lambda m, k: avisos.append(m), "checks falhando: Constituição, Container")
+    e = circle.store.get("self_dev_espera")
+    assert e["precisa_de_voce"] and e["motivo"].startswith("Disjuntor") and e["ate"] > time.time() + 3600 and avisos
+    assert circle.store.get("self_dev_abandonos") == []                   # recomeça a contar depois de desarmar
+    assert not disjuntor_abandonos(circle.store, lambda m, k: None, "conflito com a main")   # causa diferente não soma

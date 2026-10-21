@@ -38,7 +38,7 @@ from .budget import TZ
 from .merge_gate import protegidos
 from .reproducao import SEGREDOS, ambiente_isolado, liberar_worktree
 
-from .revisor import MAX_PRS_ABERTOS
+from .revisor import MAX_PRS_ABERTOS, disjuntor_abandonos
 
 _liberar_worktree = liberar_worktree
 __all__ = ["SEGREDOS", "ambiente_isolado", "SelfDeveloper", "DevResult", "build_self_dev"]   # reexport para corpo e reparo
@@ -820,7 +820,9 @@ class SelfDeveloper:
         self._episodio(pr, "abandonado", f"abandonado após {MAX_CONSERTOS} consertos: {motivo[:160]}")
         self._set_item(item_id, "pendente", f"PR #{pr} fechado após {MAX_CONSERTOS} consertos: {motivo[:120]}")
         self.ctx.reply(f"Developer fechou o PR #{pr} (“{titulo}”) depois de {MAX_CONSERTOS} consertos; o item volta para a fila.", "saude")
+        disjuntor_abandonos(self.s, self.ctx.reply, motivo)
         return DevResult(item_id, "abandonado", motivo[:200], pr)
+
 
     def _guardar_parcial(self, item_id: int, branch: str, wt: Path, wip: dict | None) -> bool:
         tem = bool(_git(["status", "--porcelain"], wt, check=False)) or bool(wip)

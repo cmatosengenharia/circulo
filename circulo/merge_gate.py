@@ -451,14 +451,30 @@ class GitHubREST:
         suspeitos = [r for r in runs if r.get("conclusion") == "failure" and curto(r)]
         if not suspeitos:
             return runs
-        try:
+        msg = ""
+        try:                                   # a anotação diz o motivo — mas exige a permissão Checks, que o token pode não ter
             notas = self._req("GET", f"/check-runs/{suspeitos[0]['id']}/annotations")
+            msg = next((a.get("message", "") for a in notas or [] if NAO_INICIADO.search(a.get("message", ""))), "")
         except (urllib.error.URLError, OSError, ValueError, KeyError):
-            return runs
-        msg = next((a.get("message", "") for a in notas or [] if NAO_INICIADO.search(a.get("message", ""))), "")
+            pass
+        if not msg and all(self._sem_passos(r) for r in suspeitos):
+            # sem a anotação: job que falhou sem executar NENHUM passo (nem "Set up job") nunca é defeito do código —
+            # o GitHub não o iniciou (cobrança, limite de gasto). Na noite de 20→21/10 isto passou por "checks falhando"
+            # e o Developer abriu e fechou 31 PRs em círculo.
+            msg = "jobs falharam sem executar nenhum passo: o GitHub Actions não os iniciou (cobrança ou limite de gasto)"
         for r in suspeitos if msg else []:
             r["nao_iniciado"] = msg[:200]
         return runs
+
+    def _sem_passos(self, r: dict) -> bool:
+        if r.get("sem_passos") or r.get("steps") == []:
+            return True
+        if r.get("steps"):
+            return False
+        try:                                   # check-run da API Checks não traz passos: pergunta ao job do Actions (mesmo id)
+            return not (self._req("GET", f"/actions/jobs/{r['id']}").get("steps") or [])
+        except (urllib.error.URLError, OSError, ValueError, KeyError):
+            return False
 
     def _check_runs(self, sha):
         try:
