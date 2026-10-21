@@ -29,7 +29,7 @@ import urllib.error
 
 from .agents import Ctx
 from .decision import Question, norm
-from .json_llm import objeto
+from .json_llm import objeto, objeto_ou_corte
 from .licoes import titulo_curto
 from .merge_gate import CONSTITUICAO
 
@@ -393,7 +393,7 @@ def _sem_item(texto: str) -> str | None:
 
 
 def _parse(texto: str) -> dict | None:
-    return objeto(texto, _item)
+    return objeto_ou_corte(texto, lambda d, _cortado: _item(d))
 
 
 def _item(d: dict) -> dict | None:
