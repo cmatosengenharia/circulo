@@ -339,13 +339,19 @@ def retrato(store: Store) -> dict[str, Any]:
     ritmo = store.get("ritmo") or {}
     bat = store.get("batimento") or {}
     rodando = (bool(bat.get("em")) and time.time() - float(bat.get("em") or 0) < 900) or time.time() - desde < 900
+    from . import fazendo as fz
+    em_curso = {membro(ag): {**a, "agente": ag} for ag, a in fz.agora(store).items()}
+    ultimos = {membro(ag): a for ag, a in fz.ultimo(store).items() if time.time() - float(a.get("em", 0)) < 3600}
     membros = []
     for k, d in EQUIPE.items():
-        estado = "trabalhando" if k == ativo and rodando else "parado" if not rodando and k not in ("cassio", "llm", "github") else "disponivel"
-        if k in ("jev", "llm", "github") and k != ativo:
+        faz = em_curso.get(k) if rodando else None
+        estado = "trabalhando" if (k == ativo or faz) and rodando else "parado" if not rodando and k not in ("cassio", "llm", "github") else "disponivel"
+        if k in ("jev", "llm", "github") and k != ativo and not faz:
             estado = "disponivel"
         c = carga.get(k) or {}
-        membros.append({"id": k, **d, "estado": estado, "agora": detalhe if k == ativo else "", "desde": desde if k == ativo else None,
+        agora_txt = (faz["o_que"] + (" · " + faz["passo"] if faz.get("passo") else "")) if faz else (detalhe if k == ativo else "")
+        membros.append({"id": k, **d, "estado": estado, "agora": agora_txt, "desde": (faz["desde"] if faz else desde) if estado == "trabalhando" else None,
+                        "fazendo": faz, "ultimo": ultimos.get(k),
                         "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")})
     return {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
             "quadro": quadro(store), "tick": store.tick}

@@ -222,13 +222,10 @@ def test_agente_com_erro_nao_vira_pr(circle, repo):
 
 
 def test_claude_code_com_is_error_conta_como_falha(monkeypatch, tmp_path):
-    import json
-    import subprocess as sp
     from circulo.self_dev import ClaudeCodeAgent
-
-    def fake_run(*a, **k):
-        return sp.CompletedProcess(a, 0, stdout=json.dumps({"is_error": True, "usage": {}}), stderr="")
-    monkeypatch.setattr("circulo.self_dev.subprocess.run", fake_run)
+    from test_fazendo import FakePopen
+    FakePopen.eventos = [{"type": "result", "is_error": True, "usage": {}}]
+    monkeypatch.setattr("circulo.self_dev.subprocess.Popen", FakePopen)
     assert ClaudeCodeAgent().run("x", tmp_path)["ok"] is False
 
 

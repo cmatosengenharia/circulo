@@ -157,6 +157,22 @@ FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(ruff
                "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)")
 
 
+def _fazendo(store, o_que: str | None = None, passo: str | None = None, item: int | None = None) -> None:
+    """Mesmo contrato de `fazendo.marcar`/`fazendo.passo` para o agente `corrigir_codigo`, sem importar o módulo
+    (o Developer é constituição). `o_que` começa um registro novo; só `passo` acrescenta ao que está em curso."""
+    agora = time.time()
+    f = dict(store.get("fazendo") or {})
+    a = f.get("corrigir_codigo")
+    if o_que:
+        a = {"o_que": o_que[:160], "item": item, "desde": agora, "em": agora, "passo": (passo or "")[:160],
+             "passos": [{"t": agora, "texto": passo[:160]}] if passo else []}
+    elif a and passo:
+        a.update({"passo": passo[:160], "em": agora, "passos": (a.get("passos") or [])[-7:] + [{"t": agora, "texto": passo[:160]}]})
+    if a:
+        f["corrigir_codigo"] = a
+        store.set("fazendo", f)
+
+
 class ClaudeCodeAgent:
     """Claude Code em modo não interativo dentro do worktree."""
 
@@ -178,21 +194,50 @@ class ClaudeCodeAgent:
             env.pop("ANTHROPIC_API_KEY", None)
             env.pop("ANTHROPIC_WORKSPACE_ID", None)
         ferramentas = os.environ.get("CIRCULO_CODE_AGENT_FERRAMENTAS") or ",".join(FERRAMENTAS)
-        p = subprocess.run([self.cmd, "-p", task, "--output-format", "json", "--permission-mode", "acceptEdits",
-                            "--allowedTools", ferramentas, "--max-turns", str(self.max_turns)], cwd=workdir, capture_output=True,
-                           text=True, timeout=self.timeout, env=env)
-        tokens = 0
-        try:
-            data = json.loads(p.stdout or "{}")
-            u = data.get("usage", {})
-            tokens = int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
-        except json.JSONDecodeError:
-            data = {}
-        modelos = list((data.get("modelUsage") or {}).keys()) if isinstance(data, dict) else []
+        # stream-json: cada ferramenta que o Claude Code usa chega na hora e vira um passo visível na Equipe ao vivo
+        # (`ouvinte`); o evento final `result` tem os mesmos campos do `--output-format json` de antes.
+        p = subprocess.Popen([self.cmd, "-p", task, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
+                              "--allowedTools", ferramentas, "--max-turns", str(self.max_turns)], cwd=workdir, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, env=env)
+        data, bruto = self._acompanhar(p)
+        tokens, u = 0, data.get("usage", {})
+        tokens = int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
+        modelos = list((data.get("modelUsage") or {}).keys())
         # saída 0 não basta: o Claude Code devolve is_error (limite da conta, máximo de passos) com trabalho pela metade
-        erro = bool(data.get("is_error")) if isinstance(data, dict) else False
-        return {"ok": p.returncode == 0 and not erro, "tokens": tokens, "log": (p.stdout + p.stderr)[-4000:],
-                "modelo": ", ".join(modelos) or "Claude Code"}
+        erro = bool(data.get("is_error"))
+        return {"ok": p.returncode == 0 and not erro, "tokens": tokens, "log": bruto[-4000:], "modelo": ", ".join(modelos) or "Claude Code",
+                "passos": self._passos}
+
+    def _acompanhar(self, p) -> tuple[dict, str]:
+        """Lê o streaming linha a linha: passos para o ouvinte, o evento `result` como dado final. Mata no timeout."""
+        import threading
+        from .registro import passo_do_evento
+        self._passos: list[str] = []
+        data, linhas = {}, []
+        morto = threading.Timer(self.timeout, p.kill)
+        morto.start()
+        try:
+            for linha in p.stdout or []:
+                try:
+                    ev = json.loads(linha)
+                except json.JSONDecodeError:
+                    linhas.append(linha)
+                    continue
+                if ev.get("type") == "result":
+                    data = ev
+                    linhas.append(json.dumps(ev, ensure_ascii=False))
+                elif (txt := passo_do_evento(ev)):
+                    self._passos.append(txt)
+                    if getattr(self, "ouvinte", None):
+                        try:
+                            self.ouvinte(txt)
+                        except (OSError, ValueError, TypeError):   # mostrar o passo nunca derruba o Developer
+                            pass
+            err = p.stderr.read() if p.stderr else ""
+            p.wait()
+        finally:
+            morto.cancel()
+        return data, "".join(linhas) + (err or "")
 
 
 @dataclass
@@ -354,6 +399,7 @@ class SelfDeveloper:
         from .neuronios import ABRIR_PR, Resultado, avaliar_aprendidos, diff_do_worktree, portoes_natos_pr, registrar
         texto = ""
         for tentativa in range(1 + MAX_CORRECOES_LOCAIS):
+            _fazendo(self.s, passo="portões antes do PR: constituição, tamanho, teste novo, lint e testes" + (f" (correção local {tentativa})" if tentativa else ""))
             arquivos, adicionadas = diff_do_worktree(wt, base, _git)
             falhas = registrar(self.ctx, ABRIR_PR, portoes_natos_pr(arquivos, adicionadas), titulo)
             if not falhas:
@@ -414,7 +460,10 @@ class SelfDeveloper:
 
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer") -> dict:
         t0 = time.time()
+        self.agent.ouvinte = lambda txt: _fazendo(self.s, passo=txt)
+        _fazendo(self.s, passo="Claude Code: começando a sessão")
         out = self.agent.run(task, wt)
+        _fazendo(self.s, passo=f"Claude Code terminou ({int(time.time() - t0)} s, {int(out.get('tokens') or 0)} tokens)")
         from .licoes import registrar as monitorar
         monitorar(self.ctx, "developer:agente", bool(out.get("ok")), sujeito=titulo[:120],
                   motivo="" if out.get("ok") else str(out.get("log", ""))[-600:])
@@ -463,6 +512,7 @@ class SelfDeveloper:
         item = self.pick(item_id)
         if not item:
             return DevResult(None, "nada", "nenhum erro recorrente pendente no roteiro")
+        _fazendo(self.s, f"item #{item['id']}: {item['titulo'][:90]}", item=item["id"], passo="preparando o worktree")
         inc = None
         if "incidente #" in item["detalhe"]:
             iid = int(item["detalhe"].split("incidente #")[1].split(",")[0].split(")")[0])
@@ -565,6 +615,7 @@ class SelfDeveloper:
             pr = None
             if has_remote and self.gh is not None:
                 _git(["push", "-u", "origin", branch], wt)
+                _fazendo(self.s, passo="abrindo o PR no GitHub")
                 pr = self.gh.create_pr(branch, "main", item["titulo"],
                                        f"Correção automática (roteiro #{item['id']}).\n\nArquivos: {', '.join(changed)}\n\n"
                                        "O gate de merge do círculo decide sozinho: checks verdes, teste novo, Reviewer (Jev). "
@@ -607,6 +658,7 @@ class SelfDeveloper:
             return DevResult(item_id, "aguardando_ci", f"o PR #{pr} mudou desde a reprovação; o gate avalia de novo", pr)
         if int(st.get("consertos", 0)) >= MAX_CONSERTOS:
             return self._abandonar(st, titulo, motivo)
+        _fazendo(self.s, f"conserto do PR #{pr}: {titulo[:80]}", item=item_id, passo=f"motivo: {motivo[:100]}")
         wt = self.repo.parent / f".circulo-wt-{item_id}"
         try:
             if wt.exists():

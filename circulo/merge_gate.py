@@ -192,13 +192,24 @@ class MergeGate:
             return Verdict(n, sha, False, f"Reviewer Code: {decision}", details)
         return Verdict(n, sha, True, "todos os gates passaram", details)
 
+    def _passo(self, texto: str) -> None:
+        """O que a Equipe ao vivo mostra do gate (mesmo contrato de `fazendo.passo`, sem importar o módulo: constituição)."""
+        f = dict(self.ctx.store.get("fazendo") or {})
+        a = f.get("revisar_prs")
+        if a:
+            agora = time.time()
+            a.update({"passo": texto[:160], "em": agora, "passos": (a.get("passos") or [])[-7:] + [{"t": agora, "texto": texto[:160]}]})
+            self.ctx.store.set("fazendo", f)
+
     def run(self) -> list[Verdict]:
         out = []
         abertos = self.gh.open_prs()
         self._pr_do_developer_sumiu({p["number"] for p in abertos})
         self._vigiar_main()
         for pr in abertos:
+            self._passo(f"PR #{pr['number']}: conferindo CI, revisor e tamanho")
             v = self.evaluate(pr)
+            self._passo(f"PR #{v.number}: {'merge' if v.merge else v.reason[:90]}")
             if v.merge:
                 merged, msg = self.gh.merge(v.number, v.sha, pr.get("title", f"PR #{v.number}"))
                 if not merged:
