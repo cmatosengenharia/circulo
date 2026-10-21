@@ -54,7 +54,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `llm.py` | 190 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
 | `loop.py` | 900 | O círculo: loop infinito, Jev First, retoma de onde parou, pausa só por orçamento. |
 | `medico.py` | 314 | O Médico do loop: plano de controle que diagnostica gargalos por PADRÃO medido e responde pela escada mais barata. |
-| `memoria.py` | 335 | Memória de trabalho do time: o que o círculo já viu, recuperado por relevância na hora em que um agente precisa. |
+| `memoria.py` | 400 | Memória de trabalho do time: o que o círculo já viu, recuperado por relevância na hora em que um agente precisa. |
 | `memory.py` | 112 | Memória do círculo (RAG) e playbooks por tipo de pedido. |
 | `merge_gate.py` ⚖️ | 461 | QA e release (merge) do círculo. |
 | `metrics.py` | 98 | Métricas do loop no padrão Prometheus, via prometheus_client, num registry próprio (não no global do processo). |

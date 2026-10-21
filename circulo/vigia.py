@@ -421,6 +421,12 @@ class Vigia:
         higiene.rodar(self.s, now)                               # expira "depende de você", encurta títulos, une lições iguais
         from . import capacidade
         cap = capacidade.rodar(self.s, self.ctx.dl, now)        # quem está sobrecarregado; sobe/desce trabalhadores
+        from . import graft
+        from .memoria import do_ctx
+        mem = do_ctx(self.ctx)
+        if mem is not None and mem.graft:
+            mem.espelhar_pendentes()                                 # linhas antigas ganham nó no Graft, 50 por passagem
+            graft.manter(self.s, now)                                # apply-safe a cada 6 h; duplicata do mesmo registro resolvida
         from . import conta
         try:
             conta.vigiar(self.s, self.ctx.reply, now)              # assinatura: sessão do Claude de pé, relogin quando cai

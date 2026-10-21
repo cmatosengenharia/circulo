@@ -19,7 +19,7 @@ import time
 import unicodedata
 from typing import Any
 
-from . import nomes
+from . import graft, nomes
 from .state import Store
 
 DIA = 86400.0
@@ -108,12 +108,15 @@ class Memoria:
         if self.fts:
             self.s.db.executescript(FTS)
         self._ultimo_reindex = 0.0
+        if "graft_id" not in {r["name"] for r in self.s.q("PRAGMA table_info(memoria)")}:
+            self.s.x("ALTER TABLE memoria ADD COLUMN graft_id TEXT")
+        self.graft = graft.ligado()          # memória semântica (vetores + grafo) ao lado do FTS; opcional
 
     # ------------------------------------------------------------ caminho de escrita
     def _gravar(self, tipo: str, ref: Any, titulo: str, texto: str, resultado: str | None, em: float, peso: float | None = None) -> None:
         peso = peso if peso is not None else PESO_RESULTADO.get(resultado or "", 1.0)
         titulo, texto = (titulo or "")[:200], (texto or "")[:2000]
-        velho = self.s.one("SELECT id, titulo, texto, resultado FROM memoria WHERE tipo=? AND ref=?", (tipo, str(ref)))
+        velho = self.s.one("SELECT id, titulo, texto, resultado, graft_id FROM memoria WHERE tipo=? AND ref=?", (tipo, str(ref)))
         if velho and (velho["titulo"], velho["texto"], velho["resultado"]) == (titulo, texto, resultado):
             return
         if velho:
@@ -122,11 +125,32 @@ class Memoria:
             if self.fts:
                 self.s.x("INSERT INTO memoria_fts(memoria_fts, rowid, titulo, texto) VALUES('delete', ?, ?, ?)", (velho["id"], velho["titulo"], velho["texto"]))
                 self.s.x("INSERT INTO memoria_fts(rowid, titulo, texto) VALUES(?,?,?)", (velho["id"], titulo, texto))
+            if self.graft:                   # o nó antigo fica SUPERSEDED: história visível, fora da busca
+                gid = graft.substituir(tipo, ref, velho["graft_id"], titulo, texto, resultado)
+                if gid:
+                    self.s.x("UPDATE memoria SET graft_id=? WHERE id=?", (gid, velho["id"]))
             return
         mid = self.s.x("INSERT INTO memoria(tipo,ref,titulo,texto,resultado,peso,em,atualizado) VALUES(?,?,?,?,?,?,?,?)",
                        (tipo, str(ref), titulo, texto, resultado, peso, em, time.time()))
         if self.fts:
             self.s.x("INSERT INTO memoria_fts(rowid, titulo, texto) VALUES(?,?,?)", (mid, titulo, texto))
+        if self.graft:
+            gid = graft.inserir(tipo, ref, titulo, texto, resultado)
+            if gid:
+                self.s.x("UPDATE memoria SET graft_id=? WHERE id=?", (gid, mid))
+
+    def espelhar_pendentes(self, limite: int = 50) -> int:
+        """Linhas que ainda não têm nó no Graft (indexadas antes dele existir, ou com ele caído): poucas por vez."""
+        if not self.graft:
+            return 0
+        n = 0
+        for r in self.s.q("SELECT id, tipo, ref, titulo, texto, resultado FROM memoria WHERE graft_id IS NULL ORDER BY em DESC LIMIT ?", (limite,)):
+            gid = graft.inserir(r["tipo"], r["ref"], r["titulo"], r["texto"], r["resultado"])
+            if not gid:
+                break                        # graft caiu no meio: o resto fica para a próxima
+            self.s.x("UPDATE memoria SET graft_id=? WHERE id=?", (gid, r["id"]))
+            n += 1
+        return n
 
     def episodio(self, item_id: int | None, pr: int | None, resultado: str, titulo: str, detalhe: str, arquivos: list[str] | None = None) -> None:
         """O Desenvolvedor terminou (PR mergeado, fechado ou abandonado): fica o que foi tentado e o que deu."""
@@ -246,6 +270,7 @@ class Memoria:
             rows = self.s.q(f"SELECT m.*, 0 AS rank FROM memoria m WHERE 1=1{filtro_tipo} ORDER BY em DESC LIMIT 2000", args)
             pontuados = [(self._bm25(ts, r), r) for r in rows]
             pontuados = [(p, r) for p, r in pontuados if p > 0]
+        pontuados = self._fundir_com_graft(consulta, pontuados, tipos)
         out = []
         for base, r in pontuados:
             idade = max(0.0, agora - float(r["em"])) / DIA
@@ -256,6 +281,29 @@ class Memoria:
                         "parecido": round(jaccard(consulta, r["titulo"] + " " + r["texto"][:300]), 2)})
         out.sort(key=lambda h: -h["score"])
         return out[:k]
+
+    def _fundir_com_graft(self, consulta: str, pontuados: list, tipos: tuple[str, ...] | None) -> list:
+        """Reciprocal Rank Fusion entre a lista lexical (FTS/BM25) e a semântica do Graft (vetor + BM25 dele).
+        Um registro que só o Graft acha ("limite da conta" para "token estourou") entra pela posição dele; um que
+        os dois acham sobe. A escala vira 1/(60+posição), a mesma para as duas listas."""
+        if not self.graft:
+            return pontuados
+        semantica = graft.recuperar(consulta, k=12)
+        if not semantica:
+            return pontuados
+        K = 60.0
+        por_id: dict[int, tuple[float, Any]] = {}
+        for pos, (_, r) in enumerate(sorted(pontuados, key=lambda x: -x[0])):
+            por_id[int(r["id"])] = (1.0 / (K + pos), r)
+        for pos, h in enumerate(semantica):
+            if not h.get("tipo") or (tipos and h["tipo"] not in tipos):
+                continue
+            r = self.s.one("SELECT * FROM memoria WHERE tipo=? AND ref=?", (h["tipo"], h["ref"]))
+            if not r:
+                continue
+            base, _ = por_id.get(int(r["id"]), (0.0, r))
+            por_id[int(r["id"])] = (base + 1.0 / (K + pos), r)
+        return list(por_id.values())
 
     @staticmethod
     def _bm25(ts: list[str], r) -> float:
@@ -309,14 +357,26 @@ class Memoria:
         return [{"tipo": h["tipo"], "titulo": h["titulo"][:120], "resultado": h["resultado"], "ha_dias": round((agora - h["em"]) / DIA, 1)}
                 for h in self.buscar(str(assunto)[:600], k=k, tipos=tipos, dias=dias)]
 
+    def _forte(self, texto: str, tipo: str) -> str | None:
+        """ref do registro que o cache verificado do Graft devolve como STRONG para este texto (a mesma coisa com
+        outras palavras), ou None. WEAK não basta: só o vetor concorda, e o título pode enganar."""
+        if not self.graft:
+            return None
+        c = graft.consultar(texto)
+        return c["ref"] if c and c.get("hit") == "STRONG" and c.get("tipo") == tipo else None
+
     def estudo_parecido(self, item: dict) -> dict | None:
         """Um estudo recente de assunto parecido: reaproveitar custa 0 tokens. None se não houver um bom o bastante."""
         self.reindexar()
-        for h in self.buscar(item["titulo"], k=5, tipos=("estudo",), dias=ESTUDO_VALE_DIAS):
+        forte = self._forte(item["titulo"], "estudo")
+        hits = self.buscar(item["titulo"], k=5, tipos=("estudo",), dias=ESTUDO_VALE_DIAS)
+        if forte and forte not in {h["ref"] for h in hits}:          # o cache semântico achou o que o léxico não achou
+            hits.insert(0, {"ref": forte})
+        for h in hits:
             if str(h["ref"]) == str(item.get("id")):
                 continue
             r = self.s.one("SELECT id, titulo, estudo FROM roadmap WHERE id=?", (int(h["ref"]),))
-            if not r or not r["estudo"] or jaccard(item["titulo"], r["titulo"]) < MIN_PARECIDO_ESTUDO:
+            if not r or not r["estudo"] or (jaccard(item["titulo"], r["titulo"]) < MIN_PARECIDO_ESTUDO and str(r["id"]) != forte):
                 continue
             est = json.loads(r["estudo"])
             if est.get("modo") == "reaproveitado" or not est.get("fontes"):
@@ -327,17 +387,31 @@ class Memoria:
     def item_parecido(self, titulo: str, ignorar: int | None = None) -> dict | None:
         """Item do roteiro que já diz a mesma coisa com outras palavras (aberto ou feito há pouco)."""
         self.reindexar()
-        for h in self.buscar(titulo, k=8, tipos=("item",)):
+        forte = self._forte(titulo, "item")
+        hits = self.buscar(titulo, k=8, tipos=("item",))
+        if forte and forte not in {h["ref"] for h in hits}:
+            hits.insert(0, {"ref": forte})
+        for h in hits:
             if ignorar is not None and str(h["ref"]) == str(ignorar):
                 continue
             r = self.s.one("SELECT id, titulo, status, updated_at FROM roadmap WHERE id=?", (int(h["ref"]),))
-            if r and jaccard(titulo, r["titulo"]) >= MIN_PARECIDO_ITEM and (r["status"] != "feito" or time.time() - float(r["updated_at"]) < 14 * DIA):
-                return {"id": r["id"], "titulo": r["titulo"], "status": r["status"], "parecido": round(jaccard(titulo, r["titulo"]), 2)}
+            semantico = r is not None and str(r["id"]) == forte
+            if r and (jaccard(titulo, r["titulo"]) >= MIN_PARECIDO_ITEM or semantico) and (r["status"] != "feito" or time.time() - float(r["updated_at"]) < 14 * DIA):
+                return {"id": r["id"], "titulo": r["titulo"], "status": r["status"], "semantico": semantico,
+                        "parecido": round(max(jaccard(titulo, r["titulo"]), 0.9 if semantico else 0.0), 2)}
         # itens pendentes ainda não indexados (o índice guarda feitos/estudados): confere direto no roteiro
         for r in self.s.q("SELECT id, titulo, status FROM roadmap WHERE status IN ('pendente','em_andamento') ORDER BY id DESC LIMIT 200"):
             if (ignorar is None or r["id"] != ignorar) and jaccard(titulo, r["titulo"]) >= MIN_PARECIDO_ITEM:
                 return {"id": r["id"], "titulo": r["titulo"], "status": r["status"], "parecido": round(jaccard(titulo, r["titulo"]), 2)}
         return None
+
+    def entorno(self, assunto: str, k: int = 6) -> list[dict]:
+        """O que está ligado a este assunto no grafo do Graft (lição ↔ item ↔ PR, por palavra-chave e semântica):
+        [{tipo, ref, titulo, profundidade}]. Vazio sem Graft."""
+        if not self.graft or not assunto:
+            return []
+        return [{"tipo": n["tipo"], "ref": n["ref"], "titulo": (n.get("title") or "")[:120], "profundidade": n.get("depth")}
+                for n in graft.explorar(str(assunto)[:600], profundidade=2, feixe=4) if n.get("tipo")][:k]
 
     def poupou(self, agente: str, assunto: str, tokens: int, hits: list[dict]) -> None:
         self.s.x("INSERT INTO memoria_uso(agente,assunto,hits,poupou_tokens,created_at) VALUES(?,?,?,?,?)",
@@ -351,7 +425,7 @@ class Memoria:
         hoje = self.s.one("SELECT COUNT(*) n, COALESCE(SUM(poupou_tokens),0) t, SUM(poupou_tokens>0) r FROM memoria_uso WHERE created_at>=?", (dia,))
         por_agente = {r["agente"]: {"nome": nomes.nome(r["agente"]), "consultas": int(r["n"]), "com_lembranca": int(r["c"] or 0)}
                       for r in self.s.q("SELECT agente, COUNT(*) n, SUM(hits<>'[]') c FROM memoria_uso WHERE created_at>=? GROUP BY agente ORDER BY n DESC", (dia,))}
-        return {"fts": self.fts, "por_tipo": por_tipo, "total": sum(por_tipo.values()), "por_agente": por_agente, "equipe": sorted(RECEITA),
+        return {"fts": self.fts, "graft": graft.resumo(self.s), "por_tipo": por_tipo, "total": sum(por_tipo.values()), "por_agente": por_agente, "equipe": sorted(RECEITA),
                 "usos_24h": int(hoje["n"] or 0), "reaproveitados_24h": int(hoje["r"] or 0), "tokens_poupados_24h": int(hoje["t"] or 0),
                 "ultimos": [{"agente": u["agente"], "agente_nome": nomes.nome(u["agente"]), "assunto": u["assunto"], "hits": json.loads(u["hits"]), "poupou_tokens": u["poupou_tokens"], "em": u["created_at"]} for u in usos]}
 
