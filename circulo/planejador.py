@@ -27,6 +27,7 @@ import sqlite3
 import time
 import urllib.error
 
+from . import rastro
 from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
@@ -239,6 +240,13 @@ class Planejador:
             if pergunta is None:
                 return None, "sem_pergunta", "nenhuma pergunta do conselho com dor", None
             pid = conselho.registrar(pergunta)
+        try:
+            exigir_pergunta(self.s, pid)       # antes de qualquer gasto: item do loop sem a pergunta de origem não nasce
+        except SemPerguntaOrigem as exc:
+            from .licoes import registrar as monitorar
+            monitorar(self.ctx, rastro.PONTO, False, sujeito=f"pergunta #{pid}", motivo=str(exc),
+                      assinatura=f"rastro:{rastro.SEM_PERGUNTA_ORIGEM}", causa=rastro.SEM_PERGUNTA_ORIGEM, licao=False)
+            return pid, "recusado", f"{rastro.SEM_PERGUNTA_ORIGEM}: {exc}", None
         ja = self.s.one("SELECT item_id FROM perguntas WHERE id=? AND item_id IS NOT NULL", (pid,))
         if ja:                 # idempotente pelo id da pergunta: uma nova tentativa não grava um segundo item
             conselho.marcar(pid, "virou_item")
@@ -323,15 +331,11 @@ class Planejador:
             self.ctx.reply(f"Conselho ({pergunta.persona}): “{item['titulo'][:90]}” já existe como item #{par['id']} "
                            f"({par['status']}, {int(par['parecido'] * 100)}% parecido). Não abri outro.", "roteiro")
             return pid, "repetida", f"parecido com o item #{par['id']}: {par['titulo'][:90]}", None
-        ordem = (self.s.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
-        agora = time.time()
         detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (
             f"\nEvidência ({item['base']}): {item['dado']}" if item.get("dado") else "")
         detalhe = f"Pergunta do conselho #{pid} ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
-        rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo) "
-                       "VALUES(?,?,'loop','pendente',?,?,?,?,?)",
-                       (titulo_curto(item["titulo"]), detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora,
-                        modulo_de(item)))
+        rid = gravar_item(self.s, pid, titulo_curto(item["titulo"]), detalhe, f"pergunta do conselho #{pid}: {pergunta.persona}",
+                          modulo_de(item))
         conselho.marcar(pid, "virou_item", rid)
         marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")
@@ -373,6 +377,28 @@ SYSTEM_DIVIDIR = """Você é o Planejador do círculo autoevolutivo (repositóri
 Use o erro da última tentativa para isolar a parte difícil num sub-item próprio.
 Responda só com JSON numa linha, sem markdown:
 {"sub_itens": [{"titulo": "até 100 caracteres", "detalhe": "até 2 frases: o que mudar e onde", "teste": "o teste que prova"}]}"""
+
+
+class SemPerguntaOrigem(ValueError):
+    """Item do loop sem a pergunta do conselho que o originou (lição #15): o rastro:cadeia barraria a entrega."""
+
+
+def exigir_pergunta(store, pergunta_id: int | None) -> int:
+    """O id da pergunta de origem, se ela existe na tabela do conselho; senão SemPerguntaOrigem."""
+    if not pergunta_id or not store.one("SELECT 1 FROM perguntas WHERE id=?", (pergunta_id,)):
+        raise SemPerguntaOrigem(f"pergunta de origem #{pergunta_id} não está na tabela do conselho")
+    return pergunta_id
+
+
+def gravar_item(store, pergunta_id: int | None, titulo: str, detalhe: str, evidencia: str, modulo: str | None = None) -> int:
+    """A única forma de o planejador gravar um item do loop no roteiro: sempre preso à pergunta que o originou."""
+    pid = exigir_pergunta(store, pergunta_id)
+    ordem = (store.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
+    agora = time.time()
+    rid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo) "
+                  "VALUES(?,?,'loop','pendente',?,?,?,?,?)", (titulo, detalhe[:2000], evidencia, ordem, agora, agora, modulo))
+    store.x("UPDATE perguntas SET item_id=?, updated_at=? WHERE id=?", (rid, agora, pid))
+    return rid
 
 
 def _parse_sub_itens(texto: str) -> list[dict]:
