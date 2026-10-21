@@ -550,7 +550,7 @@ class Store:
                   ("llm_calls", "job", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
-                  ("decisions", "estado", "TEXT"))
+                  ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

@@ -190,8 +190,41 @@ class Memoria:
         if "diagnosticos" in tabelas:
             fonte("diagnosticos", "SELECT *, ultima_em AS updated_at, primeira_em AS created_at FROM diagnosticos WHERE ultima_em>? ORDER BY ultima_em LIMIT 500",
                   lambda r: self._gravar("diagnostico", r["id"], r["titulo"], f"{r['tipo']} · {r['vezes']}× · {(r['evidencia'] or '')[:500]}", f"{r['status']}/{r['acao'] or '?'}", float(r["created_at"])))
+        self._externas(cursor, n)
         self.s.set("memoria_cursor", cursor)
         return n
+
+    def _externas(self, cursor: dict, n: dict[str, int]) -> None:
+        """Memória entre repositórios: `CIRCULO_MEMORIA_EXTERNA` = caminhos (vírgula) de `circulo.db` de outros loops.
+        Lições, itens feitos e estudos deles entram neste índice (só leitura, ref `ext:<nome>:<id>`, peso ×0.7): o que um
+        loop aprendeu cuidando de um repositório vale como pista nos outros, sem mandar."""
+        import os
+        import sqlite3
+        for caminho in [c.strip() for c in os.environ.get("CIRCULO_MEMORIA_EXTERNA", "").split(",") if c.strip()]:
+            nome = os.path.basename(os.path.dirname(os.path.abspath(caminho))) or "ext"
+            chave = f"ext:{caminho}"
+            desde, maior, k = float(cursor.get(chave, 0)), float(cursor.get(chave, 0)), 0
+            try:
+                db = sqlite3.connect(f"file:{caminho}?mode=ro", uri=True, timeout=2)
+                db.row_factory = sqlite3.Row
+                with db:
+                    tabelas = {r["name"] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                    fontes = []
+                    if "licoes" in tabelas:
+                        fontes.append(("licao", "SELECT id, assinatura titulo, descricao || char(10) || 'Prevenção: ' || COALESCE(prevencao,'') texto, status, created_at, updated_at FROM licoes WHERE updated_at>? ORDER BY updated_at LIMIT 300"))
+                    if "roadmap" in tabelas:
+                        fontes.append(("item", "SELECT id, titulo, COALESCE(detalhe,'') texto, status, created_at, updated_at FROM roadmap WHERE updated_at>? AND status IN ('feito','contestado') ORDER BY updated_at LIMIT 300"))
+                        fontes.append(("estudo", "SELECT id, titulo, estudo texto, status, created_at, updated_at FROM roadmap WHERE updated_at>? AND estudo LIKE '{%justificativa%' ORDER BY updated_at LIMIT 300"))
+                    for tipo, sql in fontes:
+                        for r in db.execute(sql, (desde,)):
+                            self._gravar(tipo, f"ext:{nome}:{r['id']}", f"[{nome}] {r['titulo']}", str(r["texto"] or "")[:1500], r["status"], float(r["created_at"]),
+                                         0.7 * PESO_RESULTADO.get(r["status"] or "", 1.0))
+                            maior, k = max(maior, float(r["updated_at"])), k + 1
+            except sqlite3.Error:
+                continue                                    # banco indisponível (outro loop reiniciando): tenta na próxima
+            cursor[chave] = maior
+            if k:
+                n[chave] = k
 
     # ------------------------------------------------------------ recuperação
     def buscar(self, consulta: str, k: int = 6, tipos: tuple[str, ...] | None = None, dias: float | None = None) -> list[dict]:
