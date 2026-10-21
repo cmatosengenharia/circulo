@@ -64,6 +64,15 @@ def test_parse():
     assert _parse("sem json") is None and _parse('{"titulo": ""}') is None
 
 
+def test_resposta_cortada_pelo_limite_de_tokens_depois_do_detalhe_vira_item():
+    """Lição #45: a resposta cortada no "sucesso" (título e detalhe completos) era descartada como "sem JSON válido"."""
+    cortada = ('{"titulo": "Esqueleto do teste citado", "detalhe": "Item que cita teste inexistente gera o esqueleto.", '
+               '"sucesso": "Lições novas com \'file or directory not')
+    item = _parse(cortada)
+    assert item is not None and item["titulo"] == "Esqueleto do teste citado" and item["sucesso"] == ""
+    assert _parse('{"titulo": "Só o título", "detalhe": "Item que cita') is None   # detalhe cortado não vira item
+
+
 def test_loop_planeja_quando_fica_sem_trabalho(circle, repo):  # noqa: F811
     dev, _ = preparar(circle, repo, PlanLLM())
     circle.self_dev = dev
