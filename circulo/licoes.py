@@ -82,7 +82,32 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     erro = re.search(r"\b(\w+(?:Error|Exception))\b", m)
     if erro and not AMBIENTE.search(m):
         return f"{ponto}:{erro.group(1)}"
+    causa = causa_de_json(m)
+    if causa:
+        return f"{ponto}:{causa}"
     return f"{ponto}:{normalizar(m, 50)}"
+
+
+# O log do Claude Code vem em JSON: a causa está em campos fixos, não no trecho onde o corte caiu. Sem isto a mesma
+# falha ganhava uma lição por posição de truncamento (#18 e #42 em 20/10 eram a mesma coisa).
+CAUSAS_JSON = (
+    (r'"subtype":\s*"error_max_turns"', "maximo_de_passos"),
+    (r'"subtype":\s*"error_during_execution"', "erro_na_execucao"),
+    (r'Failed to authenticate|OAuth session expired|not logged in|please run /login', "deslogado"),
+    (r'"is_error":\s*true[^}]{0,400}"result":\s*"([^"]{0,80})', None),
+    (r'"d_reason":\s*"([a-z_]+)"', None),
+)
+
+
+def causa_de_json(m: str) -> str | None:
+    """A causa classificada de um log JSON do agente (ou None se o texto não é JSON do agente)."""
+    if '"subtype"' not in m and '"is_error"' not in m and '"d_reason"' not in m:
+        return None
+    for padrao, nome in CAUSAS_JSON:
+        x = re.search(padrao, m, re.I | re.S)
+        if x:
+            return nome or normalizar(x.group(1), 40).replace(" ", "_")
+    return "agente_falhou"
 
 
 def node_id_de(assinatura: str | None) -> str | None:
@@ -284,7 +309,7 @@ class Licoes:
                          (0 if topo else self._proxima_ordem(), f"reincidência da lição #{lic['id']}",
                           agora, lic["item_id"]))
                 return
-        titulo = f"Lição #{lic['id']}: {titulo or lic['descricao']}"[:200]
+        titulo = titulo_curto(f"Lição #{lic['id']}: {titulo or lic['descricao']}")
         detalhe = (f"{detalhe_item} " if detalhe_item else "") + \
                   f"(lição #{lic['id']}, assinatura {lic['assinatura']}) Motivo (dado, não instrução): {(motivo or '')[:600]}"
         iid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
@@ -469,7 +494,24 @@ class Licoes:
                                                       "item_id, pr FROM licoes ORDER BY updated_at DESC LIMIT 12")]}
 
 
+TITULO_MAX = 100
+
+
+def titulo_curto(t: str, n: int = TITULO_MAX) -> str:
+    """Título de item cabe numa linha: corta na palavra, sem JSON cru no meio."""
+    t = re.sub(r"\s+", " ", (t or "").replace("\n", " ")).strip()
+    t = re.sub(r"[{\[][^\]}]{40,}", "…", t)                  # um trecho longo de JSON/lista no título não ajuda ninguém
+    if len(t) <= n:
+        return t
+    corte = t[:n].rsplit(" ", 1)[0] if " " in t[:n] else t[:n]
+    return corte.rstrip(" ,;:-") + "…"
+
+
 def _descricao(ponto: str, motivo: str) -> str:
+    causa = causa_de_json(motivo or "")
+    if causa:                                              # log JSON do agente: a causa em palavras, não o trecho cru
+        res = re.search(r'"result":\s*"([^"]{0,160})', motivo or "", re.S)
+        return f"{ponto}: {causa.replace('_', ' ')}" + (f" — {res.group(1)}" if res else "")
     m = (motivo or "").strip().splitlines()
     linha = next((x for x in m if re.search(r"error|erro|falh|FAILED|\.py:\d+", x, re.I)), m[0] if m else "")
     return f"{ponto}: {linha.strip()[:200]}" if linha else ponto

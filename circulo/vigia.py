@@ -417,6 +417,8 @@ class Vigia:
                     self.ctx.reply(f"Vigia: resolvido — {r['titulo']} (durou {int((now - r['primeira_em']) / 60)} min).", "saude")
         self.s.set("vigia_ultima", {"em": now, "achados": len(achados), "abertas": len([a for a in achados]), "agiu": agiu})
         medico = self.medico.rodar(now)
+        from . import higiene
+        higiene.rodar(self.s, now)                               # expira "depende de você", encurta títulos, une lições iguais
         from . import capacidade
         cap = capacidade.rodar(self.s, self.ctx.dl, now)        # quem está sobrecarregado; sobe/desce trabalhadores
         return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou, "medico": medico,

@@ -29,6 +29,7 @@ import urllib.error
 from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto
+from .licoes import titulo_curto
 from .merge_gate import CONSTITUICAO
 
 MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
@@ -325,7 +326,7 @@ class Planejador:
         detalhe = f"Pergunta do conselho #{pid} ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
         rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
                        "VALUES(?,?,'loop','pendente',?,?,?,?)",
-                       (item["titulo"][:200], detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora))
+                       (titulo_curto(item["titulo"]), detalhe[:2000], f"pergunta do conselho #{pid}: {pergunta.persona}", ordem, agora, agora))
         conselho.marcar(pid, "virou_item", rid)
         marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.53.0 — 2026-10-21
+
+**Higiene: as telas e a memória sem ruído.**
+
+- **Lição com causa, não com trecho de log**: o log JSON do Claude Code vira causa classificada (`deslogado`,
+  `maximo_de_passos`, `erro_na_execucao`, a `result`/`d_reason` em palavras) na assinatura e na descrição. Em 20/10 a
+  mesma falha tinha uma lição por posição de truncamento (#18, #42).
+- **Título de item ≤ 100 caracteres** (`titulo_curto`: corta na palavra, tira JSON do meio; o detalhe guarda o original)
+  em todas as origens (lição, Gerente de produto).
+- **"Depende de você" expira em 7 dias**: vira `descartado` com a evidência dizendo que expirou (reativável no painel).
+- **`circulo/higiene.py`** roda na thread do SRE uma vez por hora (e ao subir, como migração): expira dependentes, encurta
+  títulos, reassina e une as lições de JSON à mais antiga da mesma causa. Resumo em alerta de controle.
+
 ## 1.52.0 — 2026-10-21
 
 **Desenvolvedor com sessão contínua e contexto do código.** Cada item custava 8–12 sessões do Claude Code porque cada
