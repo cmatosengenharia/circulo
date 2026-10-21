@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.61.0 — 2026-10-21
+
+**Auditoria de todo o código: 20 defeitos reais corrigidos (três revisões independentes, cada achado confirmado no código).**
+
+Núcleo e banco
+- `state.py`: `BEGIN IMMEDIATE` que falha (outro processo segurando a escrita) não vaza mais o lock — antes travava todas
+  as threads para sempre; COMMIT que falha faz ROLLBACK em vez de deixar a transação aberta; conexão com `timeout=30 s`
+  (o painel/SRE em processo próprio estourava "database is locked" em 5 s); índices em `decisions(question, created_at)`.
+- `loop.py`: `Circle(dono=False)` para o plano de controle e `circulo dev` — um segundo processo não recupera eventos,
+  não devolve itens do Developer à fila nem restaura snapshot (cada reinício do controle duplicava PR em andamento).
+- `corpo.py`: erro de rede/ambiente (URLError, 5xx, timeout, conta deslogada) não reprova o código novo nem o põe em
+  `reprovados`; validação que passa de 20 min reprova em vez de travar o loop a cada giro.
+- `aluno.py`: esquema criado statement a statement — `executescript` fechava a transação do pedido do usuário
+  (COMMIT implícito) e o pedido era reprocessado: lançamento duplicado.
+
+Developer e gate
+- `self_dev.py`: exceção no meio do item (timeout dos testes, 4xx depois do push) devolve o item à fila com o motivo em
+  vez de deixá-lo `em_andamento` para sempre; item com remoto mas sem GitHub volta como "depende de você";
+  `TypeError` do agente não repete a sessão inteira do Claude Code; erro lendo o stream mata o Claude Code antes de o
+  worktree sumir. Helpers de ambiente e worktree foram para `reproducao.py`.
+- `reparo.py`: o Developer de produção pulava a "reprodução primeiro" (o override de `portao_pr` não chamava
+  `reproduz`; todo PR saía com "Reprodução: n/a"). `fatiador.py`: item que precisa ser dividido e o Planejador não
+  divide sai da fila desativado com o motivo (antes era pego, cortado sem agente e devolvido a cada giro).
+- `merge_gate.py`: erro de API num PR não bloqueia a avaliação dos outros. `revisor.py`: `linhas` era o nº de arquivos
+  (`--shortstat`), agora soma o `--numstat`.
+
+Decisão e aprendizado
+- `jev_lab.py`: `rodou_hoje_sem_render` casava o papel da LLM por `LIKE '%project%'`, que nunca batia; o Jev recusava
+  o 4º gasto do dia como "rodou sem render". Agora cada ação tem seus papéis.
+- `aluno_jev.py`: noul comum prevê "0.9", não "true"; a conversão devolvia "não" com confiança alta.
+- `evolution.py`: token só em receitas corrigidas dava `ZeroDivisionError` a cada giro e matava a meta-evolução.
+- `engine.py`: braço do A/B de prompt viaja no resultado do ciclo; em thread-local ele ficava na thread do pool e o
+  experimento nunca acumulava.
+
+SRE e painel
+- `medico.py`: padrão que voltava depois de fechado estourava `IntegrityError UNIQUE(chave)` e derrubava a passagem
+  inteira do SRE (higiene, capacidade, Graft, guardião da conta) enquanto durasse. `vigia.py`: erro da passagem fica
+  em `vigia_erro` em vez de `pass`.
+- `confianca.py`: medição de frescor vinda do navegador é saneada (NaN/inf/aba parada), o SLO só julga com ≥ 100
+  amostras e a lição é `ambiente` — uma aba em segundo plano abria lição estrutural e travava a evolução.
+- `painel.py`: Host local exigido em todas as rotas (DNS rebinding), origem conferida por `urlparse` (não
+  `startswith`: `localhost.evil.com`), inteiros da query e corpo não-objeto viram 400/padrão em vez de conexão
+  fechada; projeto inexistente não dá 500. `conexoes.py`: limpeza pelo rowid, sem `COUNT` fora do lock.
+  `higiene.py`: título sem espaço > 100 era encurtado de novo a cada hora.
+- `tests/test_auditoria.py`: 11 regressões.
+
 ## 1.60.0 — 2026-10-21
 
 **Graft: memória semântica local do time ao lado do índice de texto.**

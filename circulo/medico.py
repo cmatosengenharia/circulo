@@ -242,6 +242,15 @@ class Medico:
         now = now or time.time()
         achados = sondar(self.s, now)
         abertos = {r["chave"]: dict(r) for r in self.s.q("SELECT * FROM diagnosticos WHERE status!='fechado'")}
+        # fechado que volta: reabre com reincidência ANTES de contar como novo (a chave é UNIQUE: inserir de novo estourava
+        # IntegrityError e derrubava a passagem inteira do SRE enquanto o padrão durasse)
+        for a in achados:
+            if a["chave"] in abertos:
+                continue
+            r = self.s.one("SELECT * FROM diagnosticos WHERE chave=? AND status='fechado'", (a["chave"],))
+            if r:
+                self.s.x("UPDATE diagnosticos SET status='observando', reaberturas=reaberturas+1, ultima_em=?, fechado_em=NULL WHERE id=?", (now, r["id"]))
+                abertos[a["chave"]] = {**dict(r), "status": "observando"}
         novos = [a for a in achados if a["chave"] not in abertos]
         agiu = []
         from .memoria import do_ctx
@@ -270,11 +279,6 @@ class Medico:
                 self._liberar(r, now)
                 if callable(getattr(self.ctx, "reply", None)):
                     self.ctx.reply(f"Médico: fechado pelo sintoma — {r['titulo']} (sem ocorrência há 30 min).", "medico")
-        # fechado que volta: reabre com reincidência (e a lição, se houver, sobe de camada por conta própria)
-        for a in achados:
-            r = self.s.one("SELECT id, reaberturas FROM diagnosticos WHERE chave=? AND status='fechado'", (a["chave"],))
-            if r:
-                self.s.x("UPDATE diagnosticos SET status='observando', reaberturas=reaberturas+1, ultima_em=?, fechado_em=NULL WHERE id=?", (now, r["id"]))
         return {"achados": len(achados), "novos": len(novos), "agiu": agiu}
 
     def _liberar(self, r: dict, now: float) -> None:

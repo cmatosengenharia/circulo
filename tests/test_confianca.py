@@ -59,13 +59,29 @@ def test_projecao_mostra_o_que_vem(circle):
 
 
 def test_frescor_do_painel_e_um_neuronio_monitorado(circle):
-    assert registrar_frescor(circle.store, 400)
-    assert not registrar_frescor(circle.store, 400)                    # no máximo 1 por minuto
-    circle.store.set("painel_frescor_em", 0)
-    registrar_frescor(circle.store, FRESCOR_MAX_MS + 1)
-    v = circle.store.q("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id")
+    s = circle.store
+    for _ in range(99):
+        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(400, ?)", (time.time(),))
+    assert registrar_frescor(s, 400)                                    # 100ª amostra: o p99 passa a valer
+    assert not registrar_frescor(s, 400)                                # no máximo 1 por minuto
+    s.set("painel_frescor_em", 0)
+    for _ in range(5):
+        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?, ?)", (FRESCOR_MAX_MS + 1, time.time()))
+    registrar_frescor(s, FRESCOR_MAX_MS + 1)
+    v = s.q("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id")
     assert [x["ok"] for x in v] == [1, 0]
-    assert circle.store.one("SELECT classe FROM licoes WHERE assinatura='painel:frescor_atrasado'")["classe"] == "estrutural"
+    # painel atrasado é ambiente, não defeito do código: não bloqueia a evolução
+    assert s.one("SELECT classe FROM licoes WHERE assinatura='painel:frescor_atrasado'")["classe"] == "ambiente"
+    # aba parada (Mac dormiu), NaN e inf não são medição e nunca viram lição
+    assert not registrar_frescor(s, 3_600_000) and not registrar_frescor(s, float("inf")) and not registrar_frescor(s, "x")
+    assert s.one("SELECT COUNT(*) n FROM frescor WHERE atraso_ms > 600000")["n"] == 0
+
+
+def test_frescor_com_poucas_amostras_nao_julga(circle):
+    for _ in range(10):
+        registrar_frescor(circle.store, FRESCOR_MAX_MS * 10)
+        circle.store.set("painel_frescor_em", 0)
+    assert circle.store.one("SELECT COUNT(*) n FROM verificacoes WHERE ponto='painel:frescor'")["n"] == 0
 
 
 def test_sse_empurra_confianca_e_sinapses(circle, painel):  # noqa: F811
@@ -92,7 +108,7 @@ def test_api_confianca_e_frescor(circle, painel):  # noqa: F811
     with urllib.request.urlopen(painel + "/api/confianca", timeout=5) as r:
         assert json.loads(r.read())["veredito"] in ("parado", "confiavel", "atencao", "falha")
     code, body = post(painel + "/api/frescor", {"atraso_ms": 120}, {"X-Circulo": "1"})
-    assert code == 200 and body["registrado"]
+    assert code == 200 and "registrado" in body             # com poucas amostras a medição entra mas o SLO ainda não julga
     assert post(painel + "/api/frescor", {"atraso_ms": 120})[0] == 403  # sem o cabeçalho do painel
 
 

@@ -325,6 +325,13 @@ def _tokens_hoje(store) -> int:
     return int(r["tokens"] or 0) if r else 0
 
 
+# que papel de LLM cada ação do porteiro realmente aciona: é isso que conta como "rendeu" hoje (antes, um LIKE pelo
+# prefixo da ação — "project", "idle", "planejar" — nunca casava com papel nenhum e o Jev recusava o 4º gasto do dia)
+PAPEIS_DA_ACAO = {"project_cycle": ("builder", "improver", "researcher", "rubric", "reflector"), "estudo_pedido": ("estudo",),
+                  "planejar_roteiro": ("planejador",), "developer_feature": ("developer",), "llm_fallback": ("fallback",),
+                  "harness_variant": ("builder", "improver"), "idle_evolution": None, "apply_proposal": None, "self_fix": None}
+
+
 def estado_worth(store, budget, action: str, est: int, context: Mapping[str, Any]) -> dict:
     """O que decide se vale gastar: valor, custo relativo ao dia, se destrava a fila, e se a mesma ação já rodou hoje sem render."""
     agora = time.time()
@@ -334,8 +341,16 @@ def estado_worth(store, budget, action: str, est: int, context: Mapping[str, Any
     aprov = store.q("SELECT value, created_at FROM decisions WHERE question='worth_spending' AND created_at>=? AND estado LIKE ? ORDER BY id DESC LIMIT 12",
                     (hoje, f'%"action": "{action}"%'))
     rodou = sum(1 for r in aprov if float(r["value"] or 0) >= 0.5)
-    rendeu = int(store.one("SELECT COUNT(*) n FROM llm_calls WHERE created_at>=? AND ok=1 AND COALESCE(aceita,1)=1 AND papel LIKE ?",
-                           (hoje, f"%{action.split('_')[0]}%"))["n"]) if action else 0
+    papeis = PAPEIS_DA_ACAO.get(action)
+    if action and papeis is None:
+        rendeu = rodou                   # ação sem chamada de LLM própria (idle, apply, self_fix): não há o que "render"
+    elif action:
+        cond = " OR ".join("papel=? OR papel LIKE ?" for _ in papeis)          # papel exato ou com sufixo ("fallback:x")
+        args = [x for p_ in papeis for x in (p_, p_ + ":%")]
+        rendeu = int(store.one(f"SELECT COUNT(*) n FROM llm_calls WHERE created_at>=? AND ok=1 AND COALESCE(aceita,1)=1 AND ({cond})",
+                               (hoje, *args))["n"])
+    else:
+        rendeu = 0
     tokens_dia = _tokens_hoje(store)
     custo_pct = round(100.0 * est / tokens_dia, 1) if tokens_dia else (100.0 if est > 20_000 else 0.0)
     desbloqueia = bool(context.get("pergunta_validada") or context.get("item_esperando_estudo") or context.get("desbloqueia_fila"))

@@ -52,6 +52,7 @@ class CycleResult:
     nota: str = ""
     lessons: list[int] = field(default_factory=list)
     fontes: int = 0
+    arm: tuple = (None, None)       # braço do A/B de prompt usado neste ciclo (lab)
 
     @property
     def ganho(self) -> float:
@@ -111,7 +112,8 @@ class Engine:
         system = cfg["system"]
         if self.lab and role in ("builder", "improver"):
             system, arm, exp = self.lab.system_for(role)
-            self._tl.arm = (arm, exp)
+            with self._tokens_lock:
+                res.arm = (arm, exp)             # no resultado do ciclo: com variantes em paralelo o thread-local era de outra thread
         escolha = self.ctx.dl.pick_model_detalhe(role, {"tipo": project["tipo"], "pedido": project["pedido"][:300],
                                                          "tarefa": prompt})
         model = escolha["modelo"]
@@ -236,8 +238,7 @@ class Engine:
             self.ctx.dl.project_id = prev_dl
             pausa.ciclo_terminou(self.s, pid)
         now = time.time()
-        arm, exp = getattr(self._tl, "arm", (None, None))
-        self._tl.arm = (None, None)
+        arm, exp = res.arm
         if self.lab and arm and res.aceita is not None:
             self.lab.record(exp, arm, res.ganho, bool(res.aceita))
         marcar_resultado(self.s, pid, self.s.tick, res.aceita)

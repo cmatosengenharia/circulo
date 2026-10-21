@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> None:
         print(f"restaurado. O banco anterior ficou guardado em {safety}")
         return
 
-    c = Circle(args.data)
+    c = Circle(args.data, dono=args.cmd == "run")
     if args.cmd == "dev":
         if c.self_dev is None:
             print("Developer indisponível: defina CIRCULO_REPO_DIR (clone do repo) e instale o Claude Code (comando `claude`).")

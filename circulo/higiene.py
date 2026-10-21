@@ -32,6 +32,8 @@ def encurtar_titulos(store: Store, agora: float) -> int:
     n = 0
     for r in store.q("SELECT id, titulo, detalhe FROM roadmap WHERE length(titulo)>100"):
         curto = titulo_curto(r["titulo"])
+        if curto == r["titulo"] or len(curto) > 100:
+            curto = r["titulo"][:99].rstrip() + "…"          # sem espaço para cortar: cabe assim mesmo (antes repetia toda hora)
         detalhe = (r["detalhe"] or "")
         if r["titulo"] not in detalhe:
             detalhe = f"Título original: {r['titulo']}\n{detalhe}"
