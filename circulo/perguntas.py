@@ -300,7 +300,13 @@ def _m_recusas_gasto(s, agora):
 
 def _m_conflitos_pr(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM merges WHERE reason LIKE 'conflito%' AND created_at>=?", (agora - 7 * 86400,))
-    return (min(1.0, n / 3), {"conflitos_7d": n})
+    prs: dict[str, set] = {}             # arquivo → PRs que conflitaram nele (git merge-tree, gravado pelo revisor)
+    for r in s.q("SELECT de, detalhe FROM elos WHERE relacao='conflito_main' AND em>=?", (agora - 7 * 86400,)):
+        for a in json.loads(r["detalhe"] or "{}").get("arquivos", []):
+            prs.setdefault(a, set()).add(r["de"])
+    por_arquivo = {a: len(p) for a, p in sorted(prs.items(), key=lambda kv: -len(kv[1]))}
+    return (min(1.0, n / 3), {"conflitos_7d": n, "arquivos_7d": por_arquivo,
+                              "repetidos": [a for a, k in por_arquivo.items() if k >= 2]})
 
 
 def _m_licoes_abertas(s, agora):

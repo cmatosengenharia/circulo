@@ -689,7 +689,7 @@ class Circle:
         elif pick == "propor_feature":
             self.developer.idle()
         elif pick == "revisar_prs":
-            revisor.revisar(self.store, self.gate)      # rede, checks pendentes ou atrás da main: adia com backoff
+            revisor.revisar(self.store, self.gate, repo=getattr(self.self_dev, "repo", None))   # adia com backoff; grava arquivos em conflito
         elif pick == "planejar_roteiro":
             self.planejador.run(autorizado=True)       # o gasto já foi decidido acima: um porteiro só
         elif pick == "estudar_pedido":
