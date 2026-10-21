@@ -106,16 +106,32 @@ class Corpo:
             patch.write_text(diff + "\n", encoding="utf-8")
         # -f: arquivo não rastreado no caminho do código novo (ex.: cópia manual) já está guardado no patch acima
         # (lição #1 da máquina do loop: sem -f, o checkout recusava e a troca nunca acontecia)
+        from .guardrails import esquema_hash, snapshot
+        snap = snapshot(self.s, self.data, "mudanca")          # o banco de antes da troca: o rollback de dados parte daqui
+        esquema = esquema_hash(self.s)
         self._git(["checkout", "-q", "-f", "-B", "main", alvo])
         self._git(["reset", "-q", "--hard", alvo])   # (sem `git clean`: arquivo não rastreado nunca é apagado)
         self._set(estado="validando", sha=alvo, anterior=anterior, desde_tick=self.s.tick, giros_ok=0, erros=0,
-                  patch=str(patch) if patch else None)
+                  patch=str(patch) if patch else None, snapshot=str(snap) if snap else None, esquema=esquema)
         monitorar(self.ctx, "corpo:atualizar", True, sujeito=alvo[:12])
         self._rastrear(anterior, alvo)
         self.ctx.reply(f"Corpo atualizado: {anterior[:7]} → {alvo[:7]} (validado antes: importação e testes). "
                        f"Reiniciando; os próximos {VALIDAR_GIROS} giros são a prova.", "merge")
         self.reiniciar = f"código atualizado para {alvo[:7]}"
         return {"status": "atualizado", "alvo": alvo, "anterior": anterior, "patch": str(patch) if patch else None}
+
+    def _rollback_de_dados(self, st: dict) -> None:
+        """Código voltou; os dados voltam junto só se a versão reprovada mudou o esquema do banco (o código antigo pode
+        não ler o novo). Senão, o que o loop aprendeu nesses giros fica."""
+        from .guardrails import esquema_hash, pedir_restauracao
+        snap = st.get("snapshot")
+        if not snap or not Path(snap).exists():
+            return
+        if st.get("esquema") and esquema_hash(self.s) == st["esquema"]:
+            self.ctx.reply("Corpo: o esquema do banco não mudou na versão reprovada; os dados ficam.", "saude")
+            return
+        pedir_restauracao(self.data, Path(snap), f"rollback de dados junto com o de código ({str(st.get('sha', ''))[:7]} mudou o esquema)")
+        self.ctx.reply(f"Corpo: a versão reprovada mudou o esquema do banco; ao reiniciar, o banco volta ao snapshot de antes da troca ({Path(snap).name}).", "saude")
 
     def _rastrear(self, anterior: str, alvo: str) -> None:
         """Elo exato PR → versão: o gate faz squash com o título terminando em (#N), então o git diz quais PRs entraram."""
@@ -142,6 +158,7 @@ class Corpo:
             if st["erros"] >= MAX_ERROS_NA_VALIDACAO and self.disponivel and st.get("anterior"):
                 self._git(["reset", "-q", "--hard", st["anterior"]], check=False)
                 self._set(estado="revertido", reprovados=((st.get("reprovados") or []) + [st["sha"]])[-20:])
+                self._rollback_de_dados(st)
                 from .rastro import elo
                 elo(self.s, f"versao:{str(st.get('sha', ''))[:12]}", f"versao:{str(st.get('anterior'))[:12]}", "revertida")
                 monitorar(self.ctx, "corpo:evidencia", False, sujeito=str(st.get("sha", ""))[:12],

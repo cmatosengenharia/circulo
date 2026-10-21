@@ -154,3 +154,42 @@ def test_arquivo_nao_rastreado_no_caminho_nao_trava_a_troca(circle, repos, tmp_p
     r = Corpo(circle.ctx, vivo, tmp_path, validacao=OK).run()
     assert r["status"] == "atualizado" and git(vivo, "rev-parse", "HEAD") == novo
     assert (vivo / "novo.py").read_text() == "X = 1\n" and "cópia manual" in open(r["patch"]).read()
+
+
+# ------------------------------------------------------------ 1.54.0: snapshot antes da troca e rollback de dados
+
+def test_troca_de_versao_tira_snapshot_e_rollback_restaura_so_se_o_esquema_mudou(circle, tmp_path):
+    from circulo import guardrails
+    s = circle.store
+    data = tmp_path / "dados"
+    data.mkdir()
+    snap = guardrails.snapshot(s, data, "mudanca")
+    assert snap and snap.exists() and "_mudanca.db" in snap.name
+    h = guardrails.esquema_hash(s)
+    assert guardrails.esquema_hash(s) == h                                              # determinístico
+    s.x("CREATE TABLE tabela_nova(id INTEGER)")
+    assert guardrails.esquema_hash(s) != h                                              # mudou o esquema
+    marca = guardrails.pedir_restauracao(data, snap, "teste")
+    assert marca.exists()
+    db = data / "circulo.db"
+    import sqlite3
+    c = sqlite3.connect(db)
+    c.execute("CREATE TABLE sujo(x)")
+    c.commit()
+    c.close()
+    r = guardrails.restaurar_se_pedido(data, db)
+    assert r and r["snapshot"] == str(snap) and not marca.exists()
+    c = sqlite3.connect(db)
+    assert not c.execute("SELECT name FROM sqlite_master WHERE name='sujo'").fetchall()   # o banco voltou ao snapshot
+    assert c.execute("SELECT name FROM sqlite_master WHERE name='decisions'").fetchall()
+    c.close()
+    assert guardrails.restaurar_se_pedido(data, db) is None                              # sem pedido, nada
+
+
+def test_codeowners_cobre_a_constituicao():
+    from pathlib import Path
+    from circulo.merge_gate import CONSTITUICAO
+    txt = (Path(__file__).resolve().parent.parent / ".github" / "CODEOWNERS").read_text()
+    for arq in CONSTITUICAO:
+        assert f"/{arq}" in txt, arq
+    assert "@cmatosengenharia" in txt

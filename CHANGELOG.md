@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.54.0 — 2026-10-21
+
+**Rollback de dados junto com o de código, e a constituição protegida fora do sistema.**
+
+- **Snapshot do banco antes de cada troca de versão** (`guardrails.snapshot(…, "mudanca")`, guardado no estado do
+  corpo com a impressão digital do esquema). No rollback de código, se a versão reprovada **mudou o esquema** (tabela ou
+  coluna nova que o código antigo não lê), o corpo deixa um pedido (`restaurar.json`) e o loop, ao subir, restaura o
+  snapshot (o banco atual fica guardado como `antes_de_restaurar`). Esquema igual → os dados ficam.
+- **`.github/CODEOWNERS`** com os arquivos da constituição (`merge_gate`, `policy`, `budget`, `guardrails`, `self_dev`,
+  `corpo`, `.github/`, `test_arquitetura`) apontando para você. Para valer, no GitHub: Settings → Branches → main →
+  "Require a pull request before merging" + "Require review from Code Owners" (só o dono do repositório faz; é a única
+  trava que não vive dentro do sistema que ela protege). Teste garante que CODEOWNERS cobre toda a constituição.
+
 ## 1.53.0 — 2026-10-21
 
 **Higiene: as telas e a memória sem ruído.**

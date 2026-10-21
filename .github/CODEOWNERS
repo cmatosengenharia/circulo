@@ -1,0 +1,11 @@
+# Constituição do loop: só uma pessoa aprova mudanças aqui. O gate de merge do próprio loop já recusa PRs do Developer
+# que toquem estes arquivos; CODEOWNERS + proteção de branch é a trava fora do sistema que ela protege.
+# Para valer: Settings → Branches → main → "Require a pull request before merging" + "Require review from Code Owners".
+/circulo/merge_gate.py   @cmatosengenharia
+/circulo/policy.py       @cmatosengenharia
+/circulo/budget.py       @cmatosengenharia
+/circulo/guardrails.py   @cmatosengenharia
+/circulo/self_dev.py     @cmatosengenharia
+/circulo/corpo.py        @cmatosengenharia
+/.github/                @cmatosengenharia
+/tests/test_arquitetura.py @cmatosengenharia

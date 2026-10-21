@@ -35,18 +35,14 @@ from .orcamento_dia import avisar_marcos, com_tokens_dia
 from .policy import PolicyStore
 from .state import Store
 
-# trabalho real: roda a cada giro enquanto existir (corrigir_codigo espaçado: cada tentativa usa o Claude Code)
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar")
-# indagar entrou no TRABALHO em 1.30: era manutenção em rodízio com outras 8 e rodou 3 vezes em 3 h; as perguntas são o
-# começo da autoevolução, então rodam a cada giro em que o Indagador tem o que perguntar (ele mesmo dosa o intervalo).
+# indagar entrou no TRABALHO em 1.30: em rodízio rodava 3× em 3 h; as perguntas são o começo da autoevolução.
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
-# Medido no Mac (19/10, 3 h): 121 de 180 min eram descanso de 5 min enquanto um PR esperava o CI ou o Developer esperava
-# os 2 giros de espaçamento. Em voo, o giro volta em 45 s; o descanso longo fica só para quando não há nada a caminho.
+# Medido no Mac (19/10): 121 de 180 min eram descanso de 5 min com PR no CI; em voo o giro volta em 45 s.
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
-# valor esperado de cada tarefa para o porteiro do gasto: trabalho real que você pediu vale mais que manutenção
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop em docs/", "analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
            "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
@@ -83,7 +79,11 @@ class Circle:
                  gate: MergeGate | None = None, self_dev: SelfDeveloper | None = None, metricas: Metricas | None = None):
         self.data_dir = Path(data_dir)
         self.metricas = metricas if metricas is not None else METRICAS
+        from .guardrails import restaurar_se_pedido
+        restaurado = restaurar_se_pedido(self.data_dir, Path(db_path or (self.data_dir / "circulo.db")))   # rollback de dados pedido pelo corpo
         store = Store(db_path or (self.data_dir / "circulo.db"))
+        if restaurado:
+            store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('saude',?,?,0)", (f"Banco restaurado do snapshot {Path(restaurado['snapshot']).name} ({restaurado['motivo']}).", time.time()))
         policies = PolicyStore(store)
         now = now or (lambda: datetime.now(TZ))
         budget = Budget(store, lambda: com_tokens_dia(policies.get()), now)

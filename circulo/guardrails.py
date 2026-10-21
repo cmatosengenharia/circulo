@@ -84,6 +84,40 @@ def restore(db_path: Path, snapshot_file: Path) -> Path:
     return safety
 
 
+def esquema_hash(store: Store) -> str:
+    """Impressão digital do esquema (tabelas e colunas): mudou entre versões → o rollback de código pede o de dados."""
+    import hashlib
+    rows = store.q("SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name")
+    return hashlib.sha1("\n".join(f"{r['type']}:{r['name']}:{r['sql']}" for r in rows).encode()).hexdigest()[:16]
+
+
+def pedir_restauracao(data_dir: Path, snapshot_file: Path, motivo: str) -> Path:
+    """O processo que roda não pode trocar o próprio banco: deixa o pedido num arquivo; quem sobe depois executa."""
+    import json
+    marca = Path(data_dir) / "restaurar.json"
+    marca.write_text(json.dumps({"snapshot": str(snapshot_file), "motivo": motivo, "em": time.time()}), encoding="utf-8")
+    return marca
+
+
+def restaurar_se_pedido(data_dir: Path, db_path: Path) -> dict | None:
+    """Ao subir: se há um pedido de restauração e o snapshot existe, restaura (o banco atual fica guardado) e apaga o pedido."""
+    import json
+    marca = Path(data_dir) / "restaurar.json"
+    if not marca.exists():
+        return None
+    try:
+        pedido = json.loads(marca.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        marca.unlink(missing_ok=True)
+        return None
+    marca.unlink(missing_ok=True)
+    snap = Path(pedido.get("snapshot", ""))
+    if not snap.exists() or time.time() - float(pedido.get("em", 0)) > 6 * 3600:    # pedido velho: ignora
+        return None
+    guardado = restore(Path(db_path), snap)
+    return {"snapshot": str(snap), "guardado": str(guardado), "motivo": pedido.get("motivo")}
+
+
 # ------------------------------------------------------------------ orçamento de mudanças
 def level2_changes_today(store: Store) -> int:
     day0 = datetime.now(TZ).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
