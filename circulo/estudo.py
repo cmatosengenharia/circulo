@@ -204,12 +204,16 @@ class Estudo:
             r["veredito"] = "adotar"
         # Jev: a evidência sustenta o veredito? (só pode deixar mais conservador)
         if r["veredito"] != "adotar":
+            from .jev_lab import estado_evidencia
             d = self.ctx.dl.ask("evidencia_sustenta", Question(
                 "noul", f"A evidência encontrada sustenta {r['veredito']} o pedido em vez de executá-lo como está?",
-                SN("há `n_fontes` ≥ 2 e `n_citacoes` reais, e `justificativa` aponta um fato concreto das fontes que contradiz ou melhora o pedido",
-                   "as fontes são poucas ou a justificativa é opinião, genérica ou não decorre das fontes")),
-                {"veredito": r["veredito"], "n_fontes": len(r["fontes"]), "n_achados": len(r["achados"]),
-                 "n_citacoes": len(out.citations or []), "justificativa": r["justificativa"][:300]})
+                SN("há `n_fontes` ≥ 2 e `n_citacoes` reais, e `justificativa` aponta um fato concreto das fontes que contradiz ou melhora o pedido; "
+                   "se `teste_citado` = 'existe', mais certeza quando `exit_main` = 'passou' em `execucoes_seguidas` ≥ 2",
+                   "as fontes são poucas ou a justificativa é opinião, genérica ou não decorre das fontes; "
+                   "`alternou` true (o teste citado passa e falha no main: instável) ou `exit_main` = 'falhou' só 1x é evidência fraca")),
+                estado_evidencia(self.s, f"{item['titulo']}\n{item.get('detalhe') or ''}",
+                                 {"veredito": r["veredito"], "n_fontes": len(r["fontes"]), "n_achados": len(r["achados"]),
+                                  "n_citacoes": len(out.citations or []), "justificativa": r["justificativa"][:300]}))
             if float(d.value) < 0.5:
                 r["rebaixado"] = f"Jev não viu evidência suficiente para {r['veredito']}: adotado como pedido"
                 r["veredito"] = "adotar"
