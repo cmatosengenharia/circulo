@@ -13,7 +13,9 @@ atualizar à mão. Neurônio `corpo:atualizar`:
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -23,6 +25,7 @@ CHECAR_A_CADA_S = 600       # segundos entre checagens da main (além de logo de
                             # longo (300 s) faria a checagem levar horas
 VALIDAR_GIROS = 5           # giros sem erro depois de trocar o corpo = atualização evidenciada
 MAX_ERROS_NA_VALIDACAO = 2
+JANELA_PREEXISTENTE = 300      # giros antes da troca em que um erro igual absolve o código novo
 SMOKE = "import circulo.cli, circulo.loop, circulo.painel, circulo.self_dev, circulo.merge_gate"
 
 
@@ -147,11 +150,29 @@ class Corpo:
                 elo(self.s, f"pr:{m.group(1)}", f"versao:{alvo[:12]}", "entrou_em", {"de": anterior[:12]})
 
     # ------------------------------------------------------------ evidência depois: os primeiros giros
+    def _preexistente(self, erro: str, desde_tick: int) -> bool:
+        """Erro que já acontecia com o código anterior não é prova contra o código novo (lição: o worktree órfão do
+        item 95 reprovou e1c3d1a e e9a1e1f). Compara só as letras da mensagem, sem números, caminhos e pontuação."""
+        if desde_tick <= 0:
+            return False
+        texto = re.sub(r"[\d\W_]+", "", erro)
+        try:
+            linhas = self.s.q("SELECT DISTINCT message FROM run_errors WHERE tick < ? AND tick >= ?",
+                              (desde_tick, desde_tick - JANELA_PREEXISTENTE))
+        except sqlite3.Error:      # banco sem a tabela: nada é pré-existente
+            return False
+        for r in linhas:
+            chave = re.sub(r"[\d\W_]+", "", str(r["message"] or "").splitlines()[0] if r["message"] else "")[:40]
+            if len(chave) >= 20 and chave in texto:     # 40 letras: o começo da mensagem, antes de ids e caminhos
+                return True
+        return False
+
     def validar(self, erros: list) -> str | None:
         st = self.estado()
         if st.get("estado") != "validando":
             return None
         from .licoes import registrar as monitorar
+        erros = [e for e in erros if not self._preexistente(e, int(st.get("desde_tick") or 0))]
         if erros:
             st["erros"] = int(st.get("erros", 0)) + 1
             self._set(erros=st["erros"])

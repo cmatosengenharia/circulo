@@ -89,6 +89,11 @@ def touches_money(files: list[str]) -> list[str]:
     return _match(files, DINHEIRO)
 
 
+CI_NAO_INICIOU = "CI não iniciou"
+NAO_INICIADO = re.compile(r"was not started|spending limit|payments have failed|billing", re.I)
+ESPERA_CI = 3600
+
+
 def checks_ok(runs: list[dict]) -> tuple[bool, str]:
     """Todos os checks obrigatórios concluídos com sucesso, e nenhum outro check falhando."""
     latest: dict[str, dict] = {}
@@ -103,6 +108,9 @@ def checks_ok(runs: list[dict]) -> tuple[bool, str]:
     if pending:
         return False, f"checks em andamento: {', '.join(pending)}"
     bad = [n for n, r in latest.items() if r.get("conclusion") not in ("success", "skipped", "neutral")]
+    if bad and all(latest[n].get("nao_iniciado") for n in bad):
+        # o GitHub nem começou os jobs (cobrança, limite de gasto): não é defeito do PR e não há o que consertar
+        return False, f"{CI_NAO_INICIOU}: {latest[bad[0]].get('nao_iniciado')}"[:300]
     if bad:
         return False, f"checks falhando: {', '.join(bad)}"
     if any(latest[n].get("conclusion") != "success" for n in required_checks()):
@@ -181,6 +189,10 @@ class MergeGate:
             except Exception:  # noqa: BLE001 — sem a informação, segue para os checks
                 pass
         ok, why = checks_ok(self.gh.check_runs(sha))
+        if not ok and why.startswith(CI_NAO_INICIOU):
+            self._ci_indisponivel(why)
+            self._tentar_de_novo(n, sha)
+            return Verdict(n, sha, False, why, {"ci_indisponivel": True})
         if not ok:
             reprovado = why.startswith("checks falhando") or why.startswith("check obrigatório")
             return Verdict(n, sha, False, why, {"conserto": True} if reprovado else {})
@@ -229,6 +241,35 @@ class MergeGate:
             out.append(v)
         return out
 
+    def _ci_indisponivel(self, motivo: str) -> None:
+        """O Developer para de abrir e consertar PRs até o CI voltar: cada PR agora só gastaria tokens e falharia igual.
+        Mesmo contrato de `self_dev_espera` (o painel mostra em "Precisa de você"); sem importar o self_dev."""
+        s, agora = self.ctx.store, time.time()
+        atual = s.get("self_dev_espera") or {}
+        if atual and not str(atual.get("motivo", "")).startswith(CI_NAO_INICIOU) and float(atual.get("ate", 0)) > agora:
+            return      # já há uma espera mais importante (limite de uso, login)
+        from datetime import datetime
+        s.set("self_dev_espera", {"ate": agora + ESPERA_CI, "hora": datetime.fromtimestamp(agora + ESPERA_CI).strftime("%H:%M"),
+                                  "motivo": f"{CI_NAO_INICIOU}: o GitHub Actions recusa os jobs (cobrança ou limite de gasto). "
+                                            "Ajuste em github.com/settings/billing", "precisa_de_voce": True,
+                                  "detalhe": motivo[:300]})
+        if not atual or not str(atual.get("motivo", "")).startswith(CI_NAO_INICIOU):
+            self.ctx.reply("GitHub Actions não está iniciando os jobs (cobrança ou limite de gasto). O Developer pausa "
+                           "PRs até o CI voltar; nada é consertado à toa. Ajuste em github.com/settings/billing.", "saude")
+
+    def _tentar_de_novo(self, n: int, sha: str) -> None:
+        """Pede ao GitHub para rodar de novo os jobs que nem começaram, no máximo uma vez por ESPERA_CI por PR:
+        quando a cobrança volta, o PR anda sozinho (enquanto não volta, o pedido é recusado sem custo)."""
+        refazer = getattr(self.gh, "refazer_falhos", None)
+        chave = f"ci_refeito:{n}"
+        if refazer is None or time.time() - float(self.ctx.store.get(chave) or 0) < ESPERA_CI:
+            return
+        self.ctx.store.set(chave, time.time())
+        try:
+            refazer(sha)
+        except (urllib.error.URLError, OSError, ValueError, KeyError):     # recusado enquanto o CI está bloqueado
+            pass
+
     def _vigiar_main(self) -> None:
         """Neurônio `gate:main`: a main vermelha é um erro de estrutura (algo entrou quebrado). Vira lição na hora."""
         ci = getattr(self.gh, "main_ci", None)
@@ -241,6 +282,14 @@ class MergeGate:
         s = self.ctx.store
         if not sha or conclusao not in ("success", "failure") or s.get("main_ci_visto") == sha:
             return
+        if conclusao == "failure":
+            try:
+                _, why = checks_ok(self.gh.check_runs(sha))
+            except (urllib.error.URLError, OSError, ValueError, KeyError):
+                why = ""
+            if why.startswith(CI_NAO_INICIOU):     # main não está quebrada: o CI nem rodou; reavalia depois
+                self._ci_indisponivel(why)
+                return
         s.set("main_ci_visto", sha)
         from .licoes import registrar as monitorar
         monitorar(self.ctx, "gate:main", conclusao == "success", sujeito=sha[:12],
@@ -382,6 +431,33 @@ class GitHubREST:
         return self._req("GET", f"/pulls/{number}/files?per_page=100")
 
     def check_runs(self, sha):
+        return self._marcar_nao_iniciados(self._check_runs(sha))
+
+    def _marcar_nao_iniciados(self, runs: list[dict]) -> list[dict]:
+        """Jobs que falharam sem começar (segundos, sem passos): lê a anotação de um deles; se o GitHub diz que nem
+        iniciou (cobrança), marca todos com `nao_iniciado` = a mensagem."""
+        def curto(r):
+            if r.get("sem_passos") or r.get("steps") == []:
+                return True
+            try:
+                from datetime import datetime
+                ini, fim = (datetime.fromisoformat(str(r[k]).replace("Z", "+00:00")) for k in ("started_at", "completed_at"))
+                return (fim - ini).total_seconds() < 15
+            except (KeyError, ValueError, TypeError):
+                return False
+        suspeitos = [r for r in runs if r.get("conclusion") == "failure" and curto(r)]
+        if not suspeitos:
+            return runs
+        try:
+            notas = self._req("GET", f"/check-runs/{suspeitos[0]['id']}/annotations")
+        except (urllib.error.URLError, OSError, ValueError, KeyError):
+            return runs
+        msg = next((a.get("message", "") for a in notas or [] if NAO_INICIADO.search(a.get("message", ""))), "")
+        for r in suspeitos if msg else []:
+            r["nao_iniciado"] = msg[:200]
+        return runs
+
+    def _check_runs(self, sha):
         try:
             return self._req("GET", f"/commits/{sha}/check-runs?per_page=100", tolerar=(403,))["check_runs"]
         except urllib.error.HTTPError as e:
@@ -396,6 +472,8 @@ class GitHubREST:
         for run in corridas:
             for j in self._req("GET", f"/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]:
                 jobs.append({"id": j["id"], "name": j["name"], "status": j["status"], "conclusion": j.get("conclusion")})
+                if j.get("conclusion") == "failure" and not j.get("steps"):
+                    jobs[-1]["sem_passos"] = True
         return jobs
 
     def falhas_ci(self, sha: str, linhas: int = 60) -> str:
@@ -424,6 +502,11 @@ class GitHubREST:
                 fim = next((i for i, x in enumerate(limpas) if x.startswith("##[error]")), len(limpas))
                 partes.append(f"[{j['name']}]\n" + "\n".join(limpas[max(0, fim - linhas):fim + 1]))
         return "\n".join(partes)
+
+    def refazer_falhos(self, sha: str) -> None:
+        for run in self._req("GET", f"/actions/runs?head_sha={sha}&per_page=20")["workflow_runs"]:
+            if run.get("conclusion") == "failure":
+                self._req("POST", f"/actions/runs/{run['id']}/rerun-failed-jobs", {})
 
     def atras_da_main(self, sha: str) -> int:
         return int(self._req("GET", f"/compare/main...{sha}").get("behind_by", 0))
