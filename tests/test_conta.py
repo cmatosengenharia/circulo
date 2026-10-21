@@ -52,7 +52,8 @@ def test_llm_pela_assinatura_usa_o_claude_sem_a_chave(max_ligado, tmp_path, monk
     chamada = json.load(open(log))
     assert r.text.startswith("ok") and r.tokens == 10 + 3 + 2 and r.citations[0]["url"] == "https://exemplo.org/a."[:-1]
     assert not chamada["tem_chave"] and chamada["stdin"].startswith("pergunta longa")      # prompt pelo stdin
-    assert "--system-prompt" in chamada["args"] and "WebSearch,WebFetch" in chamada["args"] and chamada["max_tokens"] == "99"
+    assert "--system-prompt" in chamada["args"] and "WebSearch,WebFetch" in chamada["args"]
+    assert int(chamada["max_tokens"]) >= llm.PISO_SAIDA           # o Claude Code erra ao passar do teto: pede folgado e corta aqui
     g.generate(system="s", prompt="p", model="claude-haiku-5-5", max_tokens=5)
     assert "--max-turns" in (a := json.load(open(log))["args"]) and a[a.index("--max-turns") + 1] == "1"
 
