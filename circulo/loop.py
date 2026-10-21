@@ -412,7 +412,7 @@ class Circle:
         from . import jardineiro
         if jardineiro.precisa(self.store) and "jardinagem" not in tasks:
             tasks.append("jardinagem")
-        if self.corpo is not None and self.licoes.testes_a_checar() and "checar_licoes" not in tasks:
+        if self.corpo is not None and self.licoes.a_checar_no_main() and "checar_licoes" not in tasks:
             tasks.append("checar_licoes")
         from . import indagador
         if indagador.precisa(self.store, self.engine) and "indagar" not in tasks:
