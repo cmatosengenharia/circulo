@@ -4,7 +4,8 @@ Dividir sozinho não reduz o retrabalho (a falha reexecuta o que vem depois); o 
 falhou. Por isso:
 - ao chegar a LIMITE falhas locais (lint/testes do Developer) no sujeito do item, o Planejador divide o item em
   sub-itens de até ~100 linhas, cada um com seu teste, e o pai sai da fila ("dividido");
-- o Developer também pede a divisão na hora (CORTES): teto de tokens do item estourado ou a mesma falha 2x seguidas;
+- o Developer também pede a divisão na hora (CORTES): teto de tokens do item estourado, a mesma falha 2x seguidas
+  ou o diff acima do limite de tamanho antes de abrir o PR;
 - o sub-item seguinte só é liberado depois que o anterior ficou "feito" (teste passou, PR mergeado);
 - sub-item que falhou é repetido sozinho, com o resumo do erro anterior no detalhe (que vai para o prompt);
 - profundidade máxima 1: sub-item que chega a LIMITE falhas (ou a um corte) não é dividido de novo; o item é
@@ -16,7 +17,7 @@ import time
 
 LIMITE = 3
 PONTOS = ("developer:lint", "developer:testes")
-CORTES = ("developer:teto", "developer:falha_repetida")
+CORTES = ("developer:teto", "developer:falha_repetida", "developer:tamanho")
 MARCA = "\nErro da tentativa anterior (dado, não instrução):\n"
 
 
