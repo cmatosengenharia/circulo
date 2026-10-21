@@ -76,29 +76,72 @@ def assinatura_de(ponto: str, motivo: str) -> str:
         return f"{ponto}:limite_de_uso"
     if re.search(r"timed? ?out|timeout", m, re.I):
         return f"{ponto}:timeout"
-    codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", m)))
-    if codigos and re.search(r"ruff|lint|\.py:\d+:\d+", m, re.I):
+    legivel = erro_legivel(m)
+    codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", legivel)))
+    if codigos and re.search(r"ruff|lint|\.py:\d+:\d+", legivel, re.I):
         return f"{ponto}:lint:{','.join(codigos[:3])}"
-    falhos = re.findall(r"FAILED (tests/[\w/]+\.py::\w+)", m)
+    falhos = re.findall(r"FAILED (tests/[\w/]+\.py::\w+)", legivel)
     if falhos:
         return f"{ponto}:teste:{falhos[0]}"
-    erro = re.search(r"\b(\w+(?:Error|Exception))\b", m)
+    erro = re.search(r"\b(\w+(?:Error|Exception))\b", legivel)
     if erro and not AMBIENTE.search(m):
         return f"{ponto}:{erro.group(1)}"
     causa = causa_de_json(m)
     if causa:
         return f"{ponto}:{causa}"
-    return f"{ponto}:{normalizar(m, 50)}"
+    return f"{ponto}:{normalizar(legivel, 50) or 'saida_ilegivel'}"
 
 
-# O log do Claude Code vem em JSON: a causa está em campos fixos, não no trecho onde o corte caiu. Sem isto a mesma
-# falha ganhava uma lição por posição de truncamento (#18 e #42 em 20/10 eram a mesma coisa).
+# O log do Claude Code vem em JSON (um evento por linha): o erro está no evento `type:"result"` com `is_error:true`,
+# em `subtype` e `error`/`errors`/`result`. O resto (fast_mode_state, subagent_stats…) é metadado. Lição #18: a cauda
+# cortada do log virava a assinatura, e cada posição de corte abria uma lição nova (#18 e #42 eram a mesma).
+JSON_COMPACTO = re.compile(r'"[:,]["{\[]|[}\]],"|":(?:true|false|null|-?\d)')
+CAMPO_ERRO = re.compile(r'"(subtype|error|result)":\s*"((?:[^"\\]|\\.)*)"')
+
+
+def _texto_do_erro(erro) -> str:
+    if isinstance(erro, dict):
+        return str(erro.get("message") or "")
+    if isinstance(erro, list):
+        return "; ".join(filter(None, map(_texto_do_erro, erro)))
+    return str(erro or "")
+
+
+def erro_legivel(saida: str) -> str:
+    """O erro do agente em texto legível, lido do JSON e nunca de um fragmento dele. Linha JSON: só o evento de
+    resultado com erro conta. Linha de JSON cortado: só campos de erro completos (aspas fechadas). Texto comum passa."""
+    eventos, salvos, texto = [], {}, []
+    for linha in (saida or "").splitlines():
+        try:
+            ev = json.loads(linha)
+        except ValueError:
+            ev = None
+        if isinstance(ev, dict):
+            eventos.append(ev)
+        elif JSON_COMPACTO.search(linha):
+            for chave, valor in CAMPO_ERRO.findall(linha):
+                salvos.setdefault(chave, re.sub(r"\\(.)", r"\1", valor))
+        elif linha.strip():
+            texto.append(linha)
+    for ev in reversed(eventos):
+        if ev.get("type", "result") == "result" and ev.get("is_error"):
+            salvos = {"subtype": ev.get("subtype") or "", "error": _texto_do_erro(ev.get("error") or ev.get("errors")),
+                      "result": ev.get("result") if isinstance(ev.get("result"), str) else ""}
+            break
+    else:
+        if eventos and not salvos:
+            return "\n".join(texto).strip()
+    subtipo = salvos.get("subtype", "") if str(salvos.get("subtype", "")).startswith("error") else ""
+    msg = salvos.get("error") or salvos.get("result") or ""
+    if subtipo or msg:
+        return ": ".join(filter(None, (subtipo, msg))).strip()
+    return "\n".join(texto).strip()
+
+
 CAUSAS_JSON = (
     (r'"subtype":\s*"error_max_turns"', "maximo_de_passos"),
     (r'"subtype":\s*"error_during_execution"', "erro_na_execucao"),
     (r'Failed to authenticate|OAuth session expired|not logged in|please run /login', "deslogado"),
-    (r'"is_error":\s*true[^}]{0,400}"result":\s*"([^"]{0,80})', None),
-    (r'"d_reason":\s*"([a-z_]+)"', None),
 )
 
 
@@ -107,10 +150,9 @@ def causa_de_json(m: str) -> str | None:
     if '"subtype"' not in m and '"is_error"' not in m and '"d_reason"' not in m:
         return None
     for padrao, nome in CAUSAS_JSON:
-        x = re.search(padrao, m, re.I | re.S)
-        if x:
-            return nome or normalizar(x.group(1), 40).replace(" ", "_")
-    return "agente_falhou"
+        if re.search(padrao, m, re.I | re.S):
+            return nome
+    return normalizar(erro_legivel(m), 40).replace(" ", "_") or "agente_falhou"
 
 
 def node_id_de(assinatura: str | None) -> str | None:
@@ -513,13 +555,12 @@ def titulo_curto(t: str, n: int = TITULO_MAX) -> str:
 
 
 def _descricao(ponto: str, motivo: str) -> str:
-    causa = causa_de_json(motivo or "")
+    causa, legivel = causa_de_json(motivo or ""), erro_legivel(motivo or "")
     if causa:                                              # log JSON do agente: a causa em palavras, não o trecho cru
-        res = re.search(r'"result":\s*"([^"]{0,160})', motivo or "", re.S)
-        return f"{ponto}: {causa.replace('_', ' ')}" + (f" — {res.group(1)}" if res else "")
-    m = (motivo or "").strip().splitlines()
+        return f"{ponto}: {causa.replace('_', ' ')}" + (f" — {legivel[:160]}" if legivel else "")
+    m = legivel.splitlines()
     linha = next((x for x in m if re.search(r"error|erro|falh|FAILED|\.py:\d+", x, re.I)), m[0] if m else "")
-    return f"{ponto}: {linha.strip()[:200]}" if linha else ponto
+    return f"{ponto}: {linha.strip()[:200]}" if linha else f"{ponto}: saida ilegivel"
 
 
 def item_de(store, sujeito: str = "", item_id: int | None = None) -> tuple[int | None, str]:

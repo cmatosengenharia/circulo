@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 
-from .licoes import assinatura_de, causa_de_json, titulo_curto
+from .licoes import assinatura_de, titulo_curto
 from .state import Store
 
 EXPIRA_DIAS = 7
@@ -45,12 +45,12 @@ def encurtar_titulos(store: Store, agora: float) -> int:
 def unir_licoes_de_json(store: Store, agora: float) -> int:
     """Lições com assinatura feita de trecho de JSON viram uma só por causa classificada."""
     n = 0
-    for r in store.q("SELECT id, ponto, assinatura, descricao, status FROM licoes WHERE status<>'unida' AND (assinatura LIKE '%\"%' OR assinatura LIKE '%subagent_stats%' OR assinatura LIKE '%d_reason%')"):
+    for r in store.q("SELECT id, ponto, assinatura, descricao, status FROM licoes WHERE status<>'unida' AND (assinatura LIKE '%\"%' OR assinatura LIKE '%subagent_stats%' OR assinatura LIKE '%d_reason%' OR assinatura LIKE '%fast_mode%')"):
         motivo = r["descricao"] or r["assinatura"]
-        causa = causa_de_json(motivo)
-        if not causa:
-            continue
         nova = assinatura_de(r["ponto"], motivo)
+        if nova == r["assinatura"]:
+            continue
+        causa = nova[len(r["ponto"]) + 1:]
         dona = store.one("SELECT id FROM licoes WHERE assinatura=? AND id<>? ORDER BY id LIMIT 1", (nova, r["id"]))
         if dona:
             store.x("UPDATE licoes SET status='unida', updated_at=? WHERE id=?", (agora, r["id"]))
