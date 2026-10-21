@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from .decision import Decision, Question, SN
+from .diff_size import parse_numstat
 
 MAX_PRS_ABERTOS = 3           # PRs do Developer abertos ao mesmo tempo
 SEGURO_MIN = 0.5              # p(seguro) abaixo disso, com confiança, o Jev rejeita mesmo sem problema medido
@@ -69,6 +70,18 @@ def compartilhados(arquivos: list[str], outros: list[dict]) -> list[dict]:
     return out
 
 
+def estado_do_diff(numstat: str) -> dict:
+    """O que o `revisor_seguro` precisa do diff, medido no numstat: linhas, nº de arquivos, categoria dominante
+    (docs/testes/código, por linhas) e se toca teste."""
+    t = parse_numstat(numstat)
+    por: dict[str, int] = {}
+    for a in t.arquivos:
+        cat = "testes" if a.categoria == "teste" else "docs" if a.caminho.endswith((".md", ".rst", ".txt")) or a.caminho.startswith("docs/") else "código"
+        por[cat] = por.get(cat, 0) + a.linhas
+    return {"linhas": t.total, "n_arquivos": len(t.arquivos), "categoria_dominante": max(por, key=por.__getitem__, default=None),
+            "toca_teste": "teste" in t.por_categoria}
+
+
 def conflito_simulado(wt: Path, ref: str) -> bool | None:
     """`git merge-tree --write-tree` (git >= 2.38): 1 = conflito, 0 = mescla limpa; None = não deu para simular."""
     p = _git(["merge-tree", "--write-tree", "HEAD", ref], wt)
@@ -103,13 +116,18 @@ def classificar(dl, evidencia: dict) -> dict:
 
 
 def regra(jev, qid: str, q: Question, state) -> Decision:
-    """LocalJev: problema medido = inseguro; sem problema = seguro, menos confiante quanto maior a mudança."""
+    """LocalJev: problema medido = inseguro; sem problema = seguro, menos confiante quanto maior a mudança, quanto mais
+    arquivos e quando é código sem teste; só docs, mais confiante."""
     ev = state if isinstance(state, dict) else {}
     problema = bool(ev.get("conflito_main") or ev.get("conflito_prs") or ev.get("compartilhados")) or ev.get("testes_na_main") is False
     if problema:
         return jev._noul(qid, 0.08)
-    linhas = int(ev.get("linhas") or 0)
-    return jev._noul(qid, max(0.55, 0.95 - linhas / 2000))
+    p = 0.95 - int(ev.get("linhas") or 0) / 2000 - 0.01 * max(0, int(ev.get("n_arquivos") or 0) - 3)
+    if ev.get("categoria_dominante") == "docs":
+        p += 0.03
+    elif ev.get("categoria_dominante") == "código" and ev.get("toca_teste") is False:
+        p -= 0.1
+    return jev._noul(qid, max(0.55, p))
 
 
 def registrar(store, pr: int | None, item_id: int | None, momento: str, veredito: str, motivo: str, evidencia: dict, jev: dict) -> int:
@@ -180,13 +198,9 @@ def antes_do_pr(ctx, wt: Path, item: dict, arquivos: list[str], autor: tuple[str
     `verificar(wt)` roda lint e testes (os mesmos do CI) e devolve (ok, saida)."""
     s = ctx.store
     outros = prs_abertos(s)
-    ev: dict[str, Any] = {"pr": f"item #{item['id']}", "item_id": item["id"], "arquivos": arquivos, "linhas": None, "prs_abertos": [o["number"] for o in outros],
-                          "compartilhados": [], "conflito_main": False, "conflito_prs": [], "testes_na_main": None, "base": "medido"}
-    try:            # linhas de verdade (numstat), não o nº de arquivos que o `--shortstat` traz em primeiro
-        num = _git(["diff", "--numstat", "origin/main...HEAD"], wt).stdout if outros else ""
-        ev["linhas"] = sum(int(a) + int(d) for a, d, *_ in (ln.split("\t") for ln in num.splitlines() if ln.strip()) if a.isdigit() and d.isdigit()) if outros else None
-    except (ValueError, IndexError, AttributeError):
-        ev["linhas"] = None
+    ev: dict[str, Any] = {"pr": f"item #{item['id']}", "item_id": item["id"], "arquivos": arquivos, "prs_abertos": [o["number"] for o in outros],
+                          "compartilhados": [], "conflito_main": False, "conflito_prs": [], "testes_na_main": None, "base": "medido",
+                          **estado_do_diff(_git(["diff", "--numstat", "origin/main...HEAD"], wt).stdout)}
     motivo, aguarda = "", None
     mudou, conflito = trazer_main(wt, autor)
     if conflito:

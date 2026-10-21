@@ -190,6 +190,30 @@ def test_regra_do_jev_e_painel(circle, painel):  # noqa: F811
         json.loads(r.read())
 
 
+def test_estado_do_revisor_seguro_traz_tamanho_categoria_e_teste_do_diff(circle, repo):  # noqa: F811
+    """Pergunta do conselho #51: o estado do revisor_seguro tem os números do numstat; diffs distintos, confianças distintas."""
+    from circulo.decision import Question, SN
+    docs = revisor.estado_do_diff("12\t3\tREADME.md\n4\t0\tdocs/guia.md\n")
+    pequeno = revisor.estado_do_diff("30\t5\tcirculo/x.py\n20\t0\ttests/test_x.py\n-\t-\tdocs/logo.png\n")
+    grande = revisor.estado_do_diff("".join(f"80\t20\tcirculo/m{i}.py\n" for i in range(6)))
+    assert docs == {"linhas": 19, "n_arquivos": 2, "categoria_dominante": "docs", "toca_teste": False}
+    assert pequeno == {"linhas": 55, "n_arquivos": 3, "categoria_dominante": "código", "toca_teste": True}
+    assert grande == {"linhas": 600, "n_arquivos": 6, "categoria_dominante": "código", "toca_teste": False}
+    assert revisor.estado_do_diff("12\t3\tREADME.md\n4\t0\ttests/test_x.py\n")["categoria_dominante"] == "docs"
+    assert revisor.estado_do_diff("2\t0\ta.py\n40\t0\ttests/test_x.py\n")["categoria_dominante"] == "testes"
+    q = Question("noul", "seguro?", SN("sim", "nao"))
+    base = {"conflito_main": False, "compartilhados": [], "conflito_prs": [], "testes_na_main": None}
+    confs = [circle.ctx.dl.jev.ask_many({**base, **e}, {"revisor_seguro": q})[0]["revisor_seguro"].confidence
+             for e in (docs, pequeno, grande)]
+    assert confs[0] > confs[1] > confs[2]
+    # no fluxo, sem outro PR aberto, o estado já vem medido
+    _itens(circle, 1)
+    gh = GHVarios(repo.parent / "origin.git")
+    assert SelfDeveloper(circle.ctx, repo, AgenteDeArquivo("h.py"), gh, test_cmd=OK_CMD).run_once().status == "proposto"
+    ev = json.loads(circle.store.one("SELECT evidencia FROM revisoes WHERE momento='antes_do_pr' ORDER BY id DESC LIMIT 1")["evidencia"])
+    assert ev["linhas"] > 0 and ev["n_arquivos"] >= 2 and ev["toca_teste"] is True and ev["categoria_dominante"]
+
+
 # ------------------------------------------------------------ pré-voo do revisar_prs: adiar sem gastar
 class GateFalso:
     """Gate que falha com o erro dado (rede) ou devolve os vereditos dados (estado dos PRs)."""
