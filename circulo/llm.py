@@ -206,7 +206,10 @@ class AssinaturaLLM:
             d = {}
         texto = str(d.get("result") or "")
         if p.returncode != 0 or d.get("is_error") or not d:
-            motivo = (texto or p.stderr or p.stdout or f"saída {p.returncode}")[-300:]
+            # só os campos da causa: o resto do JSON (fast_mode_disabled_reason, subagent_stats...) virava lição por corte (#42)
+            campos = {k: d[k] for k in ("subtype", "is_error", "api_error_status", "num_turns") if k in d}
+            causa = json.dumps(campos) if campos else ""
+            motivo = (texto or causa or p.stderr or p.stdout or f"saída {p.returncode}")[-300:]
             raise (ContaDeslogada if erro_de_login(motivo) else RuntimeError)(f"claude -p: {motivo}")
         uso = d.get("usage") or {}
         urls = list(dict.fromkeys(x.rstrip(".,;:!?") for x in re.findall(r"https?://[^\s)\]>\"']+", texto))) if web_search else []
