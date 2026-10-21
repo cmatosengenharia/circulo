@@ -7,6 +7,16 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 | Versão | Data | Destaque | Itens |
 |---|---|---|---|
+| 1.48.0 | 2026-10-20 | Equipe ao vivo mostra o que cada agente está fazendo, não só quem está trabalhando. | 4 |
+| 1.47.0 | 2026-10-20 | Passe do Jev lab nas quatro perguntas em que o Jev mais duvidava. | 7 |
+| 1.46.0 | 2026-10-20 | O Desenvolvedor parou 45 min com um PR esperando conserto — deadlock entre o fatiador e o conserto. | 3 |
+| 1.45.0 | 2026-10-20 | Os gargalos medidos no Mac (24 h: 1,5 M tokens do Desenvolvedor para 7 itens entregues). | 5 |
+| 1.44.0 | 2026-10-20 | A memória do time (RAG) compartilhada com toda a equipe — a começar pelo Product owner. | 5 |
+| 1.43.0 | 2026-10-20 | Todo consumo do loop pela API, e qualquer API de IA. | 3 |
+| 1.42.0 | 2026-10-20 | Conexões ao vivo na Gestão do loop. | 3 |
+| 1.41.1 | 2026-10-20 | - Painel: aba fechada pelo navegador no meio de um `/api/...` gerava `BrokenPipeError` com traceback no `loop.err`; agora é ignorado (outros erros do servidor continuam no log). | 1 |
+| 1.41.0 | 2026-10-20 | `circulo/medico.py` | 9 |
+| 1.40.2 | 2026-10-20 | Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste: | 2 |
 | 1.40.1 | 2026-10-20 | Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17): | 2 |
 | 1.40.0 | 2026-10-20 | O Redator técnico: documentação profissional do loop, gerada da autoevolução e publicada por PR. | 8 |
 | 1.39.0 | 2026-10-20 | Sistema de design: o Círculo sobre o Primer (GitHub). | 5 |
@@ -37,23 +47,16 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.18.0 | 2026-10-18 | Pausar missão por missão | 7 |
 | 1.17.0 | 2026-10-18 | Rastreabilidade de ponta a ponta e observabilidade | 5 |
 | 1.16.0 | 2026-10-18 | giros em paralelo na mesma missão | 3 |
-| 1.15.0 | 2026-10-18 | cadastro de chaves de integração no painel | 7 |
-| 1.14.0 | 2026-10-18 | Limite diário da API customizável pelo painel | 1 |
-| 1.13.0 | 2026-10-18 | LLM especializada nesse tipo de evolução | 3 |
-| 1.12.0 | 2026-10-18 | perguntas | 4 |
-| 1.12.0 | 2026-10-18 | Trilha write-ahead | 4 |
-| 1.11.3 | 2026-10-18 | - Esperar o espaçamento entre tentativas não conta como estagnação: o vigia de progresso só considera o trabalho que | 2 |
-| 1.11.2 | 2026-10-18 | Batimento durante o giro | 1 |
-| 1.11.1 | 2026-10-18 | Trabalho parcial é retomado, não refeito | 2 |
-| 1.11.0 | 2026-10-18 | Orçamento contado errado | 4 |
-| 1.10.0 | 2026-10-18 | perceber | 13 |
 
-## Entregas do loop (36 PRs mergeados)
+## Entregas do loop (39 PRs mergeados)
 
-Por tipo: **correcao** 11 · **observabilidade** 10 · **documentacao** 7 · **seguranca** 5 · **funcionalidade** 2 · **velocidade** 1.
+Por tipo: **correcao** 12 · **observabilidade** 10 · **documentacao** 8 · **seguranca** 6 · **funcionalidade** 2 · **velocidade** 1.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #41 | 20/10/2026 | correcao (46%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
+| #39 | 20/10/2026 | seguranca (41%) | — | Parser puro de numstat com soma total e categoria dominante | item #91 (sub_item) |
+| #38 | 20/10/2026 | documentacao (99%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #37 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #36 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #35 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |

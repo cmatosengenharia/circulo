@@ -38,6 +38,7 @@ telas (`circulo/nomes.py`); o nome técnico antigo fica entre parênteses.
 | **Monitor de saúde** | `saude` (Saúde) | Mede a saúde do loop a cada giro e pede rollback se piorar. |
 | **Jardineiro** | `jardinagem` (Jardinagem) | Mede padrões ruins crescendo no código e abre item para podar. |
 | **Cientista de dados** | `meta_learner` (Aprendiz / Meta-Learner) | Aprende regras com as correções e testa a política candidata em shadow. |
+| **Médico do loop** | `medico` (Médico) | Lê incidentes, erros e tentativas; um padrão medido vira diagnóstico, o Jev diz de quem é, e a resposta sobe a escada: observar, conter, corrigir, escalar. |
 | **Redator técnico** | `documentar` (Documentador) | Gera a documentação em docs/ a partir do código, do banco e do CHANGELOG, com o Jev classificando cada entrega, e abre o PR. |
 | **Operações** | `rotinas` (Rotinas) | Regressão, padrões, resumo, prompts A/B e demais manutenções em rodízio. |
 
