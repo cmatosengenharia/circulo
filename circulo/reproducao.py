@@ -48,6 +48,34 @@ def _nomes_de_teste(fonte: str) -> set[str]:
     return out
 
 
+def _e_raises(w: ast.With) -> bool:
+    return any(isinstance(i.context_expr, ast.Call) and isinstance(i.context_expr.func, ast.Attribute)
+               and i.context_expr.func.attr == "raises" for i in w.items)
+
+
+def exigem_o_erro_antigo(fonte: str) -> list[str]:
+    """Testes que exigem `pytest.raises` numa chamada e, depois, a mesma chamada (mesmos argumentos) funcionando
+    (lição #2). Exigir o erro antigo dentro do teste prende a main ao bug: quando outra correção tira o erro, o teste
+    fica vermelho. A reprodução é do portão: o teste novo roda no código antigo e lá precisa falhar."""
+    try:
+        arv = ast.parse(fonte)
+    except SyntaxError:
+        return []
+    out = []
+    for f in ast.walk(arv):
+        if not (isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith("test")):
+            continue
+        blocos = [w for w in ast.walk(f) if isinstance(w, ast.With) and _e_raises(w)]
+        dentro = {id(n) for w in blocos for b in w.body for n in ast.walk(b)}
+        for w in blocos:
+            falha = {ast.dump(n) for b in w.body for n in ast.walk(b) if isinstance(n, ast.Call)}
+            if any(isinstance(n, ast.Call) and id(n) not in dentro and n.lineno > w.end_lineno and ast.dump(n) in falha
+                   for n in ast.walk(f)):
+                out.append(f.name)
+                break
+    return out
+
+
 def _arquivos_de_teste(repo: Path, base: str, head: str | None) -> list[str]:
     if head:
         nomes = _git(["diff", "--name-only", "--diff-filter=AM", f"{base}...{head}", "--", "tests"], repo).split()
@@ -90,7 +118,12 @@ def reproduz(repo: str | Path, base: str, head: str | None = None, python: str |
     novos = testes_novos(repo, base, head)
     if not novos:
         return True, "nenhuma função de teste nova (o portão do teste novo cuida disso)", []
-    tmp = Path(tempfile.mkdtemp(prefix="circulo-repro-"))
+    presos = [n for n in novos if n.rsplit("::", 1)[-1] in exigem_o_erro_antigo(_ler(repo, head, n.split("::", 1)[0]) or "")]
+    if presos:
+        return False, ("lição #2: o teste exige o erro antigo (pytest.raises) e depois a mesma chamada funcionando; "
+                       "quando outra correção tirar o erro, a main fica vermelha. Teste só o comportamento corrigido: "
+                       f"o portão já roda o teste novo no código antigo. Testes: {', '.join(presos)}"), novos
+    tmp =Path(tempfile.mkdtemp(prefix="circulo-repro-"))
     wt = tmp / "base"
     try:
         _git(["worktree", "add", "--detach", "-q", str(wt), _git(["rev-parse", base], repo).strip()], repo)

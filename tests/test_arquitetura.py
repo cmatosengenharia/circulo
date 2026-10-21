@@ -99,6 +99,14 @@ def test_padroes_ruins_nao_crescem():
     assert not passou, f"cresceu além do teto (pode podar e baixar o teto, nunca subir sem motivo): {passou}"
 
 
+def test_licao_2_nenhum_teste_exige_o_erro_antigo_e_depois_o_conserto():
+    """lição #2: um teste exigia `pytest.raises` em `Corpo(...).run()` (o erro do incidente) e depois o mesmo
+    `Corpo(...)` funcionando; outra correção tirou o erro e a main ficou vermelha. Nenhum teste do repo faz isso."""
+    from circulo.reproducao import exigem_o_erro_antigo
+    fazem = {p.name: n for p in Path(__file__).parent.glob("test_*.py") if (n := exigem_o_erro_antigo(p.read_text(encoding="utf-8")))}
+    assert not fazem, f"o teste exige o erro antigo e depois o conserto na mesma chamada (o portão já roda o teste no código antigo): {fazem}"
+
+
 def test_testes_nao_usam_a_data_local_da_maquina():
     """lição #48: o orçamento conta o dia em America/Sao_Paulo; `date.today()` no teste dá o dia do fuso da máquina
     (UTC no CI), e das 21 h à meia-noite de Brasília o "ontem" do teste vira o "hoje" do orçamento. Use o NOON do conftest."""
