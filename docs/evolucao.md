@@ -48,12 +48,14 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.17.0 | 2026-10-18 | Rastreabilidade de ponta a ponta e observabilidade | 5 |
 | 1.16.0 | 2026-10-18 | giros em paralelo na mesma missão | 3 |
 
-## Entregas do loop (39 PRs mergeados)
+## Entregas do loop (41 PRs mergeados)
 
-Por tipo: **correcao** 12 · **observabilidade** 10 · **documentacao** 8 · **seguranca** 6 · **funcionalidade** 2 · **velocidade** 1.
+Por tipo: **correcao** 13 · **observabilidade** 10 · **documentacao** 9 · **seguranca** 6 · **funcionalidade** 2 · **velocidade** 1.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #43 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #42 | 20/10/2026 | correcao (42%) | sim | Lição #43: Corrigir erro: JSONDecodeError em meta | item #97 (erro) |
 | #41 | 20/10/2026 | correcao (46%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #39 | 20/10/2026 | seguranca (41%) | — | Parser puro de numstat com soma total e categoria dominante | item #91 (sub_item) |
 | #38 | 20/10/2026 | documentacao (99%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
