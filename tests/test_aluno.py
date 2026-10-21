@@ -132,3 +132,16 @@ def test_licao_43_estado_com_uma_chave_aninhada_grande_ainda_vira_json_valido():
         s = aluno.compactar(estado)
         assert len(s) <= 1500
         assert isinstance(json.loads(s), dict)
+
+
+def test_licao_44_valor_da_decisao_cortado_nao_derruba_o_treino_da_meta():
+    """Lição #44: JSONDecodeError na meta voltou nos primeiros giros do código novo (aluno.treinar_se_preciso → treinar).
+    O estado já era lido com tolerância, mas o valor da decisão ainda passava por `json.loads` cru: um registro com o
+    valor cortado no meio derrubava o treino inteiro. Todo texto lido do banco passa pelo mesmo leitor tolerante."""
+    st = Store(":memory:")
+    st.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,estado) "
+         "VALUES(1,'q','\"cortado no mei',0.9,'jev',1,'{\"k\": 9}')")
+    for i in range(3):
+        _decisao(st, "q", {"k": i}, "a")
+    assert len(aluno.exemplos_de(st)["q"]) == 3
+    assert aluno.treinar_se_preciso(st, agora=time.time())["modelos"]["q"]["n"] == 3
