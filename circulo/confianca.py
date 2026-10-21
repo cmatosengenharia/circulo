@@ -206,13 +206,12 @@ def confianca(store: Store, now: float | None = None) -> dict:
                      v["em"]))
     pg = s.get("progresso") or {}
     sem = int(pg.get("sem", 0))
-    rec = pg.get("recusas") or {}
-    causa = ", ".join(f"{t} recusado {n}x pelo porteiro do gasto" for t, n in sorted(rec.items(), key=lambda kv: -kv[1])[:3])
+    from .estagnacao import causa_provavel
     from .loop import ESTAGNADO
     ck.append(_c("progresso", "seguranca", "Avançando?", "ok" if sem < 3 else "atencao" if sem < ESTAGNADO else "falha",
                  "sim" if sem < 3 else f"{sem} giros sem avançar",
                  (f"último avanço {_hora(pg.get('ultimo_avanco_em'))}" if sem < 3 else
-                  f"há trabalho esperando e nada avança; {causa or 'causa ainda não identificada'}"),
+                  f"há trabalho esperando e nada avança; {causa_provavel(pg)}"),
                  pg.get("ultimo_avanco_em") or now))
     q = {k: x for k, x in (s.get("quarentena") or {}).items() if x.get("ate_tick", 0) > s.tick}
     if q:

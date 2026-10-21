@@ -28,6 +28,18 @@ def test_estagnacao_vira_licao_com_a_causa_e_derruba_a_confianca(circle):
     assert c["estado"] == "falha" and "estudar_pedido" in c["porque"]
 
 
+def test_estagnacao_sem_recusa_diz_o_que_rodou_sem_avancar(circle):
+    """Lição #47: "causa provável: sem recusa registrada" deixava o loop cego. Sem recusa, a causa é o que os giros
+    parados fizeram de fato (tarefa que rodou sem avançar, erro), medido giro a giro."""
+    circle.trabalho_pendente = lambda ignorar_estagnacao=False: True
+    circle.idle = lambda: "corrigir_codigo"                        # roda, mas não muda nada do que conta como avanço
+    for _ in range(ESTAGNADO):
+        circle.tick()
+    alerta = circle.store.one("SELECT message FROM alerts WHERE message LIKE 'Estagnação%' ORDER BY id DESC LIMIT 1")
+    assert alerta and f"corrigir_codigo rodou sem avançar {ESTAGNADO}x" in alerta["message"]
+    assert "sem recusa registrada" not in alerta["message"]
+
+
 def test_estagnado_vai_para_o_descanso_longo(circle):
     circle.store.set("progresso", {"sem": 3})
     assert not circle.trabalho_pendente()
