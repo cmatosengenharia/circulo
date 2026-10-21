@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, intencoes, jobs, parada, telemetria
+from . import finance, intencoes, jobs, parada, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
@@ -438,7 +438,7 @@ class Circle:
         from .medico import tarefa_pausada
         componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # (corrigir_codigo tem quarentena própria)
         tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}") and not tarefa_pausada(self.store, t)
-                 and not (t in componente and self.incidents.isolated(componente[t]))]
+                 and not (t in componente and self.incidents.isolated(componente[t])) and not (t == "revisar_prs" and revisor.em_espera(s))]
         if not tasks:
             return None
         # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
@@ -689,7 +689,7 @@ class Circle:
         elif pick == "propor_feature":
             self.developer.idle()
         elif pick == "revisar_prs":
-            self.gate.run()
+            revisor.revisar(self.store, self.gate)      # rede, checks pendentes ou atrás da main: adia com backoff
         elif pick == "planejar_roteiro":
             self.planejador.run(autorizado=True)       # o gasto já foi decidido acima: um porteiro só
         elif pick == "estudar_pedido":
