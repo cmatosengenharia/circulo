@@ -68,10 +68,10 @@ def test_modo_ilimitado_e_o_padrao_nao_corta_e_continua_medindo(circle):
 
 
 def test_consumo_resume_a_medicao_e_sugere_limite_pelo_p90(circle):
-    from datetime import date, timedelta
-    from circulo.budget import consumo
+    from datetime import datetime, timedelta
+    from circulo.budget import TZ, consumo
     s = circle.store
-    hoje = date.today()
+    hoje = datetime.now(TZ).date()
     for i, t in enumerate([120_000, 300_000, 180_000, 240_000, 900_000]):          # 5 dias completos + hoje
         s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,?,1,1) ON CONFLICT(day) DO UPDATE SET tokens=excluded.tokens",
             ((hoje - timedelta(days=i + 1)).isoformat(), t))
@@ -83,11 +83,22 @@ def test_consumo_resume_a_medicao_e_sugere_limite_pelo_p90(circle):
     assert consumo(circle.store, 2)["sugestao_limite"] is None        # com menos de 3 dias completos, não sugere
 
 
+def test_testes_do_orcamento_contam_o_dia_no_fuso_do_orcamento():
+    """lição #48: date.today usa o fuso da máquina (UTC no CI); entre 21h e 0h de Brasília o "ontem" do teste
+    era o "hoje" do orçamento e um dia completo sumia. O dia dos testes vem de budget.TZ, como o do orçamento."""
+    import pathlib
+    import re
+    achados = [f"{p.name}:{n}" for p in pathlib.Path(__file__).parent.glob("test_*.py")
+               for n, linha in enumerate(p.read_text().splitlines(), 1) if re.search(r"\bdate\.today\(\)", linha)]
+    assert not achados, f"use datetime.now(TZ).date() com TZ de circulo.budget: {achados}"
+
+
 def test_vigia_no_modo_ilimitado_so_avisa_consumo_alto(circle):
-    from datetime import date, timedelta
+    from datetime import datetime, timedelta
     from circulo import vigia
+    from circulo.budget import TZ
     s = circle.store
-    hoje = date.today()
+    hoje = datetime.now(TZ).date()
     for i in range(4):
         s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,200000,1,1) ON CONFLICT(day) DO UPDATE SET tokens=200000", ((hoje - timedelta(days=i + 1)).isoformat(),))
     s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,650000,1,1) ON CONFLICT(day) DO UPDATE SET tokens=650000", (hoje.isoformat(),))
