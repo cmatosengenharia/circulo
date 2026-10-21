@@ -374,20 +374,46 @@ def estado_evolve(store, evolution_type: str, evidence: Mapping[str, Any]) -> di
             "description": desc}
 
 
-def estado_dado(dado: str, evidencia: str) -> dict:
-    """Verificação mecânica antes do Jev: quais números do dado aparecem na evidência, com o trecho em volta."""
+NUMERO = r"\d+(?:[.,]\d+)?"
+
+
+def _token_numerico(n: str) -> str:
+    """0,50 e 0.5 são o mesmo número; 18 não é 18.5 nem 1900 é 9900 (casamento por token inteiro, não por substring)."""
+    from decimal import Decimal
+    return format(Decimal(n.replace(",", ".")).normalize(), "f")
+
+
+def estado_dado(dado: str, evidencia: str, base: str = "") -> dict:
+    """Verificação mecânica antes do Jev: quais números do dado aparecem, como token numérico, na evidência (com o trecho
+    em volta). Sem dígito no dado não há o que conferir: `nao_verificavel`."""
     import re
-    nums = [n for n in re.findall(r"\d+(?:[.,]\d+)?", dado or "")][:12]
+    evidencia = evidencia or ""
+    nums = re.findall(NUMERO, dado or "")[:12]
+    tokens = {}
+    for m in re.finditer(NUMERO, evidencia):
+        tokens.setdefault(_token_numerico(m.group()), m.start())
     achados, trechos = [], []
     for n in nums:
-        m = re.search(r"(?<![\d.,])" + re.escape(n) + r"(?![\d])", evidencia or "")
-        pos = m.start() if m else -1
-        if pos >= 0:
+        p = tokens.get(_token_numerico(n))
+        if p is not None:
             achados.append(n)
-            trechos.append(evidencia[max(0, pos - 60):pos + len(n) + 40].replace("\n", " "))
+            trechos.append(evidencia[max(0, p - 60):p + len(n) + 40].replace("\n", " "))
     fr = round(len(achados) / len(nums), 2) if nums else None
-    return {"dado": (dado or "")[:300], "numeros_do_dado": nums, "numeros_na_evidencia": achados, "fracao_encontrada": fr,
-            "trechos_da_evidencia": trechos[:6], "evidencia_tem_numeros": bool(re.search(r"\d", evidencia or ""))}
+    return {"dado": (dado or "")[:300], "base": base, "dado_tem_digito": bool(nums),
+            "numero_literal_na_evidencia": "nao_verificavel" if fr is None else "sim" if fr == 1 else "nao" if fr == 0 else "parte",
+            "numeros_do_dado": nums, "numeros_na_evidencia": achados, "fracao_encontrada": fr,
+            "n_numeros_evidencia": len(re.findall(NUMERO, evidencia)), "trechos_da_evidencia": trechos[:6],
+            "evidencia_tem_numeros": bool(tokens)}
+
+
+def regra_dado(s: Mapping[str, Any]) -> float:
+    """O número do dado está, como token, na evidência? Todos: sim; nenhum: não (inventado), com confiança alta. Sem
+    dígito não há o que conferir (0,5). Base inferida aproxima de 0,5: a conta pode ter transformado o número."""
+    fr = s.get("fracao_encontrada")
+    if fr is None:
+        return 0.5
+    p = 0.05 + 0.9 * float(fr)
+    return p if s.get("base") != "inferido" else 0.5 + (p - 0.5) * 0.8
 
 
 FATOR_TESTE = {"passou": (0.85, 0.85, 0.95, 1.0), "falhou": (0.6, 0.6, 0.9, 1.0)}   # por execucoes_seguidas 0, 1, 2, 3+
@@ -422,3 +448,6 @@ def regra_evidencia(s: Mapping[str, Any]) -> float:
     f = (0.8 if s.get("teste_citado", "nenhum") in ("nenhum", "nao_medido") else 0.5 if s.get("alternou")
          else FATOR_TESTE.get(s.get("exit_main"), (0.7,) * 4)[n])
     return 0.5 + (p - 0.5) * f
+
+
+REGRAS = {"evidencia_sustenta": regra_evidencia, "dado_na_evidencia": regra_dado}   # regras do LocalJev que moram aqui
