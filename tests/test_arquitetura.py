@@ -97,3 +97,11 @@ def test_padroes_ruins_nao_crescem():
     total = medir(PACOTE)["total"]
     passou = {k: (total[k], teto) for k, teto in TETO_JARDIM.items() if total[k] > teto}
     assert not passou, f"cresceu além do teto (pode podar e baixar o teto, nunca subir sem motivo): {passou}"
+
+
+def test_testes_nao_usam_a_data_local_da_maquina():
+    """lição #48: o orçamento conta o dia em America/Sao_Paulo; `date.today()` no teste dá o dia do fuso da máquina
+    (UTC no CI), e das 21 h à meia-noite de Brasília o "ontem" do teste vira o "hoje" do orçamento. Use o NOON do conftest."""
+    proibido = re.compile(r"\bdate\.today\(\)")
+    usam = [p.name for p in Path(__file__).parent.glob("*.py") if p.name != Path(__file__).name and proibido.search(p.read_text(encoding="utf-8"))]
+    assert not usam, f"dia do fuso da máquina em vez do fuso do orçamento (use NOON / budget.TZ): {usam}"
