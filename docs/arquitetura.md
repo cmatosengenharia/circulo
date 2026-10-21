@@ -12,7 +12,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | Módulo | Linhas | O que é |
 |---|---|---|
 | `agents.py` | 238 | Agentes de domínio. Todos decidem via DecisionLayer (Jev First). |
-| `aluno.py` | 293 | O aluno do Jev: um modelo local que aprende, com as respostas do Jev, a responder as mesmas perguntas. |
+| `aluno.py` | 296 | O aluno do Jev: um modelo local que aprende, com as respostas do Jev, a responder as mesmas perguntas. |
 | `aprovacoes.py` | 121 | Precisa de você: tudo o que, no loop inteiro, está parado esperando uma decisão humana — num lugar só, com a ação. |
 | `atividade.py` | 125 | O que o loop está fazendo para evoluir: linha do tempo única, giros com a duração de cada etapa e ritmo de decisões. |
 | `budget.py` ⚖️ | 181 | Orçamento diário de tokens. |
