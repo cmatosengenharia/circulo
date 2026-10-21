@@ -25,7 +25,10 @@ def _ok_do_ultimo(s: Store, ponto: str) -> bool:
 def _painel_frescor(velho: bool) -> bool:
     s = Store(":memory:")
     dado_em = time.time() - (60 if velho else 0.2)               # o painel velho mostra um dado de um minuto atrás
-    confianca.registrar_frescor(s, (time.time() - dado_em) * 1000)
+    atraso = (time.time() - dado_em) * 1000
+    for _ in range(99):                                           # o SLO só julga com 100 amostras na janela
+        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso, time.time()))
+    confianca.registrar_frescor(s, atraso)
     return _ok_do_ultimo(s, "painel:frescor")
 
 

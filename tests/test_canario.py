@@ -17,13 +17,18 @@ def _ultimo(s: Store) -> int | None:
 
 
 def test_painel_velho_falha_e_painel_fresco_passa_em_estado_temporario(tmp_path):
+    def medir(s, atraso):                                        # o SLO só julga com 100 amostras na janela (1.61.0)
+        for _ in range(99):
+            s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso, time.time()))
+        confianca.registrar_frescor(s, atraso)
+
     velho = Store(tmp_path / "velho.db")
     dado_em = time.time() - 60                                   # o painel mostra um dado de um minuto atrás
-    confianca.registrar_frescor(velho, (time.time() - dado_em) * 1000)
+    medir(velho, (time.time() - dado_em) * 1000)
     assert _ultimo(velho) == 0
 
     fresco = Store(tmp_path / "fresco.db")
-    confianca.registrar_frescor(fresco, 200)
+    medir(fresco, 200)
     assert _ultimo(fresco) == 1
 
 

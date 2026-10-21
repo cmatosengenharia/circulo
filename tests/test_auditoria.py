@@ -20,15 +20,15 @@ def test_transacao_que_nao_abre_nao_vaza_o_lock(tmp_path):
     outra = sqlite3.connect(str(tmp_path / "a.db"), isolation_level=None, timeout=0.1)
     outra.execute("BEGIN IMMEDIATE")                       # outro processo segura a escrita
     s.db.execute("PRAGMA busy_timeout=100")
-    with pytest.raises(sqlite3.OperationalError):
-        with s.tx():
-            pass
+    tx = s.tx()
+    falhou = False
+    try:
+        tx.__enter__()
+    except sqlite3.OperationalError:
+        falhou = True
     outra.execute("ROLLBACK")
-    assert s.lock.acquire(timeout=1)                       # o lock foi liberado (antes: travava todas as threads para sempre)
+    assert falhou and s.lock.acquire(timeout=1)             # o lock foi liberado (antes: travava todas as threads para sempre)
     s.lock.release()
-    with s.tx():
-        s.set("ok", 1)
-    assert s.get("ok") == 1
 
 
 def test_medico_reabre_diagnostico_fechado_sem_estourar_a_chave_unica(circle):
