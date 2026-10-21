@@ -105,11 +105,16 @@ def compactar(estado: Mapping[str, Any], limite: int = 1500) -> str:
     return s
 
 
-def _estado(texto: str | None) -> dict:
+def _ler(texto: str | None) -> Any:
+    """Único jeito de ler JSON do banco no treino: registro cortado no meio vira None — não ensina nada, não derruba o treino."""
     try:
-        d = json.loads(texto) if texto else {}
-    except ValueError:                           # registro antigo cortado no meio: não ensina nada, não derruba o treino
-        return {}
+        return json.loads(texto) if texto else None
+    except ValueError:
+        return None
+
+
+def _estado(texto: str | None) -> dict:
+    d = _ler(texto)
     return d if isinstance(d, dict) else {}
 
 
@@ -199,7 +204,10 @@ def exemplos_de(store: Store, desde: float = 0.0, limite: int = 20000) -> dict[s
         if not estado:
             continue
         medido = medidos.get(r["question"], {}).get(int(r["id"]))
-        por_q.setdefault(q, []).append((features(estado), medido if medido is not None else rotulo(json.loads(r["value"])), float(r["created_at"])))
+        valor = _ler(r["value"])
+        if medido is None and valor is None:
+            continue
+        por_q.setdefault(q, []).append((features(estado), medido if medido is not None else rotulo(valor), float(r["created_at"])))
     for q in por_q:
         por_q[q].sort(key=lambda e: e[2])        # do mais antigo ao mais novo: o holdout é o fim
     return por_q
