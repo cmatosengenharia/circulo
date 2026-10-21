@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.62.1 — 2026-10-21
+
+- **LLM pela assinatura**: o Claude Code ERRA quando a resposta passa de `CLAUDE_CODE_MAX_OUTPUT_TOKENS` (a API só
+  corta). Com `max_tokens=200` a etapa `idle:propor_feature` falhou 7× e ficou isolada. Agora o teto pedido ao
+  Claude Code é folgado (≥ 8192) e o texto é cortado aqui, por tamanho, como a API faria.
+- Repositório público: GitHub Actions gratuito e ilimitado; o CI voltou a rodar.
+
 ## 1.62.0 — 2026-10-21
 
 **Noite de 20→21/10: 31 PRs em círculo com o CI recusado. Dois freios.**
