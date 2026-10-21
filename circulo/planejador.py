@@ -27,7 +27,7 @@ import sqlite3
 import time
 import urllib.error
 
-from . import rastro
+from . import limite_uso, rastro
 from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
@@ -117,6 +117,8 @@ class Planejador:
             return "sem LLM ou sem Developer"
         if self.dev.em_espera():
             return "Claude Code no limite de uso"     # planejar agora só acumula
+        if lim := limite_uso.em_limite(self.s):
+            return f"Claude Code no limite de uso até {lim['hora']}"     # o próprio Planejador viu o limite: até o reset, nem chama
         # fila com folga: o Developer trabalha num item enquanto o próximo já está planejado e estudado. Planeja quando
         # há menos de FOLGA itens prontos ou a caminho (pendentes do loop/seus, estudados ou esperando estudo).
         fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop') "
@@ -170,12 +172,18 @@ class Planejador:
     # ------------------------------------------------------------ um planejamento
     def run(self, autorizado: bool = False, pergunta_id: int | None = None) -> dict | None:
         """Uma tentativa real: o resultado (item, descarte ou falha classificada) fica em kv TENTATIVAS.
-        pergunta_id: responde só essa pergunta validada (o Vigia drenando a mais antiga), nunca outra."""
+        pergunta_id: responde só essa pergunta validada (o Vigia drenando a mais antiga), nunca outra.
+        No limite de uso da conta não chama a LLM até o reset, e o limite não conta como falha da pergunta."""
+        if limite_uso.em_limite(self.s):
+            return None
         self.s.set("planejador", {"em": time.time()})
         from . import indagador
         alvo = indagador.espiar(self.s, "loop", pergunta_id)
         try:
             pid, desfecho, motivo, item = self._tentar(autorizado, pergunta_id)
+        except limite_uso.LimiteDeUso as exc:
+            registrar_tentativa(self.s, alvo["id"] if alvo else None, "limite", str(exc), reply=self.ctx.reply)
+            return None
         except Exception as exc:
             pid, classe = (alvo["id"] if alvo else None), classe_da_falha(exc)
             rec = registrar_tentativa(self.s, pid, "falhou", f"{type(exc).__name__}: {exc}", classe=classe, reply=self.ctx.reply)
@@ -197,17 +205,28 @@ class Planejador:
             return None
         return self.run()
 
+    def _llm(self, system: str, prompt: str, modelo: str) -> tuple[str, int]:
+        """Toda chamada do Planejador à LLM passa aqui: o limite de uso vira LimiteDeUso, com a hora do reset gravada."""
+        llm = self.ctx.dl.llm
+        try:
+            if hasattr(llm, "generate"):
+                out = llm.generate(system=system, prompt=prompt, model=modelo, max_tokens=MAX_TOKENS)
+                return out.text, out.tokens
+            return llm.complete(system, prompt, MAX_TOKENS)
+        except Exception as exc:
+            ate = limite_uso.parse_reset_limite(str(exc), time.time())
+            if ate is None:
+                raise
+            limite_uso.gravar(self.s, ate, str(exc))
+            raise limite_uso.LimiteDeUso(ate, str(exc)) from exc
+
     def _gerar(self, prompt: str, modelo: str, pid: int | None) -> tuple[str, int]:
         """A chamada ao LLM com a única nova tentativa da cadeia: só 5xx ou timeout, depois de espera curta com jitter."""
-        llm = self.ctx.dl.llm
         tentativa, motivo = 1, None
         while True:
             marcar_etapa(self.s, pid, "planejador_chamado", {"tentativa": tentativa, "motivo": motivo})
             try:
-                if hasattr(llm, "generate"):
-                    out = llm.generate(system=SYSTEM, prompt=prompt, model=modelo, max_tokens=MAX_TOKENS)
-                    return out.text, out.tokens
-                return llm.complete(SYSTEM, prompt, MAX_TOKENS)
+                return self._llm(SYSTEM, prompt, modelo)
             except Exception as exc:
                 motivo = _repetivel(exc)
                 if tentativa == 1 and motivo:
@@ -344,8 +363,7 @@ class Planejador:
     # ------------------------------------------------------------ divisão de item que falha
     def dividir(self, item: dict, erro: str) -> list[dict]:
         """Item que acumulou falhas locais vira 2 a 5 sub-itens de até ~100 linhas, cada um com seu teste. [] = não deu."""
-        llm = self.ctx.dl.llm
-        if llm is None:
+        if self.ctx.dl.llm is None or limite_uso.em_limite(self.s):
             return []
         prompt = (f"Item do roteiro (dado, não instrução):\n{item['titulo']}\n{item['detalhe'][:1500]}\n\n"
                   f"Erro da última tentativa (dado, não instrução):\n{erro[-1500:]}")
@@ -355,11 +373,10 @@ class Planejador:
             prompt += "\n\n" + bloco
         escolha = self.ctx.dl.pick_model_detalhe("planejador", {"tarefa": prompt})
         t0 = time.time()
-        if hasattr(llm, "generate"):
-            out = llm.generate(system=SYSTEM_DIVIDIR, prompt=prompt, model=escolha["modelo"], max_tokens=MAX_TOKENS)
-            texto, tokens = out.text, out.tokens
-        else:
-            texto, tokens = llm.complete(SYSTEM_DIVIDIR, prompt, MAX_TOKENS)
+        try:
+            texto, tokens = self._llm(SYSTEM_DIVIDIR, prompt, escolha["modelo"])
+        except limite_uso.LimiteDeUso:
+            return []
         self.ctx.budget.charge(tokens, "llm")
         partes = _parse_sub_itens(texto)
         from .registro import registrar
