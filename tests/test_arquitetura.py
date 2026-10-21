@@ -107,6 +107,31 @@ def test_licao_2_nenhum_teste_exige_o_erro_antigo_e_depois_o_conserto():
     assert not fazem, f"o teste exige o erro antigo e depois o conserto na mesma chamada (o portão já roda o teste no código antigo): {fazem}"
 
 
+def test_padrao_sdk_opt_in_detectado(monkeypatch):
+    """lição #42 (e #18): o `result` de erro do Claude Code traz `fast_mode_disabled_reason":"sdk_opt_in_required"`,
+    `subagent_stats` e outros campos que não são a causa; o motivo era o fim cru do JSON, e cada corte virava uma lição.
+    Toda saída com `is_error: true` sai tratada: só os campos da causa, nunca o ruído."""
+    import subprocess
+    from types import SimpleNamespace
+
+    from circulo.licoes import assinatura_de
+    from circulo.llm import AssinaturaLLM
+    fixture = Path(__file__).parent / "fixtures" / "licao_42_saida_agente.jsonl"
+    linhas = [x for x in fixture.read_text(encoding="utf-8").splitlines()
+              if "sdk_opt_in_required" in x and re.search(r'"is_error":\s*true', x)]
+    assert linhas
+    for linha in linhas:
+        monkeypatch.setattr(subprocess, "run", lambda *a, _l=linha, **kw: SimpleNamespace(returncode=1, stdout=_l, stderr=""))
+        try:
+            AssinaturaLLM().generate(system="s", prompt="p", model="m", max_tokens=10)
+        except RuntimeError as exc:
+            motivo = str(exc)
+        else:
+            raise AssertionError("is_error: true passou como resposta")
+        assert "sdk_opt_in_required" not in motivo and "subagent_stats" not in motivo, f"saída do agente sem tratamento: {motivo}"
+        assert assinatura_de("developer:agente", motivo) == "developer:agente:maximo_de_passos"
+
+
 def test_testes_nao_usam_a_data_local_da_maquina():
     """lição #48: o orçamento conta o dia em America/Sao_Paulo; `date.today()` no teste dá o dia do fuso da máquina
     (UTC no CI), e das 21 h à meia-noite de Brasília o "ontem" do teste vira o "hoje" do orçamento. Use o NOON do conftest."""
