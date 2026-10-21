@@ -319,3 +319,19 @@ def test_impressao_do_teste_no_main_ignora_formato_e_muda_com_o_corpo(tmp_path):
     d = commit("def test_outro():\n    assert True\n")
     h = [impressao_no_main(tmp_path, s, "tests/test_a.py::test_c") for s in (a, b, c, d)]
     assert h[0] and h[0] == h[1] and h[2] not in (None, h[0]) and h[3] is None
+
+
+def test_licao_de_estrutura_com_item_descartado_nao_trava_a_evolucao_para_sempre(circle):
+    """Vigia licao_bloqueia (pergunta #52): o item da lição foi descartado (fatiador, higiene, estudo contestado) e
+    ninguém mais trabalha nele; a lição vale como corrigida quando o erro para de acontecer, e reabre o item se voltar."""
+    L = lic(circle)
+    licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    circle.store.x("UPDATE roadmap SET status='descartado', evidencia='descartado: sub-item falhou' WHERE id=?", (licao["item_id"],))
+    L.revisar()
+    assert L.bloqueia_evolucao()                                   # o erro acabou de acontecer: ainda não sumiu
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
+    L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")    # voltou
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (licao["item_id"],))["status"] == "pendente"
+    assert L.bloqueia_evolucao()
