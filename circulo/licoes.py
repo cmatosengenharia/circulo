@@ -385,8 +385,10 @@ class Licoes:
                 log.append(f"lição #{lic['id']} validada")
                 self.reply(f"Lição #{lic['id']} validada: a correção entrou ({lic['item_evidencia']}). "
                            f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer.", "licao")
-        # lição de trabalho/ambiente sem item: vale como aprendida quando para de acontecer
-        for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','reincidente') AND item_id IS NULL AND node_id IS NULL "
+        # lição sem item (trabalho/ambiente) ou cujo item ninguém mais faz: vale como aprendida quando para de acontecer;
+        # se voltar, reincide e reabre o item (sem isso, a de estrutura travava a evolução para sempre)
+        for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','em_correcao','reincidente') AND node_id IS NULL "
+                            "AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE status IN ('descartado','contestado'))) "
                             "AND ultima_tick < ?", (tick - EVID_GIROS,)):
             if node_por_causa(lic["assinatura"]):
                 continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
