@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.52.0 — 2026-10-21
+
+**Desenvolvedor com sessão contínua e contexto do código.** Cada item custava 8–12 sessões do Claude Code porque cada
+tentativa recomeçava do zero: ler os arquivos, redescobrir os testes, repetir o que já tinha tentado.
+
+- **`--resume` por item**: a sessão do Claude Code (`session_id` do evento final) fica guardada por item (12 h); a
+  tentativa seguinte do mesmo item — retomada depois de limite, correção local barrada no portão, conserto de PR
+  reprovado — continua a conversa anterior em vez de recomeçar. `CIRCULO_CODE_AGENT_RESUME=0` volta ao modo antigo.
+- **Contexto do código no prompt**: para cada módulo-alvo citado no item, os testes que já existem (`tests/test_<mod>.py`
+  com os nomes) e o último PR mergeado que tocou o arquivo, com `git log -p -1` sugerido — "acrescente ali, não crie
+  outro arquivo".
+- A Equipe ao vivo diz quando o Developer está retomando a sessão anterior.
+
 ## 1.51.0 — 2026-10-21
 
 **Desfecho por decisão: o Jev passa a ver o que cada "sim" rendeu.**

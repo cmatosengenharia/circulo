@@ -113,3 +113,42 @@ def test_tela_da_equipe_tem_os_passos(painel):  # noqa: F811
 
 
 from test_painel import painel  # noqa: E402,F401 — fixture do servidor do painel
+
+
+# ------------------------------------------------------------ 1.52.0: sessão contínua e contexto do código
+
+def test_segunda_tentativa_do_mesmo_item_retoma_a_sessao_do_claude_code(monkeypatch, tmp_path, circle, repo):  # noqa: F811
+    from circulo.self_dev import ClaudeCodeAgent, SelfDeveloper
+    FakePopen.eventos = [_tool("Edit", file_path="circulo/a.py"), {**RESULT, "session_id": "sess-123"}]
+    monkeypatch.setattr("circulo.self_dev.subprocess.Popen", FakePopen)
+    dev = SelfDeveloper(circle.ctx, repo, ClaudeCodeAgent(), None, test_cmd="true")
+    out = dev._agente("tarefa", tmp_path, "t", item_id=77)
+    assert out["sessao"] == "sess-123" and out["retomou"] is False and "--resume" not in FakePopen.visto["cmd"]
+    assert circle.store.get("self_dev_sessoes")["77"]["sessao"] == "sess-123"
+    out2 = dev._agente("continue", tmp_path, "t", item_id=77)
+    cmd = FakePopen.visto["cmd"]
+    assert out2["retomou"] is True and cmd[cmd.index("--resume") + 1] == "sess-123"
+    monkeypatch.setenv("CIRCULO_CODE_AGENT_RESUME", "0")
+    dev._agente("continue", tmp_path, "t", item_id=77)
+    assert "--resume" not in FakePopen.visto["cmd"]                                  # chave para voltar ao modo antigo
+    monkeypatch.delenv("CIRCULO_CODE_AGENT_RESUME")
+    dev._agente("outra", tmp_path, "t", item_id=78)
+    assert "--resume" not in FakePopen.visto["cmd"]                                  # item novo, sessão nova
+
+
+def test_prompt_traz_testes_existentes_e_ultimo_pr_dos_modulos_alvo(circle, repo):  # noqa: F811
+    from circulo.self_dev import SelfDeveloper
+    s = circle.store
+    (repo / "circulo").mkdir(exist_ok=True)
+    (repo / "tests").mkdir(exist_ok=True)
+    (repo / "tests" / "test_vigia.py").write_text("def test_a():\n    pass\n\ndef test_b():\n    pass\n")
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,item_id,arquivos,created_at,updated_at) VALUES(31,2,'Vigia: drenar sozinho','b','mergeado',NULL,'[\"circulo/vigia.py\", \"tests/test_vigia.py\"]',?,?)", (time.time(), time.time()))
+    dev = SelfDeveloper(circle.ctx, repo, None, None, test_cmd="true")
+    txt = dev._contexto_codigo({"titulo": "Vigia: mudar circulo/vigia.py e circulo/novo.py", "detalhe": ""})
+    assert "tests/test_vigia.py" in txt and "test_a, test_b" in txt and "acrescente ali" in txt
+    assert "#31" in txt and "git log -p -1 -- circulo/vigia.py" in txt and "`circulo/novo.py` ainda não tem" in txt
+    assert dev._contexto_codigo({"titulo": "sem arquivo", "detalhe": ""}) == ""
+    assert "Contexto do código" in dev._licoes_txt(s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('x circulo/vigia.py','d','loop','pendente','',1,0,0)"))
+
+
+from test_self_dev import repo  # noqa: E402,F401,F811 — fixture do repositório
