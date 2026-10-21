@@ -388,3 +388,37 @@ def estado_dado(dado: str, evidencia: str) -> dict:
     fr = round(len(achados) / len(nums), 2) if nums else None
     return {"dado": (dado or "")[:300], "numeros_do_dado": nums, "numeros_na_evidencia": achados, "fracao_encontrada": fr,
             "trechos_da_evidencia": trechos[:6], "evidencia_tem_numeros": bool(re.search(r"\d", evidencia or ""))}
+
+
+FATOR_TESTE = {"passou": (0.85, 0.85, 0.95, 1.0), "falhou": (0.6, 0.6, 0.9, 1.0)}   # por execucoes_seguidas 0, 1, 2, 3+
+
+
+def estado_evidencia(store, texto: str, base: Mapping[str, Any]) -> dict:
+    """O teste citado no item, como o loop o mediu no main (licoes.checagens): existe, último exit, execuções seguidas
+    com o mesmo resultado e alternância (passa-falha-passa: teste instável, o resultado isolado não prova nada)."""
+    import re
+    from .licoes import NAO_COLETADO, alvo_de
+    m = re.search(r"tests/[\w./-]+\.py::[\w\[\]-]+", texto or "")
+    exits = []
+    if m:
+        lics = [lic for lic in map(dict, store.q("SELECT * FROM licoes WHERE status!='unida' AND checagens IS NOT NULL ORDER BY id"))
+                if alvo_de(lic) == m.group(0)]
+        exits = [int(c["exit"]) for c in json.loads(lics[0]["checagens"])] if lics else []
+    seguidas = next((i for i, e in enumerate(reversed(exits)) if (e == 0) != (exits[-1] == 0)), len(exits))
+    flips = sum((a == 0) != (b == 0) for a, b in zip(exits, exits[1:], strict=False))
+    return {**base, "teste_citado": "nenhum" if not m else ("nao_medido" if not exits else
+                                                           "nao_existe" if exits[-1] in NAO_COLETADO else "existe"),
+            "exit_main": "sem_execucao" if not exits else ("passou" if exits[-1] == 0 else
+                                                           "nao_coletado" if exits[-1] in NAO_COLETADO else "falhou"),
+            "execucoes_seguidas": "3+" if seguidas >= 3 else str(seguidas), "alternou": flips >= 2}
+
+
+def regra_evidencia(s: Mapping[str, Any]) -> float:
+    """Contrariar o pedido exige fontes (citações reais da busca valem mais que URLs escritas pela LLM); o teste citado
+    medido no main só muda a confiança, nunca o lado: alternância e falha isolada aproximam de 0,5, passar seguido afasta."""
+    p = min(1.0, int(s.get("n_fontes", 0)) / 3) * (0.9 if int(s.get("n_citacoes", 0)) else 0.6)
+    p = p if s.get("veredito") == "contestar" else min(1.0, p + 0.15)
+    n = {"0": 0, "1": 1, "2": 2, "3+": 3}.get(str(s.get("execucoes_seguidas", "0")), 0)
+    f = (0.8 if s.get("teste_citado", "nenhum") in ("nenhum", "nao_medido") else 0.5 if s.get("alternou")
+         else FATOR_TESTE.get(s.get("exit_main"), (0.7,) * 4)[n])
+    return 0.5 + (p - 0.5) * f
