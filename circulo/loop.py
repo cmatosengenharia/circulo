@@ -36,11 +36,9 @@ from .policy import PolicyStore
 from .state import Store
 
 TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar")
-# indagar entrou no TRABALHO em 1.30: em rodízio rodava 3× em 3 h; as perguntas são o começo da autoevolução.
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
-# Medido no Mac (19/10): 121 de 180 min eram descanso de 5 min com PR no CI; em voo o giro volta em 45 s.
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
@@ -249,7 +247,6 @@ class Circle:
         # 3) meta-evolução (descoberta é SQL; gasto só se o Jev autorizar). Modo seguro congela os níveis 2 e 3: só a saúde roda.
         stages = [("licoes", self.licoes.revisar), ("health", self.health.check)]
         if not ctl["modo_seguro"]:
-            # só se autoevolui depois de corrigir os próprios erros: com lição de estrutura aberta, só o domínio evolui
             self.meta.so_dominio = self.licoes.bloqueia_evolucao()
             stages = [("meta", self.meta.step), ("shadow", self.shadow.evaluate)] + stages
         for stage, fn in stages:
@@ -509,9 +506,7 @@ class Circle:
                 d0 = gate.decision if gate else None
                 if gate is not None and not gate.allowed and contexto.get("desbloqueia_fila") and d0.source == "jev" \
                         and float(d0.confidence) < CONF_PARA_BARRAR and ctx.budget.can_spend(int(contexto["est_tokens"])):
-                    # Confiança média do Jev num "não" que para a esteira: pela roteirização por confiança, confiança média
-                    # alerta, não age. A regra determinística decide (como quando o Jev está em dúvida), e a resposta dele fica
-                    # registrada para o aprendiz. Confiança alta no "não" continua valendo.
+                    # "não" do Jev com confiança média só alerta: a regra decide e a resposta fica para o aprendiz.
                     estado = {"action": "idle_evolution", **contexto, "budget_left_ratio": round(ctx.budget.left_ratio(), 3)}
                     r = ctx.dl.local.ask_many(estado, {"worth_spending": Question("noul", "vale gastar agora?", SN("sim", "não"))})[0]["worth_spending"]
                     gate = Gate(float(r.value) >= gate.threshold, r, gate.threshold)
@@ -863,7 +858,8 @@ class Circle:
         from .configuracao import ENV_FILE
         self._env_mtime = ENV_FILE.stat().st_mtime if ENV_FILE.exists() else None
         self._iniciado_em = time.time()
-        self.vigia.iniciar()
+        if getattr(self, "controle", None) is None:
+            self.vigia.iniciar()                           # sem plano de controle separado: o SRE roda aqui
         n = 0
         try:
             while not self._stop.is_set():
@@ -872,6 +868,8 @@ class Circle:
                     self.store.set("ultimo_reinicio", {"em": time.time(), "motivo": "configuração alterada"})
                     break
                 self.heartbeat()
+                if getattr(self, "controle", None) is not None and self.controle.cuidar() == "desistiu":
+                    self.controle.assumir(self)            # o filho caiu demais: painel e SRE voltam para cá
                 if parada.teste_vencido(self.store):
                     self.testar_parada()             # kill switch testado toda semana, pelo mesmo caminho do botão
                 r = self._tick_com_pulso()
@@ -896,5 +894,7 @@ class Circle:
                     self._rest(segundos, sleep)
         finally:
             self.vigia.parar()
+            if getattr(self, "controle", None) is not None:
+                self.controle.parar()
             self.store.set("batimento", None)
         self.store.set("loop_status", "parado")

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.55.0 — 2026-10-21
+
+**Plano de controle em processo próprio.** Painel, SRE (travas), Médico, Higiene e Escalador saem do processo do
+giro: `python -m circulo.controle` sobe sobre o mesmo banco (SQLite em WAL), serve o painel em primeiro plano e roda
+o SRE na thread dele — sem giros. Com `circulo run --painel`, o loop sobe esse processo como filho e o
+**supervisiona**: caiu, sobe de novo; caiu mais de 3 vezes em 2 min, o loop assume painel e SRE dentro dele (como
+antes) e avisa. Ao reiniciar o giro (nova versão), o filho é encerrado e o loop novo sobe outro: ~2 s sem painel em
+vez de tudo parado. O painel deixa de disputar o GIL com o Developer; uma exceção no giro não derruba mais o SRE.
+`CIRCULO_CONTROLE_SEPARADO=0` volta ao modo de um processo. Nada muda no `launchd`: o mesmo serviço, o loop cuida do
+filho.
+
 ## 1.54.0 — 2026-10-21
 
 **Rollback de dados junto com o de código, e a constituição protegida fora do sistema.**

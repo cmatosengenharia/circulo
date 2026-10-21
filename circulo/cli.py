@@ -109,9 +109,15 @@ def main(argv: list[str] | None = None) -> None:
         testar = os.environ.get("CIRCULO_TESTAR_AO_SUBIR", "1") == "1"
         cfg.registrar(c.store, cfg.diagnostico(testar_conexoes=testar))
         if args.painel:
-            from .painel import serve
-            serve(c.store.path, args.porta, background=True)
-            print(f"painel em http://127.0.0.1:{args.porta}")
+            from . import controle
+            if controle.separado():
+                c.controle = controle.Supervisor(c.data_dir, args.porta, c.store, c.ctx.reply)
+                c.controle.iniciar()
+                print(f"plano de controle (painel + SRE) em processo próprio: http://127.0.0.1:{args.porta}")
+            else:
+                from .painel import serve
+                serve(c.store.path, args.porta, background=True)
+                print(f"painel em http://127.0.0.1:{args.porta}")
         from . import metrics
         porta = metrics.porta_configurada(args.metricas_porta)
         if porta:
