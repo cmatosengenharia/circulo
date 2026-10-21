@@ -57,6 +57,9 @@ AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit yo
 # Lição #53: o gate recusa pelos arquivos, antes dos checks, o PR que toca a constituição; o check "Constituição"
 # falhando num PR que chegou aos checks é o CI que caiu inteiro (Actions, main), não o PR: ambiente, sem item.
 CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")
+# Lição #27: o exit 4 do pytest é qualquer erro de uso; só o caminho citado, conferido na main e no roteiro, diz que o
+# alvo não existe. Alvo que ninguém vai criar não é erro novo: 128 ocorrências do mesmo arquivo de um item descartado.
+ALVO_SUMIDO = re.compile(r"file or directory not found: (tests/[\w./-]+\.py)")
 
 
 def normalizar(texto: str, n: int = 70) -> str:
@@ -252,10 +255,28 @@ def subir(camada: str | None) -> str:
     return CAMADAS[min(len(CAMADAS) - 1, CAMADAS.index(c) + 1)]
 
 
+def alvo_inexistente(store, repo: str | Path | None, motivo: str) -> str | None:
+    """O arquivo de teste que o pytest não achou (exit 4), se ele não está na main nem num item pendente do roteiro."""
+    m = ALVO_SUMIDO.search(motivo or "")
+    if not m:
+        return None
+    arquivo = m.group(1)
+    if repo and (Path(repo) / ".git").exists():
+        if any(subprocess.run(["git", "cat-file", "-e", f"{ref}:{arquivo}"], cwd=repo, capture_output=True).returncode == 0
+               for ref in ("origin/main", "main")):
+            return None
+    # o item que só cita o erro (o conserto da própria lição) não cria o arquivo
+    if store.one("SELECT 1 FROM roadmap WHERE status IN ('pendente','em_andamento') AND instr(titulo || ' ' || detalhe, ?) "
+                 "AND instr(titulo || ' ' || detalhe, 'file or directory not found')=0", (arquivo,)):
+        return None
+    return arquivo
+
+
 class Licoes:
-    def __init__(self, store, reply=None):
+    def __init__(self, store, reply=None, repo: str | Path | None = None):
         self.s = store
         self.reply = reply or (lambda *a, **k: None)
+        self.repo = repo or os.environ.get("CIRCULO_REPO_DIR")
 
     # ------------------------------------------------------------ monitorar todo ponto de verificação
     def verificar(self, ponto: str, ok: bool, sujeito: str = "", motivo: str = "", assinatura: str | None = None,
@@ -283,6 +304,9 @@ class Licoes:
         row = licao_de(self.s, sig)
         descricao = _descricao(ponto, motivo)
         node = node_id_de(sig)
+        sumido = alvo_inexistente(self.s, self.repo, motivo)
+        if sumido:
+            return self._obsoleta(row, sig, ponto, classe, descricao, node, sumido)
         if row is None:
             lid = self.s.x("""INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,
                               primeira_tick,ultima_tick,created_at,updated_at,camada,node_id,origens)
@@ -326,6 +350,21 @@ class Licoes:
         if reincidiu and lic["classe"] != "trabalho" or recorrente_ambiente or (lic["classe"] == "estrutural" and not lic["item_id"]):
             self._abrir_item(lic, motivo, detalhe_item, topo=reincidiu, titulo=titulo)
         return self._neurogenese(lic["id"])
+
+    def _obsoleta(self, row, sig, ponto, classe, descricao, node, arquivo) -> dict:
+        """Alvo do pytest que não existe nem vai existir: a lição fica obsoleta com a causa e a contagem não sobe."""
+        tick, agora = self.s.tick, time.time()
+        causa = f"Obsoleta: o alvo {arquivo} não existe na main nem em item pendente do roteiro (pytest: file or directory not found)"
+        if row is None:
+            lid = self.s.x("""INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,
+                              primeira_tick,ultima_tick,created_at,updated_at,camada,node_id,origens)
+                              VALUES(?,?,?,?,?,'obsoleta',1,0,?,?,?,?,'regra',?,?)""",
+                           (sig, ponto, classe, descricao, causa, tick, tick, agora, agora, node, json.dumps([sig])))
+        else:
+            lid = row["id"]
+            self.s.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=? "
+                     "AND status IN ('aberta','em_correcao','reincidente')", (causa, agora, lid))
+        return dict(self.s.one("SELECT * FROM licoes WHERE id=?", (lid,)))
 
     def _neurogenese(self, lid: int) -> dict:
         """A lição vira portão executável no neurônio onde o erro aconteceu (quando dá para checar mecanicamente)."""
