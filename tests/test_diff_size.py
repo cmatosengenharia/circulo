@@ -1,4 +1,6 @@
-from circulo.diff_size import categoria, checar_limite, normalizar_caminho, parse_numstat
+import subprocess
+
+from circulo.diff_size import categoria, checar_limite, normalizar_caminho, numstat_contra_base, parse_numstat
 from circulo.merge_gate import MAX_LINES
 
 NUMSTAT = (
@@ -51,3 +53,29 @@ def test_limite():
     assert (acima.categoria_dominante, acima.arquivo_dominante) == ("fonte", "circulo/x.py")
     assert "fonte" in acima.causa and "circulo/x.py" in acima.causa
     assert checar_limite("10\t0\ta.py\n", limite=5).ok is False
+
+
+def _git(repo, *args):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=repo, check=True,
+                   capture_output=True)
+
+
+def test_numstat_contra_base(tmp_path):
+    _git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "a.py").write_text("1\n2\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "base")
+    _git(tmp_path, "checkout", "-q", "-b", "feat")
+    (tmp_path / "a.py").write_text("1\n3\n4\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("x\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "branch")
+    _git(tmp_path, "checkout", "-q", "main")
+    (tmp_path / "b.py").write_text("so na base\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "base anda depois do fork")
+    _git(tmp_path, "checkout", "-q", "feat")
+    texto = numstat_contra_base("main", tmp_path)
+    assert sorted(texto.splitlines()) == ["1\t0\ttests/test_a.py", "2\t1\ta.py"]
+    assert parse_numstat(texto).total == 4
