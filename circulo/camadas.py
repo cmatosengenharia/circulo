@@ -133,7 +133,8 @@ def visao(s: Store, now: float | None = None, n: int = 30) -> dict:
     ok = [r["dur"] for r in fechadas if not r["erros"]]
     ruim = [r["dur"] for r in fechadas if r["erros"]]
     d24 = now - 86400
-    um = lambda sql, a=(): int((s.one(sql, a) or {"n": 0})["n"] or 0)  # noqa: E731
+    def um(sql, a=()):
+        return int((s.one(sql, a) or {"n": 0})["n"] or 0)
     saude = {"cor": cor, "frase": frase, "estado": st["estado"], "titulo": st["titulo"], "etapa_atual": etapa_atual,
              "ultimo_pr": dict(pr) if pr else None, "erros_24h": total_24h, "ultima_falhou": ultima_falhou,
              "entregas_24h": {"prs": um("SELECT COUNT(*) n FROM prs WHERE status='mergeado' AND updated_at>=?", (d24,)),

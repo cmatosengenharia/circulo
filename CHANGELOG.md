@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.50.0 — 2026-10-20
+
+**O Escalador: quem está sobrecarregado, e mais trabalhadores em paralelo para quem pode.**
+
+- **`circulo/capacidade.py`**: mede por agente, na última hora, ocupação (pelas intenções registradas antes e depois
+  de cada tarefa), fila, espera do item mais antigo e vazão; carga = 0,6·ocupação + 0,4·fila. Sobrecarregado =
+  ocupação ≥ 60 % e fila ≥ 3. O gargalo é o mais carregado. Roda na thread do SRE, a cada minuto; o painel recebe pela
+  stream de eventos (`event: capacidade`, a mesma via do estado e da confiança — SSE, o equivalente ao websocket na
+  biblioteca padrão).
+- **Escala só quem não conflita na esteira**: Arquiteto (cada estudo é um item independente) e Desenvolvedor (itens
+  distintos, cada um no seu worktree e branch; fetch/worktree/push do repositório principal sob trava; o Revisor já barra
+  arquivos em comum entre PRs; o gate serializa os merges). Nunca: QA/gate, DevOps/corpo, Gerente de produto, PO, Redator.
+- **O Jev decide** (`escalar_agente`, noul, estado medido: ocupação, fila, espera, tarefas/h). Sobe um trabalhador por
+  vez até 3, com 15 min entre escaladas; desce quando a fila esvazia. Cada mudança vira alerta `capacidade` e histórico.
+- Execução: `Estudo.run_paralelo` (N estudos em threads) e `SelfDeveloper.run_paralelo` (N itens distintos em threads,
+  `picks(n)`), ligados no giro sem mexer no fluxo de um trabalhador.
+- Equipe ao vivo: barra de carga em cada integrante (vermelha quando sobrecarregado), selo "×N" para quem está em
+  paralelo, gargalo e paralelismo no cabeçalho; Gestão → Saúde: linha do Escalador, atualizada pela stream.
+  `GET /api/capacidade`.
+
 ## 1.49.0 — 2026-10-20
 
 **Gestão do loop redesenhada: as quatro abas com o mesmo padrão — uma frase do que importa agora, quatro números,

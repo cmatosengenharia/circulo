@@ -460,6 +460,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
   <section data-aba="geral" class="panel c7 zero-only" hidden id="camadas" aria-label="Estado do loop">
     <div class="semaforo" id="semaforo" data-c=""><span class="luz" aria-hidden="true"></span><p id="semFrase" aria-live="polite">Conferindo o loop…</p></div>
     <div class="kpis4" id="sinais"></div>
+    <div class="sub" id="saudeCapacidade" style="margin:-6px 0 10px"></div>
     <div class="duas">
       <div><h3 class="h3">Quem está fazendo o quê <a class="mini" href="/equipe">Equipe ao vivo →</a></h3><ul class="lista" id="saudeFazendo"></ul></div>
       <div><h3 class="h3">O que está travando <small class="sub">SRE · Médico do loop · Precisa de você</small></h3><ul class="lista" id="saudeTravas"></ul></div>
@@ -1118,6 +1119,7 @@ function connect() {
   es.addEventListener("decisao", m => { const d = JSON.parse(m.data); lastId = d.id; addDecision(d); });
   es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
   es.addEventListener("status", m => { ultimoDado = Date.now(); if (S) { S.loop.vivo = JSON.parse(m.data); } });
+  es.addEventListener("capacidade", m => { renderCapacidade(JSON.parse(m.data)); });
   es.addEventListener("confianca", m => { CF = JSON.parse(m.data); ultimoDado = Date.now(); atrasoMs = Math.max(0, Date.now() - CF.gerado_em * 1000); renderAoVivo(); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
@@ -1166,6 +1168,14 @@ function renderCamadas(v) {
 }
 $("#etapas").addEventListener("click", ev => { const b = ev.target.closest(".etapa"); if (b && b.dataset.run) abrirExecucao(b.dataset.run, b.dataset.chave); });
 $("#execs").addEventListener("click", ev => { const r = ev.target.closest("rect"); if (r) abrirExecucao(r.dataset.run); });
+function renderCapacidade(c) {
+  const el = $("#saudeCapacidade"); if (!el || !c) return;
+  const med = c.medidas || [], g = med.find(m => m.agente === c.gargalo), par = med.filter(m => m.trabalhadores > 1);
+  el.innerHTML = (g ? `<b>Gargalo:</b> ${esc(g.nome)} — ocupado ${Math.round(g.ocupacao * 100)}% da última hora, ${g.fila} na fila${g.espera_s ? `, espera ${Math.round(g.espera_s / 60)} min` : ""}${g.sobrecarregado ? ` · <b style="color:var(--bad)">sobrecarregado</b>${g.escalavel ? "" : " (não escala: " + esc(g.porque) + ")"}` : ""}` : "<b>Escalador:</b> ninguém sobrecarregado")
+    + (par.length ? ` · em paralelo: ${par.map(m => `${esc(m.nome)} ×${m.trabalhadores}`).join(", ")}` : "") + (c.acoes && c.acoes.length ? ` · agora: ${c.acoes.map(a => `${esc(a.agente)} ${a.acao === "subir" ? "↑" : "↓"}${a.para}`).join(", ")}` : "");
+}
+async function refreshCapacidade() { try { renderCapacidade(await (await fetch("/api/capacidade")).json()); } catch {} }
+refreshCapacidade();
 async function refreshFazendo() {
   try {
     const r = await (await fetch("/api/equipe")).json();

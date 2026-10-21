@@ -79,6 +79,22 @@ class Estudo:
     def precisa(self) -> bool:
         return self.pendente() is not None
 
+    def pendentes(self, n: int) -> list[dict]:
+        return [dict(r) for r in self.s.q("SELECT * FROM roadmap WHERE status='pendente' AND origem IN ('pedido_cassio','loop') "
+                                          "AND COALESCE(desativado,0)=0 AND estudo IS NULL AND evidencia NOT LIKE '%depende de você%' ORDER BY ordem LIMIT ?", (n,))]
+
+    def run_paralelo(self, autorizado: bool = False) -> list[dict | None]:
+        """Tantos estudos ao mesmo tempo quantos trabalhadores o Escalador deu ao Arquiteto (1 por padrão): cada estudo é
+        um item independente, então não há conflito na esteira."""
+        from .capacidade import trabalhadores
+        n = trabalhadores(self.s, "estudar_pedido")
+        itens = self.pendentes(n) if n > 1 else []
+        if len(itens) <= 1:
+            return [self.run(autorizado=autorizado)]
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=n, thread_name_prefix="estudo") as ex:
+            return list(ex.map(lambda it: self.run(item=it, autorizado=autorizado), itens))
+
     def custo_estimado(self, item: dict | None = None) -> int:
         """Mediana medida dos últimos estudos do mesmo modo (o porteiro decide com número real), ou a estimativa do modo."""
         item = item or self.pendente()

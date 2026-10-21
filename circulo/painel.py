@@ -342,6 +342,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/aluno":
                 from .aluno import resumo as aluno_resumo
                 self._json(aluno_resumo(self._store()))
+            elif u.path == "/api/capacidade":
+                from .capacidade import resumo as cap_resumo
+                self._json(cap_resumo(self._store()))
             elif u.path == "/api/jev":
                 from .jev_lab import resumo as jev_resumo
                 self._json(jev_resumo(self._store()))
@@ -463,8 +466,13 @@ def make_handler(db_path: str):
             from .confianca import confianca
             sin = max(0, (store.one("SELECT COALESCE(MAX(id),0) m FROM verificacoes")["m"] or 0) - 30)
             last_conf, last_conf_em = None, 0.0
+            last_cap = None
             try:
                 while True:
+                    cap = store.get("capacidade_ultima")
+                    if cap and cap.get("em") != last_cap:                       # o Escalador mediu: empurra para a tela
+                        last_cap = cap.get("em")
+                        self.wfile.write(f"event: capacidade\ndata: {json.dumps(cap, ensure_ascii=False)}\n\n".encode())
                     st = loop_status(store)
                     key = (st["estado"], st["titulo"], st["detalhe"], st["pendentes"], st["tick"], st.get("etapa"))
                     if key != last_status or time.time() - last_sent > 5:

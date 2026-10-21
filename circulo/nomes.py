@@ -36,6 +36,7 @@ AGENTES: dict[str, dict[str, str]] = {
     "evoluir_harness":  {"nome": "Prompts A/B",        "cargo": "Testa prompts lado a lado", "curto": "Prompts",    "antes": "Prompts A/B"},
     "conectar_missoes": {"nome": "Integrador",         "cargo": "Liga missões que se conhecem", "curto": "Integrador", "antes": "Conexões"},
     "medico":           {"nome": "Médico do loop",     "cargo": "Diagnostica gargalos e contém o dano", "curto": "Médico", "antes": "Médico"},
+    "escalador":        {"nome": "Escalador",          "cargo": "Mede a carga e põe trabalhadores em paralelo", "curto": "Escalador", "antes": "Capacidade"},
     "documentar":       {"nome": "Redator técnico",    "cargo": "Documenta o que o loop é e fez", "curto": "Redator", "antes": "Documentador"},
     "llm":              {"nome": "Consultor (LLM)",    "cargo": "Raciocina quando a regra não basta", "curto": "LLM", "antes": "LLM"},
     "github":           {"nome": "GitHub",             "cargo": "Repositório e CI",        "curto": "GitHub",       "antes": "GitHub"},

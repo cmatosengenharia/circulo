@@ -26,6 +26,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import sys
 import time
 from dataclasses import dataclass
@@ -261,8 +262,13 @@ def _git_env() -> dict:
     return env
 
 
+_REPO_LOCK = threading.RLock()     # fetch/worktree no repositório principal: um de cada vez (trabalhadores em paralelo)
+
+
 def _git(args: list[str], cwd: Path, check: bool = True) -> str:
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=_git_env())
+    trava = _REPO_LOCK if args and args[0] in ("fetch", "worktree", "push", "remote") else threading.Lock()
+    with trava:
+        p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=_git_env())
     if check and p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)}: {p.stderr.strip()[-300:]}")
     return p.stdout.strip()
@@ -356,6 +362,36 @@ class SelfDeveloper:
                 return {"item": a["item_id"], "pr": a["number"], "branch": a["branch"], "conserto": a["conserto"],
                         "consertos": int(a.get("consertos") or 0), "conserto_sha": a.get("conserto_sha")}
         return None
+
+    def picks(self, n: int) -> list[dict]:
+        """Até n itens distintos da fila, na mesma ordem de prioridade do `pick`, sem repetir o que já está em andamento."""
+        out, vistos = [], set()
+        while len(out) < n:
+            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR +
+                            (f" AND id NOT IN ({','.join(str(i) for i in vistos)})" if vistos else "") + " ORDER BY ordem LIMIT 1")
+                 or self.s.one("SELECT * FROM roadmap WHERE origem IN ('pedido_cassio','loop') AND status='pendente' AND COALESCE(desativado,0)=0 "
+                               "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR +
+                               (f" AND id NOT IN ({','.join(str(i) for i in vistos)})" if vistos else "") + " ORDER BY ordem LIMIT 1"))
+            if not r:
+                break
+            out.append(dict(r))
+            vistos.add(int(r["id"]))
+        return out
+
+    def run_paralelo(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
+        """Com mais de um trabalhador (Escalador), roda itens distintos ao mesmo tempo, cada um no seu worktree e branch.
+        Devolve o resultado do primeiro (o loop registra um); os outros ficam na trilha e nos alertas."""
+        n = int(((self.s.get("capacidade") or {}).get("corrigir_codigo") or {}).get("trabalhadores", 1))   # o Escalador grava; o Developer só lê o kv
+        n = min(n, max(1, MAX_PRS_ABERTOS - len(self.abertos())))
+        itens = self.picks(n) if n > 1 and item_id is None else []
+        if len(itens) <= 1:
+            return self.run_once(item_id=item_id, autorizado=autorizado)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=len(itens), thread_name_prefix="developer") as ex:
+            res = list(ex.map(lambda it: self.run_once(item_id=it["id"], autorizado=autorizado), itens))
+        for r in res[1:]:
+            self.ctx.reply(f"Developer (paralelo): item #{r.item_id} → {r.status}: {str(r.detalhe or '')[:140]}", "saude")
+        return res[0]
 
     def tem_trabalho(self) -> bool:
         if self.em_espera():

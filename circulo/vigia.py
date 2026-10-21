@@ -417,7 +417,10 @@ class Vigia:
                     self.ctx.reply(f"Vigia: resolvido — {r['titulo']} (durou {int((now - r['primeira_em']) / 60)} min).", "saude")
         self.s.set("vigia_ultima", {"em": now, "achados": len(achados), "abertas": len([a for a in achados]), "agiu": agiu})
         medico = self.medico.rodar(now)
-        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou, "medico": medico}
+        from . import capacidade
+        cap = capacidade.rodar(self.s, self.ctx.dl, now)        # quem está sobrecarregado; sobe/desce trabalhadores
+        return {"achados": len(achados), "novos": len(novos), "agiu": agiu, "resolvidas": resolvidas, "drenou": drenou, "medico": medico,
+                "capacidade": {"gargalo": (cap["gargalo"] or {}).get("agente"), "acoes": cap["acoes"]}}
 
     def _drenar(self, achados: list[dict], now: float) -> dict | None:
         """Trava de pergunta validada além de DRENAR: o planejador responde só a mais antiga ainda não tentada, uma por

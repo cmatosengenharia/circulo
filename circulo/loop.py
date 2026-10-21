@@ -698,7 +698,7 @@ class Circle:
         elif pick == "planejar_roteiro":
             self.planejador.run(autorizado=True)       # o gasto já foi decidido acima: um porteiro só
         elif pick == "estudar_pedido":
-            self.estudo.run(autorizado=True)
+            self.estudo.run_paralelo(autorizado=True)          # 1 trabalhador por padrão; o Escalador pode subir
         elif pick == "antecipar":
             jobs.antecipar(self.store)
         elif pick == "documentar":
@@ -718,7 +718,7 @@ class Circle:
             item = dict(r) if r else self.self_dev.alvo()
             self._stage("developer", {"projeto": kit_project_id(self.store, "circulo"), "tarefa": "corrigir_codigo",
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
-            res = self.self_dev.run_once(item_id=item_id, autorizado=True)
+            res = self.self_dev.run_paralelo(item_id=item_id, autorizado=True) if livre else self.self_dev.run_once(item_id=item_id, autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
                 # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")

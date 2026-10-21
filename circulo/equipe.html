@@ -51,6 +51,9 @@ h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;co
 .membro .passos li::before{content:"";position:absolute;left:0;top:7px;width:4px;height:4px;border-radius:50%;background:var(--border)}
 .membro .passos li:last-child{color:var(--ink)}.membro .passos li:last-child::before{background:var(--ok)}
 .membro .ha{font-size:11px;color:var(--muted);margin-left:4px}
+.membro .carga-bar{grid-column:2/4;height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:2px;display:none}.membro .carga-bar i{display:block;height:100%;background:var(--ok)}
+.membro[data-carga]:not([data-carga="0"]) .carga-bar{display:block}.membro[data-sobre="1"] .carga-bar i{background:var(--bad)}.membro[data-sobre="1"] b{color:var(--bad)}
+.membro .xn{display:inline-block;font-size:10.5px;font-weight:700;color:var(--jev);background:var(--jev-soft);border-radius:999px;padding:0 6px;margin-left:6px;vertical-align:1px}
 .membro .carga{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--bg);border:1.5px solid var(--border)}
 .membro .carga[data-zero]{visibility:hidden}
 
@@ -205,11 +208,12 @@ function desenharMembros(r) {
   const box = $("#membros");
   if (!box.dataset.pronto) {
     box.innerHTML = Object.entries(GRUPOS).filter(([g]) => porGrupo[g]).map(([g, nome]) => `<h3>${esc(nome)}</h3>` + porGrupo[g].map(m =>
-      `<div class="membro" id="m-${m.id}" data-estado="${m.estado}" title="${esc(m.faz)}">${avatar(m.id)}<div><b>${esc(m.nome)}<span class="ha"></span></b><small class="agora"></small></div><span class="carga" data-zero></span><ul class="passos"></ul></div>`).join("")).join("");
+      `<div class="membro" id="m-${m.id}" data-estado="${m.estado}" title="${esc(m.faz)}">${avatar(m.id)}<div><b>${esc(m.nome)}<span class="xn" hidden></span><span class="ha"></span></b><small class="agora"></small></div><span class="carga" data-zero></span><div class="carga-bar"><i></i></div><ul class="passos"></ul></div>`).join("")).join("");
     box.dataset.pronto = "1";
   }
   r.membros.forEach(atualizarMembro);
-  $("#salaMeta").textContent = r.rodando ? `· giro ${r.tick} · ritmo ${r.ritmo || "—"}` : "· o loop não está rodando";
+  const par = Object.entries(r.paralelo || {}).map(([k, n]) => `${(EQUIPE[membro(k)] || {}).nome || k} ×${n}`).join(", ");
+  $("#salaMeta").textContent = (r.rodando ? `· giro ${r.tick} · ritmo ${r.ritmo || "—"}` : "· o loop não está rodando") + (r.gargalo ? ` · gargalo: ${(EQUIPE[membro(r.gargalo)] || {}).nome || r.gargalo}` : "") + (par ? ` · em paralelo: ${par}` : "");
 }
 function atualizarMembro(m) {
   const el = $(`#m-${m.id}`); if (!el) return;
@@ -218,6 +222,9 @@ function atualizarMembro(m) {
   $(".agora", el).textContent = m.estado === "trabalhando" ? (m.agora || "trabalhando agora") : (m.ultimo ? `último: ${m.ultimo.o_que} → ${m.ultimo.resultado}` : (m.cargo || ""));
   $(".ha", el).textContent = m.estado === "trabalhando" && f ? `· há ${f.ha_s < 60 ? f.ha_s + " s" : Math.round(f.ha_s / 60) + " min"}` : "";
   $(".passos", el).innerHTML = (f && f.passos ? f.passos.slice(-5) : []).map(p => `<li title="${esc(p.texto)}">${esc(p.texto)}</li>`).join("");
+  const cp = m.capacidade; el.dataset.carga = cp ? Math.round(cp.carga * 100) : 0; el.dataset.sobre = cp && cp.sobrecarregado ? "1" : "0";
+  if (cp) { $(".carga-bar i", el).style.width = Math.round(cp.carga * 100) + "%"; el.title = `${m.faz} · carga ${Math.round(cp.carga * 100)}%: ocupado ${Math.round(cp.ocupacao * 100)}% da última hora, ${cp.fila} na fila, ${cp.tarefas_1h} tarefa(s) em 1 h${cp.sobrecarregado ? " · SOBRECARREGADO" : ""}${cp.escalavel ? " · pode escalar: " + cp.porque : cp.porque ? " · não escala: " + cp.porque : ""}`; }
+  const xn = $(".xn", el); xn.hidden = !(cp && cp.trabalhadores > 1); xn.textContent = cp && cp.trabalhadores > 1 ? `×${cp.trabalhadores}` : "";
   const c = $(".carga", el), n = m.vagas ? `${m.carga} · ${m.vagas}` : m.carga;
   c.textContent = n; c.title = `${m.carga} ${m.carga_rotulo}${m.vagas ? " · vagas " + m.vagas : ""}`;
   if (m.carga || m.vagas) c.removeAttribute("data-zero"); else c.setAttribute("data-zero", "");

@@ -339,7 +339,9 @@ def retrato(store: Store) -> dict[str, Any]:
     ritmo = store.get("ritmo") or {}
     bat = store.get("batimento") or {}
     rodando = (bool(bat.get("em")) and time.time() - float(bat.get("em") or 0) < 900) or time.time() - desde < 900
-    from . import fazendo as fz
+    from . import capacidade, fazendo as fz
+    cap = capacidade.resumo(store)
+    cargas = {membro(m["agente"]): m for m in cap.get("medidas") or []}
     em_curso = {membro(ag): {**a, "agente": ag} for ag, a in fz.agora(store).items()}
     ultimos = {membro(ag): a for ag, a in fz.ultimo(store).items() if time.time() - float(a.get("em", 0)) < 3600}
     membros = []
@@ -351,9 +353,10 @@ def retrato(store: Store) -> dict[str, Any]:
         c = carga.get(k) or {}
         agora_txt = (faz["o_que"] + (" · " + faz["passo"] if faz.get("passo") else "")) if faz else (detalhe if k == ativo else "")
         membros.append({"id": k, **d, "estado": estado, "agora": agora_txt, "desde": (faz["desde"] if faz else desde) if estado == "trabalhando" else None,
-                        "fazendo": faz, "ultimo": ultimos.get(k),
+                        "fazendo": faz, "ultimo": ultimos.get(k), "capacidade": cargas.get(k),
                         "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")})
     return {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
+            "gargalo": cap.get("gargalo"), "paralelo": cap.get("paralelo") or {},
             "quadro": quadro(store), "tick": store.tick}
 
 

@@ -114,7 +114,7 @@ def test_painel_mostra_o_vigia(circle, painel):  # noqa: F811
     assert d["estado"] in ("travado", "observando") and d["abertas"] and "pergunta_valida_parada" in d["sondas"]
     from circulo.projects import kit_project_id
     with urllib.request.urlopen(painel + f"/missao/{kit_project_id(circle.store, 'circulo')}", timeout=5) as r:
-        assert 'id="vigiaLista"' in r.read().decode()
+        assert 'id="saudeTravas"' in r.read().decode()
     with urllib.request.urlopen(painel + "/api/fluxo/obras", timeout=5) as r:
         assert any(o["agente"] == "vigia" for o in json.loads(r.read())["obras"])
 
