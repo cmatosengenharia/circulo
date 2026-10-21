@@ -2,6 +2,7 @@
 import time
 
 from circulo.budget import LIMITE_MIN, definir_limite, limite_diario
+from conftest import NOON
 
 from test_painel import painel, post  # noqa: F401 — fixture do servidor do painel
 
@@ -68,31 +69,31 @@ def test_modo_ilimitado_e_o_padrao_nao_corta_e_continua_medindo(circle):
 
 
 def test_consumo_resume_a_medicao_e_sugere_limite_pelo_p90(circle):
-    from datetime import date, timedelta
+    from datetime import timedelta
     from circulo.budget import consumo
     s = circle.store
-    hoje = date.today()
+    hoje, agora = NOON.date(), NOON.timestamp()
     for i, t in enumerate([120_000, 300_000, 180_000, 240_000, 900_000]):          # 5 dias completos + hoje
         s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,?,1,1) ON CONFLICT(day) DO UPDATE SET tokens=excluded.tokens",
             ((hoje - timedelta(days=i + 1)).isoformat(), t))
-    s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) VALUES(1,'estudo','m','jev',30000,1,'x',?)", (time.time(),))
-    c = consumo(s, 14)
+    s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) VALUES(1,'estudo','m','jev',30000,1,'x',?)", (agora,))
+    c = consumo(s, 14, agora)
     assert c["dias_completos"] == 5 and c["mediana_dia"] == 240_000 and c["maximo_dia"] == 900_000
     assert c["sugestao_limite"] == 900_000                            # p90 de 5 dias cai no maior; arredondado em 50 mil
     assert c["por_papel"]["estudo"]["tokens"] == 30000 and sum(c["por_hora"]) == 30000 and len(c["por_dia"]) >= 5
-    assert consumo(circle.store, 2)["sugestao_limite"] is None        # com menos de 3 dias completos, não sugere
+    assert consumo(circle.store, 2, agora)["sugestao_limite"] is None        # com menos de 3 dias completos, não sugere
 
 
 def test_vigia_no_modo_ilimitado_so_avisa_consumo_alto(circle):
-    from datetime import date, timedelta
+    from datetime import timedelta
     from circulo import vigia
     s = circle.store
-    hoje = date.today()
+    hoje, agora = NOON.date(), NOON.timestamp()
     for i in range(4):
         s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,200000,1,1) ON CONFLICT(day) DO UPDATE SET tokens=200000", ((hoje - timedelta(days=i + 1)).isoformat(),))
     s.x("INSERT INTO budget(day,tokens,jev_calls,llm_calls) VALUES(?,650000,1,1) ON CONFLICT(day) DO UPDATE SET tokens=650000", (hoje.isoformat(),))
-    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Pedido seu','d','pedido_cassio','pendente','pedido',1,?,?)", (time.time(), time.time()))
-    chaves = {x["chave"]: x for x in vigia.sondar(s, time.time())}
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Pedido seu','d','pedido_cassio','pendente','pedido',1,?,?)", (agora, agora))
+    chaves = {x["chave"]: x for x in vigia.sondar(s, agora)}
     assert "orcamento_curto" not in chaves                             # sem corte, não há "não paga o próximo estudo"
     assert chaves["consumo_alto"]["gravidade"] == 0.4 and chaves["consumo_alto"]["evidencia"]["mediana_dia"] == 200000
 

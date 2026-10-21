@@ -8,6 +8,7 @@ O grafo de importação do pacote é lido do código (ast), e as regras abaixo b
 - nenhum módulo passa de MAX_LINHAS, e os indicadores do jardineiro não passam do teto de hoje (podar baixa o teto).
 """
 import ast
+import re
 from pathlib import Path
 
 from circulo.jardineiro import medir
@@ -78,7 +79,29 @@ def test_json_da_llm_so_e_lido_por_json_llm():
     assert not fora, f"leia o JSON da LLM com circulo.json_llm.objeto/objeto_ou_corte: {fora}"
 
 
+def test_json_da_llm_e_aceito_pelo_criterio_do_papel_e_nao_por_uma_chave():
+    """lição #22 (reincidiu 2x): ler pela chave devolvia o primeiro objeto que a tinha (rascunho, formato ecoado) e o
+    papel só validava depois, descartando a resposta boa que vinha em seguida. O leitor recebe o critério do papel."""
+    from circulo.json_llm import objeto, objeto_ou_corte
+    formato = 'formato: {"veredito": "adotar|adaptar"} '
+    valido = lambda d: d if d.get("veredito") in ("adotar", "adaptar") else None  # noqa: E731
+    assert objeto(formato + '{"veredito": "adotar", "j": "x"}', valido) == {"veredito": "adotar", "j": "x"}
+    assert objeto_ou_corte(formato + '{"veredito": "adaptar", "j": "x", "k": "cor', lambda d, cortado: valido(d) if cortado else None) \
+        == {"veredito": "adaptar", "j": "x"}
+    chamadas = re.compile(r"\bobjeto(?:_ou_corte)?\(\s*\w+\s*,\s*[\"']")
+    por_chave = [p.name for p in PACOTE.glob("*.py") if chamadas.search(p.read_text(encoding="utf-8"))]
+    assert not por_chave, f"passe o critério de aceite do papel (callable), não uma chave: {por_chave}"
+
+
 def test_padroes_ruins_nao_crescem():
     total = medir(PACOTE)["total"]
     passou = {k: (total[k], teto) for k, teto in TETO_JARDIM.items() if total[k] > teto}
     assert not passou, f"cresceu além do teto (pode podar e baixar o teto, nunca subir sem motivo): {passou}"
+
+
+def test_testes_nao_usam_a_data_local_da_maquina():
+    """lição #48: o orçamento conta o dia em America/Sao_Paulo; `date.today()` no teste dá o dia do fuso da máquina
+    (UTC no CI), e das 21 h à meia-noite de Brasília o "ontem" do teste vira o "hoje" do orçamento. Use o NOON do conftest."""
+    proibido = re.compile(r"\bdate\.today\(\)")
+    usam = [p.name for p in Path(__file__).parent.glob("*.py") if p.name != Path(__file__).name and proibido.search(p.read_text(encoding="utf-8"))]
+    assert not usam, f"dia do fuso da máquina em vez do fuso do orçamento (use NOON / budget.TZ): {usam}"

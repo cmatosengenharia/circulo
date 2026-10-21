@@ -370,24 +370,27 @@ Responda só com JSON numa linha, sem markdown:
 
 
 def _parse_sub_itens(texto: str) -> list[dict]:
-    d = objeto(texto, "sub_itens")
-    partes = d.get("sub_itens") if d else None
+    return objeto(texto, _sub_itens) or []
+
+
+def _sub_itens(d: dict) -> list[dict] | None:
+    partes = d.get("sub_itens")
     if not isinstance(partes, list):
-        return []
+        return None
     out = [{k: str(p.get(k) or "").strip() for k in ("titulo", "detalhe", "teste")} for p in partes if isinstance(p, dict)]
     out = [p for p in out if p["titulo"] and p["detalhe"] and p["teste"]]
-    return out[:5] if len(out) >= 2 else []
+    return out[:5] if len(out) >= 2 else None
 
 
 def _sem_item(texto: str) -> str | None:
-    d = objeto(texto, "sem_item")
-    return str(d["sem_item"]) if d and d.get("sem_item") else None
+    return objeto(texto, lambda d: str(d["sem_item"]) if d.get("sem_item") else None)
 
 
 def _parse(texto: str) -> dict | None:
-    d = objeto(texto, "titulo")
-    if d is None:
-        return None
+    return objeto(texto, _item)
+
+
+def _item(d: dict) -> dict | None:
     item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado")}
     return item if item["titulo"] and item["detalhe"] else None
 
