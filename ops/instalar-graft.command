@@ -1,0 +1,23 @@
+#!/bin/zsh
+# Instala o Graft (memória semântica local, github.com/AEndrix03/Graft) para o círculo no Mac. Dois cliques.
+# - binário pelo Homebrew; perfil `circulo` (o grafo do loop não mistura com as suas anotações);
+# - as skills do Graft no Claude Code (~/.claude/skills), para o Developer usar /recall e /memoryze;
+# - primeira chamada carrega o modelo de embeddings (~600 MB, uma vez).
+set -e
+echo "Círculo: instalando o Graft (memória semântica do time)."
+if ! command -v brew >/dev/null 2>&1; then
+  echo "Homebrew não encontrado. Instale em https://brew.sh e rode este arquivo de novo."; exit 1
+fi
+if ! command -v graft >/dev/null 2>&1; then
+  brew tap AEndrix03/graft https://github.com/AEndrix03/Graft.git
+  brew install graft
+fi
+graft --version
+graft profile add circulo 2>/dev/null || true
+export GRAFT_PROFILE=circulo
+echo "Carregando o modelo e conferindo o daemon (pode levar alguns minutos na primeira vez)…"
+graft stats
+graft setup claudecode || true
+echo
+echo "Pronto. O loop percebe o Graft sozinho na próxima passagem (diagnóstico: Memória semântica (Graft) · ligado)."
+echo "Para desligar sem desinstalar: CIRCULO_GRAFT=0 no ~/.config/circulo/env."

@@ -25,6 +25,8 @@ Painel: **http://127.0.0.1:8765**. Depois disso, nada exige você: pedidos novos
 | `ANTHROPIC_API_KEY` | motor das missões, pesquisa na web, evolução do harness | missões ficam registradas, sem construir |
 | `GITHUB_TOKEN` + `CIRCULO_REPO` | gate de merge (PRs de agente entram sozinhos) | sem merge automático |
 | `CIRCULO_REPO_DIR` + Claude Code (`claude`) | Developer: o loop corrige o próprio código por PR | sem autocorreção de código |
+| `CIRCULO_CONTA=max` | tudo na assinatura do Claude (Max/Pro) pelo Claude Code, sem a API; o loop cuida do login (abre `claude auth login` no Mac quando a sessão cai; `claude setup-token` dá um token de 1 ano) | consumo pela `ANTHROPIC_API_KEY` |
+| `graft` no PATH ([Graft](https://github.com/AEndrix03/Graft), `ops/instalar-graft.command`) | memória semântica local do time: vetores + grafo ao lado do FTS; item/estudo repetido dito com outras palavras é reconhecido; o Developer consulta e grava no mesmo grafo (perfil `circulo`) | memória do time só pelo índice de texto |
 
 Para ver tudo funcionando sem chave nenhuma: `circulo demo` (LLM simulada, dados separados, rotulado no painel).
 

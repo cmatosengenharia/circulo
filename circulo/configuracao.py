@@ -35,6 +35,7 @@ CHAVES = (
     ("CIRCULO_REPO", "Repositório, ex.: cmatosengenharia/circulo"),
     ("CIRCULO_REPO_DIR", "Clone local do repo para o Developer corrigir o próprio código."),
     ("CIRCULO_DECISOR", "Opcional: 'aluno' faz o decisor local (aluno destilado onde provou + regra) responder mesmo com a chave do Jev."),
+    ("CIRCULO_GRAFT", "Opcional: '0' desliga a memória semântica (Graft) mesmo com o binário instalado. Perfil: CIRCULO_GRAFT_PERFIL (padrão circulo)."),
     ("CIRCULO_MEMORIA_EXTERNA", "Opcional: caminhos (vírgula) de circulo.db de outros loops; lições, itens e estudos deles entram na memória do time (só leitura)."),
     ("OTEL_EXPORTER_OTLP_ENDPOINT", "Opcional: coletor OpenTelemetry (ex.: Grafana Cloud, Tempo, Jaeger) que recebe os traços dos giros por OTLP/HTTP."),
     ("OTEL_EXPORTER_OTLP_HEADERS", "Opcional: cabeçalhos do coletor no formato do OpenTelemetry (ex.: Authorization=Basic%20...)."),
@@ -182,6 +183,13 @@ def diagnostico(testar_conexoes: bool = False) -> list[Peca]:
     else:
         ok, det = _llm_ok() if testar_conexoes else (True, "chave e SDK presentes (use --testar para chamar a API)")
         p.append(Peca("Motor das missões (LLM)", "ligado" if ok else "parado", det, "" if ok else "Confira ANTHROPIC_API_KEY."))
+    from . import graft
+    if graft.ligado():
+        st = graft.estatisticas() if testar_conexoes else None
+        p.append(Peca("Memória semântica (Graft)", "ligado", f"perfil {graft.PERFIL}" + (f" · {st.get('n_nodes', 0)} nós, {st.get('n_edges', 0)} arestas" if st else ""), ""))
+    else:
+        p.append(Peca("Memória semântica (Graft)", "aviso", "sem o binário `graft`: a memória do time usa só o índice de texto (FTS5)",
+                      "Opcional: rode ops/instalar-graft.command no Mac (brew tap AEndrix03/graft … && brew install graft)."))
     gh = bool(os.environ.get("GITHUB_TOKEN") and os.environ.get("CIRCULO_REPO"))
     if not gh:
         p.append(Peca("QA e release (merge)", "parado", "sem GITHUB_TOKEN/CIRCULO_REPO", "Preencha GITHUB_TOKEN e CIRCULO_REPO."))

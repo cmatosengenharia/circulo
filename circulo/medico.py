@@ -159,7 +159,8 @@ def classificar(dl, achados: list[dict], mem=None) -> list[dict]:
     from .decision import SN, Question
     from .memoria import RECEITA
     qs, estado = {}, {"achados": [{"titulo": a["titulo"], "tipo": a["tipo"], "evidencia": a["evidencia"],
-                                   "memoria": mem.lembrancas(a["titulo"], k=3, tipos=RECEITA["medico"][0]) if mem else []} for a in achados]}
+                                   "memoria": mem.lembrancas(a["titulo"], k=3, tipos=RECEITA["medico"][0]) if mem else [],
+                                   "entorno": mem.entorno(a["titulo"]) if mem else []} for a in achados]}
     for i in range(len(achados)):
         qs[f"medico_bloqueia_{i}"] = Question("noul", f"Finding `achados.{i}.titulo` (evidence `achados.{i}.evidencia`) is blocking the loop's progress right now.",
                                               SN("the pattern stops items, PRs or stages from advancing, or repeats the same failed work",

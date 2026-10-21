@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.60.0 — 2026-10-21
+
+**Graft: memória semântica local do time ao lado do índice de texto.**
+
+- **`circulo/graft.py`**: adaptador do [Graft](https://github.com/AEndrix03/Graft) (daemon C local, SQLite + sqlite-vec +
+  FTS5, embeddings BGE-M3 por llama.cpp; sem chave, sem nuvem). Perfil próprio `circulo` (`CIRCULO_GRAFT_PERFIL`);
+  cada registro do `memoria` vira um nó com a palavra-chave `circulo:<tipo>:<ref>`, que é como o nó volta a ser linha.
+  Tudo opcional: sem o binário (ou com ele caído, pausa de 5 min) cada chamada devolve vazio e o círculo segue só com o
+  FTS. `CIRCULO_GRAFT=0` desliga.
+- **Escrita**: cada linha nova da memória vira nó (coluna `memoria.graft_id`); conteúdo novo do mesmo registro insere
+  outro nó e marca o antigo como `SUPERSEDED` (história visível, fora da busca). Linhas indexadas antes do Graft
+  existir ganham nó aos poucos (50 por passagem do SRE).
+- **Busca**: `Memoria.buscar` funde a lista lexical (FTS/BM25) com a semântica do Graft (vetor + BM25 dele) por
+  Reciprocal Rank Fusion: "token estourou" acha "limite da conta", que o BM25 não acha; o que os dois acham sobe.
+- **Cache verificado**: `item_parecido` e `estudo_parecido` aceitam um STRONG do `graft query` como repetição
+  (`semantico: true`) além do Jaccard de títulos; WEAK não basta.
+- **Grafo**: `Memoria.entorno` (`graft explore`) dá ao Médico o entorno de cada achado (lição ↔ item ↔ PR).
+- **Manutenção** (`graft.manter`, no SRE a cada 6 h): `apply-safe`; par de nós duplicados do MESMO registro é
+  supersessão do mais antigo pelo mais novo; o resto fica listado para você no painel (`/api/memoria` → `graft`).
+- **Developer**: recebe `GRAFT_PROFILE`, pode rodar `graft` (`Bash(graft:*)`) e a tarefa pede `graft query` antes e
+  `graft insert` do que aprendeu depois. `ops/instalar-graft.command` instala pelo Homebrew, cria o perfil, carrega o
+  modelo e põe as skills do Graft no Claude Code. Diagnóstico: "Memória semântica (Graft)".
+- `tests/test_graft.py`: 7 testes com um `graft` falso no PATH.
+
 ## 1.59.0 — 2026-10-21
 
 **O loop roda na assinatura do Claude (Max), sem a API, e cuida sozinho da sessão.**
