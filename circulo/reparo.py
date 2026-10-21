@@ -46,7 +46,7 @@ from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git,
 REPARO = "developer:reparo"
 REVERTIDA = "developer:constituicao_revertida"
 BASE = "developer:base"
-TETO, REPETIDA = CORTES
+TETO, REPETIDA, TAMANHO = CORTES
 PISO_TETO = 100_000
 JANELA_TETO = 86400
 ULTIMA_FALHA = "developer_ultima_falha"         # {worktree do item: assinatura_falha da última falha local}
@@ -124,10 +124,11 @@ class DeveloperComReparo(SelfDeveloper):
         self._consertando = False
         self._repetida = False
         self._cortado = ""
+        self._excedeu = ""
         self._base_quebrada = ""
 
     def run_once(self, *a, **kw):
-        self._rodada, self._cortado, self._base_quebrada = 0, "", ""
+        self._rodada, self._cortado, self._excedeu, self._base_quebrada = 0, "", "", ""
         r = super().run_once(*a, **kw)
         if self._base_quebrada and r.status == "agente_falhou" and not r.pr:
             self._set_item(r.item_id, "pendente", self._base_quebrada[:300])
@@ -135,6 +136,9 @@ class DeveloperComReparo(SelfDeveloper):
         if self._cortado and r.status == "agente_falhou" and not r.pr:
             self._set_item(r.item_id, "pendente", f"{self._cortado}; vai para o fatiador")
             return DevResult(r.item_id, "teto", self._cortado)
+        if self._excedeu and r.status == "testes_falharam" and not r.pr:
+            self._set_item(r.item_id, "pendente", f"{self._excedeu[:250]}; vai para o fatiador")
+            return DevResult(r.item_id, "tamanho", self._excedeu)
         return r
 
     def consertar(self):
@@ -358,6 +362,25 @@ class DeveloperComReparo(SelfDeveloper):
         lic = licao_de(self.s, sig)
         return lic is not None and lic["status"] in ("aberta", "em_correcao", "reincidente")
 
+    def _numstat(self, wt: Path, base: str) -> str:
+        _git(["add", "-A"], wt)
+        return _git(["diff", "--cached", "--numstat", base], wt)
+
+    def _excede(self, wt: Path, base: str, titulo: str) -> bool:
+        """Pré-checagem antes de lint, testes, push e CI: acima do limite, a causa dominante vai para a trilha e para a
+        lição (assinatura por categoria dominante) e o item vai para o fatiador."""
+        from .diff_size import checar_limite
+        from .licoes import registrar as monitorar
+        from .neuronios import ABRIR_PR
+        v = checar_limite(self._numstat(wt, base))
+        if v.ok:
+            return False
+        monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=v.causa, causa=f"tamanho:{v.categoria_dominante}",
+                  assinatura=f"{ABRIR_PR}:tamanho:{v.categoria_dominante}")
+        monitorar(self.ctx, TAMANHO, False, sujeito=wt.name, licao=False, motivo=v.causa)
+        self._excedeu = v.causa
+        return True
+
     def portao_pr(self, wt: Path, base: str, item_id: int | None, titulo: str) -> tuple[bool, str]:
         from .licoes import assinatura_de
         from .licoes import registrar as monitorar
@@ -366,6 +389,8 @@ class DeveloperComReparo(SelfDeveloper):
         self._base, self._item_id, self._repetida = base, item_id, False
         texto, rodada = "", None          # rodada = {"sig", "tokens"} depois que o agente reparou
         try:
+            if self._excede(wt, base, titulo):
+                return False, self._excedeu
             for tentativa in range(1 + MAX_RODADAS_REPARO):
                 arquivos, adicionadas = diff_do_worktree(wt, base, _git)
                 falhas = registrar(self.ctx, ABRIR_PR, portoes_natos_pr(arquivos, adicionadas), titulo)
