@@ -55,6 +55,17 @@ CREATE TABLE IF NOT EXISTS aluno_sombra (
 CREATE INDEX IF NOT EXISTS aluno_sombra_q ON aluno_sombra(question, created_at);
 """
 
+
+def _esquema(store) -> None:
+    """Statement a statement, sob o lock do Store: `executescript` fecha a transação em curso de quem chamou (o pedido
+    do usuário roda `observar` dentro de `with s.tx()`; o COMMIT implícito quebrava o tx e o pedido era reprocessado)."""
+    if getattr(store, "_aluno_esquema", False):
+        return
+    for sql in ESQUEMA.split(";"):
+        if sql.strip():
+            store.x(sql)
+    store._aluno_esquema = True          # por Store, não global: cada banco (testes, memória externa) tem o seu
+
 _SUFIXO = re.compile(r"_\d+$")
 
 
@@ -197,7 +208,7 @@ def exemplos_de(store: Store, desde: float = 0.0, limite: int = 20000) -> dict[s
 def treinar(store: Store, agora: float | None = None) -> dict:
     """Treina um modelo por pergunta e guarda tudo em kv (pesos + métricas). Devolve o relatório."""
     agora = agora or time.time()
-    store.db.executescript(ESQUEMA)
+    _esquema(store)
     por_q = exemplos_de(store)
     modelos: dict[str, dict] = {}
     for q, ex in por_q.items():
@@ -263,9 +274,7 @@ def observar(store: Store, nome: str, estado: Mapping[str, Any], valor_jev: Any)
     previsto, prob = p
     jev = rotulo(valor_jev)
     concorda = int(previsto == jev)
-    if not _cache.get("esquema"):
-        store.db.executescript(ESQUEMA)
-        _cache["esquema"] = True
+    _esquema(store)
     store.x("INSERT INTO aluno_sombra(question,previsto,prob,jev,concorda,created_at) VALUES(?,?,?,?,?,?)",
             (pergunta(nome), previsto, prob, jev, concorda, time.time()))
     return {"question": pergunta(nome), "previsto": previsto, "prob": prob, "jev": jev, "concorda": bool(concorda)}

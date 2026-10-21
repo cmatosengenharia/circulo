@@ -123,9 +123,10 @@ def antes_do_pr(ctx, wt: Path, item: dict, arquivos: list[str], autor: tuple[str
     outros = prs_abertos(s)
     ev: dict[str, Any] = {"pr": f"item #{item['id']}", "item_id": item["id"], "arquivos": arquivos, "linhas": None, "prs_abertos": [o["number"] for o in outros],
                           "compartilhados": [], "conflito_main": False, "conflito_prs": [], "testes_na_main": None, "base": "medido"}
-    try:
-        ev["linhas"] = int(_git(["diff", "--shortstat", "origin/main...HEAD"], wt).stdout.split()[0]) if outros else None
-    except (ValueError, IndexError):
+    try:            # linhas de verdade (numstat), não o nº de arquivos que o `--shortstat` traz em primeiro
+        num = _git(["diff", "--numstat", "origin/main...HEAD"], wt).stdout if outros else ""
+        ev["linhas"] = sum(int(a) + int(d) for a, d, *_ in (ln.split("\t") for ln in num.splitlines() if ln.strip()) if a.isdigit() and d.isdigit()) if outros else None
+    except (ValueError, IndexError, AttributeError):
         ev["linhas"] = None
     motivo, aguarda = "", None
     mudou, conflito = trazer_main(wt, autor)

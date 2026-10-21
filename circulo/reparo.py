@@ -398,6 +398,15 @@ class DeveloperComReparo(SelfDeveloper):
                     ok, saida = self.verificar(wt)
                     falhas = [] if ok else [Resultado("lint e testes (iguais ao CI)", False, saida)]
                 if not falhas:
+                    # reprodução primeiro, igual ao SelfDeveloper (este override pulava o portão: "Reprodução: n/a" nos PRs)
+                    from .reproducao import reproduz
+                    try:
+                        ok, det, _ = reproduz(wt, base, None, env=_ambiente())
+                    except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as exc:   # sem conseguir conferir, não prova: barra
+                        ok, det = False, f"não consegui montar o código antigo para reproduzir: {exc}"
+                    falhas = registrar(self.ctx, ABRIR_PR, [Resultado("reprodução primeiro", ok, "" if ok else det)], titulo)
+                    self.evidencia_pr = det.splitlines()[0] if ok else ""
+                if not falhas:
                     falhas = registrar(self.ctx, ABRIR_PR, avaliar_aprendidos(self.s, ABRIR_PR, wt, adicionadas,
                                                                               _ambiente(), item_id), titulo)
                 if not falhas:

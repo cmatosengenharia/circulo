@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     cfg.carregar_env()
     from .loop import Circle
     from .painel import serve
-    c = Circle(args.data)
+    c = Circle(args.data, dono=False)
     c.vigia.iniciar()                                   # SRE + Médico + Higiene + Escalador, no processo do controle
     c.store.set("controle_separado", {"pid": os.getpid(), "em": time.time(), "porta": args.porta})
 

@@ -25,7 +25,12 @@ CHECAR_A_CADA_S = 600       # segundos entre checagens da main (além de logo de
                             # longo (300 s) faria a checagem levar horas
 VALIDAR_GIROS = 5           # giros sem erro depois de trocar o corpo = atualização evidenciada
 MAX_ERROS_NA_VALIDACAO = 2
-JANELA_PREEXISTENTE = 300      # giros antes da troca em que um erro igual absolve o código novo
+JANELA_PREEXISTENTE = 300
+# erro de rede/ambiente (GitHub fora, DNS, timeout de subprocesso) não é prova contra o código novo: dois giros com o
+# GitHub instável logo após a troca revertiam código bom e o punham em `reprovados` para sempre
+AMBIENTE = re.compile(r"URLError|TimeoutExpired|ConnectionError|ConnectionReset|RemoteDisconnected|IncompleteRead|"
+                      r"HTTPError.*\b5\d\d\b|HTTP Error 5\d\d|Name or service not known|nodename nor servname|"
+                      r"database is locked|ContaDeslogada|credit balance", re.I)      # giros antes da troca em que um erro igual absolve o código novo
 SMOKE = "import circulo.cli, circulo.loop, circulo.painel, circulo.self_dev, circulo.merge_gate"
 
 
@@ -86,9 +91,13 @@ class Corpo:
             env = {**ambiente_isolado(), "PYTHONPATH": str(wt)}
             cmds = self.validacao or [[sys.executable, "-c", SMOKE], [sys.executable, "-m", "pytest", "-q", "-x"]]
             for cmd in cmds:
-                p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=1200, env=env)
-                if p.returncode != 0:
-                    motivo = (p.stdout + p.stderr)[-1500:]
+                try:
+                    p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=1200, env=env)
+                    codigo, saida = p.returncode, (p.stdout + p.stderr)
+                except subprocess.TimeoutExpired as exc:          # suíte travada na main nova: reprova, não trava o loop a cada giro
+                    codigo, saida = -1, f"validação passou de 1200 s: {' '.join(cmd)}\n{(exc.stdout or b'')[-800:]!r}"
+                if codigo != 0:
+                    motivo = saida[-1500:]
                     st = self.estado()
                     self._set(reprovados=((st.get("reprovados") or []) + [alvo])[-20:])
                     monitorar(self.ctx, "corpo:atualizar", False, sujeito=alvo[:12], motivo=motivo, classe="estrutural",
@@ -172,7 +181,7 @@ class Corpo:
         if st.get("estado") != "validando":
             return None
         from .licoes import registrar as monitorar
-        erros = [e for e in erros if not self._preexistente(e, int(st.get("desde_tick") or 0))]
+        erros = [e for e in erros if not AMBIENTE.search(e) and not self._preexistente(e, int(st.get("desde_tick") or 0))]
         if erros:
             st["erros"] = int(st.get("erros", 0)) + 1
             self._set(erros=st["erros"])
