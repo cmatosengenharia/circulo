@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
@@ -18,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 from . import __version__, finance
 from . import atividade as atv
 from . import registro, repo_stats
+from .budget import TZ
 from .money import fmt_brl
 from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
@@ -47,7 +49,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
     pol = s.one("SELECT version, body FROM policy_versions WHERE status='active' ORDER BY version DESC LIMIT 1")
     policy = json.loads(pol["body"])
     shadow = s.one("SELECT version, reason FROM policy_versions WHERE status='shadow' ORDER BY version DESC LIMIT 1")
-    day = time.strftime("%Y-%m-%d", time.localtime())
+    day = datetime.now(TZ).date().isoformat()
     budget = s.one("SELECT * FROM budget ORDER BY day DESC LIMIT 1")
 
     pf = " AND project_id=?" if projeto else ""
