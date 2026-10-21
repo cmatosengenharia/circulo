@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any, Iterable
 
+from circulo import roadmap
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
@@ -558,6 +560,7 @@ class Store:
             cols = {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}
             if col not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        roadmap.migrar(self.db)
         self.db.execute("CREATE INDEX IF NOT EXISTS trail_run ON trail(run_id)")
         # `decisions` cresce uma linha por pergunta e é varrida por pergunta/data em toda passagem (indagador, perguntas, jev_lab)
         self.db.execute("CREATE INDEX IF NOT EXISTS decisions_q_em ON decisions(question, created_at)")
