@@ -103,6 +103,20 @@ def test_resposta_cortada_no_item_aproveita_o_veredito_e_os_achados(circle):
     assert circle.store.one("SELECT COUNT(*) n FROM licoes WHERE assinatura='estudo:saida_invalida'")["n"] == 0
 
 
+def test_cortada_depois_da_justificativa_inteira_estuda_e_sem_ela_grava_o_motivo_tipado(circle):
+    """Lição #22: cortada logo depois do último valor inteiro, a resposta vale; cortada dentro da justificativa, a
+    verificação grava qual chave obrigatória faltou, e não um "sem JSON válido" genérico."""
+    pedido(circle)
+    circle.ctx.dl.llm = Pesquisa('{"veredito": "adotar", "justificativa": "segue o pedido"')
+    r = Estudo(circle.ctx).run()
+    assert r is not None and r["veredito"] == "adotar" and r["justificativa"] == "segue o pedido"
+    pedido(circle, "Outro pedido")
+    circle.ctx.dl.llm = Pesquisa('{"veredito": "adaptar", "achados": ["x"], "justificativa": "A fonte oficial mostra')
+    assert Estudo(circle.ctx).run() is None
+    v = circle.store.one("SELECT motivo FROM verificacoes WHERE ponto='estudo:pedido' AND ok=0 ORDER BY id DESC LIMIT 1")
+    assert "falta_chave: justificativa" in v["motivo"]
+
+
 def test_adaptar_cortado_sem_o_item_novo_e_adotado_como_pedido(circle):
     """Lição #22: adaptar sem o item reescrito completo não reescreve nada: segue o pedido como está."""
     iid = pedido(circle)

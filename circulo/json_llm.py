@@ -42,6 +42,8 @@ def _ate_o_corte(s: str):
             pilha.pop()
         elif c == ",":
             cortes.append((i, "".join(reversed(pilha))))
+    if not na_string:       # cortado logo depois de um valor inteiro: fechar as chaves não perde o último valor
+        cortes.append((len(s), "".join(reversed(pilha))))
     for i, fecho in reversed(cortes):
         try:
             return json.loads(s[:i] + fecho)

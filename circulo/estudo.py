@@ -25,7 +25,7 @@ import time
 
 from .agents import Ctx
 from .decision import Question, SN
-from .json_llm import objeto_ou_corte
+from .saida_json import Saida, ler
 
 MIN_FONTES = 2
 EST_TOKENS = 9000
@@ -170,19 +170,20 @@ class Estudo:
         if not out.text.strip() and MODOS[modo]["buscas"]:        # a busca comeu a resposta: uma vez sem busca, mesmo teto
             out = llm.generate(system=SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=MODOS[modo]["max_tokens"], web_search=0)
             self.ctx.budget.charge(out.tokens, "llm")
-        r = _parse(out.text)
+        saida = _parse(out.text)
+        r = saida.dados
         if r is not None:
             r["modo"] = modo
         try:
             from .registro import registrar
             registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="estudo", modelo=escolha["modelo"],
                       escolha=escolha, uso=out, duracao_ms=int((time.time() - t0) * 1000), ok=r is not None,
-                      erro=None if r else "resposta sem JSON válido", entrada=f"[{modo}] {item['titulo']}", saida=out.text)
+                      erro=None if r else f"resposta sem JSON válido: {saida}", entrada=f"[{modo}] {item['titulo']}", saida=out.text)
         except Exception:  # noqa: BLE001
             pass
         if r is None:
             monitorar(self.ctx, "estudo:pedido", False, sujeito=item["titulo"],
-                      motivo="resposta sem JSON válido: " + out.text[-200:], assinatura="estudo:saida_invalida")
+                      motivo=f"resposta sem JSON válido: {saida}: " + out.text[-200:], assinatura="estudo:saida_invalida")
             return None
         # fontes: as do JSON e as citações reais da busca
         urls = {a.get("url") for a in r["achados"] if str(a.get("url", "")).startswith("http")}
@@ -262,16 +263,14 @@ class Estudo:
         return True
 
 
-def _parse(texto: str) -> dict | None:
-    return objeto_ou_corte(texto, _aceita)
+def _parse(texto: str) -> Saida:
+    return ler(texto, ("veredito", "justificativa"), ("achados", "item"), _aceita)
 
 
 def _aceita(d: dict, cortado: bool) -> dict | None:
     if d.get("veredito") not in ("adotar", "adaptar", "contestar"):
         return None
     if cortado:
-        if not d.get("justificativa"):
-            return None
         d["cortado"] = True
         novo = d.get("item") if isinstance(d.get("item"), dict) else {}
         if d["veredito"] == "adaptar" and not (novo.get("titulo") and novo.get("detalhe") and novo.get("sucesso")):
