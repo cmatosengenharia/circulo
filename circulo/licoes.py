@@ -53,7 +53,7 @@ DO_ITEM = re.compile(r"(?:\.circulo-wt-|roteiro #)(\d+)$")   # o worktree e o r�
 AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit your [a-z ]{0,20}limit|timed? ?out|"
                       r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http(?: error:?)? ?5\d\d|bad gateway|"
                       r"service unavailable|gateway time|"
-                      r"remotedisconnected|name resolution|ssl", re.I)
+                      r"remotedisconnected|name resolution|ssl|credit balance", re.I)
 # Lição #53: o gate recusa pelos arquivos, antes dos checks, o PR que toca a constituição; o check "Constituição"
 # falhando num PR que chegou aos checks é o CI que caiu inteiro (Actions, main), não o PR: ambiente, sem item.
 CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")
