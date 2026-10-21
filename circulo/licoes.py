@@ -65,12 +65,17 @@ def normalizar(texto: str, n: int = 70) -> str:
     return re.sub(r"\s+", " ", t).strip()[:n]
 
 
+DESLOGADO = r"Failed to authenticate|OAuth session expired|not logged in|please run /login"
+
+
 def assinatura_de(ponto: str, motivo: str) -> str:
     """Mesma causa → mesma assinatura, mesmo com números, hashes e PRs diferentes."""
     m = motivo or ""
     # causas de ambiente com assinatura estável (o log bruto do agente muda a cada vez)
     if re.search(r'"api_error_status":\s*429|hit your [a-z ]{0,20}limit|session limit|usage limit|rate[ _-]?limit', m, re.I):
         return f"{ponto}:limite_de_uso"
+    if ponto == PONTO_AGENTE and re.search(DESLOGADO, m, re.I):
+        return f"{ponto}:deslogado"
     if re.search(r"timed? ?out|timeout", m, re.I):
         return f"{ponto}:timeout"
     codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", m)))
@@ -82,7 +87,7 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     erro = re.search(r"\b(\w+(?:Error|Exception))\b", m)
     if erro and not AMBIENTE.search(m):
         return f"{ponto}:{erro.group(1)}"
-    causa = causa_de_json(m)
+    causa = causa_de_json(m, ponto)
     if causa:
         return f"{ponto}:{causa}"
     return f"{ponto}:{normalizar(m, 50)}"
@@ -93,20 +98,24 @@ def assinatura_de(ponto: str, motivo: str) -> str:
 CAUSAS_JSON = (
     (r'"subtype":\s*"error_max_turns"', "maximo_de_passos"),
     (r'"subtype":\s*"error_during_execution"', "erro_na_execucao"),
-    (r'Failed to authenticate|OAuth session expired|not logged in|please run /login', "deslogado"),
+    (DESLOGADO, "deslogado"),
     (r'"is_error":\s*true[^}]{0,400}"result":\s*"([^"]{0,80})', None),
-    (r'"d_reason":\s*"([a-z_]+)"', None),
 )
+PONTO_AGENTE = "developer:agente"
+# no log do agente, qualquer par `chave":valor` basta (o corte pode cair no meio de qualquer chave); nos outros pontos,
+# só as chaves do Claude Code
+PAR_JSON = re.compile(r'\w"\s*:\s*[\[{"\d\-tfn]')
+CHAVES_DO_AGENTE = re.compile(r'"(?:subtype|is_error|d_reason)"')
 
 
-def causa_de_json(m: str) -> str | None:
+def causa_de_json(m: str, ponto: str = "") -> str | None:
     """A causa classificada de um log JSON do agente (ou None se o texto não é JSON do agente)."""
-    if '"subtype"' not in m and '"is_error"' not in m and '"d_reason"' not in m:
+    if not (PAR_JSON if ponto == PONTO_AGENTE else CHAVES_DO_AGENTE).search(m):
         return None
     for padrao, nome in CAUSAS_JSON:
         x = re.search(padrao, m, re.I | re.S)
         if x:
-            return nome or normalizar(x.group(1), 40).replace(" ", "_")
+            return nome or normalizar(x.group(1), 40).replace(" ", "_") or "agente_falhou"
     return "agente_falhou"
 
 
