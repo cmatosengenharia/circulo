@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .merge_gate import MAX_LINES
+
 GERADOS = {"uv.lock", "poetry.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Pipfile.lock",
            "Cargo.lock", "go.sum"}
 _RENOMEACAO = re.compile(r"\{([^{}]*) => ([^{}]*)\}")
@@ -64,3 +66,26 @@ def parse_numstat(texto: str) -> Tamanho:
         categoria_dominante=max(por_categoria, key=por_categoria.__getitem__, default=None),
         arquivo_dominante=maior.caminho if maior else None,
     )
+
+
+@dataclass(frozen=True)
+class Veredito:
+    ok: bool
+    total: int
+    limite: int
+    categoria_dominante: str | None
+    arquivo_dominante: str | None
+
+    @property
+    def veredito(self) -> str:
+        return "ok" if self.ok else "excedeu"
+
+    @property
+    def causa(self) -> str:
+        return f"{self.categoria_dominante} ({self.arquivo_dominante})" if self.arquivo_dominante else ""
+
+
+def checar_limite(numstat: str, limite: int = MAX_LINES) -> Veredito:
+    """Mesma regra do bloqueio de tamanho do merge: passa com total <= limite."""
+    t = parse_numstat(numstat)
+    return Veredito(t.total <= limite, t.total, limite, t.categoria_dominante, t.arquivo_dominante)

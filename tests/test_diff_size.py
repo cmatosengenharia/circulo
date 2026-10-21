@@ -1,4 +1,5 @@
-from circulo.diff_size import categoria, normalizar_caminho, parse_numstat
+from circulo.diff_size import categoria, checar_limite, normalizar_caminho, parse_numstat
+from circulo.merge_gate import MAX_LINES
 
 NUMSTAT = (
     "120\t30\tcirculo/loop.py\n"
@@ -40,3 +41,16 @@ def test_categoria():
     assert categoria("pkg/test_x.py") == "teste"
     assert categoria("package-lock.json") == "gerado"
     assert categoria("circulo/x.py") == "fonte"
+
+
+def test_limite():
+    abaixo = checar_limite("700\t0\tcirculo/loop.py\n99\t1\ttests/test_loop.py\n", 800)
+    assert (abaixo.ok, abaixo.total, abaixo.limite) == (True, 800, 800)
+    acima = checar_limite("10\t0\tcirculo/loop.py\n1\t0\ttests/test_loop.py\n790\t0\tuv.lock\n", 800)
+    assert (acima.ok, acima.total, acima.limite) == (False, 801, 800)
+    assert (acima.categoria_dominante, acima.arquivo_dominante) == ("gerado", "uv.lock")
+    assert "excedeu" in acima.veredito and "uv.lock" in acima.causa
+
+
+def test_limite_padrao_e_o_do_bloqueio_de_tamanho():
+    assert checar_limite("1\t0\tx.py\n").limite == MAX_LINES
