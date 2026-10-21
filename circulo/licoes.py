@@ -54,6 +54,9 @@ AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit yo
                       r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http(?: error:?)? ?5\d\d|bad gateway|"
                       r"service unavailable|gateway time|"
                       r"remotedisconnected|name resolution|ssl", re.I)
+# Lição #53: o gate recusa pelos arquivos, antes dos checks, o PR que toca a constituição; o check "Constituição"
+# falhando num PR que chegou aos checks é o CI que caiu inteiro (Actions, main), não o PR: ambiente, sem item.
+CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")
 
 
 def normalizar(texto: str, n: int = 70) -> str:
@@ -219,6 +222,8 @@ class Licoes:
         """Registra o resultado da verificação, com o item do roteiro em execução e a causa normalizada da falha
         (quem tem: developer:abrir_pr, developer:testes, developer:base). Falha (com `licao=True`) vira ou reforça uma lição."""
         tick, agora = self.s.tick, time.time()
+        if not ok and ponto == "gate:ci" and CI_INTEIRO.search(motivo or ""):
+            assinatura, classe = "gate:ci:nao_rodou", "ambiente"
         sig = (assinatura or assinatura_de(ponto, motivo)) if not ok else assinatura
         item, item_titulo = item_de(self.s, sujeito, item_id)
         vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo,causa) "
