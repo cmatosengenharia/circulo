@@ -21,8 +21,11 @@ há problema medido (conflito ou quebra nunca passam), e o Jev decide o risco re
 from __future__ import annotations
 
 import json
+import math
+import random
 import subprocess
 import time
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -113,6 +116,62 @@ def registrar(store, pr: int | None, item_id: int | None, momento: str, veredito
     return store.x("INSERT INTO revisoes(pr,item_id,momento,veredito,motivo,evidencia,conf,fonte,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    (pr, item_id, momento, veredito, motivo[:500], json.dumps(evidencia, ensure_ascii=False, default=str)[:4000],
                     jev.get("conf"), jev.get("fonte"), time.time()))
+
+
+# ------------------------------------------------------------------ pré-voo do revisar_prs: adiar sem gastar
+ADIADO = "revisar_prs_adiado"     # {tentativas, causa, ate_tick} do adiamento em curso
+ADIAR_MAX_TENTATIVAS = 5          # adiamentos seguidos; no seguinte, o erro conta como falha
+ADIAR_TETO_GIROS = 16             # teto do backoff exponencial
+ESPERA_DO_ESTADO = (("checks em andamento", "checks_pendentes"), ("atrás da main", "atras_da_main"))
+
+
+def pre_voo(estado: dict | None = None, erro: BaseException | None = None) -> str:
+    """'adiar:<causa>' quando repetir mais tarde resolve sem gastar, ou 'executar'. Pura: olha o erro da API
+    (rede_transitoria: URLError, timeout, HTTP 5xx) ou os motivos dos vereditos dos PRs (checks_pendentes, atras_da_main)."""
+    if erro is not None:
+        if isinstance(erro, urllib.error.HTTPError):
+            return "adiar:rede_transitoria" if erro.code >= 500 else "executar"
+        if isinstance(erro, (urllib.error.URLError, TimeoutError, ConnectionError)):
+            return "adiar:rede_transitoria"
+        return "executar"
+    causas = []
+    for motivo in (estado or {}).get("motivos") or ():
+        causa = next((c for trecho, c in ESPERA_DO_ESTADO if trecho in motivo), None)
+        if causa is None:
+            return "executar"
+        causas.append(causa)
+    return f"adiar:{max(causas, key=causas.count)}" if causas else "executar"
+
+
+def espera_em_giros(tentativa: int, rng=random.random) -> int:
+    """Backoff exponencial com teto e jitter completo: os giros idle não voltam todos juntos."""
+    return max(1, math.ceil(rng() * min(ADIAR_TETO_GIROS, 2 ** tentativa)))
+
+
+def em_espera(store) -> bool:
+    st = store.get(ADIADO)
+    return bool(st) and store.tick < int(st["ate_tick"])
+
+
+def revisar(store, gate, rng=random.random) -> str:
+    """Roda o gate e classifica o desfecho: adiável vira evento 'adiado' (não falha) e o próximo giro idle espera
+    o backoff; passado ADIAR_MAX_TENTATIVAS seguidos, ou causa não adiável, o erro sobe como falha."""
+    try:
+        vereditos, erro = gate.run(), None
+    except Exception as exc:
+        vereditos, erro = [], exc
+    causa = pre_voo(erro=erro) if erro is not None else pre_voo({"motivos": [v.reason for v in vereditos]})
+    tentativa = int((store.get(ADIADO) or {}).get("tentativas", 0)) + 1
+    if causa == "executar" or tentativa > ADIAR_MAX_TENTATIVAS:
+        store.set(ADIADO, None)
+        if erro is not None:
+            raise erro
+        return "executar"
+    ate = store.tick + espera_em_giros(tentativa, rng)
+    store.set(ADIADO, {"tentativas": tentativa, "causa": causa, "ate_tick": ate})
+    registrar(store, None, None, "pre_voo", "adiado", causa.split(":", 1)[1],
+              {"tentativa": tentativa, "ate_tick": ate, "erro": repr(erro)[:300] if erro else None}, {})
+    return causa
 
 
 # ------------------------------------------------------------------ as duas revisões

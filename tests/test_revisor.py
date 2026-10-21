@@ -1,8 +1,11 @@
 """Revisor: vários PRs do Developer em paralelo, cada um validado dentro do ecossistema; rejeitado, o item volta à fila."""
 import json
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
+
+import pytest
 
 from circulo import revisor
 from circulo.merge_gate import REQUIRED_CHECKS, MergeGate
@@ -185,3 +188,95 @@ def test_regra_do_jev_e_painel(circle, painel):  # noqa: F811
         assert 'id="revLista"' in r.read().decode()
     with urllib.request.urlopen(painel + "/api/fluxo/obras", timeout=5) as r:
         json.loads(r.read())
+
+
+# ------------------------------------------------------------ pré-voo do revisar_prs: adiar sem gastar
+class GateFalso:
+    """Gate que falha com o erro dado (rede) ou devolve os vereditos dados (estado dos PRs)."""
+
+    def __init__(self, erro=None, motivos=()):
+        self.erro, self.motivos, self.rodadas = erro, list(motivos), 0
+
+    def run(self):
+        self.rodadas += 1
+        if self.erro is not None:
+            raise self.erro
+        from circulo.merge_gate import Verdict
+        return [Verdict(100 + i, "abc", False, m) for i, m in enumerate(self.motivos)]
+
+
+@pytest.fixture
+def erro_urlerror():
+    return GateFalso(erro=urllib.error.URLError(TimeoutError("timed out")))
+
+
+@pytest.fixture
+def erro_http_502():
+    return GateFalso(erro=urllib.error.HTTPError("https://api.github.com/repos/x/pulls", 502, "Bad Gateway", {}, None))
+
+
+@pytest.fixture
+def erro_timeout():
+    return GateFalso(erro=TimeoutError("The read operation timed out"))
+
+
+@pytest.fixture
+def prs_checks_pendentes():
+    return GateFalso(motivos=["checks em andamento: Testes (Python 3.12)", "checks em andamento: Lint"])
+
+
+@pytest.fixture
+def prs_atras_da_main():
+    return GateFalso(motivos=["branch 3 commit(s) atrás da main: atualizada, o CI roda de novo"])
+
+
+CAUSAS = [("erro_urlerror", "adiar:rede_transitoria"), ("erro_http_502", "adiar:rede_transitoria"),
+          ("erro_timeout", "adiar:rede_transitoria"), ("prs_checks_pendentes", "adiar:checks_pendentes"),
+          ("prs_atras_da_main", "adiar:atras_da_main")]
+
+
+def _estado_ou_erro(g):
+    return {"erro": g.erro} if g.erro is not None else {"estado": {"motivos": g.motivos}}
+
+
+@pytest.mark.parametrize("fixture,causa", CAUSAS)
+def test_pre_voo_classifica_a_causa_de_cada_falha(request, fixture, causa):
+    assert revisor.pre_voo(**_estado_ou_erro(request.getfixturevalue(fixture))) == causa
+
+
+def test_pre_voo_executa_quando_a_causa_nao_e_adiavel():
+    assert revisor.pre_voo() == "executar"
+    assert revisor.pre_voo(erro=urllib.error.HTTPError("u", 404, "Not Found", {}, None)) == "executar"
+    assert revisor.pre_voo(erro=KeyError("head")) == "executar"
+    assert revisor.pre_voo(estado={"motivos": ["checks em andamento: Lint", "checks falhando: Testes"]}) == "executar"
+
+
+@pytest.mark.parametrize("fixture,causa", CAUSAS)
+def test_adiamento_vira_evento_adiado_e_nao_falha(circle, request, fixture, causa):
+    g, s = request.getfixturevalue(fixture), circle.store
+    assert revisor.revisar(s, g, rng=lambda: 0.5) == causa          # não levanta: não é falha
+    ev = s.one("SELECT momento, veredito, motivo FROM revisoes ORDER BY id DESC LIMIT 1")
+    assert (ev["momento"], ev["veredito"], ev["motivo"]) == ("pre_voo", "adiado", causa.split(":", 1)[1])
+    assert revisor.em_espera(s)
+
+
+def test_adiamento_tem_backoff_limitado_com_jitter_e_limite_de_tentativas(circle, erro_http_502):
+    s = circle.store
+    esperas = []
+    for _ in range(revisor.ADIAR_MAX_TENTATIVAS):
+        revisor.revisar(s, erro_http_502, rng=lambda: 0.999)
+        esperas.append(s.get(revisor.ADIADO)["ate_tick"] - s.tick)
+    assert esperas == sorted(esperas) and max(esperas) <= revisor.ADIAR_TETO_GIROS and esperas[0] >= 1
+    assert revisor.espera_em_giros(4, rng=lambda: 0.0) < revisor.espera_em_giros(4, rng=lambda: 0.999)   # jitter
+    with pytest.raises(urllib.error.HTTPError):           # passou do limite: aí é falha de verdade
+        revisor.revisar(s, erro_http_502, rng=lambda: 0.5)
+    assert s.get(revisor.ADIADO) is None
+
+
+def test_no_loop_o_502_do_revisar_prs_e_adiado_sem_incidente_e_o_giro_idle_espera(circle, erro_http_502):
+    circle.gate = erro_http_502
+    circle._run_idle_task("revisar_prs")
+    assert circle.store.one("SELECT COUNT(*) n FROM incidents WHERE stage='idle:revisar_prs'")["n"] == 0
+    for _ in range(3):
+        assert circle.idle() != "revisar_prs"
+    assert erro_http_502.rodadas == 1
