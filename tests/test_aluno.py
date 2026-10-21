@@ -116,3 +116,19 @@ def test_estado_compacto_sempre_fecha_e_registro_cortado_nao_derruba_o_treino():
         _decisao(st, "q", {"k": i}, "a")
     ex = aluno.exemplos_de(st)
     assert len(ex["q"]) == 3                                                    # o registro quebrado foi ignorado, o resto treina
+
+
+def test_licao_43_estado_com_uma_chave_aninhada_grande_ainda_vira_json_valido():
+    """Lição #43: JSONDecodeError na meta (treino do aluno). Com uma única chave grande o `compactar` cortava a string
+    do JSON no limite e gravava estado que não fecha; qualquer estado precisa sair JSON válido dentro do limite."""
+    rnd = random.Random(43)
+    casos = [{"d": {str(i): ["y" * 80] * 8 for i in range(12)}},
+             {"lista": [{"a": "z" * 80, "b": list(range(8))}] * 8}]
+    for _ in range(200):
+        casos.append({f"k{rnd.randrange(60)}": rnd.choice(["x" * rnd.randrange(400), list(range(rnd.randrange(20))),
+                                                            {str(j): "w" * 90 for j in range(rnd.randrange(15))}, 3.5])
+                      for _ in range(rnd.randrange(1, 4))})
+    for estado in casos:
+        s = aluno.compactar(estado)
+        assert len(s) <= 1500
+        assert isinstance(json.loads(s), dict)

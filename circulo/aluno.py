@@ -84,11 +84,14 @@ def compactar(estado: Mapping[str, Any], limite: int = 1500) -> str:
         return v if isinstance(v, (int, float, bool)) or v is None else str(v)[:n]
     d = {str(k)[:40]: enxuto(v) for k, v in dict(estado).items()}
     s = json.dumps(d, ensure_ascii=False)
-    while len(s) > limite and len(d) > 1:
-        maior = max(d, key=lambda k: len(json.dumps(d[k], ensure_ascii=False)))
-        d[maior] = "…"
+    while len(s) > limite and d:
+        grandes = [k for k in d if d[k] != "…"]
+        if grandes:
+            d[max(grandes, key=lambda k: len(json.dumps(d[k], ensure_ascii=False)))] = "…"
+        else:
+            del d[max(d, key=len)]
         s = json.dumps(d, ensure_ascii=False)
-    return s[:limite]
+    return s
 
 
 def _estado(texto: str | None) -> dict:
