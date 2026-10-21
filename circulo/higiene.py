@@ -45,7 +45,7 @@ def unir_licoes_de_json(store: Store, agora: float) -> int:
     n = 0
     for r in store.q("SELECT id, ponto, assinatura, descricao, status FROM licoes WHERE status<>'unida' AND (assinatura LIKE '%\"%' OR assinatura LIKE '%subagent_stats%' OR assinatura LIKE '%d_reason%')"):
         motivo = r["descricao"] or r["assinatura"]
-        causa = causa_de_json(motivo)
+        causa = causa_de_json(motivo, r["ponto"])
         if not causa:
             continue
         nova = assinatura_de(r["ponto"], motivo)
