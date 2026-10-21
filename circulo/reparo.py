@@ -23,6 +23,8 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
   9. Pré-voo antes da 1ª chamada do item: os testes dos módulos que o item cita rodam na main limpa. Vermelhos lá, a
      base está quebrada: nenhuma chamada, lição `developer:base` com a causa, e o item volta para a fila (Agentless e
      SWE Atlas rodam os testes no código original antes de julgar o patch).
+  10. Com o pytest do loop, `pytest --collect-only -q` roda antes da suíte (lição #9): erro de coleta barra ali, como
+     developer:testes, e a lição sai assinada pelo módulo e pela exceção (`licoes.coletas`).
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -116,6 +118,8 @@ class DeveloperComReparo(SelfDeveloper):
         super().__init__(*a, **kw)
         if auto_testes:
             self.test_cmd = [*self.test_cmd, "--tb=short"]
+        # lição #9: com o pytest do loop, a coleta é um portão antes da suíte (barato: só importa os módulos de teste)
+        self.coleta_cmd = [sys.executable, "-m", "pytest", "--collect-only", "-q"] if auto_testes else None
         self.fix_cmds = fix_cmds        # None = automático: o ruff --fix do CI quando o lint é o ruff do CI
         self.piso_teto = piso_teto
         self._base: str | None = None
@@ -323,7 +327,8 @@ class DeveloperComReparo(SelfDeveloper):
         """O mesmo que o CI (lint e testes), com o autofix do lint antes de dar o lint por reprovado.
         A saída que volta é a focada (é ela que alimenta a rodada do agente)."""
         self._resolver_lint()
-        etapas = ([("lint", self.lint_cmd)] if self.lint_cmd else []) + [("testes", self.test_cmd)]
+        etapas = ([("lint", self.lint_cmd)] if self.lint_cmd else []) + \
+            ([("coleta", self.coleta_cmd)] if self.coleta_cmd else []) + [("testes", self.test_cmd)]
         from .licoes import registrar as monitorar
 
         def rodar(cmd):
@@ -342,10 +347,10 @@ class DeveloperComReparo(SelfDeveloper):
                 saida = saida_focada(p.stdout + p.stderr)
                 if registrar:
                     self._repetida = self._mesma_falha(wt, saida) or self._repetida
-                    monitorar(self.ctx, f"developer:{nome}", False, sujeito=str(wt.name), motivo=saida,
-                              causa=causa_testes(p.stdout + p.stderr) if nome == "testes" else None)
+                    monitorar(self.ctx, f"developer:{'lint' if nome == 'lint' else 'testes'}", False, sujeito=str(wt.name),
+                              motivo=saida, causa=causa_testes(p.stdout + p.stderr) if nome != "lint" else None)
                 return False, saida
-            if registrar:
+            if registrar and nome != "coleta":
                 monitorar(self.ctx, f"developer:{nome}", True, sujeito=str(wt.name))
         if registrar:
             self.s.set(ULTIMA_FALHA, {**(self.s.get(ULTIMA_FALHA) or {}), wt.name: ""})   # verde: nada a repetir
