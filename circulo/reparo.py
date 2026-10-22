@@ -200,19 +200,18 @@ class DeveloperComReparo(SelfDeveloper):
             self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
 
     def _vetar(self, item: dict) -> DevResult | None:
-        """Portão de reincidência antes de qualquer gasto: o item bloqueia no disjuntor e volta para diagnóstico."""
+        """Portão de reincidência antes de qualquer gasto: o item vai para 'descartado' com a causa; só o redrive reabre."""
         from .licoes import registrar as monitorar
-        from .portao_previo import LIMIAR, VETAR, VETO_PONTO, decidir, fechados_sem_merge
-        d = decidir(item["titulo"], fechados_sem_merge(self.s))
+        from .portao_previo import DESCARTADO, LIMIAR, VETAR, VETO_PONTO, decidir, fechados_sem_merge, normalizar
+        fechados = fechados_sem_merge(self.s)
+        d = decidir(item["titulo"], fechados)
         if d.acao != VETAR:
             return None
-        texto = (f"vetado ({d.causa}): os últimos {LIMIAR} PRs deste título fecharam sem merge com os mesmos checks "
-                 "falhando; volta para diagnóstico sem novo PR")
+        checks = next(c for t, c in fechados if normalizar(t) == normalizar(item["titulo"]))
+        texto = (f"descartado ({d.causa}): os últimos {LIMIAR} PRs deste título fecharam sem merge com os mesmos checks "
+                 f"falhando ({', '.join(sorted(checks))}); reabra com `circulo redrive --item {item['id']}`")
         monitorar(self.ctx, VETO_PONTO, False, sujeito=item["titulo"][:120], motivo=texto, causa=d.causa, licao=False)
-        todos = self.s.get(DISJUNTOR) or {}
-        self.s.set(DISJUNTOR, {**todos, str(item["id"]): {"sig": VETO_PONTO, "n": LIMIAR, "chave": self._chave(texto),
-                                                          "texto": texto}})
-        self._set_item(item["id"], BLOQUEADO, texto[:300])
+        self._set_item(item["id"], DESCARTADO, texto[:300])
         return DevResult(item["id"], VETAR, texto)
 
     def consertar(self):
