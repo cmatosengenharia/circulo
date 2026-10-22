@@ -166,3 +166,23 @@ def test_espera_mais_importante_nao_e_tirada_quando_o_ci_volta(circle):
              for i, n in enumerate(REQUIRED_CHECKS)])                         # CI rodou de verdade (um teste falhou)
     MergeGate(circle.ctx, gh, human="h").run()
     assert circle.store.get("self_dev_espera")["motivo"] == "limite de uso"
+
+
+def test_tres_tentativas_sem_mudanca_tiram_o_item_da_fila(circle):
+    """21/10 15:33–19:20: o agente pedia "Approve python3.12" e a sessão retomada repetia; 272 chamadas em 4 h."""
+    from circulo.revisor import SEM_MUDANCA_MAX, sem_mudanca_seguida
+    s = circle.store
+    agora = time.time()
+    iid = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Trigger','d','loop','pendente','',1,?,?)", (agora, agora))
+    item = dict(s.one("SELECT * FROM roadmap WHERE id=?", (iid,)))
+    avisos = []
+    for _ in range(SEM_MUDANCA_MAX - 1):
+        assert not sem_mudanca_seguida(s, lambda m, k: avisos.append(m), item, "3. Approve `python3.12` in this worktree.")
+    assert sem_mudanca_seguida(s, lambda m, k: avisos.append(m), item, "3. Approve `python3.12` in this worktree.")
+    assert s.one("SELECT desativado FROM roadmap WHERE id=?", (iid,))["desativado"] == 1
+    assert avisos and "python3.12" in avisos[-1] and str(iid) not in (s.get("self_dev_sem_mudanca") or {})
+
+
+def test_developer_pode_rodar_python_com_versao():
+    from circulo.self_dev import FERRAMENTAS
+    assert {"Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)"} <= set(FERRAMENTAS)

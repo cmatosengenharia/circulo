@@ -38,7 +38,7 @@ from .budget import TZ
 from .merge_gate import protegidos
 from .reproducao import SEGREDOS, ambiente_isolado, liberar_worktree
 
-from .revisor import MAX_PRS_ABERTOS, disjuntor_abandonos
+from .revisor import MAX_PRS_ABERTOS, disjuntor_abandonos, sem_mudanca_seguida
 
 _liberar_worktree = liberar_worktree
 __all__ = ["SEGREDOS", "ambiente_isolado", "SelfDeveloper", "DevResult", "build_self_dev"]   # reexport para corpo e reparo
@@ -163,7 +163,7 @@ class CodeAgent(Protocol):
 
 
 # O que o Claude Code pode rodar sem pedir aprovação (não há ninguém para aprovar em `-p`): testes, lint e git de leitura no próprio worktree. Sem isto ele escrevia código e teste às cegas e pedia "aprove os comandos" — 25% das chamadas de 20/10 terminaram assim, e o item voltava para a fila barrado nos portões.
-FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
+FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
                "Bash(git log:*)", "Bash(git stash:*)", "Bash(git show:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)",
                "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)", "Bash(graft:*)")
 
@@ -213,8 +213,7 @@ class ClaudeCodeAgent:
         tokens, u = 0, data.get("usage", {})
         tokens = int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
         modelos = list((data.get("modelUsage") or {}).keys())
-        # saída 0 não basta: o Claude Code devolve is_error (limite da conta, máximo de passos) com trabalho pela metade
-        erro = bool(data.get("is_error"))
+        erro = bool(data.get("is_error"))   # saída 0 não basta: o Claude Code devolve is_error (limite da conta, máximo de passos) com trabalho pela metade
         return {"ok": p.returncode == 0 and not erro, "tokens": tokens, "log": bruto[-4000:], "modelo": ", ".join(modelos) or "Claude Code",
                 "passos": self._passos, "sessao": data.get("session_id"), "retomou": bool(retomar)}
 
@@ -459,8 +458,7 @@ class SelfDeveloper:
             txt = mem.contexto(f"{item['titulo']} {(item['detalhe'] or '')[:400]}", "corrigir_codigo", k=6, item_id=item_id)
         txt = codigo + txt
         if lic is not None:
-            # e as lições que mais reincidem, poucas, para o que a busca não alcança
-            geral = lic.contexto(limite=5 if txt else 15)
+            geral = lic.contexto(limite=5 if txt else 15)   # e as lições que mais reincidem, poucas, para o que a busca não alcança
             txt += ("\n" if txt and geral else "") + geral
         from .neuronios import ABRIR_PR, portoes
         ps = portoes(self.s, ABRIR_PR, item_id)
@@ -484,8 +482,7 @@ class SelfDeveloper:
                 ok, saida = self.verificar(wt)
                 falhas = [] if ok else [Resultado("lint e testes (iguais ao CI)", False, saida)]
             if not falhas:
-                # reprodução primeiro (playbook de bug fix do pstack): o teste novo precisa falhar no código antigo
-                from .reproducao import reproduz
+                from .reproducao import reproduz   # reprodução primeiro (playbook de bug fix do pstack): o teste novo precisa falhar no código antigo
                 try:
                     ok, det, _ = reproduz(wt, base, None, env=ambiente_isolado())
                 except Exception as exc:  # noqa: BLE001 — sem conseguir conferir, não prova: barra
@@ -541,7 +538,7 @@ class SelfDeveloper:
         if item_id is None:
             return None
         s = (self.s.get("self_dev_sessoes") or {}).get(str(item_id))
-        return s["sessao"] if s and time.time() - float(s.get("em", 0)) < 12 * 3600 else None
+        return s["sessao"] if s and s.get("sessao") != "-" and time.time() - float(s.get("em", 0)) < 12 * 3600 else None
 
     def _guardar_sessao(self, item_id: int | None, sessao: str | None) -> None:
         if item_id is None or not sessao:
@@ -625,8 +622,7 @@ class SelfDeveloper:
                                                                                 "custo": "assinatura"})
         if gate is not None and not gate.allowed:
             return DevResult(item["id"], "adiado", gate.reason or "Jev: não compensa agora")
-        # nível "domain": a mudança ainda passa por testes locais, CI, gate de merge e rollback de saúde
-        evo = self.ctx.dl.should_evolve("domain", {"occurrences": n, "consistency": 1.0,
+        evo = self.ctx.dl.should_evolve("domain", {"occurrences": n, "consistency": 1.0,   # nível "domain": a mudança ainda passa por testes locais, CI, gate de merge e rollback de saúde
                                                     "kind": "self_fix", "description": item["titulo"]})
         if not evo.allowed:
             return DevResult(item["id"], "adiado", "Jev: evidência insuficiente para mexer no código")
@@ -672,6 +668,9 @@ class SelfDeveloper:
                     self._set_item(item["id"], "observacao", "em observação: o agente não achou o que mudar; o erro precisa parar de acontecer")
                 else:
                     self._set_item(item["id"], "pendente", "agente não produziu mudança")
+                self._guardar_sessao(item["id"], "-")          # sessão retomada repetiria a mesma resposta: a próxima começa do zero
+                if sem_mudanca_seguida(self.s, self.ctx.reply, item, str(out.get("log", ""))):
+                    self._set_item(item["id"], "pendente", "depende de você: o agente não muda nada há 3 tentativas seguidas")
                 return DevResult(item["id"], "sem_mudanca", out.get("log", "")[-300:])
             ok, falha = self.portao_pr(wt, base, item["id"], item["titulo"])
             if not ok and "constituição intacta:" in falha:
@@ -742,6 +741,7 @@ class SelfDeveloper:
                 self._set_item(item["id"], "em_andamento", f"commit na branch {branch} (sem remoto)")
             self.ctx.reply(f"Developer abriu correção para “{item['titulo']}”" + (f" (PR #{pr})." if pr else "."), "merge")
             self._desfecho("proposto", item["id"], pr)
+            self.s.set("self_dev_sem_mudanca", {k: v for k, v in (self.s.get("self_dev_sem_mudanca") or {}).items() if k != str(item["id"])})
             return DevResult(item["id"], "proposto", ", ".join(changed), pr)
         except Exception as exc:             # timeout dos testes, GitHub 4xx depois do push…: o item volta à fila, não fica preso
             self._set_item(item["id"], "pendente", f"falha interna do Developer: {exc!r}"[:300])
