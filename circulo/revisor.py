@@ -90,6 +90,63 @@ def conflito_simulado(wt: Path, ref: str) -> bool | None:
     return None
 
 
+def arquivos_em_conflito(saida: str) -> list[str]:
+    """Caminhos da seção 'Conflicted file info' de `git merge-tree --write-tree --name-only -z`: depois do OID da
+    árvore, um caminho por NUL até o NUL vazio que abre as mensagens informativas."""
+    out: list[str] = []
+    for caminho in saida.split("\0")[1:]:
+        if not caminho:
+            break
+        if caminho not in out:
+            out.append(caminho)
+    return out
+
+
+def _mudados(repo: Path, intervalo: str) -> set[str]:
+    return set(_git(["diff", "--name-only", intervalo], repo).stdout.split())
+
+
+def medir_conflito(repo: Path, branch: str) -> dict | None:
+    """Arquivos em que a branch conflita de fato com origin/main ({arquivos, base}); None = não deu para medir.
+    Git anterior à 2.38 (sem `--write-tree`): reserva pela interseção dos arquivos mudados nos dois lados."""
+    _git(["fetch", "-q", "origin", "main", branch], repo)
+    p = _git(["merge-tree", "--write-tree", "--name-only", "-z", "origin/main", f"origin/{branch}"], repo)
+    if p.returncode in (0, 1):
+        return {"arquivos": arquivos_em_conflito(p.stdout) if p.returncode == 1 else [], "base": "merge-tree"}
+    if p.returncode == 129:
+        comum = _mudados(repo, f"origin/main...origin/{branch}") & _mudados(repo, f"origin/{branch}...origin/main")
+        return {"arquivos": sorted(comum), "base": "intersecao"}
+    return None
+
+
+def gravar_conflitos(store, repo: Path | None, vereditos) -> None:
+    """PR devolvido por conflito com a main: grava na trilha (`elos`, pr:N → conflito:<sha>) os arquivos em conflito,
+    uma vez por versão do PR."""
+    from . import rastro
+    for v in vereditos:
+        if not (repo and v.details.get("conflito")):
+            continue
+        para = f"conflito:{v.sha}"
+        if store.one("SELECT 1 FROM elos WHERE de=? AND para=? AND relacao='conflito_main'", (f"pr:{v.number}", para)):
+            continue
+        row = store.one("SELECT branch FROM prs WHERE number=?", (v.number,))
+        medida = medir_conflito(Path(repo), row["branch"]) if row and row["branch"] else None
+        if medida is None:
+            continue
+        det = {"sha": v.sha, "total": len(medida["arquivos"]), **medida}
+        while len(json.dumps(det, ensure_ascii=False)) > 1000:      # o elo guarda até 1000 caracteres: JSON inteiro
+            det["arquivos"] = det["arquivos"][:-1]
+        rastro.elo(store, f"pr:{v.number}", para, "conflito_main", det)
+
+
+def conflitos_do_pr(store, pr: int) -> list[str]:
+    """Arquivos em conflito gravados para o PR (todas as versões)."""
+    out: list[str] = []
+    for r in store.q("SELECT detalhe FROM elos WHERE de=? AND relacao='conflito_main' ORDER BY em", (f"pr:{pr}",)):
+        out += [a for a in json.loads(r["detalhe"] or "{}").get("arquivos", []) if a not in out]
+    return out
+
+
 def trazer_main(wt: Path, autor: tuple[str, str]) -> tuple[bool, bool]:
     """Rebaseia a branch do worktree sobre origin/main. (mudou, conflito). Em conflito, aborta e deixa tudo como estava."""
     _git(["fetch", "-q", "origin", "main"], wt)
@@ -171,13 +228,15 @@ def em_espera(store) -> bool:
     return bool(st) and store.tick < int(st["ate_tick"])
 
 
-def revisar(store, gate, rng=random.random) -> str:
+def revisar(store, gate, rng=random.random, repo: Path | None = None) -> str:
     """Roda o gate e classifica o desfecho: adiável vira evento 'adiado' (não falha) e o próximo giro idle espera
-    o backoff; passado ADIAR_MAX_TENTATIVAS seguidos, ou causa não adiável, o erro sobe como falha."""
+    o backoff; passado ADIAR_MAX_TENTATIVAS seguidos, ou causa não adiável, o erro sobe como falha.
+    PR devolvido por conflito com a main tem os arquivos em conflito gravados (`gravar_conflitos`)."""
     try:
         vereditos, erro = gate.run(), None
     except Exception as exc:
         vereditos, erro = [], exc
+    gravar_conflitos(store, repo, vereditos)
     causa = pre_voo(erro=erro) if erro is not None else pre_voo({"motivos": [v.reason for v in vereditos]})
     tentativa = int((store.get(ADIADO) or {}).get("tentativas", 0)) + 1
     if causa == "executar" or tentativa > ADIAR_MAX_TENTATIVAS:
