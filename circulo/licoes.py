@@ -180,21 +180,33 @@ def erro_legivel(saida: str) -> str:
     return "\n".join(texto).strip()
 
 
+# Lição #42: o subtype engana (erro de API vem como "success" com is_error); terminal_reason fica no fim do evento e
+# sobrevive ao corte. Ordem: texto específico do result, terminal_reason, subtype. Só metadado do SDK = log cortado.
 CAUSAS_JSON = (
-    (r'"subtype":\s*"error_max_turns"', "maximo_de_passos"),
-    (r'"subtype":\s*"error_during_execution"', "erro_na_execucao"),
     (r'Failed to authenticate|OAuth session expired|not logged in|please run /login', "deslogado"),
+    (r'"terminal_reason":\s*"max_turns"', "maximo_de_passos"),
+    (r'"terminal_reason":\s*"api_error"', "erro_de_api"),
+    (r'"subtype":\s*"error_max_turns"', "maximo_de_passos"),
+    (r'"subtype":\s*"error_max_budget_usd"', "limite_de_orcamento"),
+    (r'"subtype":\s*"error_during_execution"', "erro_na_execucao"),
 )
+JSON_DO_AGENTE = re.compile(r'"(?:subtype|is_error|terminal_reason)"|fast_mode_|subagent_stats|d_reason"')
 
 
 def causa_de_json(m: str) -> str | None:
     """A causa classificada de um log JSON do agente (ou None se o texto não é JSON do agente)."""
-    if '"subtype"' not in m and '"is_error"' not in m and '"d_reason"' not in m:
+    if not JSON_DO_AGENTE.search(m):
         return None
     for padrao, nome in CAUSAS_JSON:
         if re.search(padrao, m, re.I | re.S):
             return nome
-    return normalizar(erro_legivel(m), 40).replace(" ", "_") or "agente_falhou"
+    terminal = re.search(r'"terminal_reason":\s*"(\w+)"', m)
+    if terminal and terminal.group(1) != "completed":
+        return normalizar(terminal.group(1), 40)
+    causa = normalizar(erro_legivel(m), 40).replace(" ", "_")
+    if causa:
+        return causa
+    return "agente_falhou" if re.search(r'"(?:subtype|is_error|terminal_reason)"', m) else "log_cortado"
 
 
 def node_id_de(assinatura: str | None) -> str | None:
