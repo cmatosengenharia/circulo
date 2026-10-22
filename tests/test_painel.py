@@ -173,3 +173,38 @@ def test_aba_fechada_no_meio_da_resposta_nao_vira_traceback(capsys):
         srv.handle_error(socket.socket(), ("127.0.0.1", 1))
     err = capsys.readouterr().err
     assert "BrokenPipeError" not in err and "ValueError" in err
+
+
+def test_faixa_de_saude_com_incidente_aberto_nao_fica_verde_e_aparece_no_painel(tmp_path):
+    """Pergunta #58: a faixa de saúde lê só o SQLite e serve /painel sem Grafana; um incidente aberto pinta o semáforo
+    e aparece na linha de causa."""
+    import time
+
+    from circulo.painel import saude
+    from circulo.state import Store
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+    st.x("INSERT INTO incidents(fingerprint,stage,kind,message,count,first_seen,last_seen,first_tick,last_tick,status) "
+         "VALUES('fp','meta','JSONDecodeError','Expecting value <b>',8,?,?,1,3,'aberto')", (agora, agora))
+    h = saude(st.db)
+    assert h["semaforo"] in ("amarelo", "vermelho") and h["incidentes_abertos"] == 1
+    assert set(h) >= {"giros", "jev_duvida_pct", "incidentes_abertos", "llm_falhas_7d_pct", "gate"} and h["causa"]
+    srv = serve(st.path, port=0, background=True)
+    try:
+        t0 = time.monotonic()
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/painel", timeout=5) as r:
+            pagina = r.read().decode()
+            assert r.status == 200 and r.headers["Content-Type"].startswith("text/html")
+        assert time.monotonic() - t0 < 0.5
+    finally:
+        srv.shutdown()
+    assert "JSONDecodeError" in pagina and "&lt;b&gt;" in pagina and "<script src" not in pagina
+    for campo in ("Giros", "Jev em dúvida", "Incidentes abertos", "Falhas de LLM", "Gate"):
+        assert campo in pagina
+
+
+def test_faixa_de_saude_verde_sem_sinal_ruim(tmp_path):
+    from circulo.painel import saude
+    from circulo.state import Store
+    h = saude(Store(tmp_path / "s.db").db)
+    assert h["semaforo"] == "verde" and h["causa"] is None and h["gate"] is None
