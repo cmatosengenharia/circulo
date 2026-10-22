@@ -16,6 +16,7 @@ import re
 import urllib.error
 from dataclasses import dataclass
 
+from .gate_causa import checks_falhando
 from .merge_gate import CI_NAO_INICIOU as NAO_INICIOU_MSG
 from .merge_gate import REQUIRED_CHECKS, checks_ok
 
@@ -24,7 +25,7 @@ MAIN_VERMELHA, CI_NAO_INICIOU, SISTEMICO = "main_vermelha", "ci_nao_iniciou", "a
 ADIAR_PONTO = "developer:abrir_pr:adiar"
 LICAO_MAIN = "gate:main_vermelha"
 MIN_PRS, JANELA = 3, 24 * 3600
-DO_PR, FALHANDO = re.compile(r"PR #(\d+)"), "checks falhando: "
+DO_PR = re.compile(r"PR #(\d+)")
 
 
 @dataclass(frozen=True)
@@ -57,10 +58,10 @@ def checks_dos_prs(store, agora: float) -> list[set[str]]:
     vistos, historico = set(), []
     for r in store.q("SELECT sujeito, motivo FROM verificacoes WHERE ponto='gate:ci' AND ok=0 AND created_at>? "
                      "ORDER BY id DESC", (desde,)):
-        m, primeira = DO_PR.search(r["sujeito"] or ""), (r["motivo"] or "").split("\n", 1)[0]
-        if m and m.group(1) not in vistos and primeira.startswith(FALHANDO):
+        m, falhos = DO_PR.search(r["sujeito"] or ""), checks_falhando(r["motivo"])
+        if m and m.group(1) not in vistos and falhos is not None:
             vistos.add(m.group(1))
-            historico.append({c.strip() for c in primeira[len(FALHANDO):].split(",") if c.strip()})
+            historico.append(falhos)
     return historico
 
 
