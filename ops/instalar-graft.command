@@ -10,7 +10,11 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 if ! command -v graft >/dev/null 2>&1; then
   brew tap AEndrix03/graft https://github.com/AEndrix03/Graft.git
-  brew install graft
+  # O Homebrew recusa fórmula de tap de terceiros até você confiar nela. Confia só na fórmula do Graft
+  # (não no tap inteiro): é o código de instalação dele que roda aqui. Para desfazer: brew untrust --formula aendrix03/graft/graft
+  echo "Confiando só na fórmula aendrix03/graft/graft (github.com/AEndrix03/Graft)."
+  brew trust --formula aendrix03/graft/graft 2>/dev/null || true      # Homebrew antigo não tem `trust` nem precisa
+  brew install aendrix03/graft/graft
 fi
 graft --version
 graft profile add circulo 2>/dev/null || true
