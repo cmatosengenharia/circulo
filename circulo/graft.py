@@ -39,8 +39,14 @@ def ligado() -> bool:
     return shutil.which(comando()) is not None
 
 
+# o loop roda como serviço (launchd) com o PATH de quando foi instalado: sem a pasta do Homebrew, `graft` instalado
+# depois não era achado (22/10: instalado e 0 de 900 lembranças espelhadas). Procura também nos lugares padrão.
+PASTAS_PADRAO = ("/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.graft/bin"), "/home/linuxbrew/.linuxbrew/bin")
+
+
 def comando() -> str:
-    return os.environ.get("CIRCULO_GRAFT_CMD") or "graft"
+    pedido = os.environ.get("CIRCULO_GRAFT_CMD") or "graft"
+    return shutil.which(pedido) or shutil.which(pedido, path=os.pathsep.join(PASTAS_PADRAO)) or pedido
 
 
 def _ambiente() -> dict:

@@ -210,3 +210,16 @@ def test_sem_graft_o_painel_mostra_como_instalar(monkeypatch):
     Memoria(s)._gravar("licao", 1, "x", "y", "aberta", time.time())
     r = graft.resumo(s)
     assert not r["ligado"] and r["espelho"] == {"nos": 0, "lembrancas": 1} and "instalar-graft.command" in r["instalar"]
+
+
+def test_acha_o_graft_fora_do_path_do_servico(tmp_path, monkeypatch):
+    """22/10: o loop (launchd) tinha o PATH antigo, sem /opt/homebrew/bin; o graft instalado depois ficava invisível."""
+    pasta = tmp_path / "homebrew-bin"
+    pasta.mkdir()
+    (pasta / "graft").write_text("#!/bin/sh\necho '{\"status\":0,\"result\":{}}'\n")
+    (pasta / "graft").chmod(0o755)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setenv("CIRCULO_GRAFT", "1")
+    monkeypatch.delenv("CIRCULO_GRAFT_CMD", raising=False)
+    monkeypatch.setattr(graft, "PASTAS_PADRAO", (str(pasta),))
+    assert graft.comando() == str(pasta / "graft") and graft.ligado()

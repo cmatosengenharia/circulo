@@ -52,6 +52,8 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("arquivo")
     args = ap.parse_args(argv)
     carregar_env()                        # configuração única: o loop lê as chaves sozinho
+    from .graft import PASTAS_PADRAO      # serviço com PATH antigo: ferramentas instaladas depois (graft, claude) ficam visíveis
+    os.environ["PATH"] = os.pathsep.join([os.environ.get("PATH", "")] + [p for p in PASTAS_PADRAO if os.path.isdir(p) and p not in os.environ.get("PATH", "").split(os.pathsep)])
     from . import configuracao as cfg
     try:                                  # e as que você cadastrou no painel, do cofre do sistema (Keychain)
         from .cofre import Cadastro

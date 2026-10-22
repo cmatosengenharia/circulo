@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.64.1 — 2026-10-22
+
+- **Graft instalado e invisível**: o loop roda como serviço (launchd) com o PATH de quando foi instalado, sem
+  `/opt/homebrew/bin`; o `graft` instalado depois não era achado (0 de 900 lembranças espelhadas). `graft.comando()`
+  procura também nas pastas padrão (Homebrew Apple Silicon e Intel, `~/.graft/bin`) e a CLI acrescenta essas pastas
+  ao PATH do processo, para o Developer também achar o `graft`.
+- `ops/instalar-graft.command`: confia só na fórmula do Graft (`brew trust --formula`, o Homebrew recusa tap de
+  terceiros sem isso); a falta das skills do Claude Code no pacote do Homebrew não aparece mais como erro.
+
 ## 1.64.0 — 2026-10-21
 
 **Evidência do Graft em tela (aba Autoevolução → "Graft · memória semântica").**

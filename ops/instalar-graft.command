@@ -21,7 +21,7 @@ graft profile add circulo 2>/dev/null || true
 export GRAFT_PROFILE=circulo
 echo "Carregando o modelo e conferindo o daemon (pode levar alguns minutos na primeira vez)…"
 graft stats
-graft setup claudecode || true
+graft setup claudecode 2>/dev/null || echo "(skills do Graft para o Claude Code não vêm no pacote do Homebrew: opcional, o loop usa o graft pela linha de comando)"
 echo
 echo "Pronto. O loop percebe o Graft sozinho na próxima passagem (diagnóstico: Memória semântica (Graft) · ligado)."
 echo "Para desligar sem desinstalar: CIRCULO_GRAFT=0 no ~/.config/circulo/env."
