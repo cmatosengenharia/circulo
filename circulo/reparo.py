@@ -161,6 +161,10 @@ class DeveloperComReparo(SelfDeveloper):
         bloqueado = self.s.one("SELECT evidencia FROM roadmap WHERE id=? AND status=?", (item_id, BLOQUEADO))
         if bloqueado:
             return DevResult(item_id, BLOQUEADO, bloqueado["evidencia"])
+        item = self.pick(item_id)
+        veto = self._vetar(item) if item else None
+        if veto:
+            return veto
         self._rodada, self._cortado, self._base_quebrada, self._disjuntor = 0, "", "", ""
         r = super().run_once(item_id=item_id, autorizado=autorizado)
         if self._disjuntor and r.status == "testes_falharam":
@@ -194,6 +198,22 @@ class DeveloperComReparo(SelfDeveloper):
             todos.pop(str(r["id"]), None)
             self.s.set(DISJUNTOR, todos)
             self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
+
+    def _vetar(self, item: dict) -> DevResult | None:
+        """Portão de reincidência antes de qualquer gasto: o item bloqueia no disjuntor e volta para diagnóstico."""
+        from .licoes import registrar as monitorar
+        from .portao_previo import LIMIAR, VETAR, VETO_PONTO, decidir, fechados_sem_merge
+        d = decidir(item["titulo"], fechados_sem_merge(self.s))
+        if d.acao != VETAR:
+            return None
+        texto = (f"vetado ({d.causa}): os últimos {LIMIAR} PRs deste título fecharam sem merge com os mesmos checks "
+                 "falhando; volta para diagnóstico sem novo PR")
+        monitorar(self.ctx, VETO_PONTO, False, sujeito=item["titulo"][:120], motivo=texto, causa=d.causa, licao=False)
+        todos = self.s.get(DISJUNTOR) or {}
+        self.s.set(DISJUNTOR, {**todos, str(item["id"]): {"sig": VETO_PONTO, "n": LIMIAR, "chave": self._chave(texto),
+                                                          "texto": texto}})
+        self._set_item(item["id"], BLOQUEADO, texto[:300])
+        return DevResult(item["id"], VETAR, texto)
 
     def consertar(self):
         self._consertando = True
