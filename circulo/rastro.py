@@ -256,6 +256,8 @@ def cadeia_item(store: Store, item_id: int, now: float | None = None) -> dict | 
         passos.append(_passo("fim", "Contestado pelo estudo (esperando você)", "falha", it["updated_at"], it["evidencia"]))
     elif st == "observacao":
         passos.append(_passo("fim", "Em observação: o erro precisa parar de acontecer", "pendente", it["updated_at"], it["evidencia"]))
+    elif st == "bloqueado":
+        passos.append(_passo("fim", "Bloqueado: a mesma barra 2x antes do PR", "falha", it["updated_at"], it["evidencia"]))
     elif st in ("pendente", "em_andamento", "parcial"):
         passos.append(_passo("fim", {"pendente": "Na fila", "em_andamento": "Em andamento", "parcial": "Parcial"}[st], "pendente",
                              it["updated_at"], it["evidencia"]))

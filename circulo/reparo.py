@@ -25,6 +25,10 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      SWE Atlas rodam os testes no código original antes de julgar o patch).
   10. Com o pytest do loop, `pytest --collect-only -q` roda antes da suíte (lição #9): erro de coleta barra ali, como
      developer:testes, e a lição sai assinada pelo módulo e pela exceção (`licoes.coletas`).
+  11. Disjuntor do developer:abrir_pr (pergunta #55): cada barra grava no item a assinatura da causa
+     (`licoes.assinatura_de`). A mesma 2x seguidas → o item vai para 'bloqueado', sem nova chamada ao agente nem ao
+     pytest. A sonda de reabertura, no início de cada giro, devolve o item à fila quando os arquivos citados na barra
+     (ou a main inteira, se ela não cita arquivo) mudam. Falha de lint/testes repetida segue para o fatiador (item 7).
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -65,6 +69,18 @@ RUFF_FIX = [[sys.executable, "-m", "ruff", "check", "--fix", *SELECAO_CI, ALTERA
             [sys.executable, "-m", "ruff", "format", NOVOS]]
 ERRO_LINT = re.compile(r":\d+:\d+: [A-Z]+\d+")
 RESUMO_PYTEST = re.compile(r"^=+ short test summary info =+$")
+BLOQUEADO = "bloqueado"
+DISJUNTOR = "developer_disjuntor"               # {item: {"sig", "n", "chave", "texto"}}: a última barra do abrir_pr
+ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
+
+
+def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") -> bool:
+    """Grava a barra do abrir_pr no item. True = a mesma assinatura 2x seguidas: o disjuntor abre."""
+    todos = store.get(DISJUNTOR) or {}
+    antes = todos.get(str(item_id)) or {}
+    n = antes.get("n", 0) + 1 if antes.get("sig") == sig else 1
+    store.set(DISJUNTOR, {**todos, str(item_id): {"sig": sig, "n": n, "chave": chave, "texto": texto[:2000]}})
+    return n >= 2
 
 
 def saida_focada(texto: str, limite: int = LINHAS_FEEDBACK) -> str:
@@ -129,10 +145,18 @@ class DeveloperComReparo(SelfDeveloper):
         self._repetida = False
         self._cortado = ""
         self._base_quebrada = ""
+        self._disjuntor = ""
 
-    def run_once(self, *a, **kw):
-        self._rodada, self._cortado, self._base_quebrada = 0, "", ""
-        r = super().run_once(*a, **kw)
+    def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
+        self._reabrir()
+        bloqueado = self.s.one("SELECT evidencia FROM roadmap WHERE id=? AND status=?", (item_id, BLOQUEADO))
+        if bloqueado:
+            return DevResult(item_id, BLOQUEADO, bloqueado["evidencia"])
+        self._rodada, self._cortado, self._base_quebrada, self._disjuntor = 0, "", "", ""
+        r = super().run_once(item_id=item_id, autorizado=autorizado)
+        if self._disjuntor and r.status == "testes_falharam":
+            self._set_item(r.item_id, BLOQUEADO, self._disjuntor[:300])
+            return r
         if self._base_quebrada and r.status == "agente_falhou" and not r.pr:
             self._set_item(r.item_id, "pendente", self._base_quebrada[:300])
             return DevResult(r.item_id, "base_quebrada", self._base_quebrada)
@@ -140,6 +164,27 @@ class DeveloperComReparo(SelfDeveloper):
             self._set_item(r.item_id, "pendente", f"{self._cortado}; vai para o fatiador")
             return DevResult(r.item_id, "teto", self._cortado)
         return r
+
+    # ------------------------------------------------------------ disjuntor do abrir_pr
+    def _chave(self, texto: str) -> str:
+        """O que precisa mudar para a barra deixar de ser a mesma: os arquivos que ela cita, na main; sem arquivo, a main."""
+        ref = "origin/main" if _git(["rev-parse", "--verify", "-q", "origin/main"], self.repo, check=False) else "HEAD"
+        limpo = re.sub(r"\S*/\.circulo-wt-[^/\s]+/", "", texto or "")
+        citados = sorted(set(ARQUIVO_CITADO.findall(limpo)))
+        if not citados:
+            return _git(["rev-parse", f"{ref}^{{tree}}"], self.repo, check=False)
+        return " ".join(f"{c}={_git(['rev-parse', f'{ref}:{c}'], self.repo, check=False)}" for c in citados)
+
+    def _reabrir(self) -> None:
+        """Sonda do disjuntor: o item bloqueado volta para a fila quando o que a barra cita mudou na main."""
+        todos = self.s.get(DISJUNTOR) or {}
+        for r in self.s.q("SELECT id FROM roadmap WHERE status=?", (BLOQUEADO,)):
+            d = todos.get(str(r["id"]))
+            if d is not None and self._chave(d.get("texto", "")) == d.get("chave"):
+                continue
+            todos.pop(str(r["id"]), None)
+            self.s.set(DISJUNTOR, todos)
+            self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
 
     def consertar(self):
         self._consertando = True
@@ -422,6 +467,12 @@ class DeveloperComReparo(SelfDeveloper):
                               motivo=f"o agente terminou com erro na rodada; {rodada['tokens']} tokens")
                     break
             monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=texto, causa=causa_da_falha(falhas))
+            if item_id is not None and not self._consertando:
+                sig = assinatura_de(ABRIR_PR, texto)
+                # a mesma falha de lint/testes 2x já pede a divisão ao fatiador: bloquear tiraria o item de lá
+                if barra_do_item(self.s, item_id, sig, self._chave(texto), texto) and not (self._repetida or self._cortado):
+                    self._disjuntor = f"disjuntor: a mesma barra 2x seguidas ({sig}); só volta quando o que ela cita mudar"
+                    texto += f"\n({self._disjuntor})"
             return False, texto
         finally:
             self._base = self._item_id = None
