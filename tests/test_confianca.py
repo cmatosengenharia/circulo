@@ -103,6 +103,33 @@ def test_sse_empurra_confianca_e_sinapses(circle, painel):  # noqa: F811
     assert got["confianca"] >= 2 and got["sinapse"] >= 1               # confiança empurrada sem o painel pedir
 
 
+def test_sse_reempurra_confianca_parada_dentro_do_slo_de_frescor(circle, painel):  # noqa: F811
+    """lição #60 (painel:frescor_atrasado): com os checks estáveis a confiança precisa ser reenviada a cada ≤ 2 s;
+    antes o relógio do reenvio zerava a cada cálculo e o card na tela envelhecia sem limite (p99 5472 ms).
+    Loop desligado em descanso longo: nenhum "há N s" muda a chave, só o reenvio periódico renova o card."""
+    circle.tick()
+    circle.store.set("etapa", {**circle.store.get("etapa"), "em": time.time() - 600})
+    chegadas: list[tuple[float, float]] = []
+
+    def read():
+        fim = time.time() + 7
+        with urllib.request.urlopen(painel + "/api/eventos?desde=0", timeout=10) as r:
+            evento = None
+            for line in r:
+                if line.startswith(b"event: "):
+                    evento = line[7:].strip().decode()
+                elif line.startswith(b"data: ") and evento == "confianca":
+                    chegadas.append((time.time(), json.loads(line[6:])["gerado_em"]))
+                if time.time() > fim:
+                    return
+    t = threading.Thread(target=read, daemon=True)
+    t.start()
+    t.join(10)
+    assert len(chegadas) >= 3
+    pior = max(b[0] - a[1] for a, b in zip(chegadas, chegadas[1:], strict=False))   # idade do card logo antes do próximo
+    assert pior * 1000 <= FRESCOR_MAX_MS, f"card ficou {pior:.1f} s sem renovar"
+
+
 def test_api_confianca_e_frescor(circle, painel):  # noqa: F811
     circle.tick()
     with urllib.request.urlopen(painel + "/api/confianca", timeout=5) as r:

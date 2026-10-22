@@ -560,7 +560,7 @@ def make_handler(db_path: str):
             # sinapses: cada verificação de cada neurônio, ao vivo (as 30 últimas na conexão, depois só as novas)
             from .confianca import confianca
             sin = max(0, (store.one("SELECT COALESCE(MAX(id),0) m FROM verificacoes")["m"] or 0) - 30)
-            last_conf, last_conf_em = None, 0.0
+            last_conf, last_conf_em, conf_enviada_em = None, 0.0, 0.0
             last_cap = None
             try:
                 while True:
@@ -583,8 +583,8 @@ def make_handler(db_path: str):
                         conf = confianca(store)
                         chave = json.dumps([conf["veredito"], [(c["id"], c["estado"], c["valor"], c["porque"]) for c in conf["checks"]]],
                                            ensure_ascii=False)
-                        if chave != last_conf or time.time() - last_conf_em >= 2.0:
-                            last_conf = chave
+                        if chave != last_conf or time.time() - conf_enviada_em >= 2.0:
+                            last_conf, conf_enviada_em = chave, time.time()
                             self.wfile.write(f"event: confianca\ndata: {json.dumps(conf, ensure_ascii=False)}\n\n".encode())
                         last_conf_em = time.time()
                     for v in store.q("SELECT id, tick, ponto, sujeito, ok, assinatura, substr(motivo,1,240) motivo, created_at "
