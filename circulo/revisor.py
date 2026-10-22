@@ -346,3 +346,26 @@ def disjuntor_abandonos(store, reply, motivo: str) -> bool:
     reply(f"Disjuntor do Developer: {DISJUNTOR_PRS} PRs seguidos abandonados por “{causa}”. Pausei por "
           f"{DISJUNTOR_PAUSA // 3600} h (até {hora}) para não gastar em círculo; veja o CI/GitHub.", "saude")
     return True
+
+
+SEM_MUDANCA_MAX = 3          # tentativas seguidas do mesmo item sem o agente mudar nada
+
+
+def sem_mudanca_seguida(store, reply, item: dict, log: str) -> bool:
+    """O agente terminou sem mudar nada no mesmo item SEM_MUDANCA_MAX vezes seguidas: o item sai da fila (desativado,
+    "depende de você") com o que o agente disse. Em 21/10 ele pedia "Approve python3.12" e a sessão retomada repetia
+    isso: 272 chamadas em 4 h, uma a cada 42 s. Devolve True quando tirou o item da fila."""
+    import re
+    cont = dict(store.get("self_dev_sem_mudanca") or {})
+    chave = str(item["id"])
+    cont[chave] = int(cont.get(chave, 0)) + 1
+    store.set("self_dev_sem_mudanca", {k: v for k, v in cont.items() if k == chave or v < SEM_MUDANCA_MAX})
+    if cont[chave] < SEM_MUDANCA_MAX:
+        return False
+    store.x("UPDATE roadmap SET desativado=1, updated_at=? WHERE id=?", (time.time(), item["id"]))
+    pedido = re.sub(r"\\n|\s+", " ", log)[-220:].strip()
+    reply(f"Developer: “{str(item.get('titulo', ''))[:80]}” — o agente não mudou nada em {SEM_MUDANCA_MAX} tentativas seguidas; "
+          f"tirei o item da fila para você ver. Última resposta: {pedido}", "saude")
+    cont.pop(chave, None)
+    store.set("self_dev_sem_mudanca", cont)
+    return True

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.63.0 — 2026-10-21
+
+**Developer preso pedindo aprovação: 272 chamadas em 4 h (15:33–19:20) sem mudar nada.**
+
+- O agente pedia "Approve `python3.12`" (a lista de ferramentas só tinha `python`/`python3`), terminava sem mudança e a
+  sessão retomada (`--resume`) repetia a mesma resposta a cada ~42 s. Três freios:
+  `Bash(python3.11|3.12|3.13:*)` liberados; `sem_mudanca` descarta a sessão (a próxima começa do zero);
+  `revisor.sem_mudanca_seguida` tira o item da fila (desativado, "depende de você", com a última resposta do agente)
+  depois de 3 tentativas seguidas sem mudança. O contador zera quando o item vira PR.
+- `tests/test_ci_indisponivel.py`: +2 regressões.
+
 ## 1.62.2 — 2026-10-21
 
 **A main estava vermelha no CI desde a 1.61: a coleta do pytest quebrava.**
