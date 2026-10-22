@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.64.0 — 2026-10-21
+
+**Evidência do Graft em tela (aba Autoevolução → "Graft · memória semântica").**
+
+- `memoria.uso_graft` registra por dia (kv `graft_uso`): buscas híbridas (texto + vetor), achados que **só o Graft**
+  trouxe e os confirmados pelos dois (cada hit da busca leva `via`: texto | graft | ambos), consultas ao cache
+  verificado por resultado (STRONG/WEAK/MISS/falhou) e repetições de item reconhecidas pelo STRONG que o Jaccard de
+  títulos não pegaria — com os últimos exemplos (consulta → o que foi achado).
+- `graft.resumo` traz o espelho (lembranças com nó no grafo / total), o uso do dia e como instalar quando desligado.
+- Painel: cartão com estado (ligado/desligado/pausado), 5 números, "O que só o Graft trouxe" e "Cache verificado hoje".
+  Desligado mostra só o índice de texto e o caminho para ligar (`~/Projects/instalar-graft.command`).
+- `tests/test_graft.py`: +2.
+
 ## 1.63.0 — 2026-10-21
 
 **Developer preso pedindo aprovação: 272 chamadas em 4 h (15:33–19:20) sem mudar nada.**

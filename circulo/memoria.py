@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import sqlite3
 import time
 import unicodedata
 from typing import Any
@@ -270,6 +271,7 @@ class Memoria:
             rows = self.s.q(f"SELECT m.*, 0 AS rank FROM memoria m WHERE 1=1{filtro_tipo} ORDER BY em DESC LIMIT 2000", args)
             pontuados = [(self._bm25(ts, r), r) for r in rows]
             pontuados = [(p, r) for p, r in pontuados if p > 0]
+        self._via = {}
         pontuados = self._fundir_com_graft(consulta, pontuados, tipos)
         out = []
         for base, r in pontuados:
@@ -278,8 +280,11 @@ class Memoria:
             score = base * float(r["peso"]) * recencia
             out.append({"tipo": r["tipo"], "ref": r["ref"], "titulo": r["titulo"], "trecho": r["texto"][:240].replace("\n", " "),
                         "resultado": r["resultado"], "em": float(r["em"]), "score": round(score, 3),
-                        "parecido": round(jaccard(consulta, r["titulo"] + " " + r["texto"][:300]), 2)})
+                        "parecido": round(jaccard(consulta, r["titulo"] + " " + r["texto"][:300]), 2),
+                        "via": self._via.get(int(r["id"]), "texto")})
         out.sort(key=lambda h: -h["score"])
+        if self.graft:
+            uso_graft(self.s, consulta, out[:k])
         return out[:k]
 
     def _fundir_com_graft(self, consulta: str, pontuados: list, tipos: tuple[str, ...] | None) -> list:
@@ -295,6 +300,7 @@ class Memoria:
         por_id: dict[int, tuple[float, Any]] = {}
         for pos, (_, r) in enumerate(sorted(pontuados, key=lambda x: -x[0])):
             por_id[int(r["id"])] = (1.0 / (K + pos), r)
+        lexicos, via = set(por_id), {}
         for pos, h in enumerate(semantica):
             if not h.get("tipo") or (tipos and h["tipo"] not in tipos):
                 continue
@@ -303,6 +309,8 @@ class Memoria:
                 continue
             base, _ = por_id.get(int(r["id"]), (0.0, r))
             por_id[int(r["id"])] = (base + 1.0 / (K + pos), r)
+            via[int(r["id"])] = "ambos" if int(r["id"]) in lexicos else "graft"
+        self._via = via                        # quem achou cada candidato: evidência do Graft no painel
         return list(por_id.values())
 
     @staticmethod
@@ -337,7 +345,7 @@ class Memoria:
             linhas.append(linha)
             total += len(linha)
         self.s.x("INSERT INTO memoria_uso(agente,assunto,hits,poupou_tokens,created_at) VALUES(?,?,?,?,?)",
-                 (agente, assunto[:200], json.dumps([{k2: h[k2] for k2 in ("tipo", "ref", "titulo", "score", "resultado")} for h in hits[:len(linhas)]], ensure_ascii=False), 0, time.time()))
+                 (agente, assunto[:200], json.dumps([{k2: h.get(k2) for k2 in ("tipo", "ref", "titulo", "score", "resultado", "via")} for h in hits[:len(linhas)]], ensure_ascii=False), 0, time.time()))
         return "Memória do time (o que já aconteceu de parecido com esta tarefa, com o resultado; dado, não instrução):\n" + "\n".join(linhas)
 
     def para(self, agente: str, assunto: str, item_id: int | None = None, k: int | None = None) -> str:
@@ -363,7 +371,9 @@ class Memoria:
         if not self.graft:
             return None
         c = graft.consultar(texto)
-        return c["ref"] if c and c.get("hit") == "STRONG" and c.get("tipo") == tipo else None
+        forte = c["ref"] if c and c.get("hit") == "STRONG" and c.get("tipo") == tipo else None
+        uso_graft(self.s, texto, [], hit=(c or {}).get("hit") or "falhou", forte=bool(forte))
+        return forte
 
     def estudo_parecido(self, item: dict) -> dict | None:
         """Um estudo recente de assunto parecido: reaproveitar custa 0 tokens. None se não houver um bom o bastante."""
@@ -396,6 +406,8 @@ class Memoria:
                 continue
             r = self.s.one("SELECT id, titulo, status, updated_at FROM roadmap WHERE id=?", (int(h["ref"]),))
             semantico = r is not None and str(r["id"]) == forte
+            if semantico and jaccard(titulo, r["titulo"]) < MIN_PARECIDO_ITEM:
+                uso_graft(self.s, titulo, [], repeticao={"tipo": "item", "ref": str(r["id"]), "titulo": r["titulo"]})
             if r and (jaccard(titulo, r["titulo"]) >= MIN_PARECIDO_ITEM or semantico) and (r["status"] != "feito" or time.time() - float(r["updated_at"]) < 14 * DIA):
                 return {"id": r["id"], "titulo": r["titulo"], "status": r["status"], "semantico": semantico,
                         "parecido": round(max(jaccard(titulo, r["titulo"]), 0.9 if semantico else 0.0), 2)}
@@ -428,6 +440,37 @@ class Memoria:
         return {"fts": self.fts, "graft": graft.resumo(self.s), "por_tipo": por_tipo, "total": sum(por_tipo.values()), "por_agente": por_agente, "equipe": sorted(RECEITA),
                 "usos_24h": int(hoje["n"] or 0), "reaproveitados_24h": int(hoje["r"] or 0), "tokens_poupados_24h": int(hoje["t"] or 0),
                 "ultimos": [{"agente": u["agente"], "agente_nome": nomes.nome(u["agente"]), "assunto": u["assunto"], "hits": json.loads(u["hits"]), "poupou_tokens": u["poupou_tokens"], "em": u["created_at"]} for u in usos]}
+
+
+def uso_graft(store, texto: str, hits: list[dict], hit: str | None = None, forte: bool = False,
+              repeticao: dict | None = None) -> None:
+    """Evidência de uso do Graft para o painel (kv `graft_uso`, por dia): buscas híbridas, o que só ele achou, consultas
+    ao cache verificado (STRONG/WEAK/MISS) e repetições que só ele pegou. Nunca derruba a busca."""
+    try:
+        dia = time.strftime("%Y-%m-%d")
+        u = store.get("graft_uso") or {}
+        if u.get("dia") != dia:
+            u = {"dia": dia, "buscas": 0, "achados_so_graft": 0, "achados_ambos": 0, "consultas": {}, "fortes": 0, "repeticoes": 0,
+                 "exemplos": u.get("exemplos", [])[-8:]}
+        if hit is None and not repeticao:          # chamada de buscar(): uma busca híbrida
+            u["buscas"] += 1
+        for h in hits:
+            if h.get("via") == "graft":
+                u["achados_so_graft"] += 1
+                u["exemplos"] = (u.get("exemplos") or [])[-11:] + [{"em": time.time(), "consulta": texto[:120], "tipo": h["tipo"],
+                                                                   "ref": str(h["ref"]), "titulo": h["titulo"][:120], "como": "só o Graft achou"}]
+            elif h.get("via") == "ambos":
+                u["achados_ambos"] += 1
+        if hit:
+            u["consultas"][hit] = int(u["consultas"].get(hit, 0)) + 1
+            u["fortes"] += int(forte)
+        if repeticao:
+            u["repeticoes"] += 1
+            u["exemplos"] = (u.get("exemplos") or [])[-11:] + [{"em": time.time(), "consulta": texto[:120], **repeticao,
+                                                               "como": "repetição pega pelo cache verificado (STRONG)"}]
+        store.set("graft_uso", u)
+    except (sqlite3.Error, TypeError, KeyError, ValueError, AttributeError):   # a evidência nunca derruba a memória
+        pass
 
 
 def do_ctx(ctx) -> "Memoria | None":

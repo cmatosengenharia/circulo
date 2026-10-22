@@ -179,3 +179,34 @@ def test_graft_caido_pausa_e_nunca_derruba_a_memoria(tmp_path, monkeypatch):
     m._gravar("licao", 1, "Ruff reclamou de import", "no worktree", "aberta", time.time())
     assert m.s.one("SELECT graft_id FROM memoria")["graft_id"] is None
     assert graft.resumo(m.s)["pausado_ate"] and graft.recuperar("ruff") == [] and m.buscar("ruff reclamou")  # busca lexical segue
+
+
+def test_evidencia_de_uso_vai_para_o_painel(graft_falso):
+    """O painel mostra o que o Graft fez: espelho, buscas, o que só ele achou, consultas STRONG e repetições pegas."""
+    s = Store(":memory:")
+    m = Memoria(s)
+    agora = time.time()
+    m._gravar("licao", 1, "Developer: limite de uso da conta", "esperar o reset", "validada", agora)
+    _marcar(graft_falso, s.one("SELECT graft_id FROM memoria WHERE ref='1'")["graft_id"], "perto:token estourou")
+    hits = m.buscar("token estourou")
+    assert hits[0]["via"] == "graft"
+    iid = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+              ("Pausar o Developer quando a cota da assinatura acabar", "d", "loop", "pendente", "", 1, agora, agora))
+    m._gravar("item", iid, "Pausar o Developer quando a cota da assinatura acabar", "d", "pendente", agora)
+    _marcar(graft_falso, s.one("SELECT graft_id FROM memoria WHERE tipo='item'")["graft_id"], "forte:esperar o reset")
+    assert m.item_parecido("Fazer o loop esperar o reset do limite de uso")["semantico"]
+    r = graft.resumo(s)
+    u = r["uso"]
+    assert r["espelho"] == {"nos": 2, "lembrancas": 2}
+    assert u["buscas"] >= 1 and u["achados_so_graft"] == 1 and u["consultas"].get("STRONG") == 1 and u["fortes"] == 1
+    assert u["repeticoes"] == 1 and {e["como"] for e in u["exemplos"]} == {"só o Graft achou", "repetição pega pelo cache verificado (STRONG)"}
+    uso = json.loads(s.one("SELECT hits FROM memoria_uso ORDER BY id DESC LIMIT 1")["hits"]) if s.one("SELECT 1 FROM memoria_uso") else []
+    assert all("via" in h for h in uso)
+
+
+def test_sem_graft_o_painel_mostra_como_instalar(monkeypatch):
+    monkeypatch.setenv("CIRCULO_GRAFT", "0")
+    s = Store(":memory:")
+    Memoria(s)._gravar("licao", 1, "x", "y", "aberta", time.time())
+    r = graft.resumo(s)
+    assert not r["ligado"] and r["espelho"] == {"nos": 0, "lembrancas": 1} and "instalar-graft.command" in r["instalar"]

@@ -520,6 +520,15 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div class="sub" id="indagFunil" style="margin:0 0 8px"></div>
       <ul class="lista" id="indag"></ul>
     </section>
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Graft: memória semântica" id="graft">
+      <div class="cabeca"><div><h2>Graft · memória semântica <small class="sub" id="graftEstado"></small></h2>
+        <p class="sub" style="margin:2px 0 0" id="graftSub">Vetores e grafo locais (github.com/AEndrix03/Graft) ao lado do índice de texto: acha a mesma coisa dita com outras palavras.</p></div></div>
+      <div class="kpis4" id="graftKpis"></div>
+      <div class="duas">
+        <div><h3 class="h3">O que só o Graft trouxe <small class="sub">o índice de texto sozinho não acharia</small></h3><ul class="lista" id="graftExemplos"></ul></div>
+        <div><h3 class="h3">Cache verificado hoje <small class="sub">STRONG decide; WEAK e MISS não</small></h3><ul class="lista" id="graftConsultas"></ul></div>
+      </div>
+    </section>
     <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Bastidores da evolução">
       <details class="mais"><summary id="revResumo">Revisor de código</summary>
         <div class="indag-tot" id="revTot"></div><ul class="list" id="revAbertos"></ul><ul class="list" id="revLista"></ul><span hidden id="revMax">3</span></details>
@@ -1275,6 +1284,37 @@ async function refreshMemoria() {
   } catch {}
 }
 setInterval(refreshMemoria, 20000); refreshMemoria();
+async function refreshGraft() {
+  try {
+    const g = ((await (await fetch("/api/memoria")).json()).graft) || {};
+    const U = g.uso || {}, E = g.espelho || {}, C = U.consultas || {}, num = n => (n || 0).toLocaleString("pt-BR");
+    const pausado = g.pausado_ate && g.pausado_ate * 1000 > Date.now();
+    $("#graftEstado").textContent = !g.ligado ? "· desligado" : pausado ? "· pausado (daemon não respondeu)" : `· ligado · perfil ${g.perfil}`;
+    if (!g.ligado) {
+      $("#graftSub").textContent = `Não instalado no Mac: a memória do time usa só o índice de texto. Para ligar: ${g.instalar || "ops/instalar-graft.command"}.`;
+    }
+    const cobre = E.lembrancas ? E.nos / E.lembrancas : 0, tot = Object.values(C).reduce((a, b) => a + b, 0);
+    if (!g.ligado) {
+      $("#graftKpis").innerHTML = [[`${num(E.lembrancas)}`, "lembranças só no índice de texto"], ["0", "nós no grafo semântico"], ["—", "buscas híbridas"], ["—", "repetições pegas pelo STRONG"]]
+        .map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+      $("#graftExemplos").innerHTML = `<li class="vazio">Aparece aqui depois de instalar o Graft.</li>`;
+      $("#graftConsultas").innerHTML = `<li class="vazio">—</li>`;
+      return;
+    }
+    $("#graftKpis").innerHTML = [
+      [`${num(E.nos)} / ${num(E.lembrancas)}`, cobre >= 0.95 ? "lembranças com nó no grafo" : "lembranças com nó no grafo · espelhando 50 por passagem", cobre >= 0.95 ? "ok" : "warn"],
+      [num(U.buscas), "buscas híbridas hoje (texto + vetor)", ""],
+      [num(U.achados_so_graft), `achados que só o Graft trouxe · ${num(U.achados_ambos)} confirmados pelos dois`, U.achados_so_graft ? "ok" : ""],
+      [num(U.repeticoes), `repetições pegas pelo STRONG · ${num(U.fortes)} STRONG em ${num(tot)} consultas`, U.repeticoes ? "ok" : ""],
+      [g.ms ? `${g.ms} ms` : "—", g.manutencao_em ? `última chamada · manutenção ${new Date(g.manutencao_em * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}${(g.pendentes || []).length ? ` · ${g.pendentes.length} p/ revisar` : ""}` : "última chamada · manutenção ainda não rodou", ""],
+    ].map(([v, l, c]) => `<div><b class="${c}">${v}</b><span>${l}</span></div>`).join("");
+    $("#graftExemplos").innerHTML = (U.exemplos || []).slice().reverse().map(x => `<li><span class="pt" data-e="ok"></span><div class="tx"><b>${esc(x.tipo)} #${esc(String(x.ref).split(":")[0])} · ${esc((x.titulo || "").slice(0, 90))}</b><small>${esc(x.como)} · buscando “${esc((x.consulta || "").slice(0, 80))}”</small></div></li>`).join("")
+      || `<li class="vazio">Nada ainda hoje: aparece quando uma busca acha algo que o texto não acharia.</li>`;
+    $("#graftConsultas").innerHTML = ["STRONG", "WEAK", "MISS", "falhou"].filter(k => C[k]).map(k => `<li><span class="pt" data-e="${k === "STRONG" ? "ok" : k === "falhou" ? "bad" : ""}"></span><div class="tx"><b>${k}</b><small>${k === "STRONG" ? "usado para reconhecer item/estudo repetido" : k === "WEAK" ? "só o vetor concordou: ignorado" : k === "MISS" ? "nada parecido no grafo" : "o daemon não respondeu"}</small></div><span class="dir">${num(C[k])}</span></li>`).join("")
+      || `<li class="vazio">Nenhuma consulta ainda hoje.</li>`;
+  } catch {}
+}
+setInterval(refreshGraft, 20000); refreshGraft();
 async function refreshJev() {
   try {
     const j = await (await fetch("/api/jev")).json();

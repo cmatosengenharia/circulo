@@ -20,6 +20,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import time
 
@@ -185,7 +186,15 @@ def manter(store, agora: float | None = None, a_cada: float = 6 * 3600) -> dict 
 def resumo(store) -> dict:
     """Para o painel: ligado?, perfil, chamadas, última latência, grafo e manutenção. Nunca chama o daemon."""
     m = store.get("graft_manutencao") or {}
+    try:
+        tot, esp = store.one("SELECT COUNT(*) t, SUM(graft_id IS NOT NULL) e FROM memoria")
+    except sqlite3.Error:                    # banco antigo sem a coluna
+        tot, esp = 0, 0
+    u = store.get("graft_uso") or {}
     return {"ligado": ligado(), "perfil": PERFIL, "chamadas": _estado["chamadas"], "ms": round(_estado["ms"]),
+            "espelho": {"nos": int(esp or 0), "lembrancas": int(tot or 0)},
+            "uso": u if u.get("dia") == time.strftime("%Y-%m-%d") else {"dia": time.strftime("%Y-%m-%d"), "exemplos": u.get("exemplos", [])},
+            "instalar": "dois cliques em ~/Projects/instalar-graft.command (Homebrew, perfil circulo, modelo ~600 MB)",
             "pausado_ate": (_estado["falhou_em"] + PAUSA_APOS_FALHA) if time.time() - _estado["falhou_em"] < PAUSA_APOS_FALHA else None,
             "grafo": m.get("grafo") or {}, "manutencao_em": m.get("em"), "pendentes": m.get("pendentes") or []}
 
