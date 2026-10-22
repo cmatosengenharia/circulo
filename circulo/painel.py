@@ -237,6 +237,76 @@ def novidades(store: Store, desde: int, projeto: int | None = None) -> list[dict
     return [{**dict(r), "value": json.loads(r["value"])} for r in rows]
 
 
+# Faixa de saúde (pergunta #58): limiares do semáforo, em % (amarelo, vermelho). Jev em dúvida = resposta do Jev abaixo
+# de JEV_INCERTO nas últimas 24 h (o mesmo corte padrão da cascata em decision.py); falhas de LLM = ok=0 em 7 dias.
+JEV_INCERTO = 0.25
+LIMIAR_JEV_DUVIDA = (20.0, 40.0)
+LIMIAR_LLM_FALHAS = (5.0, 20.0)
+INCIDENTES_VERMELHO = 3
+SEMAFORO = {"verde": ("ok", "✓"), "amarelo": ("llm", "!"), "vermelho": ("bad", "✕")}
+
+
+def _um(conn, sql: str, args: tuple = ()):
+    return conn.execute(sql, args).fetchone()
+
+
+def _pct(r) -> float:
+    return round(100 * (r[1] or 0) / r[0], 1) if r[0] else 0.0
+
+
+def saude(conn) -> dict:
+    """Semáforo + 5 números do loop, lidos só do SQLite (sqlite3.Connection), e a causa quando não está verde."""
+    agora = time.time()
+    tick = _um(conn, "SELECT value FROM kv WHERE key='tick'")
+    jev = _um(conn, "SELECT COUNT(*), SUM(confidence < ?) FROM decisions WHERE source='jev' AND created_at > ? "
+             "AND question NOT LIKE 'crit_%' AND question NOT LIKE 'rel_%'", (JEV_INCERTO, agora - 86400))
+    llm = _um(conn, "SELECT COUNT(*), SUM(ok=0) FROM llm_calls WHERE created_at > ?", (agora - 7 * 86400,))
+    abertos = conn.execute("SELECT kind, stage, message, count FROM incidents WHERE status!='resolvido' "
+                           "ORDER BY CASE status WHEN 'isolado' THEN 0 ELSE 1 END, last_seen DESC").fetchall()
+    g = _um(conn, "SELECT ponto, ok, sujeito, motivo, created_at FROM verificacoes WHERE ponto LIKE 'gate:%' ORDER BY id DESC LIMIT 1")
+    out = {"giros": int(json.loads(tick[0])) if tick else 0, "jev_duvida_pct": _pct(jev), "incidentes_abertos": len(abertos),
+           "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
+           "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
+    nivel = {"amarelo": [], "vermelho": []}
+    if abertos:
+        k, st, msg, n = abertos[0]
+        nivel["vermelho" if len(abertos) >= INCIDENTES_VERMELHO else "amarelo"].append(
+            f"{len(abertos)} incidente(s) aberto(s), o mais recente: {k} em {st} ×{n} ({msg[:120]})")
+    for valor, (am, vm), nome in ((out["jev_duvida_pct"], LIMIAR_JEV_DUVIDA, "Jev em dúvida"),
+                                  (out["llm_falhas_7d_pct"], LIMIAR_LLM_FALHAS, "falhas de LLM em 7 d")):
+        if valor >= am:
+            nivel["vermelho" if valor >= vm else "amarelo"].append(f"{nome} em {valor}% (limite {am}%)")
+    if g and not g[1]:
+        nivel["vermelho" if g[0] == "gate:main" else "amarelo"].append(f"gate {g[0]} falhou em {g[2] or '—'}")
+    cor = "vermelho" if nivel["vermelho"] else "amarelo" if nivel["amarelo"] else "verde"
+    return {"semaforo": cor, "causa": "; ".join(nivel["vermelho"] + nivel["amarelo"]) or None, **out}
+
+
+def pagina_saude(h: dict) -> bytes:
+    """Uma tela, HTML estático com os tokens do tema; cor sempre com glifo e palavra."""
+    from html import escape
+
+    from .tema import COMPONENTES, TOKENS
+    tom, glifo = SEMAFORO[h["semaforo"]]
+    g = h["gate"]
+    gate = "—" if g is None else f"{'✓ ok' if g['ok'] else '✕ falhou'} · {g['ponto']} {g['sujeito'] or ''}"
+    nums = (("Giros", str(h["giros"])), ("Jev em dúvida (24 h)", f"{h['jev_duvida_pct']}%"),
+            ("Incidentes abertos", str(h["incidentes_abertos"])),
+            ("Falhas de LLM (7 d)", f"{h['llm_falhas_7d_pct']}% de {h['llm_chamadas_7d']}"), ("Gate (último)", gate))
+    causa = f'<p class="causa" style="color:var(--{tom})"><b>Causa:</b> {escape(h["causa"])}</p>' if h["causa"] else ""
+    return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
+            "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
+            ".faixa{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}"
+            ".card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:14px 18px;min-width:140px}"
+            ".card b{display:block;font-size:22px}.card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}"
+            f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
+            f'<main><div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<b>{glifo} {h["semaforo"]}</b></div>'
+            + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
+            + f"</div>{causa}</main></body></html>").encode()
+
+
 def _page(name: str = "painel.html") -> bytes:
     return resources.files("circulo").joinpath(name).read_bytes()
 
@@ -281,6 +351,14 @@ def make_handler(db_path: str):
                               "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            elif u.path == "/painel":
+                body = pagina_saude(saude(self._store().db))
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
