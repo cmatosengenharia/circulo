@@ -413,6 +413,12 @@ class DeveloperComReparo(SelfDeveloper):
         from .licoes import registrar as monitorar
         from .neuronios import (ABRIR_PR, Resultado, avaliar_aprendidos, causa_da_falha, diff_do_worktree, portoes_natos_pr,
                                 registrar)
+        from .pre_pr import ADIAR, ADIAR_PONTO, conserta_main, decidir, ler_main
+        d = decidir(*ler_main(self.gh), conserta_main=conserta_main(self.s, item_id))
+        if d.acao == ADIAR:
+            texto = f"- CI da main: adiado ({d.causa}); um PR agora falharia por motivo externo, nada foi enviado"
+            monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
+            return False, texto
         self._base, self._item_id, self._repetida = base, item_id, False
         texto, rodada = "", None          # rodada = {"sig", "tokens"} depois que o agente reparou
         try:
