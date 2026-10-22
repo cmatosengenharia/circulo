@@ -174,6 +174,7 @@ def test_graft_caido_pausa_e_nunca_derruba_a_memoria(tmp_path, monkeypatch):
     (pasta / "graft").write_text("#!/bin/sh\nexit 1\n")
     (pasta / "graft").chmod(0o755)
     monkeypatch.setenv("PATH", f"{pasta}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("CIRCULO_GRAFT", "1")
     graft._estado.update(falhou_em=0.0, aquecido=True, chamadas=0)
     m = Memoria(Store(":memory:"))
     m._gravar("licao", 1, "Ruff reclamou de import", "no worktree", "aberta", time.time())
@@ -223,3 +224,22 @@ def test_acha_o_graft_fora_do_path_do_servico(tmp_path, monkeypatch):
     monkeypatch.delenv("CIRCULO_GRAFT_CMD", raising=False)
     monkeypatch.setattr(graft, "PASTAS_PADRAO", (str(pasta),))
     assert graft.comando() == str(pasta / "graft") and graft.ligado()
+
+
+def test_testes_e_validacao_nunca_falam_com_o_graft_real():
+    """22/10: no Mac com o graft instalado, os testes usavam o daemon real — lentos, diferentes do CI (a validação local
+    reprovou toda versão nova por 15 h) e sujando o grafo de verdade."""
+    import os as _os
+    from circulo.reproducao import ambiente_isolado
+    assert _os.environ.get("CIRCULO_GRAFT") == "0"                       # conftest
+    assert ambiente_isolado()["CIRCULO_GRAFT"] == "0"                   # testes do Developer e validação do corpo
+
+
+def test_perfil_trocado_reespelha_do_zero(graft_falso):
+    s = Store(":memory:")
+    m = Memoria(s)
+    m._gravar("licao", 1, "Ruff reclamou", "no worktree", "aberta", time.time())
+    assert s.one("SELECT graft_id FROM memoria")["graft_id"]
+    s.set("graft_perfil", "circulo")                                      # perfil antigo (sujo)
+    Memoria(s)
+    assert s.one("SELECT graft_id FROM memoria")["graft_id"] is None and s.get("graft_perfil") == graft.PERFIL

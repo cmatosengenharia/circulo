@@ -181,7 +181,9 @@ def ambiente_isolado() -> dict:
     """Ambiente dos testes do Developer: sem chaves, sem repositório e com o Developer desligado.
     Sem isso, um teste que cria um loop acordaria outro Developer de verdade (Claude Code dentro de Claude Code)."""
     env = {k: v for k, v in os.environ.items() if k not in SEGREDOS}
-    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0"})
+    # CIRCULO_GRAFT=0: testes nunca falam com o Graft real (22/10: no Mac com graft instalado, os testes ficavam lentos e
+    # diferentes do CI, a validação local reprovava toda versão nova e os testes sujavam o grafo de verdade)
+    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0", "CIRCULO_GRAFT": "0", "GRAFT_HOOKS": "0"})
     return env
 
 

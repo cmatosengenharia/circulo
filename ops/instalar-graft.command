@@ -17,8 +17,8 @@ if ! command -v graft >/dev/null 2>&1; then
   brew install aendrix03/graft/graft
 fi
 graft --version
-graft profile add circulo 2>/dev/null || true
-export GRAFT_PROFILE=circulo
+graft profile add circulo-loop 2>/dev/null || true
+export GRAFT_PROFILE=circulo-loop
 echo "Carregando o modelo e conferindo o daemon (pode levar alguns minutos na primeira vez)…"
 graft stats
 graft setup claudecode 2>/dev/null || echo "(skills do Graft para o Claude Code não vêm no pacote do Homebrew: opcional, o loop usa o graft pela linha de comando)"

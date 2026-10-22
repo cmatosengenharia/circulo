@@ -112,6 +112,10 @@ class Memoria:
         if "graft_id" not in {r["name"] for r in self.s.q("PRAGMA table_info(memoria)")}:
             self.s.x("ALTER TABLE memoria ADD COLUMN graft_id TEXT")
         self.graft = graft.ligado()          # memória semântica (vetores + grafo) ao lado do FTS; opcional
+        if self.graft and self.s.get("graft_perfil") != graft.PERFIL:
+            # perfil trocado (ou primeiro uso): os ids de nó do perfil antigo não valem aqui; reespelha do zero, 50 por passagem
+            self.s.x("UPDATE memoria SET graft_id=NULL")
+            self.s.set("graft_perfil", graft.PERFIL)
 
     # ------------------------------------------------------------ caminho de escrita
     def _gravar(self, tipo: str, ref: Any, titulo: str, texto: str, resultado: str | None, em: float, peso: float | None = None) -> None:

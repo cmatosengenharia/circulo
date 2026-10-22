@@ -199,7 +199,7 @@ class ClaudeCodeAgent:
     def run(self, task, workdir, sessao: str | None = None):
         # Todo consumo do loop é pela API: o Claude Code recebe a ANTHROPIC_API_KEY e não depende do login da conta (sessão OAuth que expira sem ninguém para relogar). CIRCULO_CODE_AGENT_USA_API=0 volta ao login da assinatura.
         env = dict(os.environ)
-        env.update({"GRAFT_PROFILE": os.environ.get("CIRCULO_GRAFT_PERFIL") or "circulo"} | (getattr(self, "ambiente_extra", None) or {}))   # TRACEPARENT: o fio do item; GRAFT_PROFILE: memória do time
+        env.update({"GRAFT_PROFILE": os.environ.get("CIRCULO_GRAFT_PERFIL") or "circulo-loop"} | (getattr(self, "ambiente_extra", None) or {}))   # TRACEPARENT: o fio do item; GRAFT_PROFILE: memória do time
         if os.environ.get("CIRCULO_CODE_AGENT_USA_API", "1") == "0" or os.environ.get("CIRCULO_CONTA", "").lower() in ("max", "pro", "assinatura") or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
             for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):     # na assinatura (CIRCULO_CONTA=max) a chave da API venceria o login
                 env.pop(k, None)

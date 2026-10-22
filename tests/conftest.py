@@ -24,6 +24,7 @@ def no_keys(monkeypatch):
               "CIRCULO_REPO", "CIRCULO_REPO_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CIRCULO_CONTA", "CIRCULO_LLM_PROVEDOR"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("CIRCULO_SEM_DEVELOPER", "1")
+    monkeypatch.setenv("CIRCULO_GRAFT", "0")          # nunca o Graft real (quem testa o Graft usa o `graft_falso`)
 
 
 @pytest.fixture(autouse=True)

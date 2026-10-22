@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.65.0 — 2026-10-22
+
+**15 h sem evolução: os testes usavam o Graft real no Mac.**
+
+- Depois de instalado o Graft (22/10 00:00), os testes rodavam no Mac com o daemon de verdade: lentos e com resultado
+  diferente do CI (`test_capacidade` falhava ali e passava no GitHub). A validação local do corpo reprovou toda versão
+  nova (fcbaf6d, 966c2d4) e o Mac ficou preso na ff1709a; o Developer via "base quebrada" e não abria PR (0 PRs em
+  15 h). E os testes gravaram dados falsos no grafo real.
+- Isolamento: `conftest` e `reproducao.ambiente_isolado` (testes do Developer, validação do corpo) põem
+  `CIRCULO_GRAFT=0`; só os testes do Graft ligam o `graft` falso. Validado com um `graft` espião no PATH: 0 chamadas
+  em 788 testes.
+- Perfil novo e limpo `circulo-loop` (o `circulo` ficou sujo): criado na primeira chamada, e a memória reespelha do
+  zero quando o perfil muda (`graft_perfil` no kv). O antigo pode ser apagado com `graft profile remove circulo --yes`.
+
 ## 1.64.1 — 2026-10-22
 
 - **Graft instalado e invisível**: o loop roda como serviço (launchd) com o PATH de quando foi instalado, sem

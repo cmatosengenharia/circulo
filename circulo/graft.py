@@ -26,7 +26,8 @@ import time
 
 TIMEOUT = 20.0
 TIMEOUT_FRIO = 180.0            # primeira chamada: o daemon sobe e carrega o modelo (~600 MB)
-PERFIL = os.environ.get("CIRCULO_GRAFT_PERFIL") or "circulo"
+# perfil novo (22/10): o `circulo` foi sujo pelos testes, que rodavam no Mac com o graft real antes do isolamento
+PERFIL = os.environ.get("CIRCULO_GRAFT_PERFIL") or "circulo-loop"
 PREFIXO = "circulo:"
 MAX_CORPO = 4000
 PAUSA_APOS_FALHA = 300.0        # graft caiu: não tenta de novo a cada busca
@@ -61,6 +62,12 @@ def _rodar(args: list[str], entrada: str | None = None) -> dict | None:
     """Uma chamada ao CLI; o `result` do JSON, ou None (indisponível, erro, timeout). Nunca levanta."""
     if not ligado() or time.time() - _estado["falhou_em"] < PAUSA_APOS_FALHA:
         return None
+    if not _estado.get("perfil_ok"):            # o perfil próprio existe antes da primeira chamada (idempotente)
+        _estado["perfil_ok"] = True
+        try:
+            subprocess.run([comando(), "profile", "add", PERFIL], capture_output=True, text=True, timeout=30, env=_ambiente())
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     t0 = time.monotonic()
     try:
         p = subprocess.run([comando(), *args], input=entrada, capture_output=True, text=True,
