@@ -5,19 +5,26 @@
 (valida contra a base atual e espera os checks rodarem), o developer:abrir_pr lê o último CI da main antes do push e
 adia com a causa normalizada. 'CI sem iniciar' (limite de gasto, como no #86) tem causa própria. Mede-se pela
 verificação `developer:abrir_pr:adiar` por causa contra os fechamentos no gate_recente.
+
+Pergunta do conselho #75: mesmo com a main verde, os últimos MIN_PRS PRs falhando com o mesmo conjunto de checks,
+e ele cobrindo todos os obrigatórios (PRs 49 e 80-84: os mesmos 7), é causa sistêmica: adia com 'adiado_sistemico'.
+O histórico só vale desde a última main verde e dentro de JANELA, para o próximo PR voltar a ser a sonda.
 """
 from __future__ import annotations
 
+import re
 import urllib.error
 from dataclasses import dataclass
 
 from .merge_gate import CI_NAO_INICIOU as NAO_INICIOU_MSG
-from .merge_gate import checks_ok
+from .merge_gate import REQUIRED_CHECKS, checks_ok
 
 ABRIR, ADIAR = "abrir", "adiar"
-MAIN_VERMELHA, CI_NAO_INICIOU = "main_vermelha", "ci_nao_iniciou"
+MAIN_VERMELHA, CI_NAO_INICIOU, SISTEMICO = "main_vermelha", "ci_nao_iniciou", "adiado_sistemico"
 ADIAR_PONTO = "developer:abrir_pr:adiar"
 LICAO_MAIN = "gate:main_vermelha"
+MIN_PRS, JANELA = 3, 24 * 3600
+DO_PR, FALHANDO = re.compile(r"PR #(\d+)"), "checks falhando: "
 
 
 @dataclass(frozen=True)
@@ -26,14 +33,35 @@ class Decisao:
     causa: str = ""
 
 
-def decidir(conclusao: str | None, jobs_executaram: bool, conserta_main: bool = False) -> Decisao:
-    """Último CI da main → abrir ou adiar. O item que conserta a main vermelha abre (é ele que reabre a árvore);
-    com o CI sem iniciar nem ele abre, porque o CI do PR também não rodaria."""
-    if conclusao != "failure":
-        return Decisao(ABRIR)
-    if not jobs_executaram:
+def decidir(conclusao: str | None, jobs_executaram: bool, conserta_main: bool = False,
+            historico: list[set[str]] = (), obrigatorios=REQUIRED_CHECKS) -> Decisao:
+    """Último CI da main e os checks falhando de cada PR recente (do mais recente) → abrir ou adiar. O item que
+    conserta a main vermelha abre (é ele que reabre a árvore); com o CI sem iniciar nem ele abre, porque o CI do PR
+    também não rodaria."""
+    if conclusao == "failure" and not jobs_executaram:
         return Decisao(ADIAR, CI_NAO_INICIOU)
-    return Decisao(ABRIR) if conserta_main else Decisao(ADIAR, MAIN_VERMELHA)
+    if conserta_main:
+        return Decisao(ABRIR)
+    if conclusao == "failure":
+        return Decisao(ADIAR, MAIN_VERMELHA)
+    ultimos = historico[:MIN_PRS]
+    if len(ultimos) == MIN_PRS and all(c == ultimos[0] for c in ultimos) and set(obrigatorios) <= ultimos[0]:
+        return Decisao(ADIAR, SISTEMICO)
+    return Decisao(ABRIR)
+
+
+def checks_dos_prs(store, agora: float) -> list[set[str]]:
+    """Os checks falhando de cada PR (do mais recente) no gate:ci, desde a última main verde e dentro de JANELA."""
+    verde = store.one("SELECT MAX(created_at) t FROM verificacoes WHERE ponto='gate:main' AND ok=1")
+    desde = max(agora - JANELA, (verde["t"] if verde else None) or 0)
+    vistos, historico = set(), []
+    for r in store.q("SELECT sujeito, motivo FROM verificacoes WHERE ponto='gate:ci' AND ok=0 AND created_at>? "
+                     "ORDER BY id DESC", (desde,)):
+        m, primeira = DO_PR.search(r["sujeito"] or ""), (r["motivo"] or "").split("\n", 1)[0]
+        if m and m.group(1) not in vistos and primeira.startswith(FALHANDO):
+            vistos.add(m.group(1))
+            historico.append({c.strip() for c in primeira[len(FALHANDO):].split(",") if c.strip()})
+    return historico
 
 
 def ler_main(gh) -> tuple[str | None, bool]:
