@@ -228,6 +228,29 @@ def em_espera(store) -> bool:
     return bool(st) and store.tick < int(st["ate_tick"])
 
 
+def causa_do_ci(store, gh, vereditos) -> None:
+    """Cada PR devolvido por 'checks falhando' ganha a causa (`ci_causa.classificar`) na trilha, uma vez por versão.
+    infra_suspeita tira o conserto da fila: o Developer não gasta tentativa e o item não reabre por um CI que nem rodou;
+    codigo_ou_indeterminado segue para o conserto, que reexecuta lint e testes no worktree com a main."""
+    from .ci_causa import INFRA, classificar, do_run
+    vistos = dict(store.get("ci_causa_vistos") or {})
+    for v in vereditos:
+        if gh is None or not v.reason.startswith("checks falhando") or vistos.get(str(v.number)) == v.sha:
+            continue
+        try:
+            checks = [do_run(r) for r in gh.check_runs(v.sha)]
+        except (urllib.error.URLError, OSError, ValueError, KeyError):
+            continue
+        causa = classificar(checks) or "indeterminado"
+        vistos[str(v.number)] = v.sha
+        row = store.one("SELECT item_id FROM prs WHERE number=?", (v.number,))
+        if causa == INFRA:
+            store.x("UPDATE prs SET conserto=NULL, updated_at=? WHERE number=? AND conserto_sha=?", (time.time(), v.number, v.sha))
+        registrar(store, v.number, row["item_id"] if row else None, "ci_causa", causa, v.reason,
+                  {"sha": v.sha, "checks": checks}, {})
+    store.set("ci_causa_vistos", dict(list(vistos.items())[-50:]))
+
+
 def revisar(store, gate, rng=random.random, repo: Path | None = None) -> str:
     """Roda o gate e classifica o desfecho: adiável vira evento 'adiado' (não falha) e o próximo giro idle espera
     o backoff; passado ADIAR_MAX_TENTATIVAS seguidos, ou causa não adiável, o erro sobe como falha.
@@ -237,6 +260,7 @@ def revisar(store, gate, rng=random.random, repo: Path | None = None) -> str:
     except Exception as exc:
         vereditos, erro = [], exc
     gravar_conflitos(store, repo, vereditos)
+    causa_do_ci(store, getattr(gate, "gh", None), vereditos)
     causa = pre_voo(erro=erro) if erro is not None else pre_voo({"motivos": [v.reason for v in vereditos]})
     tentativa = int((store.get(ADIADO) or {}).get("tentativas", 0)) + 1
     if causa == "executar" or tentativa > ADIAR_MAX_TENTATIVAS:
