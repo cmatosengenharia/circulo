@@ -14,7 +14,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Mapping, Protocol
 
-from . import aluno
+from . import aluno, jev_lab
 from .budget import Budget
 from .metrics import METRICAS, seguro
 from .state import Store
@@ -210,7 +210,9 @@ class LocalJev:
                 out[qid] = self._noul(qid, (0.6 if concreto else 0.25) if vago else (0.85 if concreto else 0.6))
                 continue
             fn = getattr(self, f"_q_{qid}", None)
-            if fn is None:
+            if qid in jev_lab.REGRAS:
+                out[qid] = self._noul(qid, jev_lab.REGRAS[qid](state))
+            elif fn is None:
                 out[qid] = self._unknown(qid, q)
             else:
                 out[qid] = fn(q, state)
@@ -436,10 +438,6 @@ class LocalJev:
             return (1 - c["nota"]) * (1 + min(c["parado_giros"], 500) / 100) + 2 * c["feedback_novo"] + (3 if c["sem_regua"] else 0)
         best = max(s.get("projetos", []), key=valor)
         return Decision("next_project", "choice", str(best["id"]), 0.7, self.source)
-
-    def _q_evidencia_sustenta(self, q, s):
-        from .jev_lab import regra_evidencia
-        return self._noul("evidencia_sustenta", regra_evidencia(s))
 
     def _q_isolate_stage(self, q, s):
         n = int(s.get("falhas_recentes", 0))
