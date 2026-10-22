@@ -74,6 +74,15 @@ DISJUNTOR = "developer_disjuntor"               # {item: {"sig", "n", "chave", "
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
+def tokens_do_item(store, titulo: str) -> tuple[int, int]:
+    """(tokens, chamadas) do Developer no item: a rodada principal, o reparo e o conserto do PR."""
+    item = PREFIXO_TITULO.sub("", titulo)
+    gastos = [int(r["tokens"] or 0) for r in store.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' "
+                                                     "AND instr(entrada, ?) > 0", (item,))
+              if PREFIXO_TITULO.sub("", r["entrada"] or "") == item]
+    return sum(gastos), len(gastos)
+
+
 def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") -> bool:
     """Grava a barra do abrir_pr no item. True = a mesma assinatura 2x seguidas: o disjuntor abre."""
     todos = store.get(DISJUNTOR) or {}
@@ -195,12 +204,7 @@ class DeveloperComReparo(SelfDeveloper):
 
     # ------------------------------------------------------------ teto de tokens por item
     def _tokens_do_item(self, titulo: str) -> tuple[int, int]:
-        """(tokens, chamadas) do Developer no item: a rodada principal, o reparo e o conserto do PR."""
-        item = PREFIXO_TITULO.sub("", titulo)
-        gastos = [int(r["tokens"] or 0) for r in self.s.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' "
-                                                          "AND instr(entrada, ?) > 0", (item,))
-                  if PREFIXO_TITULO.sub("", r["entrada"] or "") == item]
-        return sum(gastos), len(gastos)
+        return tokens_do_item(self.s, titulo)
 
     def teto(self) -> int:
         """max(2× a mediana de tokens dos PRs entregues em 24 h, piso): um dia ruim não encolhe o teto abaixo do piso."""
