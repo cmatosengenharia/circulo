@@ -245,11 +245,30 @@ class DeveloperComReparo(SelfDeveloper):
         já guarda o dela; o conserto está num PR empurrado)."""
         from .licoes import registrar as monitorar
         monitorar(self.ctx, TETO, False, sujeito=wt.name, licao=False, motivo=motivo)
+        self._fora_da_fila_se_preso(wt.name, motivo)
         if self._item_id is not None and not self._consertando:
             wip = (self.s.get("self_dev_wip") or {}).get(str(self._item_id))
             self._guardar_parcial(self._item_id, _git(["rev-parse", "--abbrev-ref", "HEAD"], wt), wt, wip)
         self._cortado = motivo
         return {"ok": False, "tokens": 0, "log": motivo, "teto": True}
+
+    def _fora_da_fila_se_preso(self, sujeito: str, motivo: str) -> None:
+        """O teto do item é acumulado e não volta a cair: um item cortado de novo nunca mais anda. Antes, como itens de
+        erro vêm primeiro na fila, ele era pego a cada hora, cortado sem chamar o agente e devolvido — e a fila inteira
+        parava atrás dele (22→23/10: 17 h, item #144). No 2º corte o item sai da fila (desativado) para você decidir."""
+        item_id = self._item_id
+        if item_id is None and sujeito.startswith(".circulo-wt-") and sujeito[12:].isdigit():
+            item_id = int(sujeito[12:])                 # o corte vem antes do portão: o id está no nome do worktree
+        if item_id is None or self._consertando:
+            return
+        cortes = int(self.s.one("SELECT COUNT(*) n FROM verificacoes WHERE ponto=? AND ok=0 AND sujeito=?", (TETO, sujeito))["n"])
+        if cortes < 2:
+            return
+        self.s.x("UPDATE roadmap SET desativado=1, evidencia=?, updated_at=? WHERE id=? AND COALESCE(desativado,0)=0",
+                 (f"depende de você: cortado {cortes}× pelo teto de tokens do item ({motivo[:120]}); a fila segue sem ele", time.time(), item_id))
+        if callable(getattr(self.ctx, "reply", None)):
+            self.ctx.reply(f"Developer: o item #{item_id} bateu o teto de tokens {cortes}× e não anda mais; tirei da fila para "
+                           "você decidir (dividir, reescrever ou descartar). O resto da fila segue.", "saude")
 
     def _mesma_falha(self, wt: Path, saida: str) -> bool:
         """A falha é a mesma da rodada anterior do item: pede a divisão em vez de outra chamada."""

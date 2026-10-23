@@ -186,3 +186,24 @@ def test_tres_tentativas_sem_mudanca_tiram_o_item_da_fila(circle):
 def test_developer_pode_rodar_python_com_versao():
     from circulo.self_dev import FERRAMENTAS
     assert {"Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)"} <= set(FERRAMENTAS)
+
+
+def test_item_cortado_de_novo_pelo_teto_sai_da_fila(circle):
+    """22→23/10: o item #144 bateu o teto de tokens (acumulado, não volta a cair) e foi pego, cortado e devolvido a
+    cada hora por 17 h; itens de erro vêm primeiro, então a fila inteira parou atrás dele."""
+    from circulo.reparo import TETO, DeveloperComReparo
+    s = circle.store
+    agora = time.time()
+    iid = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES('Lição #67','d','erro','pendente','',1,?,?)", (agora, agora))
+    dev = DeveloperComReparo.__new__(DeveloperComReparo)
+    dev.ctx, dev.s, dev._item_id, dev._consertando = circle.ctx, s, None, False
+    avisos = []
+    circle.ctx.reply = lambda m, k="": avisos.append(m)
+    sujeito = f".circulo-wt-{iid}"
+    s.x("INSERT INTO verificacoes(tick,ponto,ok,sujeito,motivo,created_at) VALUES(1,?,0,?,'teto',?)", (TETO, sujeito, agora))
+    dev._fora_da_fila_se_preso(sujeito, "teto de tokens do item")
+    assert not s.one("SELECT desativado FROM roadmap WHERE id=?", (iid,))["desativado"]      # 1º corte: o fatiador ainda pode dividir
+    s.x("INSERT INTO verificacoes(tick,ponto,ok,sujeito,motivo,created_at) VALUES(1,?,0,?,'teto',?)", (TETO, sujeito, agora))
+    dev._fora_da_fila_se_preso(sujeito, "teto de tokens do item")
+    r = s.one("SELECT desativado, evidencia FROM roadmap WHERE id=?", (iid,))
+    assert r["desativado"] == 1 and r["evidencia"].startswith("depende de você") and avisos

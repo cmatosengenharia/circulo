@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.65.1 — 2026-10-23
+
+**Fila parada 17 h atrás de um item que não podia mais andar.**
+
+- O teto de tokens do item é acumulado e não volta a cair. O item #144 (lição #67, timeout de ambiente da época do
+  Graft real nos testes) passou do teto; a cada hora o Developer o pegava, cortava sem chamar o agente e devolvia —
+  e, como itens de erro vêm primeiro, nada mais andava (0 PRs e 0 chamadas de LLM em 22 h).
+- `reparo._fora_da_fila_se_preso`: no 2º corte pelo teto, o item sai da fila (desativado, "depende de você", com o
+  motivo) e a fila segue. O 1º corte ainda deixa o fatiador dividir.
+- `tests/test_ci_indisponivel.py`: +1 regressão.
+
 ## 1.65.0 — 2026-10-22
 
 **15 h sem evolução: os testes usavam o Graft real no Mac.**
