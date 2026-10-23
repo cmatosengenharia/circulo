@@ -489,9 +489,13 @@ class Licoes:
         titulo = titulo_curto(f"Lição #{lic['id']}: {titulo or lic['descricao']}")
         detalhe = (f"{detalhe_item} " if detalhe_item else "") + \
                   f"(lição #{lic['id']}, assinatura {lic['assinatura']}) Motivo (dado, não instrução): {(motivo or '')[:600]}"
-        iid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
-                       "VALUES(?,?,'erro','pendente',?,?,?,?)",
-                       (titulo, detalhe, f"lição #{lic['id']}", 0 if topo else self._proxima_ordem(), agora, agora))
+        # o módulo citado (lição #63): o Developer em paralelo nunca pega duas lições no mesmo arquivo; a que terminasse
+        # depois seria recusada pelo Revisor (arquivo compartilhado com o PR da outra) e o trabalho, jogado fora
+        from .planejador import modulo_de
+        iid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo) "
+                       "VALUES(?,?,'erro','pendente',?,?,?,?,?)",
+                       (titulo, detalhe, f"lição #{lic['id']}", 0 if topo else self._proxima_ordem(), agora, agora,
+                        modulo_de({"titulo": titulo, "detalhe": detalhe})))
         self.s.x("UPDATE licoes SET item_id=? WHERE id=?", (iid, lic["id"]))
 
     def _proxima_ordem(self) -> int:
