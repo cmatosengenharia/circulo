@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.66.0 — 2026-10-23
+
+**Sentinela da entrega: o loop avisa quando para de entregar, mesmo sem erro nenhum.**
+
+- `circulo/sentinela.py`: olha o resultado, não os erros. Itens prontos na fila e nada mergeado há 4 h → aviso com
+  diagnóstico do período (espera do Developer, o aviso que mais se repetiu, chamadas do Developer, estado do corpo),
+  no topo do "Precisa de você" e como **notificação do macOS** (`CIRCULO_NOTIFICAR=0` desliga). Repete a cada 6 h
+  enquanto durar e avisa quando a entrega volta. Roda a cada passagem do SRE.
+- Contra o banco real de 23/10 ela diria: "Entrega parada há 38 h com 7 itens prontos. repetiu 37×: Developer:
+  “Lição #67…” → teto". As três paradas desta semana (CI recusado, Graft real nos testes, item preso no teto) não
+  tinham erro visível; esta seria pega na 4ª hora.
+- `tests/test_sentinela.py`: 3 testes.
+
 ## 1.65.1 — 2026-10-23
 
 **Fila parada 17 h atrás de um item que não podia mais andar.**
