@@ -362,3 +362,16 @@ def test_licao_de_estrutura_com_item_dividido_e_sub_item_fora_da_fila_nao_trava_
     avancar(circle, EVID_GIROS + 1)
     L.revisar()
     assert s.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
+
+
+def test_licao_de_estrutura_com_item_que_depende_de_voce_nao_trava_a_evolucao_por_dias(circle):
+    """Vigia licao_bloqueia (item #148, 125 h): o Developer devolveu o item da lição como 'pendente' + "depende de você"
+    (3 tentativas sem mudança, exige a constituição, commit sem PR) sem desativá-lo; ninguém pega, e a lição só soltava
+    quando a higiene o expirava (7 dias). Fora da fila é fora da fila, com ou sem o flag desativado."""
+    L = lic(circle)
+    licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    circle.store.x("UPDATE roadmap SET status='pendente', evidencia='depende de você: a correção exige mexer na constituição' "
+                   "WHERE id=?", (licao["item_id"],))
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
