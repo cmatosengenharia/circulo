@@ -127,3 +127,55 @@ def test_sub_item_com_pr_aberto_nao_trava_o_conserto_nem_a_fila(circle, repo):  
     dev.run_once = lambda item_id=None, autorizado=False: chamadas.append(item_id) or type("R", (), {"status": "consertado", "detalhe": ""})()
     circle._run_idle_task("corrigir_codigo")
     assert chamadas == [None]                                                  # consertar() vem antes de qualquer item novo
+
+
+# ------------------------------------------------------------ pré-divisão determinística (sub-item #60: 94705 tokens)
+
+TEXTO_60 = ("Extrair features das tentativas do planejador (minutos, categoria, falhas seguidas)",
+            "Em circulo/planejador.py, registrar a tentativa com minutos_desde_a_anterior() e categoria_do_item(); "
+            "em circulo/tentativas_planejador.py, criar extrair_features() e falhas_seguidas(); em circulo/features.py, "
+            "expor por_categoria() e media_de_minutos(). Testes: tests/test_tentativas_planejador.py::test_features_categoria.")
+
+
+def preparar_60(circle, repo):  # noqa: F811
+    item, dev, agent, llm = preparar(circle, repo)
+    circle.store.x("UPDATE roadmap SET titulo=?, detalhe=? WHERE id=?", (*TEXTO_60, item))
+    return item, dev, agent, llm
+
+
+def test_estimar_tamanho_conta_modulos_e_simbolos_citados():
+    est = fatiador.estimar_tamanho(*TEXTO_60)
+    assert est["modulos"] == ["circulo/planejador.py", "circulo/tentativas_planejador.py", "circulo/features.py"]
+    assert {"extrair_features", "categoria_do_item", "media_de_minutos", "test_features_categoria"} <= set(est["simbolos"])
+    assert est["linhas"] > 0 and fatiador.grande_demais(est)
+    assert not fatiador.grande_demais(fatiador.estimar_tamanho("Item pequeno", "em circulo/loop.py, mudar giro()"))
+
+
+def test_texto_do_60_gera_fatias_por_modulo_sem_chamar_a_llm(circle, repo):  # noqa: F811
+    """lição #29: o sub-item #60 estourou o teto de tokens (94705); a regra divide por módulo antes da LLM."""
+    item, dev, agent, llm = preparar_60(circle, repo)
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    partes = subs(circle, item)
+    assert len(partes) >= 2 and alvo == partes[0]["id"] and llm.prompts == []      # zero chamadas à LLM
+    assert "circulo/planejador.py" in partes[0]["titulo"] and "extrair_features" in partes[1]["detalhe"]
+    assert "extrair_features" not in partes[0]["detalhe"]                            # cada fatia só com o seu módulo
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "dividido"
+    m = fatiador.medicoes(circle.store)                                              # estimativa x tokens, para recalibrar
+    assert [x["id"] for x in m] == [p["id"] for p in partes] and m[0]["modulos"] == 1 and m[0]["tokens"] == 0
+
+
+def test_sub_item_pre_dividido_que_estoura_o_teto_e_redividido_sozinho(circle, repo):  # noqa: F811
+    """O teto de tokens é a rede de segurança: só o sub-item que estourou vai à LLM; o pai e as outras fatias seguem."""
+    item, dev, agent, llm = preparar_60(circle, repo)
+    fatiador.proximo(circle.ctx, dev, circle.planejador)
+    a = subs(circle, item)[0]
+    circle.licoes.verificar("developer:teto", False, sujeito=f".circulo-wt-{a['id']}", licao=False,
+                            motivo="teto de tokens do item: 94705 gastos + ~5919 da próxima chamada > 100000")
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    partes = subs(circle, item)
+    assert partes[0]["id"] == a["id"] and partes[0]["status"] == "dividido" and len(llm.prompts) == 1
+    assert alvo == partes[1]["id"] and "Parte A" in partes[1]["titulo"] and "Parte B" in partes[2]["titulo"]
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "dividido"   # pai segue
+    circle.store.x("UPDATE roadmap SET status='feito' WHERE pai=? AND status!='dividido'", (item,))
+    fatiador.proximo(circle.ctx, dev, circle.planejador)
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "feito"
