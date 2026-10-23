@@ -87,7 +87,7 @@ def test_tres_pedidos_do_mesmo_job_em_7_dias_viram_missao_antecipar_no_idle(circ
     jobs.registrar(circle.ctx, _pedido(s, "Monte um plano de viagem com cronograma"))
     jobs.registrar(circle.ctx, _pedido(s, "Escreva um post antigo", dias=9))      # fora da janela
     jobs.registrar(circle.ctx, _pedido(s, "Escreva um post de teste", origem="demo"))   # não é humano
-    assert jobs.recorrentes(s) == {"conteudo": 3}
+    assert jobs.recorrentes(jobs.pedidos_7d(s)).jobs == {"conteudo": 3}
     assert jobs.precisa(s)
 
     circle._run_idle_task("antecipar")
@@ -106,3 +106,26 @@ def test_cada_pedido_atendido_pelo_loop_ganha_job_em_90_por_cento(circle):
         circle.tick()
     r = s.one("SELECT COUNT(*) n, SUM(job IS NOT NULL AND job!='desconhecido') ok FROM events WHERE kind='novo_projeto'")
     assert r["n"] == 31 and r["ok"] / r["n"] >= 0.9
+
+
+def test_recorrentes_agrupa_32_pedidos_por_job_e_aponta_o_dominante():
+    """Pergunta #119: dos pedidos de 7d, quais jobs se repetem e qual o loop antecipa. Pura: sem DB nem LLM."""
+    rotulos = (["conteudo"] * 12 + ["financas"] * 9 + ["plano"] * 5 + ["landing_page"] * 2
+               + ["pesquisa_decisao"] + ["desconhecido"] * 2 + [None])
+    pedidos = [{"job": j} for j in rotulos]
+    assert len(pedidos) == 32
+    r = jobs.recorrentes(pedidos)
+    assert r.total == 32 and r.cobertura == round(29 / 32, 3) and r.cobertura >= 0.9
+    assert list(r.jobs.items()) == [("conteudo", 12), ("financas", 9), ("plano", 5)]   # só ≥3, do maior ao menor
+    assert r.fracao == {"conteudo": 0.375, "financas": 0.281, "plano": 0.156}          # fração dos 32
+    assert r.dominante == "conteudo"
+    assert jobs.recorrentes(pedidos, minimo=10).jobs == {"conteudo": 12}
+    assert jobs.recorrentes(pedidos, minimo=13).dominante is None
+    vazio = jobs.recorrentes([])
+    assert vazio.total == 0 and vazio.cobertura == 0.0 and vazio.jobs == {} and vazio.dominante is None
+
+
+def test_recorrentes_da_amostra_real_classifica_90_por_cento_e_tem_job_recorrente():
+    pedidos = [{"job": jobs.classificar(t).job} for t, _ in jobs.amostra_rotulada()]
+    r = jobs.recorrentes(pedidos)
+    assert r.cobertura >= 0.9 and r.jobs and r.dominante in r.jobs
