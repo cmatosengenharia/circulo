@@ -86,17 +86,17 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
         s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'loop','pendente','pedido',?,?,?)", (f"Estudar coisa {i}", "d", 500 + i, agora, agora))
     import threading
     vistos = set()
+    juntos = threading.Barrier(3, timeout=10)   # só abre com os 3 estudos dentro do LLM ao mesmo tempo; em série, quebra
 
-    class Lenta(Pesquisa):
+    class Junta(Pesquisa):
         def generate(self, *, system, prompt, model, max_tokens, web_search=0):
             vistos.add(threading.current_thread().name.split("_")[0])
-            time.sleep(0.2)
+            juntos.wait()
             return LLMResult(json.dumps(resposta("adotar")), 100, model, [])
-    circle.ctx.dl.llm = Lenta({})
+    circle.ctx.dl.llm = Junta({})
     s.set(capacidade.KV, {"estudar_pedido": {"trabalhadores": 3, "desde": agora}})
-    t0 = time.time()
     out = Estudo(circle.ctx).run_paralelo(autorizado=True)
-    assert len(out) == 3 and all(o and o["veredito"] == "adotar" for o in out) and time.time() - t0 < 0.55   # 3 em paralelo, não 0,6 s em série
+    assert len(out) == 3 and all(o and o["veredito"] == "adotar" for o in out)
     assert s.one("SELECT COUNT(*) n FROM roadmap WHERE estudo IS NOT NULL AND status='pendente'")["n"] == 3
     assert any(v.startswith("estudo") for v in vistos)
 

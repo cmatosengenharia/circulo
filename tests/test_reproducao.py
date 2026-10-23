@@ -81,6 +81,15 @@ def test_licao_2_teste_que_exige_o_erro_antigo_e_barrado_no_portao(repo):
     assert main(["--repo", str(repo), "--base", "main"]) == 1
 
 
+def test_licao_2_teste_que_prova_paralelismo_pelo_relogio_e_barrado_no_portao(repo):
+    """Lição #2 (antes #62/#67): `time.time() - t0 < 0.55` provava que 3 estudos rodavam juntos e falhava sob carga no CI."""
+    (repo / "tests" / "test_par.py").write_text(
+        "import time\nfrom app import dobro\n\n"
+        "def test_dobra_em_paralelo():\n    t0 = time.time()\n    assert dobro(1) == 2 and time.time() - t0 < 0.5\n")
+    ok, det, novos = reproduz(repo, "HEAD", None)
+    assert not ok and "lição #2" in det and "Barrier" in det and novos == ["tests/test_par.py::test_dobra_em_paralelo"]
+
+
 def test_sem_teste_novo_nao_trava(repo):
     (repo / "app.py").write_text("def soma(a, b):\n    return a + b\n\ndef dobro(x):\n    return 2 * x\n")
     ok, det, novos = reproduz(repo, "HEAD", None)
