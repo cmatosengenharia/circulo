@@ -346,3 +346,19 @@ def test_licao_de_estrutura_com_item_fora_da_fila_nao_trava_a_evolucao_para_semp
     avancar(circle, EVID_GIROS + 1)
     L.revisar()
     assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
+
+
+def test_licao_de_estrutura_com_item_dividido_e_sub_item_fora_da_fila_nao_trava_a_evolucao_para_sempre(circle):
+    """Vigia licao_bloqueia (item #139, 85 h): o item da lição foi dividido pelo fatiador e um sub-item saiu da fila
+    (2º corte do teto, sem mudança); o pai fica 'dividido' para sempre (só vira feito com todos os subs feitos)."""
+    L = lic(circle)
+    licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    s, agora = circle.store, time.time()
+    s.x("UPDATE roadmap SET status='dividido', evidencia='dividido em 2 sub-itens' WHERE id=?", (licao["item_id"],))
+    for i, off in enumerate((1, 0)):
+        s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,pai,desativado) "
+            "VALUES(?,?,'sub_item','pendente',?,?,?,?,?,?)",
+            (f"parte {i + 1}", "d", "depende de você: cortado 2× pelo teto" if off else "", i, agora, agora, licao["item_id"], off))
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert s.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
