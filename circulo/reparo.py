@@ -22,7 +22,9 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      caminho do worktree), para agregar falhas de testes diferentes.
   9. Pré-voo antes da 1ª chamada do item: os testes dos módulos que o item cita rodam na main limpa. Vermelhos lá, a
      base está quebrada: nenhuma chamada, lição `developer:base` com a causa, e o item volta para a fila (Agentless e
-     SWE Atlas rodam os testes no código original antes de julgar o patch).
+     SWE Atlas rodam os testes no código original antes de julgar o patch). A mesma base vermelha (`assinatura_falha`)
+     2x seguidas no item → 'bloqueado_base', com um único evento por (item, assinatura) e o contador no kv; o item
+     volta à fila quando a main muda, e o pré-voo decide de novo (pergunta #129: item #144 com 3786 falhas locais).
   10. Com o pytest do loop, `pytest --collect-only -q` roda antes da suíte (lição #9): erro de coleta barra ali, como
      developer:testes, e a lição sai assinada pelo módulo e pela exceção (`licoes.coletas`).
   11. Disjuntor do developer:abrir_pr (pergunta #55): cada barra grava no item a assinatura da causa
@@ -71,6 +73,8 @@ ERRO_LINT = re.compile(r":\d+:\d+: [A-Z]+\d+")
 RESUMO_PYTEST = re.compile(r"^=+ short test summary info =+$")
 BLOQUEADO = "bloqueado"
 DISJUNTOR = "developer_disjuntor"               # {item: {"sig", "n", "chave", "texto"}}: a última barra do abrir_pr
+BLOQUEADO_BASE = "bloqueado_base"
+BASE_VERMELHA = "developer_base_vermelha"       # {item: {"sig", "n", "chave"}}: a última base vermelha do pré-voo
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
@@ -154,13 +158,16 @@ class DeveloperComReparo(SelfDeveloper):
         self._repetida = False
         self._cortado = ""
         self._base_quebrada = ""
+        self._base_status = "pendente"
         self._disjuntor = ""
 
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()
-        bloqueado = self.s.one("SELECT evidencia FROM roadmap WHERE id=? AND status=?", (item_id, BLOQUEADO))
+        self._reabrir_base()
+        bloqueado = self.s.one("SELECT status, evidencia FROM roadmap WHERE id=? AND status IN (?,?)",
+                               (item_id, BLOQUEADO, BLOQUEADO_BASE))
         if bloqueado:
-            return DevResult(item_id, BLOQUEADO, bloqueado["evidencia"])
+            return DevResult(item_id, bloqueado["status"], bloqueado["evidencia"])
         item = self.pick(item_id)
         veto = self._vetar(item) if item else None
         if veto:
@@ -171,7 +178,7 @@ class DeveloperComReparo(SelfDeveloper):
             self._set_item(r.item_id, BLOQUEADO, self._disjuntor[:300])
             return r
         if self._base_quebrada and r.status == "agente_falhou" and not r.pr:
-            self._set_item(r.item_id, "pendente", self._base_quebrada[:300])
+            self._set_item(r.item_id, self._base_status, self._base_quebrada[:300])
             return DevResult(r.item_id, "base_quebrada", self._base_quebrada)
         if self._cortado and r.status == "agente_falhou" and not r.pr:
             self._set_item(r.item_id, "pendente", f"{self._cortado}; vai para o fatiador")
@@ -198,6 +205,15 @@ class DeveloperComReparo(SelfDeveloper):
             todos.pop(str(r["id"]), None)
             self.s.set(DISJUNTOR, todos)
             self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
+
+    def _reabrir_base(self) -> None:
+        """O item de base vermelha volta à fila quando a main muda: o pré-voo roda de novo (verde segue; a mesma falha
+        bloqueia na hora, porque o contador continua)."""
+        vermelhas = self.s.get(BASE_VERMELHA) or {}
+        for r in self.s.q("SELECT id FROM roadmap WHERE status=?", (BLOQUEADO_BASE,)):
+            d = vermelhas.get(str(r["id"]))
+            if d is None or self._chave("") != d.get("chave"):
+                self._set_item(r["id"], "pendente", "a main mudou desde a base vermelha: o pré-voo roda de novo")
 
     def _vetar(self, item: dict) -> DevResult | None:
         """Portão de reincidência antes de qualquer gasto: o item vai para 'descartado' com a causa; só o redrive reabre."""
@@ -347,7 +363,7 @@ class DeveloperComReparo(SelfDeveloper):
         e o motivo para não chamar o agente. '' = segue (verdes, nada a rodar, ou o worktree já não é a main limpa)."""
         if _git(["status", "--porcelain"], wt, check=False) or _git(["rev-parse", "HEAD"], wt) != self._merge_base(wt):
             return ""
-        r = self.s.one("SELECT detalhe FROM roadmap WHERE titulo=? ORDER BY updated_at DESC LIMIT 1", (titulo,))
+        r = self.s.one("SELECT id, detalhe FROM roadmap WHERE titulo=? ORDER BY updated_at DESC LIMIT 1", (titulo,))
         testes = self._testes_afetados(wt, f"{titulo}\n{r['detalhe'] if r else ''}")
         if not testes:
             return ""
@@ -356,12 +372,24 @@ class DeveloperComReparo(SelfDeveloper):
                                capture_output=True, text=True, timeout=900, env=_ambiente())
         except subprocess.TimeoutExpired:
             return ""
+        vermelhas, chave = self.s.get(BASE_VERMELHA) or {}, str(r["id"]) if r else ""
         if p.returncode in (0, 5):                   # 5 = nenhum teste coletado
+            if vermelhas.pop(chave, None):
+                self.s.set(BASE_VERMELHA, vermelhas)
             return ""
         from .licoes import registrar as monitorar
-        causa = causa_testes(p.stdout + p.stderr)
-        monitorar(self.ctx, BASE, False, sujeito=titulo[:120], motivo=saida_focada(p.stdout + p.stderr), causa=causa)
-        self._base_quebrada = f"base quebrada: {causa} já falha na main; nenhuma chamada ao agente"
+        saida = p.stdout + p.stderr
+        causa = causa_testes(saida)
+        sig, antes = assinatura_falha(saida) or causa, vermelhas.get(chave) or {}
+        n = antes.get("n", 0) + 1 if r and antes.get("sig") == sig else 1
+        if r:
+            self.s.set(BASE_VERMELHA, {**vermelhas, chave: {"sig": sig, "n": n, "chave": self._chave("")}})
+        if n == 1:                                   # um evento por (item, assinatura); as repetições ficam no contador
+            monitorar(self.ctx, BASE, False, sujeito=titulo[:120], motivo=saida_focada(saida), causa=causa,
+                      item_id=r["id"] if r else None)
+        self._base_status = BLOQUEADO_BASE if n >= 2 else "pendente"
+        self._base_quebrada = (f"base quebrada: {causa} já falha na main; nenhuma chamada ao agente"
+                               + (f"; a mesma falha {n}x seguidas: fora da fila até a main mudar" if n >= 2 else ""))
         return self._base_quebrada
 
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer", item_id: int | None = None) -> dict:
