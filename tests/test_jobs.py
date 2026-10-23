@@ -156,3 +156,32 @@ def test_cobertura_de_antecipacao_medida_nos_pedidos_humanos_de_7_dias(circle):
     jobs.registrar(circle.ctx, _pedido(s, "Escreva um post para o fim de semana"))
     r = antecipacao.medir(s)
     assert r.total == 4 and r.antecipados == 1 and r.cobertura == 0.25 and r.sem_antecipacao == []
+
+
+def test_job_recorrente_vira_um_unico_item_proposto_com_a_pergunta_de_origem_licao_15(circle):
+    """Pergunta #132: dos 32 pedidos de 7d, o job que se repete vira 1 item 'proposto' do roteiro, preso à pergunta do
+    conselho (lição #15); uma segunda chamada na mesma semana não duplica, e sem pergunta não nasce item."""
+    import pytest
+
+    from circulo.planejador import SemPerguntaOrigem
+    s = circle.store
+    agora = time.time()
+    perg = s.x("INSERT INTO perguntas(chave,persona,texto,status,created_at,updated_at) "
+               "VALUES('jtbd','entrevistador_jtbd','qual job se repete?','feita',?,?)", (agora, agora))
+    rotulos = ["conteudo"] * 4 + ["financas"] * 2 + ["plano"] * 2 + ["desconhecido"] * 24
+    for i, j in enumerate(rotulos):
+        s.x("UPDATE events SET job=? WHERE id=?", (j, _pedido(s, f"pedido {i}", dias=i / 10)))
+    assert len(jobs.pedidos_7d(s)) == 32
+    antes = s.one("SELECT COUNT(*) n FROM roadmap")["n"]
+    with pytest.raises(SemPerguntaOrigem):
+        jobs.propor_item(s, None)
+    assert s.one("SELECT COUNT(*) n FROM roadmap")["n"] == antes
+
+    rid = jobs.propor_item(s, perg)
+    it = s.one("SELECT * FROM roadmap WHERE id=?", (rid,))
+    assert it["status"] == "proposto" and it["origem"] == "loop" and it["pergunta_id"] == perg
+    assert it["titulo"].startswith("antecipar:conteudo")
+    assert s.one("SELECT item_id FROM perguntas WHERE id=?", (perg,))["item_id"] == rid
+    assert jobs.propor_item(s, perg) is None                       # mesma semana: não duplica
+    assert s.one("SELECT COUNT(*) n FROM roadmap")["n"] == antes + 1
+    assert not s.one("SELECT 1 FROM roadmap WHERE status='proposto' AND pergunta_id IS NULL")
