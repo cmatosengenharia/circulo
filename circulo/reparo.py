@@ -193,8 +193,8 @@ class DeveloperComReparo(SelfDeveloper):
         todos = self.s.get(DISJUNTOR) or {}
         for r in self.s.q("SELECT id FROM roadmap WHERE status=?", (BLOQUEADO,)):
             d = todos.get(str(r["id"]))
-            if d is not None and self._chave(d.get("texto", "")) == d.get("chave"):
-                continue
+            if d is None or self._chave(d.get("texto", "")) == d.get("chave"):
+                continue                      # sem barra do abrir_pr: o bloqueio é do disjuntor do roadmap
             todos.pop(str(r["id"]), None)
             self.s.set(DISJUNTOR, todos)
             self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
