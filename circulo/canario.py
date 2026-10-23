@@ -32,7 +32,36 @@ def _painel_frescor(velho: bool) -> bool:
     return _ok_do_ultimo(s, "painel:frescor")
 
 
-INJECOES: dict[str, Callable[[bool], bool]] = {"painel:frescor": _painel_frescor}
+_CODIGO = {"filename": "circulo/a.py", "additions": 3, "deletions": 0}
+_TESTE = {"filename": "tests/test_a.py", "additions": 1, "deletions": 0}
+_CONFLITO = ["<" * 7 + " HEAD", "x = 1", "=" * 7, "x = 2", ">" * 7 + " main"]
+
+
+def _portao_abrir_pr(ponto: str, causa: str, com_falha: tuple, controle: tuple) -> Callable[[bool], bool]:
+    """O portão nato do abrir_pr julga o diff pela mesma sinapse do Developer; só conta como barrado no ponto certo
+    e com a causa certa."""
+    def passa(falha: bool) -> bool:
+        from types import SimpleNamespace
+
+        from . import neuronios
+        from .licoes import Licoes
+        s = Store(":memory:")
+        arquivos, adicionadas = com_falha if falha else controle
+        neuronios.registrar(SimpleNamespace(licoes=Licoes(s)), neuronios.ABRIR_PR,
+                            neuronios.portoes_natos_pr(arquivos, adicionadas))
+        r = s.one("SELECT ok, motivo FROM verificacoes WHERE ponto=? ORDER BY id DESC LIMIT 1", (ponto,))
+        return not r or bool(r["ok"]) or r["motivo"] != causa
+    return passa
+
+
+INJECOES: dict[str, Callable[[bool], bool]] = {
+    "painel:frescor": _painel_frescor,
+    "developer:abrir_pr:sem_marcador_de_conflito": _portao_abrir_pr(
+        "developer:abrir_pr:sem_marcador_de_conflito", "marcadores de conflito em: circulo/a.py",
+        ([_CODIGO, _TESTE], {"circulo/a.py": _CONFLITO}), ([_CODIGO, _TESTE], {"circulo/a.py": ["x = 1"]})),
+    "developer:abrir_pr:teste_novo": _portao_abrir_pr(
+        "developer:abrir_pr:teste_novo", "nenhum teste novo em tests/", ([_CODIGO], {}), ([_CODIGO, _TESTE], {})),
+}
 
 
 def injetar(ponto: str) -> dict:
