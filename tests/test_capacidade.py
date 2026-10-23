@@ -1,8 +1,10 @@
 """O Escalador (circulo/capacidade.py): mede a carga por agente, acha o gargalo, o Jev decide subir um trabalhador — só para
 quem não conflita na esteira (Arquiteto, Desenvolvedor) — e o loop roda esses agentes em paralelo."""
 import json
+import re
 import time
 import urllib.request
+from pathlib import Path
 
 from circulo import capacidade, intencoes
 from circulo.estudo import Estudo
@@ -10,7 +12,7 @@ from circulo.llm import LLMResult
 
 from test_estudo import Pesquisa, resposta  # noqa: F401
 from test_painel import painel  # noqa: F401
-from test_self_dev import TEST_CMD, FakeGH, FixAgent, repo  # noqa: F401
+from test_self_dev import FakeGH, repo  # noqa: F401
 
 
 def _ocupar(s, acao, segundos, n=1, ha=0):
@@ -99,12 +101,27 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
     assert any(v.startswith("estudo") for v in vistos)
 
 
+class AgenteDoModulo:
+    """Cada item mexe só no seu módulo: itens distintos não compartilham arquivo e o Revisor não recusa o que terminar
+    depois (lição #63: com os dois mexendo em app.py, o resultado dependia de qual thread chegava primeiro)."""
+    def __init__(self, atraso: dict | None = None):
+        self.atraso = atraso or {}
+
+    def run(self, task, workdir):
+        n = re.search(r"Item (\d+)", task).group(1)
+        time.sleep(self.atraso.get(n, 0))
+        (Path(workdir) / f"item_{n}.py").write_text(f"N = {n}\n")
+        (Path(workdir) / f"test_item_{n}.py").write_text(f"from item_{n} import N\n\n\ndef test_n():\n    assert N == {n}\n")
+        return {"ok": True, "tokens": 1, "log": "ok"}
+
+
 def test_desenvolvedor_pega_itens_distintos_em_paralelo(circle, repo):  # noqa: F811
     from circulo.self_dev import SelfDeveloper
     s = circle.store
     s.x("UPDATE roadmap SET status='feito'")
     _fila_dev(s, 3)
-    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), FakeGH(), test_cmd=TEST_CMD)
+    s.x("UPDATE roadmap SET modulo='item_' || substr(titulo, 6) || '.py' WHERE titulo LIKE 'Item %'")
+    dev = SelfDeveloper(circle.ctx, repo, AgenteDoModulo({"0": 0.5}), FakeGH(), test_cmd=["python3", "-c", "import glob, runpy; [runpy.run_path(f)['test_n']() for f in glob.glob('test_item_*.py')]"])   # o 1º termina por último
     assert [i["titulo"] for i in dev.picks(2)] == ["Item 0", "Item 1"]
     s.set(capacidade.KV, {"corrigir_codigo": {"trabalhadores": 2, "desde": time.time()}})
     r = dev.run_paralelo(autorizado=True)
