@@ -335,3 +335,14 @@ def test_licao_de_estrutura_com_item_descartado_nao_trava_a_evolucao_para_sempre
     L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")    # voltou
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (licao["item_id"],))["status"] == "pendente"
     assert L.bloqueia_evolucao()
+
+
+def test_licao_de_estrutura_com_item_fora_da_fila_nao_trava_a_evolucao_para_sempre(circle):
+    """Vigia licao_bloqueia (item #137, 17 h): o item da lição saiu da fila (desativado: teto de tokens, fatiador sem
+    divisão, revisor sem mudança, painel) e segue 'pendente' sem ninguém pegar; é o mesmo que descartado."""
+    L = lic(circle)
+    licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    circle.store.x("UPDATE roadmap SET desativado=1, evidencia='depende de você: cortado 2× pelo teto' WHERE id=?", (licao["item_id"],))
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
