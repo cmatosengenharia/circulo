@@ -134,7 +134,9 @@ def tem_trabalho(s) -> bool:
 
 def proximo(ctx, dev, planejador) -> int | None:
     """O id do item que o Developer deve executar agora (sub-item da divisão em curso ou o próximo da fila)."""
-    s = ctx.store
+    from . import roadmap
+    s, repo = ctx.store, getattr(dev, "repo", None)
+    roadmap.reabrir(s)
     for pai in s.q("SELECT id FROM roadmap p WHERE status='dividido' AND NOT EXISTS "
                    "(SELECT 1 FROM roadmap r WHERE r.pai = p.id AND r.status NOT IN ('feito','dividido'))"):
         s.x("UPDATE roadmap SET status='feito', evidencia='todos os sub-itens feitos', updated_at=? WHERE id=?",
@@ -144,6 +146,8 @@ def proximo(ctx, dev, planejador) -> int | None:
         if not _liberado(sub):                # o anterior ainda não passou: o seguinte espera, mas a fila normal não para
             item = dev.pick()
             return item["id"] if item else None
+        if roadmap.fora_da_fila(ctx, sub, repo):
+            return proximo(ctx, dev, planejador)
         motivo = motivo_de_dividir(s, sub["id"])
         if motivo and str(sub["id"]) in (s.get(ESTIMATIVAS) or {}) and planejador is not None:
             partes = planejador.dividir(sub, ultimo_erro(s, sub["id"]) or motivo)
@@ -157,6 +161,8 @@ def proximo(ctx, dev, planejador) -> int | None:
     item = dev.pick()
     if item is None:
         return None
+    if roadmap.fora_da_fila(ctx, item, repo):
+        return proximo(ctx, dev, planejador)
     motivo = motivo_de_dividir(s, item["id"])
     if motivo:
         partes = planejador.dividir(item, ultimo_erro(s, item["id"]) or motivo) if planejador is not None else []
