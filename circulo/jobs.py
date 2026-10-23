@@ -155,7 +155,7 @@ def recorrentes(pedidos, minimo: int = MIN_OCORRENCIAS) -> Recorrencia:
 
 def pedidos_7d(store, agora: float | None = None) -> list:
     agora = time.time() if agora is None else agora
-    return store.q(f"SELECT job FROM events WHERE {HUMANO} AND created_at>?", (agora - JANELA,))
+    return store.q(f"SELECT job, created_at FROM events WHERE {HUMANO} AND created_at>?", (agora - JANELA,))
 
 
 def _pendentes(store, agora: float) -> dict[str, int]:

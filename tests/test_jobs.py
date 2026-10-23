@@ -129,3 +129,30 @@ def test_recorrentes_da_amostra_real_classifica_90_por_cento_e_tem_job_recorrent
     pedidos = [{"job": jobs.classificar(t).job} for t, _ in jobs.amostra_rotulada()]
     r = jobs.recorrentes(pedidos)
     assert r.cobertura >= 0.9 and r.jobs and r.dominante in r.jobs
+
+
+def test_cobertura_de_antecipacao_conta_so_o_item_proativo_criado_antes_do_pedido():
+    """Pergunta #128: que fração dos pedidos de 7d já tinha um item 'antecipar:<job>' aberto? Pura: sem DB nem LLM."""
+    from circulo import antecipacao
+    pedidos = ([{"job": "conteudo", "created_at": t} for t in (10, 20, 30)]      # antecipado antes de todos
+               + [{"job": "financas", "created_at": t} for t in (10, 20, 30)]    # antecipado só depois
+               + [{"job": "plano", "created_at": t} for t in (10, 20)])          # nunca antecipado, não recorrente
+    itens = [{"nome": "antecipar:conteudo", "created_at": 5}, {"nome": "antecipar:financas", "created_at": 40}]
+    r = antecipacao.cobertura(pedidos, itens)
+    assert r.total == 8 and r.antecipados == 3 and r.cobertura == 0.375 and r.cobertura >= antecipacao.META
+    assert r.sem_antecipacao == ["financas"]                     # recorrente (≥3) e nenhum pedido antecipado
+    assert antecipacao.cobertura(pedidos, [{"nome": "antecipar:financas", "created_at": 15}]).antecipados == 2
+    vazio = antecipacao.cobertura([], itens)
+    assert vazio.total == 0 and vazio.cobertura == 0.0 and vazio.sem_antecipacao == []
+
+
+def test_cobertura_de_antecipacao_medida_nos_pedidos_humanos_de_7_dias(circle):
+    from circulo import antecipacao
+    s = circle.store
+    for i, t in enumerate(["Escreva 5 posts para o Instagram", "Crie legendas para os posts da semana",
+                           "Escreva um post sobre a promoção"]):
+        jobs.registrar(circle.ctx, _pedido(s, t, dias=3 - i))
+    jobs.antecipar(s, agora=time.time() - 3600)                  # o item proativo nasce depois dos 3 pedidos
+    jobs.registrar(circle.ctx, _pedido(s, "Escreva um post para o fim de semana"))
+    r = antecipacao.medir(s)
+    assert r.total == 4 and r.antecipados == 1 and r.cobertura == 0.25 and r.sem_antecipacao == []
