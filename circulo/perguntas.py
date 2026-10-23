@@ -23,6 +23,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .custo import tokens_por_desfecho
 from .decision import Question
 from .json_llm import objeto
 from .licoes import item_de
@@ -86,11 +87,15 @@ def _economista(s, agora) -> list[Pergunta]:
     entregues = _um(s, "SELECT COUNT(DISTINCT pr) FROM merges WHERE merged=1 AND created_at>=?", (agora - 86400,))
     if papeis and total:
         maior = papeis[0]
+        dev = tokens_por_desfecho(s.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' AND created_at>=?",
+                                      (agora - 7 * 86400,)), s.q("SELECT titulo, status, evidencia FROM roadmap"))
         out.append(Pergunta("economista:etapa_cara", "economista",
                             f"Qual é o jeito mais barato de obter o mesmo resultado na etapa que mais gasta ({maior['papel']})?",
                             min(1.0, int(maior["t"] or 0) / max(total, 1)),
                             {"tokens_24h_por_papel": {p["papel"]: int(p["t"] or 0) for p in papeis},
-                             "prs_entregues_24h": entregues, "tokens_por_pr": int(total / max(entregues, 1))}))
+                             "prs_entregues_24h": entregues, "tokens_por_pr": int(total / max(entregues, 1)),
+                             "developer_tokens_7d_por_desfecho": dev["por_desfecho"],
+                             "tokens_sem_pr_pct": dev["tokens_sem_pr_pct"], "top_causas_sem_pr": dev["top_causas"]}))
     n = _um(s, "SELECT COUNT(*) FROM decisions WHERE created_at>=?", (agora - 86400,))
     regra = _um(s, "SELECT COUNT(*) FROM decisions WHERE created_at>=? AND source='local'", (agora - 86400,))
     if n and regra / n > 0.15:
