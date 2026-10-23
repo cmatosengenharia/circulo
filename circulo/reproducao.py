@@ -77,6 +77,29 @@ def exigem_o_erro_antigo(fonte: str) -> list[str]:
     return out
 
 
+def provam_paralelismo_pelo_relogio(fonte: str) -> list[str]:
+    """Testes de paralelismo (`*paralel*`, `*ao_mesmo_tempo*`) cujo critério é o tempo de parede, uma comparação com
+    `time.<algo>() - <x>` à esquerda (lição #2, antes #62/#67): sob carga no CI o tempo estoura e o teste fica flaky.
+    Paralelismo se prova com barreira (`threading.Barrier`), que só abre com todos dentro ao mesmo tempo."""
+    try:
+        arv = ast.parse(fonte)
+    except SyntaxError:
+        return []
+    out = []
+    for f in ast.walk(arv):
+        if not (isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith("test")
+                and ("paralel" in f.name or "ao_mesmo_tempo" in f.name)):
+            continue
+        for n in ast.walk(f):
+            if isinstance(n, ast.Compare) and isinstance(n.left, ast.BinOp) and isinstance(n.left.op, ast.Sub):
+                c = n.left.left
+                if (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
+                        and isinstance(c.func.value, ast.Name) and c.func.value.id == "time"):
+                    out.append(f.name)
+                    break
+    return out
+
+
 def _arquivos_de_teste(repo: Path, base: str, head: str | None) -> list[str]:
     if head:
         nomes = _git(["diff", "--name-only", "--diff-filter=AM", f"{base}...{head}", "--", "tests"], repo).split()
@@ -124,6 +147,11 @@ def reproduz(repo: str | Path, base: str, head: str | None = None, python: str |
         return False, ("lição #2: o teste exige o erro antigo (pytest.raises) e depois a mesma chamada funcionando; "
                        "quando outra correção tirar o erro, a main fica vermelha. Teste só o comportamento corrigido: "
                        f"o portão já roda o teste novo no código antigo. Testes: {', '.join(presos)}"), novos
+    cronometrados = [n for n in novos
+                     if n.rsplit("::", 1)[-1] in provam_paralelismo_pelo_relogio(_ler(repo, head, n.split("::", 1)[0]) or "")]
+    if cronometrados:
+        return False, ("lição #2: o teste prova paralelismo pelo tempo de parede e fica flaky sob carga no CI. "
+                       f"Use threading.Barrier no lugar do cronômetro. Testes: {', '.join(cronometrados)}"), novos
     tmp =Path(tempfile.mkdtemp(prefix="circulo-repro-"))
     wt = tmp / "base"
     try:
