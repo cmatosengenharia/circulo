@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
@@ -134,17 +135,33 @@ def da_missao(store, project_id: int | None) -> str:
     return p["tipo"] if p["tipo"] in JOBS else DESCONHECIDO
 
 
-def recorrentes(store, agora: float | None = None) -> dict[str, int]:
+class Recorrencia(NamedTuple):
+    total: int                   # pedidos considerados
+    cobertura: float             # fração deles com algum job (nem nulo nem 'desconhecido')
+    jobs: dict[str, int]         # jobs com contagem ≥ mínimo, do maior ao menor
+    fracao: dict[str, float]     # fração de todos os pedidos que cada um cobre
+    dominante: str | None        # o job a antecipar primeiro
+
+
+def recorrentes(pedidos, minimo: int = MIN_OCORRENCIAS) -> Recorrencia:
+    """Agrupa pedidos pelo job já gravado no registro e aponta os que se repetem; pura, sem DB nem LLM."""
+    rotulos = [p["job"] for p in pedidos]
+    contagem = Counter(j for j in rotulos if j and j != DESCONHECIDO)
+    total = len(rotulos)
+    rec = {j: n for j, n in sorted(contagem.items(), key=lambda kv: (-kv[1], kv[0])) if n >= minimo}
+    return Recorrencia(total, round(sum(contagem.values()) / total, 3) if total else 0.0, rec,
+                       {j: round(n / total, 3) for j, n in rec.items()}, next(iter(rec), None))
+
+
+def pedidos_7d(store, agora: float | None = None) -> list:
     agora = time.time() if agora is None else agora
-    return {r["job"]: r["n"] for r in store.q(
-        f"SELECT job, COUNT(*) n FROM events WHERE {HUMANO} AND created_at>? AND job IS NOT NULL AND job!=? "
-        "GROUP BY job HAVING COUNT(*)>=? ORDER BY n DESC, job", (agora - JANELA, DESCONHECIDO, MIN_OCORRENCIAS))}
+    return store.q(f"SELECT job FROM events WHERE {HUMANO} AND created_at>?", (agora - JANELA,))
 
 
 def _pendentes(store, agora: float) -> dict[str, int]:
     feitas = {r["nome"] for r in store.q("SELECT nome FROM projects WHERE nome LIKE 'antecipar:%' AND created_at>?",
                                          (agora - JANELA,))}
-    return {j: n for j, n in recorrentes(store, agora).items() if f"antecipar:{j}" not in feitas}
+    return {j: n for j, n in recorrentes(pedidos_7d(store, agora)).jobs.items() if f"antecipar:{j}" not in feitas}
 
 
 def precisa(store) -> bool:
