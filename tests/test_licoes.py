@@ -375,3 +375,16 @@ def test_licao_de_estrutura_com_item_que_depende_de_voce_nao_trava_a_evolucao_po
     avancar(circle, EVID_GIROS + 1)
     L.revisar()
     assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
+
+
+def test_licao_de_estrutura_com_item_bloqueado_pelo_disjuntor_nao_trava_a_evolucao(circle):
+    """Vigia licao_bloqueia (item #153, 127 h): o item da lição foi para 'bloqueado' (disjuntor do abrir_pr: só volta
+    quando o arquivo citado muda na main) e ninguém o pega. Cada correção anterior listou mais um jeito de sair da fila;
+    a regra é o contrário: só segura a lição o item que o Developer ainda vai pegar."""
+    L = lic(circle)
+    for status in ("bloqueado", "parcial"):
+        licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura=f"incidente:{status}")
+        circle.store.x("UPDATE roadmap SET status=? WHERE id=?", (status, licao["item_id"]))
+    avancar(circle, EVID_GIROS + 1)
+    L.revisar()
+    assert {r["status"] for r in circle.store.q("SELECT status FROM licoes")} == {"validada"} and not L.bloqueia_evolucao()

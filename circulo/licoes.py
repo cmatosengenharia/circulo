@@ -519,14 +519,16 @@ class Licoes:
                 log.append(f"lição #{lic['id']} validada")
                 self.reply(f"Lição #{lic['id']} validada: a correção entrou ({lic['item_evidencia']}). "
                            f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer.", "licao")
-        # lição sem item (trabalho/ambiente) ou cujo item ninguém mais faz (descartado, contestado, fora da fila — desativado
-        # ou devolvido "depende de você" —, ou dividido com um sub-item fora da fila: o pai só vira feito com todos): vale
-        # como aprendida quando para de acontecer; se voltar, reincide e reabre o item (sem isso, a de estrutura travava a
-        # evolução para sempre, ou até a higiene expirar o "depende de você" em dias)
-        fora = "(COALESCE(desativado,0)=1 OR (status='pendente' AND COALESCE(evidencia,'') LIKE '%depende de você%'))"
+        # lição sem item (trabalho/ambiente) ou cujo item ninguém mais faz (fora da fila em qualquer estado — descartado,
+        # bloqueado, desativado, devolvido "depende de você"… —, ou dividido com um sub-item fora da fila: o pai só vira
+        # feito com todos): vale como aprendida quando para de acontecer; se voltar, reincide e reabre o item. A regra diz
+        # quem está na fila, não quem saiu: cada estado novo de saída travava a evolução até alguém listá-lo aqui
+        na_fila = ("(status='em_andamento' OR (status='pendente' AND COALESCE(desativado,0)=0 "
+                   "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%'))")
+        fora = f"status NOT IN ('feito','dividido') AND NOT {na_fila}"
         for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','em_correcao','reincidente') AND node_id IS NULL "
-                            "AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE status IN ('descartado','contestado') "
-                            f"OR {fora}) OR item_id IN (SELECT pai FROM roadmap WHERE {fora} AND status!='feito')) "
+                            f"AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE {fora}) "
+                            f"OR item_id IN (SELECT pai FROM roadmap WHERE {fora})) "
                             "AND ultima_tick < ?", (tick - EVID_GIROS,)):
             if node_por_causa(lic["assinatura"]):
                 continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
