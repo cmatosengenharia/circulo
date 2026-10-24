@@ -53,6 +53,11 @@ NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
 TTL_ESTRUTURA = 6 * 3600   # lição de estrutura sem reincidir por tanto tempo, com o caminho exercitado, fica obsoleta
 PASSAGENS_PARA_EXPIRAR = 3  # passagens pelo caminho na janela: silêncio sem exposição não prova a correção
 ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
+# o item que alguém ainda vai fazer (a regra diz quem está na fila, não quem saiu: cada estado novo de saída — descartado,
+# bloqueado, desativado, devolvido "depende de você"… — travava a evolução até alguém listá-lo)
+NA_FILA = ("(status='em_andamento' OR (status='pendente' AND COALESCE(desativado,0)=0 "
+           "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%'))")
+FORA_DA_FILA = f"status NOT IN ('feito','dividido') AND NOT {NA_FILA}"
 NODE_ID = re.compile(r"teste:(tests/[\w./-]+\.py::\S+)")
 DO_ITEM = re.compile(r"(?:\.circulo-wt-|roteiro #)(\d+)$")   # o worktree e o rótulo do Developer levam o id do item
 
@@ -448,7 +453,10 @@ class Licoes:
                     self._abrir_item(lic, motivo, detalhe_item, titulo=titulo, forcar=True)
         recorrente_ambiente = lic["classe"] == "ambiente" and self.s.one(
             "SELECT COUNT(*) n FROM verificacoes WHERE assinatura=? AND ok=0 AND created_at>=?", (sig, agora - 86400))["n"] >= AMBIENTE_RECORRENTE
-        if reincidiu and lic["classe"] != "trabalho" or recorrente_ambiente or (lic["classe"] == "estrutural" and not lic["item_id"]):
+        # a de estrutura trava a evolução: se o erro ainda acontece, o item dela precisa estar na fila (item #171)
+        sem_fila = lic["classe"] == "estrutural" and (not lic["item_id"] or self.s.one(
+            f"SELECT 1 FROM roadmap WHERE id=? AND {FORA_DA_FILA}", (lic["item_id"],)))
+        if reincidiu and lic["classe"] != "trabalho" or recorrente_ambiente or sem_fila:
             self._abrir_item(lic, motivo, detalhe_item, topo=reincidiu, titulo=titulo)
         return self._neurogenese(lic["id"])
 
@@ -531,14 +539,10 @@ class Licoes:
                            f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer.", "licao")
         # lição sem item (trabalho/ambiente) ou cujo item ninguém mais faz (fora da fila em qualquer estado — descartado,
         # bloqueado, desativado, devolvido "depende de você"… —, ou dividido com um sub-item fora da fila: o pai só vira
-        # feito com todos): vale como aprendida quando para de acontecer; se voltar, reincide e reabre o item. A regra diz
-        # quem está na fila, não quem saiu: cada estado novo de saída travava a evolução até alguém listá-lo aqui
-        na_fila = ("(status='em_andamento' OR (status='pendente' AND COALESCE(desativado,0)=0 "
-                   "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%'))")
-        fora = f"status NOT IN ('feito','dividido') AND NOT {na_fila}"
+        # feito com todos): vale como aprendida quando para de acontecer; se voltar, reincide e reabre o item
         for lic in self.s.q("SELECT * FROM licoes WHERE status IN ('aberta','em_correcao','reincidente') AND node_id IS NULL "
-                            f"AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE {fora}) "
-                            f"OR item_id IN (SELECT pai FROM roadmap WHERE {fora})) "
+                            f"AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE {FORA_DA_FILA}) "
+                            f"OR item_id IN (SELECT pai FROM roadmap WHERE {FORA_DA_FILA})) "
                             "AND ultima_tick < ?", (tick - EVID_GIROS,)):
             if node_por_causa(lic["assinatura"]):
                 continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
