@@ -1,9 +1,10 @@
 """Roadmap: todo item nasce de uma pergunta do conselho; `Origem` só existe com um pergunta_id válido.
 
 Seleção do item para o Developer (`fora_da_fila`, chamado pelo `fatiador.proximo`):
-- disjuntor por assinatura: LIMITE_IGUAIS falhas locais (`developer:*`) com a mesma assinatura no item o tiram da fila
-  ('bloqueado', com motivo e data) e viram a verificação PONTO, que o conselho lê. Depois de COOLDOWN (dobrado a cada
-  vez que volta a abrir), ou quando o node id do item muda, `reabrir` o devolve meio-aberto: uma única tentativa, e
+- disjuntor por assinatura (quarentena à la DLQ, `deve_bloquear`): LIMITE_IGUAIS falhas locais (`developer:*`, mais as
+  repetições da base vermelha, que o pré-voo só conta no kv) com a mesma assinatura no item o tiram da fila
+  ('bloqueado', com motivo, assinatura e data) e viram a verificação PONTO, que o conselho lê. Depois de COOLDOWN
+  (dobrado a cada vez que volta a abrir), ou quando o node id do item muda, `reabrir` o devolve meio-aberto: uma única tentativa, e
   qualquer falha nela bloqueia de novo (Fowler, CircuitBreaker);
 - item de lição fechada sai da fila só se o node id dela passar isolado no main (`licoes.reexecutar_no_main`, o curador
   do item #37); vermelho, segue na fila e só é reexecutado de novo depois de COOLDOWN.
@@ -14,11 +15,11 @@ import sqlite3
 import time
 from dataclasses import dataclass
 
-LIMITE_IGUAIS = 10
+LIMITE_IGUAIS = 5
 COOLDOWN = 6 * 3600
 BLOQUEADO = "bloqueado"
 PONTO = "developer:disjuntor"
-DISJUNTOR = "roadmap_disjuntor"          # {item: {"sig", "n", "node", "em", "vezes", "desde"?}}; "desde" = meio-aberto
+DISJUNTOR = "roadmap_disjuntor"          # {item: {"sig", "n", "node", "em", "vezes", "base", "desde"?}}; "desde" = meio-aberto
 VERMELHA = "roadmap_licao_vermelha"      # {item: quando o node id da lição fechada falhou no main}
 FECHADAS = ("validada", "evidenciada")
 
@@ -61,6 +62,24 @@ def _mais_repetida(s, item_id: int, desde: float) -> tuple[str, int]:
     return (r["assinatura"] or "", r["n"]) if r else ("", 0)
 
 
+def deve_bloquear(falhas_mesma_assinatura: int, limite: int = LIMITE_IGUAIS) -> bool:
+    return falhas_mesma_assinatura >= limite
+
+
+def _falhas_iguais(s, item_id: int, d: dict) -> tuple[str, int]:
+    """(assinatura, vezes) da falha local mais repetida; a base vermelha grava um evento por assinatura e conta as
+    repetições no kv do pré-voo (item #144: 3786 falhas sem abrir o disjuntor). Meio-aberto, só o que veio depois."""
+    sig, n = _mais_repetida(s, item_id, d.get("desde", 0))
+    base, antes = _base_vermelha(s, item_id), (d.get("base") or {}) if "desde" in d else {}
+    extra = base.get("n", 0) - (antes.get("n", 0) if antes.get("sig") == base.get("sig") else 0)
+    return (base["sig"], extra) if extra > n else (sig, n)
+
+
+def _base_vermelha(s, item_id: int) -> dict:
+    from .reparo import BASE_VERMELHA
+    return {k: v for k, v in ((s.get(BASE_VERMELHA) or {}).get(str(item_id)) or {}).items() if k in ("sig", "n")}
+
+
 def _espera(d: dict) -> float:
     return COOLDOWN * 2 ** (d["vezes"] - 1)
 
@@ -84,7 +103,7 @@ def reabrir(s, agora: float | None = None) -> list[int]:
 
 def _bloquear(ctx, item: dict, sig: str, n: int, agora: float) -> None:
     s = ctx.store
-    d = {"sig": sig, "n": n, "node": _node(s, item["id"], sig), "em": agora,
+    d = {"sig": sig, "n": n, "node": _node(s, item["id"], sig), "em": agora, "base": _base_vermelha(s, item["id"]),
          "vezes": ((s.get(DISJUNTOR) or {}).get(str(item["id"])) or {}).get("vezes", 0) + 1}
     motivo = (f"bloqueado em {time.strftime('%Y-%m-%d %H:%M', time.localtime(agora))}: {n} falhas locais iguais "
               f"({sig[:160]}); reteste em {_espera(d) / 3600:g} h ou quando o node id mudar")
@@ -121,8 +140,8 @@ def fora_da_fila(ctx, item: dict, repo=None, agora: float | None = None) -> bool
     """True = o item não vai para o Developer agora: o disjuntor abriu, ou a lição dele já está fechada e verde no main."""
     agora = agora or time.time()
     d = (ctx.store.get(DISJUNTOR) or {}).get(str(item["id"])) or {}
-    sig, n = _mais_repetida(ctx.store, item["id"], d.get("desde", 0))
-    if n >= (1 if "desde" in d else LIMITE_IGUAIS):
+    sig, n = _falhas_iguais(ctx.store, item["id"], d)
+    if deve_bloquear(n, 1 if "desde" in d else LIMITE_IGUAIS):
         _bloquear(ctx, item, sig, n, agora)
         return True
     return _licao_verde_no_main(ctx, item, repo, agora)
