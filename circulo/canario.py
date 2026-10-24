@@ -126,6 +126,27 @@ def injetar(ponto: str) -> dict:
             "ok": velho_falhou and fresco_passou}
 
 
+def _injetar_portao(portao: dict) -> dict:
+    """O portão aprendido julga a assinatura da sua lição (tem de barrar) e o controle (tem de passar), num store e num
+    worktree descartáveis: o portão real não conta avaliação nem bloqueio."""
+    from .licoes import portoes_que_deixam_passar
+    causa = next((r["causa"] for r in portoes_que_deixam_passar([portao])), "")
+    return {"ponto": f"portao:{portao['id']}", "velho_falhou": causa in ("", "barrou também o controle"),
+            "fresco_passou": causa != "barrou também o controle", "ok": not causa}
+
+
+def _portoes_que_nunca_barraram(s: Store, now: float) -> list[dict]:
+    return [dict(r) for r in s.q("SELECT * FROM portoes WHERE ativo=1 AND bloqueios=0 AND created_at < ?",
+                                 (now - INTERVALO,))]
+
+
+def portoes_sem_prova(s: Store, now: float | None = None) -> int:
+    """Portões aprendidos que nunca barraram nada e não têm canário verde provando que ainda recusam a própria lição."""
+    now = now or time.time()
+    provados = com_canario(s, now)
+    return sum(f"portao:{p['id']}" not in provados for p in _portoes_que_nunca_barraram(s, now))
+
+
 def com_canario(s: Store, now: float | None = None) -> set[str]:
     """Pontos com canário verde dentro da validade."""
     desde = (now or time.time()) - VALIDADE
@@ -134,14 +155,17 @@ def com_canario(s: Store, now: float | None = None) -> set[str]:
 
 
 def rodar(s: Store, reply=None, now: float | None = None) -> list[dict]:
-    """Ciclo de saúde: injeta a falha em cada ponto que nunca falhou e tem injeção conhecida, no máximo 1x por dia."""
+    """Ciclo de saúde: injeta a falha em cada ponto que nunca falhou e tem injeção conhecida, e a assinatura da lição
+    em cada portão aprendido que nunca barrou nada; no máximo 1x por dia cada."""
     now = now or time.time()
     pontos = [r["ponto"] for r in s.q("SELECT ponto FROM verificacoes GROUP BY ponto HAVING SUM(ok=0)=0")]
+    alvos = [(p, lambda p=p: injetar(p)) for p in pontos if p in INJECOES]
+    alvos += [(f"portao:{p['id']}", lambda p=p: _injetar_portao(p)) for p in _portoes_que_nunca_barraram(s, now)]
     out = []
-    for p in pontos:
-        if p not in INJECOES or s.one("SELECT 1 FROM canarios WHERE ponto=? AND em>?", (p, now - INTERVALO)):
+    for p, injetor in alvos:
+        if s.one("SELECT 1 FROM canarios WHERE ponto=? AND em>?", (p, now - INTERVALO)):
             continue
-        r = injetar(p)
+        r = injetor()
         s.x("INSERT INTO canarios(ponto, ok, velho_falhou, fresco_passou, em) VALUES(?,?,?,?,?)",
             (p, int(r["ok"]), int(r["velho_falhou"]), int(r["fresco_passou"]), now))
         if not r["ok"] and reply:

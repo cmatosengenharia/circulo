@@ -157,8 +157,8 @@ def _arquiteto(s, agora) -> list[Pergunta]:
 
 def _auditor(s, agora) -> list[Pergunta]:
     out = []
-    nunca = _um(s, "SELECT COUNT(*) FROM portoes WHERE ativo=1 AND bloqueios=0 AND created_at < ?", (agora - 86400,))
-    from .canario import com_canario
+    from .canario import com_canario, portoes_sem_prova
+    nunca = portoes_sem_prova(s, agora)    # portão aprendido com canário verde já provou que recusa a própria lição
     provados = com_canario(s, agora)       # ponto com canário verde já provou, com falha injetada, que ainda barra
     sem_falha = [r["ponto"] for r in s.q("SELECT ponto FROM verificacoes GROUP BY ponto HAVING SUM(ok=0)=0 AND COUNT(*) > 50")
                  if r["ponto"] not in provados]
