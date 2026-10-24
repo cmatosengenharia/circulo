@@ -396,6 +396,14 @@ class Circle:
         return f"#{tx_id} → {cat or row['category']}/{tag or row['tag']}. Anotado para aprender."
 
     # ------------------------------------------------------------ evolução natural (sem input)
+    def _trabalho_pronto(self, tasks) -> list[str]:
+        """Trabalho real entre `tasks` que pode rodar AGORA: esperar o espaçamento (ESPACO) ou a recusa do porteiro do gasto
+        (1, 2, 4… até 64 giros) não é estagnação. Única regra do idle e do trabalho_pendente (lição #47)."""
+        s = self.store
+        last, recusas = s.get("idle_last", {}) or {}, (s.get("progresso") or {}).get("recusas") or {}
+        return [t for t in TRABALHO if t in tasks and s.tick - int(last.get(t, -10**6)) >= max(ESPACO.get(t, 1), min(64, 2 ** int(recusas.get(t, 0))) if recusas.get(t) else 1)
+                and self._tem_trabalho(t)]
+
     def idle(self) -> str | None:
         ctx, s = self.ctx, self.store
         self._stage("idle")
@@ -439,10 +447,7 @@ class Circle:
         # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
         last = s.get("idle_last", {})
         staleness = {t: s.tick - int(last.get(t, -10**6)) for t in tasks}
-        # recusado pelo porteiro do gasto: espera cada vez mais antes de tentar de novo (1, 2, 4… até 64 giros)
-        recusas = (s.get("progresso") or {}).get("recusas") or {}
-        trabalho = [t for t in TRABALHO if t in tasks and staleness[t] >= max(ESPACO.get(t, 1), min(64, 2 ** int(recusas.get(t, 0))) if recusas.get(t) else 1)
-                    and self._tem_trabalho(t)]
+        trabalho = self._trabalho_pronto(tasks)
         manut = sorted((t for t in tasks if t not in TRABALHO or t == "revisar_prs"),
                        key=lambda t: (-staleness[t], tasks.index(t)))
         manut = [t for t in manut if t not in trabalho]
@@ -611,15 +616,8 @@ class Circle:
         if not ignorar_estagnacao and int((self.store.get("progresso") or {}).get("sem", 0)) >= 3:
             return False
         try:
-            # só conta o trabalho que pode rodar AGORA: esperar o espaçamento (ESPACO, recusas) não é estagnação
-            s = self.store
-            last = s.get("idle_last", {}) or {}
-            rec = (s.get("progresso") or {}).get("recusas") or {}
-            def pronto(t):
-                espera = max(ESPACO.get(t, 1), min(64, 2 ** int(rec[t])) if rec.get(t) else 1)
-                return s.tick - int(last.get(t, -10**6)) >= espera
             seguro = self.controls()["modo_seguro"]   # o que o idle barra não está pendente (lição #47)
-            return any(pronto(t) and pode_rodar(s, self.incidents, t, seguro) and self._tem_trabalho(t) for t in TRABALHO)
+            return bool(self._trabalho_pronto([t for t in TRABALHO if pode_rodar(self.store, self.incidents, t, seguro)]))
         except Exception:
             return False
 
