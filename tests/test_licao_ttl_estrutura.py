@@ -72,3 +72,19 @@ def test_vigia_expira_antes_de_emitir_e_a_reincidencia_trava_de_novo(circle):
     L.verificar("developer:agente", False, motivo="agente saiu sem commit", assinatura="developer:agente:sem_commit", classe=ESTRUTURA)
     assert s.one("SELECT status FROM licoes WHERE id=?", (calma["id"],))["status"] == "reincidente"
     assert s_licao_bloqueia(s, now + TTL_ESTRUTURA + 2)["evidencia"]["licoes"] == 2
+
+
+def test_vigia_conta_as_horas_desde_a_reabertura_e_nao_desde_a_criacao(circle):
+    """Item #170 (Vigia: 2 lições de estrutura abertas há 76 h): a lição nascida há 76 h que foi corrigida (item feito,
+    PR mergeado) e reincidiu agora estava aberta havia minutos, mas a sonda media desde created_at e abria um item de
+    trava a cada passagem. A idade é a do período aberto atual."""
+    s, L = circle.store, Licoes(circle.store)
+    lic = L.verificar("loop:progresso", False, motivo="nada avançou", assinatura="loop:estagnado", classe="estrutural")
+    now = time.time()
+    s.x("UPDATE licoes SET created_at=?, status='validada' WHERE id=?", (now - 76 * H, lic["id"]))
+    L.verificar("loop:progresso", False, motivo="nada avançou", assinatura="loop:estagnado", classe="estrutural")
+    assert s.one("SELECT status FROM licoes WHERE id=?", (lic["id"],))["status"] == "reincidente"
+
+    assert s_licao_bloqueia(s, now + 60) is None
+    trava = s_licao_bloqueia(s, now + 3 * H)
+    assert trava and 2.9 <= trava["evidencia"]["ha_horas"] <= 3.1
