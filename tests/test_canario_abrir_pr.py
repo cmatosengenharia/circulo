@@ -51,11 +51,11 @@ def test_canario_acusa_falha_com_a_causa_errada(monkeypatch):
 def test_auditor_deixa_de_contar_os_dois_pontos_depois_do_canario(circle):
     s = circle.store
     agora = time.time()
-    for ponto in (MARCADOR, TESTE_NOVO, "gate:merge"):
+    for ponto in (MARCADOR, TESTE_NOVO, "gate:ci"):
         for _ in range(51):
             s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,created_at) VALUES(0,?,'pr',1,?)", (ponto, agora))
-    assert sorted(_auditor(s, agora)[0].evidencia["pontos_que_nunca_falharam"]) == sorted([MARCADOR, TESTE_NOVO, "gate:merge"])
+    assert sorted(_auditor(s, agora)[0].evidencia["pontos_que_nunca_falharam"]) == sorted([MARCADOR, TESTE_NOVO, "gate:ci"])
 
     canario.rodar(s, now=agora)
     assert {(r["ponto"], r["ok"]) for r in s.q("SELECT ponto, ok FROM canarios")} == {(MARCADOR, 1), (TESTE_NOVO, 1)}
-    assert _auditor(s, agora)[0].evidencia["pontos_que_nunca_falharam"] == ["gate:merge"]
+    assert _auditor(s, agora)[0].evidencia["pontos_que_nunca_falharam"] == ["gate:ci"]
