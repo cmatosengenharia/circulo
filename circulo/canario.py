@@ -8,6 +8,7 @@ verde recente.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Callable
 
 from . import confianca
@@ -54,7 +55,61 @@ def _portao_abrir_pr(ponto: str, causa: str, com_falha: tuple, controle: tuple) 
     return passa
 
 
+class _GitHubSimulado:
+    def __init__(self, runs: list[dict], atras: int):
+        self.runs, self.atras = runs, atras
+
+    def open_prs(self):
+        return [{"number": 1, "head_sha": "abc", "head_ref": "circulo/canario", "draft": False, "title": "canário"}]
+
+    def pr_files(self, n):
+        return [_CODIGO, _TESTE]
+
+    def check_runs(self, sha):
+        return self.runs
+
+    def label_events(self, n):
+        return []
+
+    def atras_da_main(self, sha):
+        return self.atras
+
+    def update_branch(self, n):
+        pass
+
+    def merge(self, n, sha, title):
+        return True, "merged"
+
+
+def _gate_merge(falha: bool) -> bool:
+    """O portão do merge julga PRs simulados pela interface pública (`MergeGate.run`). Com falha (check vermelho,
+    check pendente, branch atrás da main) só conta como barrado se cada PR ficou com merged=0 e a razão certa."""
+    from .agents import Ctx
+    from .budget import Budget
+    from .decision import DecisionLayer, LocalJev
+    from .merge_gate import MergeGate, required_checks
+    from .policy import PolicyStore
+    verdes = [{"id": i, "name": n, "status": "completed", "conclusion": "success"} for i, n in enumerate(required_checks())]
+    um = required_checks()[0]
+    casos = [(verdes, 0, "todos os gates passaram")] if not falha else [
+        ([{**r, "conclusion": "failure"} if r["name"] == um else r for r in verdes], 0, f"checks falhando: {um}"),
+        ([{**r, "status": "in_progress", "conclusion": None} if r["name"] == um else r for r in verdes], 0,
+         f"checks em andamento: {um}"),
+        (verdes, 3, "branch 3 commit(s) atrás da main: atualizada, o CI roda de novo")]
+    for runs, atras, razao in casos:
+        s = Store(":memory:")
+        policies = PolicyStore(s)
+        budget = Budget(s, policies.get)
+        ctx = Ctx(s, policies, budget, DecisionLayer(s, policies.get, budget, jev=LocalJev()), Path("."), budget.now)
+        MergeGate(ctx, _GitHubSimulado(runs, atras), human="").run()
+        r = s.one("SELECT merged, reason FROM merges WHERE pr=1 ORDER BY id DESC LIMIT 1")
+        if not r or r["reason"] != razao or bool(r["merged"]) != (not falha):
+            return falha
+    return not falha
+
+
 INJECOES: dict[str, Callable[[bool], bool]] = {
+    "gate:merge": _gate_merge,
     "painel:frescor": _painel_frescor,
     "developer:abrir_pr:sem_marcador_de_conflito": _portao_abrir_pr(
         "developer:abrir_pr:sem_marcador_de_conflito", "marcadores de conflito em: circulo/a.py",
