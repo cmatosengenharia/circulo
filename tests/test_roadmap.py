@@ -1,9 +1,9 @@
-"""Disjuntor por assinatura na seleção do roadmap: 10 falhas locais iguais no item o tiram da fila ('bloqueado', com
+"""Disjuntor por assinatura na seleção do roadmap: 5 falhas locais iguais no item o tiram da fila ('bloqueado', com
 motivo e data, registrado para o conselho); depois do cooldown, ou quando o node id muda, ele ganha UMA tentativa
 (meio-aberto). Item de lição fechada só sai da fila se o node id passar isolado no main (o curador do item #37)."""
 import time
 
-from circulo import fatiador, licoes, roadmap
+from circulo import fatiador, licoes, reparo, roadmap
 
 
 class Fila:
@@ -109,3 +109,48 @@ def test_item_de_licao_fechada_com_node_id_vermelho_no_main_segue_na_fila(circle
     monkeypatch.setattr(licoes, "reexecutar_no_main", lambda repo, nodes, *a, **k: ("abc123", {n: 1 for n in nodes}))
     assert _proximo(circle) == fechado
     assert s.one("SELECT status FROM roadmap WHERE id=?", (fechado,))["status"] == "pendente"
+
+
+def test_deve_bloquear_no_teto_de_5_falhas_com_a_mesma_assinatura():
+    assert not roadmap.deve_bloquear(4) and roadmap.deve_bloquear(5) and roadmap.deve_bloquear(6)
+    assert roadmap.deve_bloquear(1, limite=1) and not roadmap.deve_bloquear(0, limite=1)
+
+
+def test_6_falhas_iguais_levam_a_bloqueado_e_o_item_nao_e_escalado(circle):
+    s = circle.store
+    preso, livre = _item(s, "preso", 1), _item(s, "livre", 2)
+    _falhar(circle, preso, 6)
+    assert _proximo(circle) == livre
+    st = s.one("SELECT status, evidencia FROM roadmap WHERE id=?", (preso,))
+    assert st["status"] == "bloqueado" and "6 falhas locais iguais" in st["evidencia"]
+    assert "tests/test_x.py::test_y" in s.get(roadmap.DISJUNTOR)[str(preso)]["sig"]        # a assinatura gravada
+    s.x("UPDATE roadmap SET status='feito' WHERE id=?", (livre,))
+    assert _proximo(circle) != preso                                        # sem o livre, segue sem ser escalado
+    assert s.one("SELECT status FROM roadmap WHERE id=?", (preso,))["status"] == "bloqueado"
+
+
+def test_4_falhas_iguais_e_2_diferentes_nao_acionam_o_bloqueio(circle):
+    s = circle.store
+    item = _item(s, "misto", 1)
+    _falhar(circle, item, 4)
+    _falhar(circle, item, 2, motivo="FAILED tests/test_x.py::test_outro_{i} - AssertionError")
+    assert _proximo(circle) == item
+    assert s.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "pendente"
+
+
+def test_base_vermelha_repetida_6_vezes_bloqueia_mesmo_com_um_unico_evento(circle):
+    """A base vermelha grava um evento por (item, assinatura) e conta as repetições no kv (item #144: 3786 falhas
+    locais sem o disjuntor abrir); o teto conta as duas."""
+    s = circle.store
+    preso, livre = _item(s, "preso", 1), _item(s, "livre", 2)
+    _falhar(circle, preso, 1)
+    base = {"sig": "tests/test_x.py::test_y AssertionError", "n": 6, "chave": "t"}
+    s.set(reparo.BASE_VERMELHA, {str(preso): base})
+    assert _proximo(circle) == livre
+    st = s.one("SELECT status, evidencia FROM roadmap WHERE id=?", (preso,))
+    assert st["status"] == "bloqueado" and "6 falhas locais iguais" in st["evidencia"]
+    d = s.get(roadmap.DISJUNTOR)[str(preso)]
+    s.set(roadmap.DISJUNTOR, {str(preso): {**d, "em": d["em"] - roadmap.COOLDOWN - 1}})
+    assert _proximo(circle) == preso                                       # meio-aberto: o contador antigo não conta
+    s.set(reparo.BASE_VERMELHA, {str(preso): {**base, "n": 7}})
+    assert _proximo(circle) == livre                                       # a mesma base vermelha de novo: bloqueia
