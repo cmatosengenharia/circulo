@@ -100,6 +100,26 @@ def provam_paralelismo_pelo_relogio(fonte: str) -> list[str]:
     return out
 
 
+def _dorme(no: ast.AST) -> bool:
+    return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "sleep"
+               and isinstance(n.func.value, ast.Name) and n.func.value.id == "time" for n in ast.walk(no))
+
+
+def ordenam_paralelismo_por_sono(fonte: str) -> list[str]:
+    """Testes de paralelismo (`*paralel*`, `*ao_mesmo_tempo*`) que usam um dublê do próprio módulo (classe) que dorme
+    `time.sleep` para ordenar as threads (lição #63): sob carga o sono não ordena nada e, em série, o teste passa igual.
+    A sobreposição se prova com `threading.Barrier(n, timeout=...)` no dublê."""
+    try:
+        arv = ast.parse(fonte)
+    except SyntaxError:
+        return []
+    dormem = {n.name for n in arv.body if isinstance(n, ast.ClassDef) and _dorme(n)}
+    return [f.name for f in ast.walk(arv)
+            if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith("test")
+            and ("paralel" in f.name or "ao_mesmo_tempo" in f.name)
+            and any(isinstance(n, ast.Name) and n.id in dormem for n in ast.walk(f))]
+
+
 def _arquivos_de_teste(repo: Path, base: str, head: str | None) -> list[str]:
     if head:
         nomes = _git(["diff", "--name-only", "--diff-filter=AM", f"{base}...{head}", "--", "tests"], repo).split()
@@ -152,6 +172,11 @@ def reproduz(repo: str | Path, base: str, head: str | None = None, python: str |
     if cronometrados:
         return False, ("lição #2: o teste prova paralelismo pelo tempo de parede e fica flaky sob carga no CI. "
                        f"Use threading.Barrier no lugar do cronômetro. Testes: {', '.join(cronometrados)}"), novos
+    dormindo = [n for n in novos
+                if n.rsplit("::", 1)[-1] in ordenam_paralelismo_por_sono(_ler(repo, head, n.split("::", 1)[0]) or "")]
+    if dormindo:
+        return False, ("lição #63: o dublê do teste de paralelismo dorme (time.sleep) para ordenar as threads; sob carga "
+                       f"não ordena e, em série, passa igual. Use threading.Barrier(n, timeout=...). Testes: {', '.join(dormindo)}"), novos
     tmp =Path(tempfile.mkdtemp(prefix="circulo-repro-"))
     wt = tmp / "base"
     try:

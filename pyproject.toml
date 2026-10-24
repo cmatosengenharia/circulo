@@ -8,7 +8,7 @@ dependencies = []
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
 metricas = ["prometheus_client>=0.17"]
-dev = ["pytest>=8", "ruff", "prometheus_client>=0.17"]
+dev = ["pytest>=8", "pytest-repeat", "ruff", "prometheus_client>=0.17"]
 
 [project.scripts]
 circulo = "circulo.cli:main"
