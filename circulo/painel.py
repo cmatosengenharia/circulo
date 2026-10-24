@@ -578,13 +578,14 @@ def make_handler(db_path: str):
                         self.wfile.flush()
                         time.sleep(0.5)
                         continue
-                    # central de confiança: empurrada quando muda e, no mínimo, a cada 2 s (o frescor é visível)
-                    if time.time() - last_conf_em >= 1.0:
+                    # central de confiança: empurrada quando muda e, no mínimo, quando o card na tela passa de 1,5 s de idade
+                    # (conta do gerado_em do card enviado, não do envio: o sono e o cálculo somam ao atraso e o SLO é 3 s)
+                    if time.time() - last_conf_em >= 1.0 or time.time() - conf_enviada_em >= 1.5:
                         conf = confianca(store)
                         chave = json.dumps([conf["veredito"], [(c["id"], c["estado"], c["valor"], c["porque"]) for c in conf["checks"]]],
                                            ensure_ascii=False)
-                        if chave != last_conf or time.time() - conf_enviada_em >= 2.0:
-                            last_conf, conf_enviada_em = chave, time.time()
+                        if chave != last_conf or time.time() - conf_enviada_em >= 1.5:
+                            last_conf, conf_enviada_em = chave, conf["gerado_em"]
                             self.wfile.write(f"event: confianca\ndata: {json.dumps(conf, ensure_ascii=False)}\n\n".encode())
                         last_conf_em = time.time()
                     for v in store.q("SELECT id, tick, ponto, sujeito, ok, assinatura, substr(motivo,1,240) motivo, created_at "

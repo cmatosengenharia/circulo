@@ -22,7 +22,7 @@ from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from . import guardrails
 from .engine import Engine
-from .estagnacao import anotar_giro, causa_provavel
+from .estagnacao import anotar_giro, causa_provavel, pode_rodar
 from .graph import MissionGraph
 from .harness_lab import HarnessLab
 from .reparo import build_developer
@@ -432,13 +432,8 @@ class Circle:
             tasks.append("planejar_roteiro")
         if self.gate is not None and "revisar_prs" not in tasks:
             tasks.append("revisar_prs")
-        if self.controls()["modo_seguro"]:
-            # só tarefas de baixo risco: nada de evoluir regras, gerar features ou mergear
-            tasks = [t for t in tasks if t in ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")]
-        from .medico import tarefa_pausada
-        componente = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}   # (corrigir_codigo tem quarentena própria)
-        tasks = [t for t in tasks if not self.incidents.isolated(f"idle:{t}") and not tarefa_pausada(self.store, t)
-                 and not (t in componente and self.incidents.isolated(componente[t])) and not (t == "revisar_prs" and revisor.em_espera(s))]
+        seguro = self.controls()["modo_seguro"]     # modo seguro só deixa baixo risco: nada de evoluir regras, features ou merge
+        tasks = [t for t in tasks if pode_rodar(s, self.incidents, t, seguro)]
         if not tasks:
             return None
         # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
@@ -623,7 +618,8 @@ class Circle:
             def pronto(t):
                 espera = max(ESPACO.get(t, 1), min(64, 2 ** int(rec[t])) if rec.get(t) else 1)
                 return s.tick - int(last.get(t, -10**6)) >= espera
-            return any(pronto(t) and self._tem_trabalho(t) for t in TRABALHO)
+            seguro = self.controls()["modo_seguro"]   # o que o idle barra não está pendente (lição #47)
+            return any(pronto(t) and pode_rodar(s, self.incidents, t, seguro) and self._tem_trabalho(t) for t in TRABALHO)
         except Exception:
             return False
 
