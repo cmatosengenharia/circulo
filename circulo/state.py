@@ -553,7 +553,7 @@ class Store:
                   ("perguntas", "cerebro", "TEXT"), ("projects", "paralelo", "INTEGER"),
                   ("projects", "pausada", "INTEGER"), ("projects", "pausada_em", "REAL"), ("licoes", "camada", "TEXT"),
                   ("decisions", "probabilidades", "TEXT"), ("licoes", "node_id", "TEXT"), ("licoes", "origens", "TEXT"),
-                  ("licoes", "checagens", "TEXT"),
+                  ("licoes", "checagens", "TEXT"), ("licoes", "aberta_em", "REAL"),
                   ("perguntas", "eixo", "TEXT"), ("perguntas", "pertinencia", "REAL"), ("perguntas", "acionavel", "INTEGER"),
                   ("perguntas", "classificacao", "TEXT"), ("roadmap", "pai", "INTEGER"), ("perguntas", "motivo", "TEXT"),
                   ("verificacoes", "item_id", "INTEGER"), ("verificacoes", "item_titulo", "TEXT"),
@@ -573,6 +573,12 @@ class Store:
             if col not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         roadmap.migrar(self.db)
+        # a lição que volta a ficar aberta (reincidência, reabertura no main) carimba quando: a idade da trava é a do
+        # período aberto atual, não a de created_at (item #170: reincidiu agora e o Vigia via "aberta há 76 h")
+        self.db.execute("""CREATE TRIGGER IF NOT EXISTS licoes_aberta_em AFTER UPDATE OF status ON licoes
+                           WHEN NEW.status IN ('aberta','em_correcao','reincidente')
+                            AND OLD.status NOT IN ('aberta','em_correcao','reincidente')
+                           BEGIN UPDATE licoes SET aberta_em=(julianday('now') - 2440587.5) * 86400.0 WHERE id=NEW.id; END""")
         self.db.execute("CREATE INDEX IF NOT EXISTS trail_run ON trail(run_id)")
         # `decisions` cresce uma linha por pergunta e é varrida por pergunta/data em toda passagem (indagador, perguntas, jev_lab)
         self.db.execute("CREATE INDEX IF NOT EXISTS decisions_q_em ON decisions(question, created_at)")

@@ -182,7 +182,7 @@ def s_corpo_atrasado(s, now):
 
 def s_licao_bloqueia(s, now):
     Licoes(s).expirar_estruturais(now)
-    r = s.one("SELECT COUNT(*) n, MIN(created_at) em FROM licoes WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente')")
+    r = s.one("SELECT COUNT(*) n, MIN(COALESCE(aberta_em, created_at)) em FROM licoes WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente')")
     if not r["n"] or now - float(r["em"] or now) < LICAO_BLOQUEIA:
         return None
     return {"chave": "licao_bloqueia", "titulo": f"{r['n']} lição(ões) de estrutura aberta(s) há {int((now - r['em']) / 3600)} h bloqueando a evolução",
