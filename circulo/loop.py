@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, intencoes, jobs, parada, revisor, telemetria
+from . import finance, intencoes, jobs, jtbd, parada, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
@@ -417,7 +417,7 @@ class Circle:
         from . import indagador
         if indagador.precisa(self.store, self.engine) and "indagar" not in tasks:
             tasks.append("indagar")
-        if jobs.precisa(self.store) and "antecipar" not in tasks:
+        if jtbd.precisa(self.store) and "antecipar" not in tasks:
             tasks.append("antecipar")
         from . import documentador
         if self.gate is not None and documentador.precisa(self.store) and "documentar" not in tasks:
@@ -695,7 +695,7 @@ class Circle:
         elif pick == "estudar_pedido":
             self.estudo.run_paralelo(autorizado=True)          # 1 trabalhador por padrão; o Escalador pode subir
         elif pick == "antecipar":
-            jobs.antecipar(self.store)
+            jtbd.antecipar(self.store)
         elif pick == "documentar":
             from . import documentador
             documentador.rodar(self.ctx, gh=getattr(self.gate, "gh", None))
