@@ -192,6 +192,38 @@ def propor_item(store, pergunta_id: int | None, agora: float | None = None) -> i
     return None
 
 
+class Desfecho(NamedTuple):
+    total: int                       # propostas 'antecipar:<job>' registradas
+    desfechos: list[str]             # 'antecipou' | 'redundante' | 'ignorada', na ordem das propostas
+    contagem: dict[str, int]         # propostas por desfecho
+    taxa: float                      # antecipou / total
+    pedidos_depois: dict[str, int]   # job → pedidos do humano nos 7 dias seguintes à proposta
+
+
+def desfecho_propostas(propostas, pedidos) -> Desfecho:
+    """Cada proposta 'antecipar:<job>' contra os pedidos do mesmo job nos 7 dias seguintes: aceita (o loop pegou o job
+    antes de o humano pedir de novo) é 'antecipou'; não aceita e o humano pediu é 'redundante'; senão 'ignorada'.
+    Pura, sem DB nem LLM."""
+    desfechos, depois = [], {}
+    for p in propostas:
+        job = p["titulo"].removeprefix("antecipar:").split(" ", 1)[0]
+        n = sum(1 for q in pedidos if q["job"] == job and p["created_at"] < q["created_at"] <= p["created_at"] + JANELA)
+        depois[job] = depois.get(job, 0) + n
+        desfechos.append("antecipou" if p["status"] not in ("proposto", "descartado")
+                         else "redundante" if n else "ignorada")
+    contagem = {d: desfechos.count(d) for d in ("antecipou", "redundante", "ignorada")}
+    return Desfecho(len(desfechos), desfechos, contagem,
+                    round(contagem["antecipou"] / len(desfechos), 3) if desfechos else 0.0, depois)
+
+
+def medir_propostas(store, agora: float | None = None) -> Desfecho:
+    """As propostas registradas nos últimos 7 dias, cruzadas com os pedidos humanos que vieram depois delas."""
+    agora = time.time() if agora is None else agora
+    propostas = store.q("SELECT titulo, status, created_at FROM roadmap WHERE titulo LIKE 'antecipar:%' "
+                        "AND created_at>? ORDER BY id", (agora - JANELA,))
+    return desfecho_propostas(propostas, pedidos_7d(store, agora))
+
+
 def antecipar(store, agora: float | None = None) -> list[int]:
     """Cada job recorrente sem missão nesta semana vira 'antecipar:<job>' (kit geral: o motor prepara a entrega)."""
     from .rastro import elo

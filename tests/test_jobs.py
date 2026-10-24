@@ -185,3 +185,40 @@ def test_job_recorrente_vira_um_unico_item_proposto_com_a_pergunta_de_origem_lic
     assert jobs.propor_item(s, perg) is None                       # mesma semana: não duplica
     assert s.one("SELECT COUNT(*) n FROM roadmap")["n"] == antes + 1
     assert not s.one("SELECT 1 FROM roadmap WHERE status='proposto' AND pergunta_id IS NULL")
+
+
+def test_proposta_antecipada_vira_antecipou_redundante_ou_ignorada_pelos_pedidos_dos_7_dias_seguintes():
+    """Pergunta #155: cada proposta 'antecipar:<job>' cruzada com os pedidos do mesmo job nos 7 dias seguintes.
+    Aceita antes de o humano pedir de novo: antecipou; não aceita e o humano pediu: redundante; nem uma coisa nem
+    outra: ignorada. Pura: sem DB nem LLM."""
+    d = 86400
+    propostas = [{"titulo": "antecipar:conteudo — lote", "status": "feito", "created_at": 0},
+                 {"titulo": "antecipar:financas — resumo", "status": "proposto", "created_at": 0},
+                 {"titulo": "antecipar:plano — plano", "status": "descartado", "created_at": 0}]
+    pedidos = ([{"job": "conteudo", "created_at": 2 * d}, {"job": "financas", "created_at": 3 * d},
+                {"job": "financas", "created_at": 5 * d}]
+               + [{"job": "plano", "created_at": -d}, {"job": "plano", "created_at": 8 * d}])   # fora da janela
+    r = jobs.desfecho_propostas(propostas, pedidos)
+    assert r.desfechos == ["antecipou", "redundante", "ignorada"]
+    assert r.total == 3 and r.contagem == {"antecipou": 1, "redundante": 1, "ignorada": 1}
+    assert r.taxa == 0.333 and r.pedidos_depois == {"conteudo": 1, "financas": 2, "plano": 0}
+    vazio = jobs.desfecho_propostas([], pedidos)
+    assert vazio.total == 0 and vazio.taxa == 0.0 and vazio.desfechos == []
+
+
+def test_evidencia_da_pergunta_jtbd_traz_a_taxa_de_antecipacao_das_propostas(circle):
+    from circulo.perguntas import METRICAS
+    s = circle.store
+    agora = time.time()
+    _, fn = METRICAS["pedidos_humano"]
+    assert fn(s, agora)[1]["antecipacao"] == {"propostas": 0, "taxa": 0.0, "antecipou": 0, "redundante": 0,
+                                              "ignorada": 0, "pedidos_depois": {}}       # medida mesmo sem proposta
+    perg = s.x("INSERT INTO perguntas(chave,persona,texto,status,created_at,updated_at) "
+               "VALUES('jtbd','entrevistador_jtbd','qual job se repete?','feita',?,?)", (agora, agora))
+    for i in range(3):
+        s.x("UPDATE events SET job='conteudo' WHERE id=?", (_pedido(s, f"post {i}", dias=3 + i),))
+    jobs.propor_item(s, perg, agora=agora)
+    s.x("UPDATE events SET job='conteudo' WHERE id=?", (_pedido(s, "mais um post", dias=-0.5),))   # pedido depois dela
+    ev = fn(s, agora + 86400)[1]["antecipacao"]
+    assert ev["propostas"] == 1 and ev["redundante"] == 1 and ev["taxa"] == 0.0
+    assert ev["pedidos_depois"] == {"conteudo": 1}
