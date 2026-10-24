@@ -66,6 +66,16 @@ CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")
 # Lição #27: o exit 4 do pytest é qualquer erro de uso; só o caminho citado, conferido na main e no roteiro, diz que o
 # alvo não existe. Alvo que ninguém vai criar não é erro novo: 128 ocorrências do mesmo arquivo de um item descartado.
 ALVO_SUMIDO = re.compile(r"file or directory not found: (tests/[\w./-]+\.py)")
+# Lição #19: o pytest imprime o código do teste que falhou; um `timeout=10` ali não é timeout, o teste é a causa.
+# O resumo `FAILED arquivo::teste` dá o nó; sem ele (saída cortada), vale o cabeçalho `____ teste ____` do bloco.
+FALHOU_RESUMO = re.compile(r"FAILED (tests/[\w/]+\.py::\w+)")
+FALHOU_CABECALHO = re.compile(r"^_{3,} ([\w.]*test\w*(?:\[[^\]]*\])?) _{3,}$", re.M)
+
+
+def teste_que_falhou(motivo: str) -> str | None:
+    texto = motivo or ""
+    m = FALHOU_RESUMO.search(texto) or FALHOU_CABECALHO.search(texto)
+    return m.group(1) if m else None
 
 
 def normalizar(texto: str, n: int = 70) -> str:
@@ -83,7 +93,7 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     # causas de ambiente com assinatura estável (o log bruto do agente muda a cada vez)
     if re.search(r'"api_error_status":\s*429|hit your [a-z ]{0,20}limit|session limit|usage limit|rate[ _-]?limit', m, re.I):
         return f"{ponto}:limite_de_uso"
-    if re.search(r"timed? ?out|timeout", m, re.I):
+    if re.search(r"timed? ?out|timeout", m, re.I) and not teste_que_falhou(m):
         return f"{ponto}:timeout"
     legivel = erro_legivel(m)
     codigos = sorted(set(re.findall(r"\b([A-Z]{1,3}\d{3,4})\b", legivel)))
@@ -92,9 +102,9 @@ def assinatura_de(ponto: str, motivo: str) -> str:
     erros_de_coleta = coletas(legivel)
     if erros_de_coleta:
         return f"{ponto}:coleta:{erros_de_coleta[0]}"
-    falhos = re.findall(r"FAILED (tests/[\w/]+\.py::\w+)", legivel)
-    if falhos:
-        return f"{ponto}:teste:{falhos[0]}"
+    falhou = teste_que_falhou(legivel)
+    if falhou:
+        return f"{ponto}:teste:{falhou}"
     erro = re.search(r"\b(\w+(?:Error|Exception))\b", legivel)
     if erro and not AMBIENTE.search(m):
         return f"{ponto}:{erro.group(1)}"
@@ -292,7 +302,7 @@ def _pytest_no_main(repo, argumentos: dict[str, list[str]], sha, python, timeout
 
 
 def classificar(ponto: str, motivo: str) -> str:
-    if AMBIENTE.search(motivo or ""):
+    if AMBIENTE.search(motivo or "") and not teste_que_falhou(motivo):
         return "ambiente"
     if ponto.startswith(("developer:", "gate:ci", "missao")):
         return "trabalho"
