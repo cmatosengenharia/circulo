@@ -34,6 +34,17 @@ def test_licao_47_tarefa_que_o_idle_barra_nao_e_trabalho_pendente(circle, barrar
     assert not circle.trabalho_pendente(ignorar_estagnacao=True)
 
 
+def test_licao_47_uma_so_regra_de_trabalho_pronto():
+    """Lição #47: o espaçamento/recusa do trabalho pronto é calculado num lugar só (a cópia em trabalho_pendente divergia do idle)."""
+    import inspect
+
+    from circulo import loop
+    fonte = inspect.getsource(loop)
+    assert fonte.count("ESPACO.get(") == 1 and fonte.count("2 ** int(") == 1
+    assert "_trabalho_pronto(" in inspect.getsource(loop.Circle.trabalho_pendente)
+    assert "_trabalho_pronto(" in inspect.getsource(loop.Circle.idle)
+
+
 def test_licao_47_tarefa_pausada_nao_vira_estagnacao_sem_causa(circle):
     circle._tem_trabalho = lambda t: t == "corrigir_codigo"
     _pausar(circle, "corrigir_codigo")
