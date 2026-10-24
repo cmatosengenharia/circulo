@@ -15,7 +15,8 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      vai no prompt do reparo. O gate do merge continua sendo a barreira independente.
   6. Teto de tokens por item, checado ANTES de cada chamada (o limite checado depois estoura: SWE-agent #1240):
      tokens já gastos no item + estimativa da próxima > max(2× a mediana dos PRs entregues em 24 h, piso fixo) →
-     nenhuma chamada; o parcial fica guardado e o item vai para o fatiador, sem exceção.
+     nenhuma chamada; o parcial fica guardado e o item vai para o fatiador, sem exceção. Os tetos contam no item raiz
+     (os sub-itens herdam), no kv: o 2º seguido sem mudança de escopo bloqueia a árvore, com registro.
   7. A mesma falha 2x seguidas (node id + linha do erro normalizada, `assinatura_falha`) não ganha outra chamada:
      o item vai para o fatiador na hora, sem esperar as LIMITE falhas.
   8. Toda falha de developer:testes grava a causa normalizada (`causa_testes`: tipo de exceção + arquivo de teste, sem o
@@ -39,6 +40,7 @@ existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, 
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import stat
@@ -77,7 +79,8 @@ BLOQUEADO = "bloqueado"
 DISJUNTOR = "developer_disjuntor"               # {item: {"sig", "n", "chave", "texto"}}: a última barra do abrir_pr
 BLOQUEADO_BASE = "bloqueado_base"
 BASE_VERMELHA = "developer_base_vermelha"       # {item: {"sig", "n", "chave"}}: a última base vermelha do pré-voo
-CONFIRMADA = 2                                  # execuções vermelhas no mesmo sha da main até o pré-voo parar de rodar
+TETO_RAIZ = "developer_teto_raiz"              # {item raiz: {"n", "escopo"}}: tetos seguidos do item e dos sub-itens
+CONFIRMADA = 2                                 # execuções vermelhas no mesmo sha da main até o pré-voo parar de rodar
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
@@ -88,6 +91,34 @@ def tokens_do_item(store, titulo: str) -> tuple[int, int]:
                                                      "AND instr(entrada, ?) > 0", (item,))
               if PREFIXO_TITULO.sub("", r["entrada"] or "") == item]
     return sum(gastos), len(gastos)
+
+
+def raiz_do_item(store, item_id: int) -> dict | None:
+    """O item raiz da divisão: os sub-itens do fatiador (coluna `pai`) herdam dele a contagem de tetos."""
+    r, vistos = store.one("SELECT id, pai, titulo, detalhe FROM roadmap WHERE id=?", (item_id,)), set()
+    while r is not None and r["pai"] is not None and r["id"] not in vistos:
+        vistos.add(r["id"])
+        r = store.one("SELECT id, pai, titulo, detalhe FROM roadmap WHERE id=?", (r["pai"],)) or r
+    return dict(r) if r else None
+
+
+def teto_do_item(store, item_id: int) -> tuple[int, int]:
+    """Conta mais um teto no item raiz, no kv (as `verificacoes` são podadas). (id da raiz, tetos seguidos): mudar o
+    título ou o detalhe da raiz é mudar o escopo e zera a contagem."""
+    raiz = raiz_do_item(store, item_id) or {"id": item_id, "titulo": "", "detalhe": ""}
+    escopo = hashlib.sha1(f"{raiz['titulo']}\n{raiz['detalhe']}".encode()).hexdigest()
+    todos = store.get(TETO_RAIZ) or {}
+    antes = todos.get(str(raiz["id"])) or {}
+    n = antes.get("n", 0) + 1 if antes.get("escopo") == escopo else 1
+    store.set(TETO_RAIZ, {**todos, str(raiz["id"]): {"n": n, "escopo": escopo}})
+    return raiz["id"], n
+
+
+def bloquear_arvore(store, raiz: int, evidencia: str) -> None:
+    """A raiz e os sub-itens não feitos saem da fila como 'bloqueado', todos com o registro do bloqueio."""
+    store.x("WITH RECURSIVE arvore(id) AS (SELECT ? UNION SELECT r.id FROM roadmap r JOIN arvore a ON r.pai = a.id) "
+            "UPDATE roadmap SET status=?, desativado=1, evidencia=?, updated_at=? "
+            "WHERE id IN (SELECT id FROM arvore) AND status!='feito'", (raiz, BLOQUEADO, evidencia, time.time()))
 
 
 def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") -> bool:
@@ -182,6 +213,7 @@ class DeveloperComReparo(SelfDeveloper):
         self._base_quebrada = ""
         self._base_status = "pendente"
         self._disjuntor = ""
+        self._teto_bloqueado: tuple[int, str] | None = None
 
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()
@@ -195,7 +227,15 @@ class DeveloperComReparo(SelfDeveloper):
         if veto:
             return veto
         self._rodada, self._cortado, self._base_quebrada, self._disjuntor = 0, "", "", ""
+        self._teto_bloqueado = None
         r = super().run_once(item_id=item_id, autorizado=autorizado)
+        if self._teto_bloqueado:                 # o SelfDeveloper devolveu o item à fila depois do corte: bloqueia de novo
+            bloquear_arvore(self.s, *self._teto_bloqueado)
+            return DevResult(r.item_id, BLOQUEADO, self._teto_bloqueado[1])
+        if r.status == "proposto" and r.item_id is not None:
+            todos = self.s.get(TETO_RAIZ) or {}
+            if todos.pop(str((raiz_do_item(self.s, r.item_id) or {"id": r.item_id})["id"]), None):
+                self.s.set(TETO_RAIZ, todos)     # entregou: os tetos deixam de ser seguidos
         if self._disjuntor and r.status == "testes_falharam":
             self._set_item(r.item_id, BLOQUEADO, self._disjuntor[:300])
             return r
@@ -293,20 +333,27 @@ class DeveloperComReparo(SelfDeveloper):
     def _fora_da_fila_se_preso(self, sujeito: str, motivo: str) -> None:
         """O teto do item é acumulado e não volta a cair: um item cortado de novo nunca mais anda. Antes, como itens de
         erro vêm primeiro na fila, ele era pego a cada hora, cortado sem chamar o agente e devolvido — e a fila inteira
-        parava atrás dele (22→23/10: 17 h, item #144). No 2º corte o item sai da fila (desativado) para você decidir."""
+        parava atrás dele (22→23/10: 17 h, item #144). A contagem é do item raiz (`teto_do_item`), no kv: contada pelo
+        nome do worktree nas `verificacoes`, cada sub-item do fatiador zerava e a poda apagava (859 tetos em 24 h).
+        No 2º teto seguido a árvore inteira vai para 'bloqueado', com registro, e espera a divisão pelo Arquiteto."""
+        from .licoes import registrar as monitorar
+        from .roadmap import PONTO
         item_id = self._item_id
         if item_id is None and sujeito.startswith(".circulo-wt-") and sujeito[12:].isdigit():
             item_id = int(sujeito[12:])                 # o corte vem antes do portão: o id está no nome do worktree
         if item_id is None or self._consertando:
             return
-        cortes = int(self.s.one("SELECT COUNT(*) n FROM verificacoes WHERE ponto=? AND ok=0 AND sujeito=?", (TETO, sujeito))["n"])
-        if cortes < 2:
+        raiz, n = teto_do_item(self.s, item_id)
+        if n < 2:
             return
-        self.s.x("UPDATE roadmap SET desativado=1, evidencia=?, updated_at=? WHERE id=? AND COALESCE(desativado,0)=0",
-                 (f"depende de você: cortado {cortes}× pelo teto de tokens do item ({motivo[:120]}); a fila segue sem ele", time.time(), item_id))
+        texto = (f"depende de você: bloqueado pelo disjuntor do teto, {n} tetos seguidos no item #{raiz} e nos sub-itens "
+                 f"({motivo[:120]}); nenhuma chamada nova ao Developer até o Arquiteto dividir o item")[:300]
+        self._teto_bloqueado = (raiz, texto)
+        bloquear_arvore(self.s, raiz, texto)
+        monitorar(self.ctx, PONTO, False, sujeito=f"roteiro #{raiz}", item_id=raiz, motivo=texto, causa="teto", licao=False)
         if callable(getattr(self.ctx, "reply", None)):
-            self.ctx.reply(f"Developer: o item #{item_id} bateu o teto de tokens {cortes}× e não anda mais; tirei da fila para "
-                           "você decidir (dividir, reescrever ou descartar). O resto da fila segue.", "saude")
+            self.ctx.reply(f"Developer: o item #{raiz} bateu o teto de tokens {n}× seguidas (contando os sub-itens) e foi "
+                           "bloqueado; precisa ser dividido. O resto da fila segue.", "saude")
 
     def _mesma_falha(self, wt: Path, saida: str) -> bool:
         """A falha é a mesma da rodada anterior do item: pede a divisão em vez de outra chamada."""
