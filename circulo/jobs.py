@@ -168,6 +168,25 @@ def precisa(store) -> bool:
     return bool(_pendentes(store, time.time()))
 
 
+def propor_item(store, pergunta_id: int | None, agora: float | None = None) -> int | None:
+    """O job recorrente mais pedido sem item 'antecipar:<job>' aberto ou criado nos últimos 7 dias vira um único item
+    'proposto' do roteiro, preso à pergunta do conselho que o originou (lição #15); None se todos já têm."""
+    from .planejador import exigir_pergunta, gravar_item
+    pid = exigir_pergunta(store, pergunta_id)
+    agora = time.time() if agora is None else agora
+    rec = recorrentes(pedidos_7d(store, agora))
+    for job, n in rec.jobs.items():
+        if store.one("SELECT 1 FROM roadmap WHERE titulo LIKE ? AND status!='descartado' "
+                     "AND (status!='feito' OR created_at>?)", (f"antecipar:{job} %", agora - JANELA)):
+            continue
+        _, entrega, _ = JOBS[job]
+        return gravar_item(store, pid, f"antecipar:{job} — {entrega}"[:100],
+                           f"O job '{job}' foi pedido {n} vezes em 7 dias ({rec.fracao[job]:.0%} dos {rec.total} pedidos). "
+                           f"Preparar antes do próximo pedido: {entrega}.",
+                           f"pergunta do conselho #{pid}: {n} pedidos de '{job}' em 7 dias", "circulo/jobs.py", "proposto")
+    return None
+
+
 def antecipar(store, agora: float | None = None) -> list[int]:
     """Cada job recorrente sem missão nesta semana vira 'antecipar:<job>' (kit geral: o motor prepara a entrega)."""
     from .rastro import elo
