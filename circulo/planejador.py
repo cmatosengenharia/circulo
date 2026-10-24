@@ -409,13 +409,15 @@ def exigir_pergunta(store, pergunta_id: int | None) -> int:
     return pergunta_id
 
 
-def gravar_item(store, pergunta_id: int | None, titulo: str, detalhe: str, evidencia: str, modulo: str | None = None) -> int:
+def gravar_item(store, pergunta_id: int | None, titulo: str, detalhe: str, evidencia: str, modulo: str | None = None,
+                status: str = "pendente") -> int:
     """A única forma de o planejador gravar um item do loop no roteiro: sempre preso à pergunta que o originou."""
     pid = exigir_pergunta(store, pergunta_id)
     ordem = (store.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
     agora = time.time()
-    rid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo) "
-                  "VALUES(?,?,'loop','pendente',?,?,?,?,?)", (titulo, detalhe[:2000], evidencia, ordem, agora, agora, modulo))
+    rid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo,"
+                  "pergunta_id,origem_status) VALUES(?,?,'loop',?,?,?,?,?,?,?,'ok')",
+                  (titulo, detalhe[:2000], status, evidencia, ordem, agora, agora, modulo, pid))
     store.x("UPDATE perguntas SET item_id=?, updated_at=? WHERE id=?", (rid, agora, pid))
     return rid
 
