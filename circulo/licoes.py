@@ -765,6 +765,69 @@ def _descricao(ponto: str, motivo: str) -> str:
     return f"{ponto}: {linha.strip()[:200]}" if linha else f"{ponto}: saida ilegivel"
 
 
+# Canário dos portões aprendidos (pergunta do conselho #141): o trecho que viola cada código de lint
+VIOLA_LINT = {
+    "B905": "def f_b905(a, b):\n    return list(zip(a, b))\n",
+    "F811": "def f_f811():\n    pass\n\n\ndef f_f811():\n    pass\n",
+    "F401": "import os\n",
+    "F841": "def f_f841():\n    x = 1\n",
+    "F821": "def f_f821():\n    return indefinido\n",
+    "E711": "def f_e711(x):\n    return x == None\n",
+    "E712": "def f_e712(x):\n    return x == True\n",
+    "E722": "def f_e722():\n    try:\n        pass\n    except:\n        pass\n",
+    "B006": "def f_b006(a=[]):\n    return a\n",
+    "B007": "def f_b007():\n    for i in range(3):\n        pass\n",
+}
+
+
+def entrada_sintetica(tipo: str, spec: dict, licao_id: int | None, falha: bool) -> dict[str, str] | None:
+    """Arquivos do worktree que o portão aprendido julga: com `falha`, levam a assinatura da lição (o teste citado
+    falhando, o código de lint violado, o teste sem a marca da lição); sem ela, são o controle. None = sem canário."""
+    argv = spec.get("argv") or []
+    if tipo == "comando" and argv[1:2] == ["pytest"] and "::" in argv[-1]:
+        arquivo, _, teste = argv[-1].partition("::")
+        return {arquivo: f"def {teste}():\n    assert {not falha}\n"}
+    if tipo == "comando" and argv[1:2] == ["ruff"] and "--select" in argv[:-1]:
+        codigos = argv[argv.index("--select") + 1].split(",")
+        if not all(c in VIOLA_LINT for c in codigos):
+            return None
+        return {"pyproject.toml": '[tool.ruff]\ntarget-version = "py311"\n',
+                "circulo/canario.py": "".join(VIOLA_LINT[c] for c in codigos) if falha else "X = 1\n"}
+    if tipo == "obrigatorio" and spec.get("em") == "teste" and licao_id is not None:
+        return {"tests/test_canario.py": "def test_canario():" + ("" if falha else f"  # lição #{licao_id}") + "\n    pass\n"}
+    return None
+
+
+def portoes_que_deixam_passar(portoes: list[dict]) -> list[dict]:
+    """Cada portão aprendido julga a entrada sintética da sua lição (tem de barrar) e o controle (tem de passar), num
+    store e num worktree descartáveis: o portão real não conta avaliação nem bloqueio. Devolve os que deixaram passar,
+    barraram também o controle ou não têm canário."""
+    from .neuronios import avaliar_aprendidos, criar_portao
+    from .state import Store
+    out = []
+    for p in portoes:
+        spec = p["spec"] if isinstance(p["spec"], dict) else json.loads(p["spec"])
+        vereditos = []
+        for falha in (True, False):
+            arquivos = entrada_sintetica(p["tipo"], spec, p.get("licao_id"), falha)
+            s = Store(":memory:")
+            if arquivos is None or not criar_portao(s, p["neuronio"], p["tipo"], spec, p.get("descricao") or "",
+                                                    p.get("licao_id")):
+                break
+            with tempfile.TemporaryDirectory() as wt:
+                for nome, texto in arquivos.items():
+                    (Path(wt) / nome).parent.mkdir(parents=True, exist_ok=True)
+                    (Path(wt) / nome).write_text(texto)
+                [r] = avaliar_aprendidos(s, p["neuronio"], Path(wt), {n: t.splitlines() for n, t in arquivos.items()},
+                                         dict(os.environ), spec.get("item"))
+            vereditos.append(r.ok)
+        causa = ("sem canário" if not vereditos else "deixou passar a assinatura da lição" if vereditos[0] else
+                 "barrou também o controle" if not vereditos[1] else "")
+        if causa:
+            out.append({"id": p.get("id"), "descricao": p.get("descricao"), "causa": causa})
+    return out
+
+
 def item_de(store, sujeito: str = "", item_id: int | None = None) -> tuple[int | None, str]:
     """(id, título) do item do roteiro: pelo id, pelo worktree `.circulo-wt-N`/`roteiro #N` ou pelo título exato."""
     if item_id is None and (m := DO_ITEM.search(sujeito or "")):
