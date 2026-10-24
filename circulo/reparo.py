@@ -25,6 +25,8 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      SWE Atlas rodam os testes no código original antes de julgar o patch). A mesma base vermelha (`assinatura_falha`)
      2x seguidas no item → 'bloqueado_base', com um único evento por (item, assinatura) e o contador no kv; o item
      volta à fila quando a main muda, e o pré-voo decide de novo (pergunta #129: item #144 com 3786 falhas locais).
+     Cada falha é upsert em `base_vermelha` por (item, assinatura, sha da main) com `ocorrencias` (Sentry); vermelha
+     CONFIRMADA vezes no mesmo sha, o pré-voo só conta, sem rodar os testes de novo (item #163).
   10. Com o pytest do loop, `pytest --collect-only -q` roda antes da suíte (lição #9): erro de coleta barra ali, como
      developer:testes, e a lição sai assinada pelo módulo e pela exceção (`licoes.coletas`).
   11. Disjuntor do developer:abrir_pr (pergunta #55): cada barra grava no item a assinatura da causa
@@ -75,6 +77,7 @@ BLOQUEADO = "bloqueado"
 DISJUNTOR = "developer_disjuntor"               # {item: {"sig", "n", "chave", "texto"}}: a última barra do abrir_pr
 BLOQUEADO_BASE = "bloqueado_base"
 BASE_VERMELHA = "developer_base_vermelha"       # {item: {"sig", "n", "chave"}}: a última base vermelha do pré-voo
+CONFIRMADA = 2                                  # execuções vermelhas no mesmo sha da main até o pré-voo parar de rodar
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
@@ -94,6 +97,25 @@ def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") ->
     n = antes.get("n", 0) + 1 if antes.get("sig") == sig else 1
     store.set(DISJUNTOR, {**todos, str(item_id): {"sig": sig, "n": n, "chave": chave, "texto": texto[:2000]}})
     return n >= 2
+
+
+def registrar_base(store, item_id: int, sig: str, sha: str, causa: str = "") -> int:
+    """Upsert da falha local de base vermelha por (item, assinatura, sha da main): a chave repetida soma `ocorrencias` e
+    atualiza `ultima_vez`, sem linha nova. Devolve as ocorrências da chave."""
+    agora = time.time()
+    store.x("INSERT INTO base_vermelha(item_id,assinatura,sha,causa,ocorrencias,primeira_vez,ultima_vez) "
+            "VALUES(?,?,?,?,1,?,?) ON CONFLICT(item_id,assinatura,sha) "
+            "DO UPDATE SET ocorrencias=ocorrencias+1, ultima_vez=excluded.ultima_vez",
+            (item_id, sig, sha, (causa or "")[:300], agora, agora))
+    return store.one("SELECT ocorrencias FROM base_vermelha WHERE item_id=? AND assinatura=? AND sha=?",
+                     (item_id, sig, sha))["ocorrencias"]
+
+
+def base_confirmada(store, item_id: int, sha: str) -> dict | None:
+    """A base vermelha que já falhou CONFIRMADA vezes neste sha da main: o resultado é conhecido, os testes não rodam."""
+    r = store.one("SELECT assinatura, causa FROM base_vermelha WHERE item_id=? AND sha=? AND ocorrencias>=? "
+                  "ORDER BY ultima_vez DESC LIMIT 1", (item_id, sha, CONFIRMADA))
+    return dict(r) if r else None
 
 
 def saida_focada(texto: str, limite: int = LINHAS_FEEDBACK) -> str:
@@ -367,25 +389,31 @@ class DeveloperComReparo(SelfDeveloper):
         testes = self._testes_afetados(wt, f"{titulo}\n{r['detalhe'] if r else ''}")
         if not testes:
             return ""
-        try:
-            p = subprocess.run([sys.executable, "-m", "pytest", "-q", "--tb=short", *testes], cwd=wt,
-                               capture_output=True, text=True, timeout=900, env=_ambiente())
-        except subprocess.TimeoutExpired:
-            return ""
-        vermelhas, chave = self.s.get(BASE_VERMELHA) or {}, str(r["id"]) if r else ""
-        if p.returncode in (0, 5):                   # 5 = nenhum teste coletado
-            if vermelhas.pop(chave, None):
-                self.s.set(BASE_VERMELHA, vermelhas)
-            return ""
+        sha, vermelhas, chave = _git(["rev-parse", "HEAD"], wt), self.s.get(BASE_VERMELHA) or {}, str(r["id"]) if r else ""
+        conhecida = base_confirmada(self.s, r["id"], sha) if r else None
+        if conhecida:
+            saida, causa, sig = "", conhecida["causa"], conhecida["assinatura"]
+        else:
+            try:
+                p = subprocess.run([sys.executable, "-m", "pytest", "-q", "--tb=short", *testes], cwd=wt,
+                                   capture_output=True, text=True, timeout=900, env=_ambiente())
+            except subprocess.TimeoutExpired:
+                return ""
+            if p.returncode in (0, 5):               # 5 = nenhum teste coletado
+                if vermelhas.pop(chave, None):
+                    self.s.set(BASE_VERMELHA, vermelhas)
+                return ""
+            saida = p.stdout + p.stderr
+            causa = causa_testes(saida)
+            sig = assinatura_falha(saida) or causa
         from .licoes import registrar as monitorar
-        saida = p.stdout + p.stderr
-        causa = causa_testes(saida)
-        sig, antes = assinatura_falha(saida) or causa, vermelhas.get(chave) or {}
+        antes = vermelhas.get(chave) or {}
         n = antes.get("n", 0) + 1 if r and antes.get("sig") == sig else 1
         if r:
             self.s.set(BASE_VERMELHA, {**vermelhas, chave: {"sig": sig, "n": n, "chave": self._chave("")}})
+            registrar_base(self.s, r["id"], sig, sha, causa)
         if n == 1:                                   # um evento por (item, assinatura); as repetições ficam no contador
-            monitorar(self.ctx, BASE, False, sujeito=titulo[:120], motivo=saida_focada(saida), causa=causa,
+            monitorar(self.ctx, BASE, False, sujeito=titulo[:120], motivo=saida_focada(saida) or causa, causa=causa,
                       item_id=r["id"] if r else None)
         self._base_status = BLOQUEADO_BASE if n >= 2 else "pendente"
         self._base_quebrada = (f"base quebrada: {causa} já falha na main; nenhuma chamada ao agente"

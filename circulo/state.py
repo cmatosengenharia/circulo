@@ -141,6 +141,18 @@ CREATE TABLE IF NOT EXISTS verificacoes (
 CREATE INDEX IF NOT EXISTS idx_verificacoes_ponto ON verificacoes(ponto, created_at);
 CREATE INDEX IF NOT EXISTS idx_verificacoes_assinatura ON verificacoes(assinatura, created_at);
 
+-- base vermelha do pré-voo: uma linha por (item, assinatura do teste, sha da main), as repetições no contador (Sentry)
+CREATE TABLE IF NOT EXISTS base_vermelha (
+  item_id INTEGER NOT NULL,
+  assinatura TEXT NOT NULL,
+  sha TEXT NOT NULL,
+  causa TEXT,
+  ocorrencias INTEGER NOT NULL,
+  primeira_vez REAL NOT NULL,
+  ultima_vez REAL NOT NULL,
+  PRIMARY KEY (item_id, assinatura, sha)
+);
+
 -- erros aprendidos: uma assinatura por causa; o mesmo erro de estrutura só acontece uma vez
 CREATE TABLE IF NOT EXISTS licoes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
