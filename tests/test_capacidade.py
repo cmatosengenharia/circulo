@@ -2,6 +2,7 @@
 quem não conflita na esteira (Arquiteto, Desenvolvedor) — e o loop roda esses agentes em paralelo."""
 import json
 import re
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -84,7 +85,6 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
     agora = time.time()
     for i in range(3):
         s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'loop','pendente','pedido',?,?,?)", (f"Estudar coisa {i}", "d", 500 + i, agora, agora))
-    import threading
     vistos = set()
     juntos = threading.Barrier(3, timeout=10)   # só abre com os 3 estudos dentro do LLM ao mesmo tempo; em série, quebra
 
@@ -103,13 +103,16 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
 
 class AgenteDoModulo:
     """Cada item mexe só no seu módulo: itens distintos não compartilham arquivo e o Revisor não recusa o que terminar
-    depois (lição #63: com os dois mexendo em app.py, o resultado dependia de qual thread chegava primeiro)."""
-    def __init__(self, atraso: dict | None = None):
-        self.atraso = atraso or {}
+    depois (lição #63: com os dois mexendo em app.py, o resultado dependia de qual thread chegava primeiro).
+    A barreira só abre com os dois agentes dentro ao mesmo tempo; em série, quebra no prazo em vez de travar a suíte."""
+    def __init__(self, n: int):
+        self.juntos = threading.Barrier(n, timeout=5)
+        self.pegos = []
 
     def run(self, task, workdir):
         n = re.search(r"Item (\d+)", task).group(1)
-        time.sleep(self.atraso.get(n, 0))
+        self.pegos.append(n)
+        self.juntos.wait()
         (Path(workdir) / f"item_{n}.py").write_text(f"N = {n}\n")
         (Path(workdir) / f"test_item_{n}.py").write_text(f"from item_{n} import N\n\n\ndef test_n():\n    assert N == {n}\n")
         return {"ok": True, "tokens": 1, "log": "ok"}
@@ -121,10 +124,12 @@ def test_desenvolvedor_pega_itens_distintos_em_paralelo(circle, repo):  # noqa: 
     s.x("UPDATE roadmap SET status='feito'")
     _fila_dev(s, 3)
     s.x("UPDATE roadmap SET modulo='item_' || substr(titulo, 6) || '.py' WHERE titulo LIKE 'Item %'")
-    dev = SelfDeveloper(circle.ctx, repo, AgenteDoModulo({"0": 0.5}), FakeGH(), test_cmd=["python3", "-c", "import glob, runpy; [runpy.run_path(f)['test_n']() for f in glob.glob('test_item_*.py')]"])   # o 1º termina por último
+    agente = AgenteDoModulo(2)
+    dev = SelfDeveloper(circle.ctx, repo, agente, FakeGH(), test_cmd=["python3", "-c", "import glob, runpy; [runpy.run_path(f)['test_n']() for f in glob.glob('test_item_*.py')]"])
     assert [i["titulo"] for i in dev.picks(2)] == ["Item 0", "Item 1"]
     s.set(capacidade.KV, {"corrigir_codigo": {"trabalhadores": 2, "desde": time.time()}})
     r = dev.run_paralelo(autorizado=True)
+    assert sorted(agente.pegos) == ["0", "1"]                                             # dois itens distintos, ao mesmo tempo
     assert r.status == "proposto"
     assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'Developer abriu correção%'")["n"] == 2   # dois PRs (o GitHub falso numera os dois como #42)
     assert s.one("SELECT COUNT(*) n FROM roadmap WHERE status='em_andamento'")["n"] == 2
