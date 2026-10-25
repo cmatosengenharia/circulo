@@ -99,3 +99,22 @@ def test_memoria_externa_entra_no_indice_e_banco_indisponivel_nao_quebra(circle,
     assert any("outro-loop" in x["titulo"] for x in m.buscar("ruff import worktree"))
     assert not m.reindexar(forcar=True).get(f"ext:{outro}")                           # cursor: nada novo, nada regravado
     assert not sqlite3.connect(str(outro)).execute("SELECT name FROM sqlite_master WHERE name='memoria'").fetchall()   # só leitura no outro banco
+
+
+def test_item_e_estudo_de_outro_loop_nao_quebram_o_planejador(circle, tmp_path, monkeypatch):
+    """Vigia (pergunta_valida_parada): `ValueError: invalid literal for int() with base 10: 'ext:outro-loop:1'` em
+    idle:planejar_roteiro. Item/estudo de outro loop têm ref `ext:<nome>:<id>`, que não é id do roteiro local."""
+    outro = tmp_path / "outro-loop" / "circulo.db"
+    outro.parent.mkdir()
+    o = Store(str(outro))
+    agora = time.time()
+    est = json.dumps({"justificativa": "teto por item", "fontes": ["https://exemplo"], "achados": []})
+    o.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,estudo,ordem,created_at,updated_at) "
+        "VALUES('Teto de tokens por item do Developer','d','loop','feito','PR #1',?,1,?,?)", (est, agora, agora))
+    o.db.commit()
+    monkeypatch.setenv("CIRCULO_MEMORIA_EXTERNA", str(outro))
+    m = Memoria(circle.store)
+    m.reindexar(forcar=True)
+    assert circle.store.one("SELECT 1 FROM memoria WHERE ref='ext:outro-loop:1' AND tipo='item'")
+    assert m.item_parecido("Teto de tokens por item do Developer") is None
+    assert m.estudo_parecido({"id": 99, "titulo": "Teto de tokens por item do Developer"}) is None
