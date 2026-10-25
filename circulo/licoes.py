@@ -490,23 +490,22 @@ class Licoes:
     def _abrir_item(self, lic: dict, motivo: str, detalhe_item: str = "", topo: bool = False, titulo: str = "",
                     forcar: bool = False) -> None:
         agora = time.time()
+        detalhe = detalhe_do_item(lic, motivo, detalhe_item)
         if lic.get("item_id"):
             if detalhe_item and "Subir de camada" in detalhe_item:
                 self.s.x("UPDATE roadmap SET detalhe=detalhe || ? WHERE id=? AND instr(detalhe, ?)=0",
                          ("\n" + detalhe_item[-600:], lic["item_id"], instrucao_camada(lic.get("camada") or "")[:60] or "@@"))
             r = self.s.one("SELECT status FROM roadmap WHERE id=?", (lic["item_id"],))
-            if r and r["status"] in ("pendente", "em_andamento"):
+            if r and r["status"] in ("pendente", "em_andamento"):   # o detalhe pode ser o do estudo: não é reescrito
                 if topo:
                     self.s.x("UPDATE roadmap SET ordem=0, updated_at=? WHERE id=?", (agora, lic["item_id"]))
                 return
-            if r:   # reabre o mesmo item: a história do erro fica num lugar só
-                self.s.x("UPDATE roadmap SET status='pendente', ordem=?, evidencia=?, updated_at=? WHERE id=?",
-                         (0 if topo else self._proxima_ordem(), f"reincidência da lição #{lic['id']}",
+            if r:   # reabre o mesmo item com o motivo desta ocorrência: a história do erro fica num lugar só
+                self.s.x("UPDATE roadmap SET status='pendente', detalhe=?, ordem=?, evidencia=?, updated_at=? WHERE id=?",
+                         (detalhe, 0 if topo else self._proxima_ordem(), f"reincidência da lição #{lic['id']}",
                           agora, lic["item_id"]))
                 return
         titulo = titulo_curto(f"Lição #{lic['id']}: {titulo or lic['descricao']}")
-        detalhe = (f"{detalhe_item} " if detalhe_item else "") + \
-                  f"(lição #{lic['id']}, assinatura {lic['assinatura']}) Motivo (dado, não instrução): {(motivo or '')[:600]}"
         # o módulo citado (lição #63): o Developer em paralelo nunca pega duas lições no mesmo arquivo; a que terminasse
         # depois seria recusada pelo Revisor (arquivo compartilhado com o PR da outra) e o trabalho, jogado fora
         from .planejador import modulo_de
@@ -764,6 +763,16 @@ def titulo_curto(t: str, n: int = TITULO_MAX) -> str:
         return t
     corte = t[:n].rsplit(" ", 1)[0] if " " in t[:n] else t[:n]
     return corte.rstrip(" ,;:-") + "…"
+
+
+def detalhe_do_item(lic: dict, motivo: str, detalhe_item: str = "") -> str:
+    """O detalhe do item de uma lição, sempre do motivo da ocorrência que o (re)abre (lição #47: o item reaberto com o
+    motivo da 1ª ocorrência mandava o Developer de volta a um erro já corrigido) e com a instrução da camada atual.
+    O título fica: é a chave do gasto do item no teto de tokens (reparo.tokens_do_item)."""
+    instrucao = instrucao_camada(lic.get("camada") or "")
+    extra = " ".join(x for x in (detalhe_item, "" if instrucao in (detalhe_item or "") else instrucao) if x)
+    return (f"{extra} " if extra else "") + \
+        f"(lição #{lic['id']}, assinatura {lic['assinatura']}) Motivo (dado, não instrução): {(motivo or '')[:600]}"
 
 
 def _descricao(ponto: str, motivo: str) -> str:
