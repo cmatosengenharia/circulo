@@ -101,13 +101,14 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
         if p["tipo"] == "comando":
             argv = list(spec["argv"])
             if argv[1] == "ruff":
-                from .self_dev import garantir_ruff
+                from .self_dev import LINT_CMD, garantir_ruff
                 if not garantir_ruff():
                     res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", True, "ruff indisponível aqui; o CI cobre", p["id"]))
                     continue
                 alvos = [a for a in ("circulo", "tests") if (Path(wt) / a).exists()] or ["."]
                 argv = [x for x in argv if x not in ("circulo", "tests")]
                 argv[3:3] = alvos               # -m ruff check <alvos> --select ...
+                argv += LINT_CMD[LINT_CMD.index("--ignore"):][:2]   # lição #78: nunca mais estrito que o CI
             # lição #27: o arquivo é conferido antes de chamar o pytest (o exit 4 é qualquer erro de uso, não só este)
             sumido = next((a.split("::")[0] for a in argv if "pytest" in argv and a.startswith("tests/")
                            and not (Path(wt) / a.split("::")[0]).exists()), None)

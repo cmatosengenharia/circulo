@@ -24,5 +24,8 @@ packages = ["circulo", "fabrica"]
 circulo = ["painel.html", "home.html", "integracoes.html", "rastros.html", "fluxo.html", "equipe.html", "aprovacoes.html", "DESIGN.md", "jobs_rotulados.json"]
 fabrica = ["painel.html", "README.md"]
 
+[tool.ruff.lint.per-file-ignores]
+"*.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
