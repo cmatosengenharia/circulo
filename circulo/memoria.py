@@ -87,6 +87,11 @@ def jaccard(a: str, b: str) -> float:
     return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
 
 
+def id_do_roteiro(ref) -> int | None:
+    """Ref de item/estudo da memória → id no roteiro local. `ext:<nome>:<id>` (outro loop) não tem linha aqui: None."""
+    return int(ref) if str(ref).isdigit() else None
+
+
 # agente → (tipos que lhe servem, quantos trechos). A mesma memória, servida no recorte de cada papel.
 RECEITA: dict[str, tuple[tuple[str, ...] | None, int]] = {
     "indagar":          (("pergunta", "item", "licao", "episodio"), 5),
@@ -389,7 +394,7 @@ class Memoria:
         for h in hits:
             if str(h["ref"]) == str(item.get("id")):
                 continue
-            r = self.s.one("SELECT id, titulo, estudo FROM roadmap WHERE id=?", (int(h["ref"]),))
+            r = self.s.one("SELECT id, titulo, estudo FROM roadmap WHERE id=?", (id_do_roteiro(h["ref"]),))
             if not r or not r["estudo"] or (jaccard(item["titulo"], r["titulo"]) < MIN_PARECIDO_ESTUDO and str(r["id"]) != forte):
                 continue
             est = json.loads(r["estudo"])
@@ -408,7 +413,7 @@ class Memoria:
         for h in hits:
             if ignorar is not None and str(h["ref"]) == str(ignorar):
                 continue
-            r = self.s.one("SELECT id, titulo, status, updated_at FROM roadmap WHERE id=?", (int(h["ref"]),))
+            r = self.s.one("SELECT id, titulo, status, updated_at FROM roadmap WHERE id=?", (id_do_roteiro(h["ref"]),))
             semantico = r is not None and str(r["id"]) == forte
             if semantico and jaccard(titulo, r["titulo"]) < MIN_PARECIDO_ITEM:
                 uso_graft(self.s, titulo, [], repeticao={"tipo": "item", "ref": str(r["id"]), "titulo": r["titulo"]})
