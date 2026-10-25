@@ -165,10 +165,30 @@ def test_falha_local_no_worktree_e_do_item_e_nunca_do_diretorio(circle):
     gravada = s.one("SELECT item_id, item_titulo FROM verificacoes WHERE ponto='developer:testes' ORDER BY id DESC LIMIT 1")
     assert (gravada["item_id"], gravada["item_titulo"]) == (item, "Simplificar o fatiador")
     # registro antigo, sem item gravado: o diretório só resolve o item na leitura; sem item, cai em 'sem_item'
-    for sujeito in (f".circulo-wt-{item}", f".circulo-wt-{item}", ".circulo-wt-999", ".circulo-wt-999"):
-        s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,motivo,created_at) VALUES(0,'developer:lint',?,0,'E1',?)",
-            (sujeito, agora))
+    for tick, sujeito in enumerate((f".circulo-wt-{item}", f".circulo-wt-{item}", ".circulo-wt-999", ".circulo-wt-999"),
+                                   start=s.tick + 1):
+        s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,motivo,created_at) VALUES(?,'developer:lint',?,0,'E1',?)",
+            (tick, sujeito, agora))
     ranking = _arquiteto(s, agora)[0].evidencia["itens_com_mais_falhas_locais"]
-    assert ranking[0] == {"item": item, "titulo": "Simplificar o fatiador", "n": 3}
-    assert {"item": "sem_item", "titulo": "sem_item", "n": 2} in ranking
+    assert ranking[0] == {"item": item, "titulo": "Simplificar o fatiador", "n": 3, "linhas": 3}
+    assert {"item": "sem_item", "titulo": "sem_item", "n": 2, "linhas": 2} in ranking
     assert not [x for x in ranking if ".circulo-wt-" in str(x)]
+
+
+def test_falhas_locais_contam_execucoes_distintas_e_nao_linhas(circle):
+    """Pergunta #160: 1 execução do Developer com 50 linhas de falha é n=1; as linhas vão à parte."""
+    from circulo.perguntas import _arquiteto
+    s, agora = circle.store, time.time()
+    item = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+               "VALUES('Item que repete linhas','x','loop','em_andamento','',1,?,?)", (agora, agora))
+    outro = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                "VALUES('Item que refaz','x','loop','em_andamento','',2,?,?)", (agora, agora))
+    for i in range(50):
+        s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id) "
+            "VALUES(7,'developer:testes','x',0,?,'falhou',?,?)", (f"sig{i % 3}", agora, item))
+    for tick in (1, 2):
+        s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id) "
+            "VALUES(?,'developer:testes','x',0,'sig','falhou',?,?)", (tick, agora, outro))
+    ranking = _arquiteto(s, agora)[0].evidencia["itens_com_mais_falhas_locais"]
+    assert ranking[0] == {"item": outro, "titulo": "Item que refaz", "n": 2, "linhas": 2}
+    assert ranking[1] == {"item": item, "titulo": "Item que repete linhas", "n": 1, "linhas": 50}

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -142,13 +142,17 @@ def _cientista(s, agora) -> list[Pergunta]:
 
 def _arquiteto(s, agora) -> list[Pergunta]:
     out = []
-    falhas = s.q("SELECT item_id, sujeito, COUNT(*) n FROM verificacoes WHERE ponto LIKE 'developer:%' AND ok=0 "
-                 "AND created_at>=? GROUP BY item_id, sujeito", (agora - 7 * 86400,))
-    por_item = Counter()
+    falhas = s.q("SELECT item_id, sujeito, tick, COUNT(*) n FROM verificacoes WHERE ponto LIKE 'developer:%' AND ok=0 "
+                 "AND created_at>=? GROUP BY item_id, sujeito, tick", (agora - 7 * 86400,))
+    execucoes, linhas = defaultdict(set), Counter()   # n = execuções (ticks) distintas; uma execução grava várias linhas
     for f in falhas:   # registro antigo, sem item gravado: o sujeito só resolve o item na leitura
-        por_item[f["item_id"] if f["item_id"] is not None else item_de(s, f["sujeito"])[0]] += f["n"]
-    retrabalho = [{"item": k, "titulo": item_de(s, item_id=k)[1] or f"roteiro #{k}", "n": n} if k is not None else
-                  {"item": "sem_item", "titulo": "sem_item", "n": n} for k, n in por_item.most_common(3)]
+        k = f["item_id"] if f["item_id"] is not None else item_de(s, f["sujeito"])[0]
+        execucoes[k].add(f["tick"])
+        linhas[k] += f["n"]
+    por_item = Counter({k: len(t) for k, t in execucoes.items()})
+    retrabalho = [{"item": k, "titulo": item_de(s, item_id=k)[1] or f"roteiro #{k}", "n": n, "linhas": linhas[k]}
+                  if k is not None else {"item": "sem_item", "titulo": "sem_item", "n": n, "linhas": linhas[k]}
+                  for k, n in por_item.most_common(3)]
     if retrabalho and retrabalho[0]["n"] >= 2:
         out.append(Pergunta("arquiteto:retrabalho", "arquiteto",
                             "Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?",
