@@ -91,11 +91,7 @@ class Corpo:
             env = {**ambiente_isolado(), "PYTHONPATH": str(wt)}
             cmds = self.validacao or [[sys.executable, "-c", SMOKE], [sys.executable, "-m", "pytest", "-q", "-x"]]
             for cmd in cmds:
-                try:
-                    p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=1200, env=env)
-                    codigo, saida = p.returncode, (p.stdout + p.stderr)
-                except subprocess.TimeoutExpired as exc:          # suíte travada na main nova: reprova, não trava o loop a cada giro
-                    codigo, saida = -1, f"validação passou de 1200 s: {' '.join(cmd)}\n{(exc.stdout or b'')[-800:]!r}"
+                codigo, saida = rodar_com_prazo(cmd, wt, env, 1200)     # suíte travada na main nova: reprova, não trava o loop
                 if codigo != 0:
                     motivo = saida[-1500:]
                     st = self.estado()
@@ -210,6 +206,26 @@ class Corpo:
             self.ctx.reply(f"Corpo {str(st.get('sha'))[:7]} evidenciado: {VALIDAR_GIROS} giros sem erro no código novo.", "merge")
             return "ok"
         return None
+
+
+def rodar_com_prazo(cmd: list[str], cwd, env: dict, prazo: int) -> tuple[int, str]:
+    """(código, saída). Grupo de processos próprio: no prazo, mata o grupo inteiro — um processo neto segurando a saída
+    fazia o `subprocess.run(timeout=…)` esperar para sempre depois de matar só o filho (24/10: 6 h e meia na validação)."""
+    import signal
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        out, _ = p.communicate(timeout=prazo)
+        return p.returncode, out or ""
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            p.kill()
+        try:
+            out, _ = p.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            out = ""
+        return -1, f"validação passou de {prazo} s: {' '.join(cmd)}\n{(out or '')[-800:]}"
 
 
 def build_corpo(ctx, data_dir: Path) -> Corpo | None:

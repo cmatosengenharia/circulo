@@ -163,6 +163,7 @@ class CodeAgent(Protocol):
 
 
 # O que o Claude Code pode rodar sem pedir aprovação (não há ninguém para aprovar em `-p`): testes, lint e git de leitura no próprio worktree. Sem isto ele escrevia código e teste às cegas e pedia "aprove os comandos" — 25% das chamadas de 20/10 terminaram assim, e o item voltava para a fila barrado nos portões.
+GIT_PRAZO = 300              # segundos por comando git (rede inclusa)
 FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
                "Bash(git log:*)", "Bash(git stash:*)", "Bash(git show:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)",
                "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)", "Bash(graft:*)")
@@ -264,7 +265,7 @@ class DevResult:
 def _git_env() -> dict:
     """Nunca pede senha (o loop não tem ninguém para digitar). Com GITHUB_TOKEN, fetch/push no GitHub usam o
     token por variável de ambiente do git (fora da linha de comando, não aparece no `ps`)."""
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_HTTP_LOW_SPEED_LIMIT": "1000", "GIT_HTTP_LOW_SPEED_TIME": "60"}   # transferência parada > 60 s aborta
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         cred = base64.b64encode(f"x-access-token:{token}".encode()).decode()
@@ -279,8 +280,11 @@ _REPO_LOCK = threading.RLock()     # fetch/worktree no repositório principal: u
 
 def _git(args: list[str], cwd: Path, check: bool = True) -> str:
     trava = _REPO_LOCK if args and args[0] in ("fetch", "worktree", "push", "remote") else threading.Lock()
-    with trava:
-        p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=_git_env())
+    try:      # prazo: um fetch/push pendurado (rede, Mac dormindo) prendia a trava do repositório e o giro para sempre (24/10)
+        with trava:
+            p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=_git_env(), timeout=GIT_PRAZO)
+    except subprocess.TimeoutExpired:
+        p = subprocess.CompletedProcess(args, 124, "", f"passou de {GIT_PRAZO} s")      # vira erro comum abaixo (ou "" sem check)
     if check and p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)}: {p.stderr.strip()[-300:]}")
     return p.stdout.strip()
@@ -295,8 +299,7 @@ class SelfDeveloper:
         self.repo = Path(repo_dir)
         self.agent = agent
         self.gh = github
-        # None = automático: o lint do CI, resolvido (e o ruff instalado, se faltar) só na primeira verificação
-        self.lint_cmd = lint_cmd if lint_cmd is not None else ([] if test_cmd is not None else None)
+        self.lint_cmd = lint_cmd if lint_cmd is not None else ([] if test_cmd is not None else None)   # None = automático: o lint do CI, resolvido (e o ruff instalado, se faltar) só na primeira verificação
         self.test_cmd = test_cmd or [sys.executable, "-m", "pytest", "-q", "-x"]
         self.author = author
 
@@ -310,8 +313,7 @@ class SelfDeveloper:
                  # pedido é hipótese: só entra depois de estudado (pesquisa em fontes confiáveis + veredito)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
                                "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
-                 # por último, o que o próprio loop planejou a partir da evidência (também estudado)
-                 or self.s.one("SELECT * FROM roadmap WHERE origem='loop' AND status='pendente' AND COALESCE(desativado,0)=0 "
+                 or self.s.one("SELECT * FROM roadmap WHERE origem='loop' AND status='pendente' AND COALESCE(desativado,0)=0 "   # por último, o que o próprio loop planejou a partir da evidência (também estudado)
                                "AND estudo IS NOT NULL" + ESPERA_PR + " ORDER BY ordem LIMIT 1"))
         return dict(r) if r else None
 
@@ -627,8 +629,7 @@ class SelfDeveloper:
         if not evo.allowed:
             return DevResult(item["id"], "adiado", "Jev: evidência insuficiente para mexer no código")
 
-        # trabalho parcial de uma sessão interrompida (limite da conta, máximo de passos) é retomado, não refeito
-        wip = (self.s.get("self_dev_wip") or {}).get(str(item["id"]))
+        wip = (self.s.get("self_dev_wip") or {}).get(str(item["id"]))   # trabalho parcial de uma sessão interrompida (limite da conta, máximo de passos) é retomado, não refeito
         if wip and not _git(["rev-parse", "--verify", wip["branch"]], self.repo, check=False):
             wip = None
         branch = wip["branch"] if wip else f"circulo/fix-{item['id']}-{int(time.time())}"
@@ -674,8 +675,7 @@ class SelfDeveloper:
                 return DevResult(item["id"], "sem_mudanca", out.get("log", "")[-300:])
             ok, falha = self.portao_pr(wt, base, item["id"], item["titulo"])
             if not ok and "constituição intacta:" in falha:
-                # a correção exige mexer na constituição: fora do alcance do loop. Não fica tentando: vai para você.
-                self._set_item(item["id"], "pendente", "depende de você: a correção exige mexer na constituição")
+                self._set_item(item["id"], "pendente", "depende de você: a correção exige mexer na constituição")   # a correção exige mexer na constituição: fora do alcance do loop. Não fica tentando: vai para você.
                 self.ctx.reply(f"Developer: “{item['titulo']}” só se corrige mexendo na constituição, que o loop não altera. "
                                "Ficou para você no roteiro.", "fora_alcance")
                 return DevResult(item["id"], "fora_do_alcance", falha[-800:])
@@ -684,8 +684,7 @@ class SelfDeveloper:
                 self.ctx.reply(f"Developer: “{item['titulo']}” foi barrado nos portões antes do PR; nada foi enviado.", "saude")
                 return DevResult(item["id"], "testes_falharam", falha[-800:])
             if has_remote:
-                # Revisor: a mudança vai entrar junto com outros PRs? Antes de empurrar, com a main de agora.
-                _git(["add", "-A"], wt)
+                _git(["add", "-A"], wt)   # Revisor: a mudança vai entrar junto com outros PRs? Antes de empurrar, com a main de agora.
                 _git(["-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}", "commit", "-q", "-m", "wip"], wt)
                 from . import revisor
                 rev = revisor.antes_do_pr(self.ctx, wt, item, _git(["diff", "--name-only", f"{base}..HEAD"], wt).splitlines(),
@@ -761,8 +760,7 @@ class SelfDeveloper:
         _git(["fetch", "origin", branch, "main"], self.repo)
         atual = _git(["rev-parse", f"origin/{branch}"], self.repo, check=False)
         if atual and st["conserto"].get("sha") and atual != st["conserto"]["sha"]:
-            # o PR mudou depois da reprovação (outro commit, main atualizada): o CI vai rodar de novo; espera o gate
-            self._salvar_pr(pr, conserto=None)
+            self._salvar_pr(pr, conserto=None)   # o PR mudou depois da reprovação (outro commit, main atualizada): o CI vai rodar de novo; espera o gate
             return DevResult(item_id, "aguardando_ci", f"o PR #{pr} mudou desde a reprovação; o gate avalia de novo", pr)
         if int(st.get("consertos", 0)) >= MAX_CONSERTOS:
             return self._abandonar(st, titulo, motivo)
@@ -771,8 +769,7 @@ class SelfDeveloper:
         try:
             _liberar_worktree(self.repo, wt)
             _git(["worktree", "add", "-B", branch, str(wt), f"origin/{branch}"], self.repo)
-            # traz a main para a branch: conflito fica marcado nos arquivos para o agente resolver
-            mescla = subprocess.run(["git", "-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}",
+            mescla = subprocess.run(["git", "-c", f"user.name={self.author[0]}", "-c", f"user.email={self.author[1]}",   # traz a main para a branch: conflito fica marcado nos arquivos para o agente resolver
                                      "merge", "--no-edit", "origin/main"], cwd=wt, capture_output=True, text=True, env=_git_env())
             conflito = mescla.returncode != 0
             _, local = self.verificar(wt, registrar=False)

@@ -17,6 +17,7 @@ from . import finance, intencoes, jobs, jtbd, parada, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
+from . import cao_de_guarda
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
@@ -801,12 +802,14 @@ class Circle:
     def _tick_com_pulso(self) -> "TickResult":
         """O batimento continua DURANTE o giro. Antes ele só era escrito entre giros: uma etapa longa (o Developer
         trabalhando 8 min) deixava o painel mostrando "Desligado" com o loop trabalhando."""
-        parar = threading.Event()
+        parar, inicio = threading.Event(), time.time()
 
         def pulso():
             while not parar.wait(self.HEARTBEAT_EVERY):
                 try:
                     self.heartbeat()
+                    if getattr(self, "dono", True):
+                        cao_de_guarda.reiniciar_se_preso(self.store, inicio, self.ctx.reply)   # giro preso sem sinal: o launchd sobe um limpo
                 except Exception:  # o pulso nunca derruba o giro
                     pass
         t = threading.Thread(target=pulso, name="pulso", daemon=True)

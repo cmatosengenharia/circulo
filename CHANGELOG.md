@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.67.0 — 2026-10-24
+
+**Giro preso 6 h e meia sem sinal de vida: prazo em tudo e um cão de guarda.**
+
+- 24/10: o giro ficou desde 15:38 na validação do corpo (`atualizar_corpo`). O batimento vem de outra thread, então
+  o loop parecia vivo; o reinício pelo próprio loop só acontece entre giros. Antes disso, o Developer já tinha ficado
+  353 min preso no mesmo dia.
+- **`git` com prazo** (`self_dev._git`, usado por todo o loop): 300 s por comando e transferência HTTP parada por
+  60 s aborta (`GIT_HTTP_LOW_SPEED_*`). Um `fetch` pendurado (rede, Mac dormindo) prendia a trava do repositório e,
+  com ela, o Developer e o corpo.
+- **Validação do corpo** em grupo de processos próprio: no prazo de 20 min o grupo inteiro morre. Um processo neto
+  segurando a saída fazia o `subprocess.run(timeout=…)` esperar para sempre depois de matar só o filho.
+- **Cão de guarda** (`circulo/cao_de_guarda.py`, na thread do batimento): giro com mais de 1 h e nenhum passo novo
+  há 45 min → registra o motivo, avisa e encerra o processo; o launchd (KeepAlive) sobe um limpo em 10 s. Giro longo
+  com passos (o Developer trabalhando) não é tocado.
+- `tests/test_cao_de_guarda.py`: 4 testes, incluindo o neto que segura a saída e o `git` que não responde.
+
 ## 1.66.0 — 2026-10-23
 
 **Sentinela da entrega: o loop avisa quando para de entregar, mesmo sem erro nenhum.**
