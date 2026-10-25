@@ -109,9 +109,11 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                 argv = [x for x in argv if x not in ("circulo", "tests")]
                 argv[3:3] = alvos               # -m ruff check <alvos> --select ...
                 argv += LINT_CMD[LINT_CMD.index("--ignore"):][:2]   # lição #78: nunca mais estrito que o CI
-            # lição #27: o arquivo é conferido antes de chamar o pytest (o exit 4 é qualquer erro de uso, não só este)
-            sumido = next((a.split("::")[0] for a in argv if "pytest" in argv and a.startswith("tests/")
-                           and not (Path(wt) / a.split("::")[0]).exists()), None)
+            # lições #26 e #27: o id (arquivo, classe, função) é conferido por ast antes de chamar o pytest (o exit 4 é
+            # qualquer erro de uso, não só este); a recusa leva os test_* reais para o reparo não repetir o id inventado
+            from .developer import alvo_pytest_existe, listar_testes
+            sumido = next((a for a in argv if "pytest" in argv and a.startswith("tests/")
+                           and not alvo_pytest_existe(wt, a)), None)
             cp = None if sumido else subprocess.run([sys.executable, *argv], cwd=wt, capture_output=True, text=True,
                                                     timeout=900, env=env)
             ok, motivo = (True, "") if cp is None else (cp.returncode == 0, (cp.stdout + cp.stderr)[-800:])
@@ -120,7 +122,10 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                 if p.get("licao_id"):
                     store.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=? AND status IN ('aberta','evidenciada','reincidente')",
                             (f"Obsoleta: o alvo do portão ({p['descricao']}) não existe mais", time.time(), p["licao_id"]))
-                res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", True, "alvo do pytest não existe mais: portão desativado (lição obsoleta)", p["id"]))
+                recusa = "" if not sumido else (
+                    f"recusa alvo_inexistente: {sumido}, pytest não rodou; test_* reais do arquivo: "
+                    f"{', '.join(listar_testes(wt, sumido.split('::')[0])) or 'nenhum (arquivo ausente)'}; ")
+                res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", True, f"{recusa}alvo do pytest não existe mais: portão desativado (lição obsoleta)", p["id"]))
                 continue
         else:
             from .merge_gate import tem_teste
