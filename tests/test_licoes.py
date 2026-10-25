@@ -388,3 +388,40 @@ def test_licao_de_estrutura_com_item_bloqueado_pelo_disjuntor_nao_trava_a_evoluc
     avancar(circle, EVID_GIROS + 1)
     L.revisar()
     assert {r["status"] for r in circle.store.q("SELECT status FROM licoes")} == {"validada"} and not L.bloqueia_evolucao()
+
+
+# ------------------------------------------------------------ lição #15: validada só com checagem na Prevenção
+def test_licao_15_validada_e_reincidente_com_prevencao_so_em_texto_vira_sem_prevencao(circle):
+    """Pergunta #239 (lição #15): validada, reincidiu 7x e a Prevenção só repete o erro; sem teste ou checagem
+    determinística citada, ela é 'sem_prevencao' e conta como aberta até ganhar uma."""
+    from circulo.neuronios import ABRIR_PR, criar_portao
+    from circulo.perguntas import _m_licoes_abertas
+    s, agora = circle.store, time.time()
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,corrigida_tick,created_at,updated_at,camada) VALUES(15,'rastro:lacuna','rastro:lacuna','estrutural',"
+        "'rastro:cadeia: item planejado pelo loop sem a pergunta do conselho que o originou',"
+        "'arquitetura (erro impossível): rastro:cadeia: item planejado pelo loop sem a pergunta','validada',8,7,0,0,0,?,?,"
+        "'arquitetura')", (agora, agora))
+    circle.licoes.revisar()
+    r = s.one("SELECT status, prevencao FROM licoes WHERE id=15")
+    assert r["status"] == "sem_prevencao" and "lição #15" in r["prevencao"]
+    assert _m_licoes_abertas(s, agora)[1]["licoes_abertas"] == 1
+    assert "#15 [sem_prevencao" in circle.licoes.contexto()
+    criar_portao(s, ABRIR_PR, "comando", {"argv": ["-m", "pytest", "-q", "tests/test_jtbd.py"]},
+                 "teste tests/test_jtbd.py (lição #15)", 15)
+    circle.licoes.revisar()
+    r = s.one("SELECT status, prevencao FROM licoes WHERE id=15")
+    assert r["status"] == "validada" and "tests/test_jtbd.py" in r["prevencao"]
+
+
+def test_item_feito_sem_checagem_deixa_a_licao_sem_prevencao_e_a_volta_do_erro_reincide(circle):
+    """lição #15: o item da lição entrou, mas nada determinístico segura o erro (lição antiga, sem portão)."""
+    L = lic(circle)
+    licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    circle.store.x("DELETE FROM portoes WHERE licao_id=?", (licao["id"],))
+    circle.store.x("UPDATE roadmap SET status='feito', evidencia='PR #3 mergeado' WHERE id=?", (licao["item_id"],))
+    L.revisar()
+    assert circle.store.one("SELECT status FROM licoes")["status"] == "sem_prevencao"
+    L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
+    r = circle.store.one("SELECT status, reincidencias FROM licoes")
+    assert (r["status"], r["reincidencias"]) == ("reincidente", 1)
