@@ -168,22 +168,24 @@ def precisa(store) -> bool:
     return bool(_pendentes(store, time.time()))
 
 
-def sem_proposta(store, agora: float | None = None) -> dict[str, int]:
+def sem_proposta(store, agora: float | None = None, pedidos=None) -> dict[str, int]:
     """Jobs recorrentes sem item 'antecipar:<job>' aberto nem criado (mesmo descartado) nos últimos 7 dias."""
     agora = time.time() if agora is None else agora
-    return {j: n for j, n in recorrentes(pedidos_7d(store, agora)).jobs.items()
+    pedidos = pedidos_7d(store, agora) if pedidos is None else pedidos
+    return {j: n for j, n in recorrentes(pedidos).jobs.items()
             if not store.one("SELECT 1 FROM roadmap WHERE titulo LIKE ? AND (created_at>? OR status NOT IN "
                              "('feito','descartado'))", (f"antecipar:{j} %", agora - JANELA))}
 
 
-def propor_item(store, pergunta_id: int | None, agora: float | None = None) -> int | None:
+def propor_item(store, pergunta_id: int | None, agora: float | None = None, pedidos=None) -> int | None:
     """O job recorrente mais pedido sem item 'antecipar:<job>' aberto ou criado nos últimos 7 dias vira um único item
     'proposto' do roteiro, preso à pergunta do conselho que o originou (lição #15); None se todos já têm."""
     from .planejador import exigir_pergunta, gravar_item
     pid = exigir_pergunta(store, pergunta_id)
     agora = time.time() if agora is None else agora
-    rec = recorrentes(pedidos_7d(store, agora))
-    for job, n in sem_proposta(store, agora).items():
+    pedidos = pedidos_7d(store, agora) if pedidos is None else pedidos
+    rec = recorrentes(pedidos)
+    for job, n in sem_proposta(store, agora, pedidos).items():
         _, entrega, _ = JOBS[job]
         return gravar_item(store, pid, f"antecipar:{job} — {entrega}"[:100],
                            f"O job '{job}' foi pedido {n} vezes em 7 dias ({rec.fracao[job]:.0%} dos {rec.total} pedidos). "
