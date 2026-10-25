@@ -212,7 +212,8 @@ def test_evidencia_da_pergunta_jtbd_traz_a_taxa_de_antecipacao_das_propostas(cir
     agora = time.time()
     _, fn = METRICAS["pedidos_humano"]
     assert fn(s, agora)[1]["antecipacao"] == {"propostas": 0, "taxa": 0.0, "antecipou": 0, "redundante": 0,
-                                              "ignorada": 0, "pedidos_depois": {}}       # medida mesmo sem proposta
+                                              "ignorada": 0, "pedidos_depois": {}, "job_maior_grupo": 0,
+                                              "motivo_sem_proposta": "sem pedidos em 7 dias"}   # medida mesmo sem proposta
     perg = s.x("INSERT INTO perguntas(chave,persona,texto,status,created_at,updated_at) "
                "VALUES('jtbd','entrevistador_jtbd','qual job se repete?','feita',?,?)", (agora, agora))
     for i in range(3):

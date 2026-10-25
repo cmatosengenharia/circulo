@@ -4,9 +4,10 @@ próprio loop viram itens 'pedido_cassio' do roteiro sem job gravado: o job dele
 from __future__ import annotations
 
 import time
+from collections import Counter
 from typing import NamedTuple
 
-from .jobs import JANELA, MIN_OCORRENCIAS, Recorrencia, classificar, pedidos_7d, recorrentes
+from .jobs import DESCONHECIDO, JANELA, MIN_OCORRENCIAS, Recorrencia, classificar, pedidos_7d, recorrentes
 from .projects import ROTEIRO_SEMENTE
 
 
@@ -18,6 +19,24 @@ def com_job(pedidos) -> list[dict]:
 def agrupar(pedidos, minimo: int = MIN_OCORRENCIAS) -> Recorrencia:
     """Os pedidos do roteiro agrupados por job; os com ≥ mínimo viram uma proposta antecipada cada. Pura."""
     return recorrentes(com_job(pedidos), minimo)
+
+
+def maior_grupo(pedidos) -> tuple[int, int]:
+    """(contagem do job mais repetido, pedidos com algum job classificado); pura."""
+    contagem = Counter(p["job"] for p in pedidos if p["job"] and p["job"] != DESCONHECIDO)
+    return max(contagem.values(), default=0), sum(contagem.values())
+
+
+def motivo_sem_proposta(total: int, classificados: int, maior: int, tem_pergunta: bool,
+                        minimo: int = MIN_OCORRENCIAS) -> str:
+    """Por que o gerador não propôs nada; '' quando nada nos pedidos o impede. Pura."""
+    if total == 0:
+        return "sem pedidos em 7 dias"
+    if classificados == 0:
+        return "pedidos sem job classificado"
+    if maior < minimo:
+        return f"maior grupo {maior} < limiar {minimo}"
+    return "" if tem_pergunta else "sem pergunta do entrevistador_jtbd"
 
 
 def pedidos_roteiro(store, agora: float | None = None) -> list[dict]:

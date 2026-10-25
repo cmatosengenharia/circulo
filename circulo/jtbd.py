@@ -32,5 +32,19 @@ def precisa(store) -> bool:
                                    and any(jobs.sem_proposta(store, None, p) for p in _fontes(store, None)))
 
 
+def diagnostico(store, agora: float | None = None) -> dict:
+    """O maior grupo de job nas mesmas fontes que o gerador agrupa (cada uma separada) e o que impede a proposta."""
+    fontes = [jobs.pedidos_7d(store, agora) if p is None else p for p in _fontes(store, agora)]
+    grupos = [antecipacao.maior_grupo(p) for p in fontes]
+    maior, classificados = max(m for m, _ in grupos), sum(c for _, c in grupos)
+    tem_pergunta = pergunta_de_origem(store) is not None
+    motivo = antecipacao.motivo_sem_proposta(sum(map(len, fontes)), classificados, maior, tem_pergunta)
+    if not motivo:
+        motivo = ("proposta pendente: o idle 'antecipar' ainda não rodou"
+                  if any(jobs.sem_proposta(store, agora, p) for p in fontes)
+                  else "o job já tem proposta aberta de antes dos 7 dias")
+    return {"job_maior_grupo": maior, "motivo_sem_proposta": motivo}
+
+
 def antecipar(store, agora: float | None = None) -> dict[str, list[int]]:
     return {"missoes": jobs.antecipar(store, agora), "propostas": propor(store, agora)}
