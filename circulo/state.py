@@ -565,7 +565,7 @@ class Store:
                   ("llm_calls", "job", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
-                  ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"))
+                  ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
@@ -583,6 +583,8 @@ class Store:
         # `decisions` cresce uma linha por pergunta e é varrida por pergunta/data em toda passagem (indagador, perguntas, jev_lab)
         self.db.execute("CREATE INDEX IF NOT EXISTS decisions_q_em ON decisions(question, created_at)")
         self.db.execute("CREATE INDEX IF NOT EXISTS decisions_em ON decisions(created_at)")
+        # extrato reimportado não duplica: a chave (FITID ou hash+ocorrência) é única no ledger
+        self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS ledger_import_key ON ledger(import_key) WHERE import_key IS NOT NULL")
 
     # ---------- utilidades ----------
     def tx(self):
