@@ -320,7 +320,7 @@ def _m_conflitos_pr(s, agora):
 
 
 def _m_licoes_abertas(s, agora):
-    n = _um(s, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente')")
+    n = _um(s, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')")
     return (min(1.0, n / 6), {"licoes_abertas": n})
 
 

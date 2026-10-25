@@ -62,7 +62,7 @@ def contexto(store, project: dict | None) -> dict[str, Any]:
         return {"missao": "loop", "tipo": "circulo",
                 "pedido": "o próprio loop: entregar qualquer pedido do humano com evidência, pelo menor custo, sem babá",
                 "itens_pendentes": _um(store, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0"),
-                "licoes_abertas": _um(store, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente')"),
+                "licoes_abertas": _um(store, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')"),
                 "giros_sem_avanco": int(prog.get("sem", 0)),
                 "falhas_24h": _um(store, "SELECT COUNT(*) FROM verificacoes WHERE ok=0 AND created_at>=?", (agora - 86400,)),
                 "tokens_24h": _um(store, "SELECT SUM(tokens) FROM llm_calls WHERE created_at>=?", (agora - 86400,))}
@@ -79,7 +79,7 @@ def contexto(store, project: dict | None) -> dict[str, Any]:
             "nota": round(float(cur["nota"] or 0), 2) if cur else None, "nota_oculta": round(float(cur["nota_oculta"] or 0), 2) if cur else None,
             "criterios_fracos": [{"criterio": t[:120], "nota": round(n, 2)} for t, n in fracos[:3]],
             "ciclos_recentes": len(ciclos), "ciclos_rejeitados_seguidos": next((i for i, c in enumerate(ciclos) if c["aceita"]), len(ciclos)),
-            "licoes_abertas": _um(store, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente') AND descricao LIKE ?",
+            "licoes_abertas": _um(store, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao') AND descricao LIKE ?",
                                   (f"%{project.get('nome') or '§'}%",)),
             "falhas_24h": _um(store, "SELECT COUNT(*) FROM verificacoes WHERE ok=0 AND created_at>=? AND sujeito=?",
                               (agora - 86400, project.get("nome") or f"missão {pid}")),

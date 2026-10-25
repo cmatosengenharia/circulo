@@ -13,6 +13,7 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    - ambiente: limite de conta, rede, timeout. É monitorado e só vira item se for recorrente (código precisa ficar resiliente).
 3. Estados: aberta → em_correcao (item em andamento) → validada (item feito: PR entrou ou o incidente sumiu)
    → evidenciada (EVID_GIROS sem reaparecer). A lição só fecha com as duas provas.
+   Validada exige a Prevenção citar um teste ou checagem determinística; senão, `sem_prevencao` (prevencao.py).
 4. Reincidência: assinatura que volta depois de validada/evidenciada. Alerta, o item volta para o topo da fila e a
    contagem fica no painel. Zero reincidências é o indicador de maturidade.
 5. Com lição estrutural aberta, o loop não se autoevolui (planejador e evolução do círculo esperam): primeiro corrige.
@@ -52,7 +53,7 @@ VERDES_PARA_FECHAR = 2      # execuções seguidas com exit 0 no main
 NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
 TTL_ESTRUTURA = 6 * 3600   # lição de estrutura sem reincidir por tanto tempo, com o caminho exercitado, fica obsoleta
 PASSAGENS_PARA_EXPIRAR = 3  # passagens pelo caminho na janela: silêncio sem exposição não prova a correção
-ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta")
+ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta", "sem_prevencao")
 # o item que alguém ainda vai fazer (a regra diz quem está na fila, não quem saiu: cada estado novo de saída — descartado,
 # bloqueado, desativado, devolvido "depende de você"… — travava a evolução até alguém listá-lo)
 NA_FILA = ("(status='em_andamento' OR (status='pendente' AND COALESCE(desativado,0)=0 "
@@ -428,7 +429,7 @@ class Licoes:
         if sig not in origens:
             self.s.x("UPDATE licoes SET origens=? WHERE id=?", (json.dumps(origens + [sig]), lic["id"]))
         # lição de teste só reincide pela reexecução no main (checar_testes), não pelo worktree de um Developer
-        reincidiu = (lic["status"] in ("validada", "evidenciada") or (lic["status"], lic["classe"]) == ("obsoleta", "estrutural")) \
+        reincidiu = (lic["status"] in ("validada", "evidenciada", "sem_prevencao") or (lic["status"], lic["classe"]) == ("obsoleta", "estrutural")) \
             and not alvo_de(lic)
         if reincidiu:
             self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ocorrencias=ocorrencias+1, "
@@ -521,6 +522,7 @@ class Licoes:
     # ------------------------------------------------------------ corrigir → validar → evidenciar
     def revisar(self) -> list[str]:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
+        from .prevencao import checagem_de, exigir, sem_prevencao
         log = self.unir_duplicatas()
         tick, agora = self.s.tick, time.time()
         for lic in self.s.q("""SELECT l.*, r.status item_status, r.evidencia item_evidencia FROM licoes l
@@ -530,12 +532,16 @@ class Licoes:
                 self.s.x("UPDATE licoes SET status='em_correcao', updated_at=? WHERE id=?", (agora, lic["id"]))
             elif lic["item_status"] == "feito":
                 pr = re.search(r"PR #(\d+)", lic["item_evidencia"] or "")
-                self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, pr=?, prevencao=?, updated_at=? WHERE id=?",
-                         (tick, int(pr.group(1)) if pr else None,
-                          f"Já corrigido ({lic['item_evidencia']}); não repetir: {lic['descricao']}", agora, lic["id"]))
-                log.append(f"lição #{lic['id']} validada")
+                checagem = checagem_de(self.s, dict(lic))
+                self.s.x("UPDATE licoes SET status=?, corrigida_tick=?, pr=?, prevencao=?, updated_at=? WHERE id=?",
+                         ("validada" if checagem else "sem_prevencao", tick, int(pr.group(1)) if pr else None,
+                          f"Já corrigido ({lic['item_evidencia']}); checagem: {checagem}; não repetir: {lic['descricao']}"
+                          if checagem else sem_prevencao(dict(lic)), agora, lic["id"]))
+                log.append(f"lição #{lic['id']} {'validada' if checagem else 'sem prevenção'}")
                 self.reply(f"Lição #{lic['id']} validada: a correção entrou ({lic['item_evidencia']}). "
-                           f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer.", "licao")
+                           f"Agora precisa ficar {EVID_GIROS} giros sem reaparecer." if checagem else
+                           f"Lição #{lic['id']} sem prevenção: a correção entrou ({lic['item_evidencia']}), mas nenhum "
+                           "teste ou checagem determinística segura o erro; segue aberta.", "licao")
         # lição sem item (trabalho/ambiente) ou cujo item ninguém mais faz (fora da fila em qualquer estado — descartado,
         # bloqueado, desativado, devolvido "depende de você"… —, ou dividido com um sub-item fora da fila: o pai só vira
         # feito com todos): vale como aprendida quando para de acontecer; se voltar, reincide e reabre o item
@@ -546,6 +552,7 @@ class Licoes:
             if node_por_causa(lic["assinatura"]):
                 continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
+        log += exigir(self.s, tick, agora)
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
             self.s.x("UPDATE licoes SET status='evidenciada', evidenciada_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
