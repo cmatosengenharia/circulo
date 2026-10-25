@@ -62,3 +62,46 @@ def test_sem_pergunta_do_conselho_o_padrao_do_roteiro_nao_vira_proposta(circle):
     _pedidos(s, PADRAO)
     assert jtbd.propor(s) == []
     assert _propostas(s) == []
+
+
+def _medida(s):
+    return perguntas._m_pedidos_humano(s, time.time())[1]["antecipacao"]
+
+
+def test_32_pedidos_sem_grupo_de_3_dizem_que_o_limiar_barrou_a_proposta(circle):
+    """Pergunta #167: 32 pedidos e propostas=0 sem dizer por quê; a métrica expõe o maior grupo e o motivo."""
+    s = circle.store
+    _pergunta(s)
+    _pedidos(s, PADRAO[:2] + SOLTOS * 7 + SOLTOS[:2])
+    assert perguntas._m_pedidos_humano(s, time.time())[1]["pedidos_7d"] == 32
+    circle._run_idle_task("antecipar")
+    medida = _medida(s)
+    assert medida["propostas"] == 0
+    assert medida["job_maior_grupo"] == 2 and medida["motivo_sem_proposta"] == "maior grupo 2 < limiar 3"
+
+
+def test_32_pedidos_sem_job_classificado_dizem_que_a_classificacao_barrou(circle):
+    s = circle.store
+    _pergunta(s)
+    _pedidos(s, SOLTOS * 8)
+    circle._run_idle_task("antecipar")
+    medida = _medida(s)
+    assert medida["propostas"] == 0
+    assert medida["job_maior_grupo"] == 0 and medida["motivo_sem_proposta"] == "pedidos sem job classificado"
+
+
+def test_padrao_sem_pergunta_do_conselho_diz_por_que_nao_virou_proposta(circle):
+    s = circle.store
+    _pedidos(s, PADRAO)
+    medida = _medida(s)
+    assert medida["propostas"] == 0 and medida["job_maior_grupo"] == 4
+    assert medida["motivo_sem_proposta"] == "sem pergunta do entrevistador_jtbd"
+
+
+def test_com_proposta_o_motivo_fica_vazio_e_o_maior_grupo_continua(circle):
+    s = circle.store
+    _pergunta(s)
+    _pedidos(s, PADRAO)
+    circle._run_idle_task("antecipar")
+    medida = _medida(s)
+    assert medida["propostas"] == 1 and medida["job_maior_grupo"] == 4 and medida["motivo_sem_proposta"] == ""

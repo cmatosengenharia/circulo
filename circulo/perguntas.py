@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import jobs
+from . import jobs, jtbd
 from .custo import tokens_por_desfecho
 from .decision import Question
 from .json_llm import objeto
@@ -331,9 +331,12 @@ def _m_lancamentos(s, agora):
 
 def _m_pedidos_humano(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM roadmap WHERE origem='pedido_cassio' AND created_at>=?", (agora - 7 * 86400,))
-    d = jobs.medir_propostas(s, agora)
+    d, diag = jobs.medir_propostas(s, agora), jtbd.diagnostico(s, agora)
+    motivo = "" if d.total else diag["motivo_sem_proposta"]
     return (min(1.0, n / 4), {"pedidos_7d": n, "antecipacao": {"propostas": d.total, "taxa": d.taxa, **d.contagem,
-                                                               "pedidos_depois": d.pedidos_depois}})
+                                                               "pedidos_depois": d.pedidos_depois,
+                                                               "job_maior_grupo": diag["job_maior_grupo"],
+                                                               "motivo_sem_proposta": motivo}})
 
 
 def _m_estagnacao(s, agora):
