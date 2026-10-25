@@ -423,6 +423,8 @@ class Licoes:
             self.reply(f"Erro novo registrado como lição #{lid} ({classe}): {descricao[:160]}", "licao")
             if classe == "estrutural":
                 self._abrir_item(lic, motivo, detalhe_item, titulo=titulo)
+            from .gemeas import reabrir
+            reabrir(self.s, self.reply, lic)
             return self._neurogenese(lid)
         lic = dict(row)
         origens = json.loads(lic.get("origens") or "[]") or [lic["assinatura"]]
@@ -522,6 +524,7 @@ class Licoes:
     # ------------------------------------------------------------ corrigir → validar → evidenciar
     def revisar(self) -> list[str]:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
+        from .gemeas import gemea_aberta, reabrir_todas
         from .prevencao import checagem_de, exigir, sem_prevencao
         log = self.unir_duplicatas()
         tick, agora = self.s.tick, time.time()
@@ -530,7 +533,7 @@ class Licoes:
                                AND l.item_id IS NOT NULL"""):
             if lic["item_status"] == "em_andamento" and lic["status"] != "em_correcao":
                 self.s.x("UPDATE licoes SET status='em_correcao', updated_at=? WHERE id=?", (agora, lic["id"]))
-            elif lic["item_status"] == "feito":
+            elif lic["item_status"] == "feito" and not gemea_aberta(self.s, lic):
                 pr = re.search(r"PR #(\d+)", lic["item_evidencia"] or "")
                 checagem = checagem_de(self.s, dict(lic))
                 self.s.x("UPDATE licoes SET status=?, corrigida_tick=?, pr=?, prevencao=?, updated_at=? WHERE id=?",
@@ -549,10 +552,11 @@ class Licoes:
                             f"AND (item_id IS NULL OR item_id IN (SELECT id FROM roadmap WHERE {FORA_DA_FILA}) "
                             f"OR item_id IN (SELECT pai FROM roadmap WHERE {FORA_DA_FILA})) "
                             "AND ultima_tick < ?", (tick - EVID_GIROS,)):
-            if node_por_causa(lic["assinatura"]):
-                continue                  # o alias dá um teste à lição: ela só fecha pela reexecução
+            if node_por_causa(lic["assinatura"]) or gemea_aberta(self.s, lic):
+                continue                  # o alias dá um teste à lição (só fecha pela reexecução); a gêmea, o erro vivo
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
         log += exigir(self.s, tick, agora)
+        log += reabrir_todas(self.s, self.reply)
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
             self.s.x("UPDATE licoes SET status='evidenciada', evidenciada_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))

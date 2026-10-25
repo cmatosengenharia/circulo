@@ -425,3 +425,58 @@ def test_item_feito_sem_checagem_deixa_a_licao_sem_prevencao_e_a_volta_do_erro_r
     L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura="incidente:abc")
     r = circle.store.one("SELECT status, reincidencias FROM licoes")
     assert (r["status"], r["reincidencias"]) == ("reincidente", 1)
+
+
+# ------------------------------------------------------------ lição #70: validada reabre quando o mesmo erro volta
+def _validada_70(s):
+    agora = time.time()
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,corrigida_tick,created_at,updated_at,camada) VALUES(70,'developer:abrir_pr:lint:B905,E501,F541',"
+        "'developer:abrir_pr','trabalho','developer:abrir_pr: circulo/a.py:3:9: B905 zip() sem strict',"
+        "'Não repetir: B905','validada',1,0,0,0,0,?,?,'regra')", (agora, agora))
+
+
+LINT_76 = ("circulo/b.py:4:1: F401 `os` imported but unused\ncirculo/b.py:9:5: B905 `zip()` without strict\n"
+           "circulo/b.py:12:89: E501 line too long (ruff)")
+
+
+def test_licao_70_validada_reabre_quando_nova_licao_tem_a_mesma_assinatura(circle):
+    """Pergunta #248 (lição #70): #70 validada, o mesmo erro (neurônio+arquivo+código) volta numa lição nova (#76):
+    a #70 volta a 'aberta', conta a reincidência e cita a lição nova; não fecha enquanto a gêmea estiver aberta."""
+    s, L = circle.store, lic(circle)
+    _validada_70(s)
+    nova = L.verificar("developer:abrir_pr", False, motivo=LINT_76)
+    assert nova["id"] != 70 and nova["assinatura"] == "developer:abrir_pr:lint:B905,E501,F401"
+    r = s.one("SELECT status, reincidencias, prevencao FROM licoes WHERE id=70")
+    assert (r["status"], r["reincidencias"]) == ("aberta", 1) and f"lição #{nova['id']}" in r["prevencao"]
+    avancar(circle, EVID_GIROS + 1)
+    L.verificar("developer:abrir_pr", False, motivo=LINT_76)                      # o erro segue acontecendo na #76
+    L.revisar()
+    assert s.one("SELECT status FROM licoes WHERE id=70")["status"] == "aberta"
+    assert s.one("SELECT COUNT(*) n FROM licoes WHERE status='validada'")["n"] == 0
+    avancar(circle, EVID_GIROS + 1)                       # parou: as duas fecham juntas (a #70, que reincidiu sem
+    L.revisar()                                           # checagem, fecha como 'sem_prevencao': lição #15)
+    r = s.one("SELECT status, reincidencias FROM licoes WHERE id=70")
+    assert (r["status"], r["reincidencias"]) == ("sem_prevencao", 1)
+    assert s.one("SELECT status FROM licoes WHERE id=?", (nova["id"],))["status"] == "validada"
+
+
+def test_licao_70_validada_ja_com_gemea_aberta_e_reaberta_no_giro(circle):
+    """lição #70: o par #70 validada / #76 aberta que já existe no banco é desfeito pelo revisar."""
+    s = circle.store
+    _validada_70(s)
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,primeira_tick,ultima_tick,"
+        "created_at,updated_at) VALUES(76,'developer:abrir_pr:lint:B905,E501,F401','developer:abrir_pr','trabalho','x',"
+        "'aberta',1,0,?,?,0,0)", (s.tick, s.tick))
+    circle.licoes.revisar()
+    r = s.one("SELECT status, reincidencias FROM licoes WHERE id=70")
+    assert (r["status"], r["reincidencias"]) == ("aberta", 1)
+
+
+def test_licao_70_outro_neuronio_ou_outro_codigo_nao_reabre(circle):
+    """lição #70: só a mesma assinatura normalizada reabre; outro neurônio ou código sem nada em comum, não."""
+    s, L = circle.store, lic(circle)
+    _validada_70(s)
+    L.verificar("gate:ci", False, motivo=LINT_76)
+    L.verificar("developer:abrir_pr", False, motivo="circulo/c.py:1:1: F811 redefinition of `f` (ruff)")
+    assert s.one("SELECT status, reincidencias FROM licoes WHERE id=70")["status"] == "validada"
