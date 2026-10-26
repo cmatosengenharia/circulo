@@ -71,3 +71,28 @@ def test_entrada_pela_equipe_quando_o_kit_pede(circle, painel, monkeypatch):  # 
 
 
 from test_painel import painel  # noqa: E402,F401 — fixture do servidor do painel
+
+
+def test_etapas_da_esteira_sao_pontos_de_encaixe_vazios_ate_a_regra_chegar(tmp_path):
+    """GAIA (pergunta #277): cada etapa da esteira é um portão do kit; sem regra declarada nada é inventado e passa."""
+    r = _repo(tmp_path)
+    k = kit.carregar(str(r))
+    assert tuple(k.etapas) == kit.ETAPAS and all(k.etapas[e] == () for e in kit.ETAPAS)
+    assert all(kit.checar(k, e) == [] for e in kit.ETAPAS)
+    try:
+        kit.checar(k, "deploy-inexistente")
+        raise AssertionError("etapa fora da esteira deveria ser recusada")
+    except ValueError:
+        pass
+
+
+def test_regra_declarada_numa_etapa_vira_checagem_no_repositorio(tmp_path):
+    r = _repo(tmp_path)
+    with (r / "pyproject.toml").open("a") as f:
+        f.write('\n[tool.circulo.etapas]\npr = ["test -f GAIA.md", "true"]\nproducao = ["true"]\n')
+    k = kit.carregar(str(r))
+    assert k.etapas["pr"] == ("test -f GAIA.md", "true") and k.etapas["merge"] == ()
+    assert any("producao" in a for a in k.avisos) and "producao" not in k.etapas      # etapa desconhecida: aviso, não portão
+    assert kit.checar(k, "pr") == ["test -f GAIA.md"]                                   # roda na pasta do repositório
+    (r / "GAIA.md").write_text("ok")
+    assert kit.checar(k, "pr") == []
