@@ -17,7 +17,7 @@ import re
 import time
 from typing import Any
 
-from . import nomes
+from . import motivo, nomes
 from .state import Store
 
 # ------------------------------------------------------------------ o time
@@ -300,13 +300,22 @@ def _carga(store: Store) -> dict[str, dict]:
     }
 
 
+def _motivo(store: Store, evidencia: str | None, status_card: str) -> dict | None:
+    """Código, check e próxima ação de um item recusado ou parado; item entregue não tem motivo."""
+    if status_card == "feito":
+        return None
+    m = motivo.do_item(store, evidencia, _pr_de(evidencia), parado=status_card == "devolvido")
+    return m.dict() if m else None
+
+
 def quadro(store: Store) -> list[dict]:
     """Colunas do quadro de entregas, da ideia à produção, com o dono de cada cartão."""
     dia = time.time() - 86400
 
     def cards(sql, args, dono, status_card):
         return [{"id": r["id"], "titulo": (r["titulo"] or "")[:110], "dono": dono, "desde": float(r["updated_at"] or 0), "origem": r["origem"],
-                 "pr": _pr_de(r["evidencia"]), "estado": status_card, "evidencia": (r["evidencia"] or "")[:140]}
+                 "pr": _pr_de(r["evidencia"]), "estado": status_card, "evidencia": (r["evidencia"] or "")[:140],
+                 "motivo": _motivo(store, r["evidencia"], status_card)}
                 for r in store.q(sql, args)]
     perguntas = [{"id": f"p{p['id']}", "titulo": p["texto"][:110], "dono": "indagar", "desde": float(p["created_at"]), "origem": "pergunta",
                   "pr": None, "estado": "valida", "evidencia": f"eixo {p['eixo']} · pertinência {int(float(p['pertinencia'] or 0) * 100)}%"}
@@ -355,9 +364,11 @@ def retrato(store: Store) -> dict[str, Any]:
         membros.append({"id": k, **d, "estado": estado, "agora": agora_txt, "desde": (faz["desde"] if faz else desde) if estado == "trabalhando" else None,
                         "fazendo": faz, "ultimo": ultimos.get(k), "capacidade": cargas.get(k),
                         "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")})
+    q = quadro(store)
+    motivo.alertar_sem_motivo(store, sorted({k["id"] for col in q for k in col["cards"] if (k.get("motivo") or {}).get("codigo") == "sem_motivo"}))
     return {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
             "gargalo": cap.get("gargalo"), "paralelo": cap.get("paralelo") or {},
-            "quadro": quadro(store), "tick": store.tick}
+            "quadro": q, "tick": store.tick}
 
 
 def resumo_json(store: Store) -> str:
