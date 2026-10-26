@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.68.0 — 2026-10-25
+
+**O Norte: o loop passa a evoluir em direção ao produto, medido, e não só a si mesmo.**
+
+Diagnóstico (25/10): 160 PRs do loop, ~85 % manutenção de si mesmo, 0 na direção "fábrica de software para uma
+equipe". Não era acaso: toda evolução nasce de uma pergunta do conselho, e o conselho só perguntava sobre sinais
+internos (lição aberta, verificação que falha, custo). Um sistema que só olha os próprios erros converge para "não
+falhar", nunca para "entregar valor".
+
+- **`circulo/norte.py`**: a visão de produto como 6 resultados mensuráveis, cada um com medição (SQL), meta e
+  distância: pedido → PR mergeado em < 24 h (mediana); PRs de produto por semana (≥ 5); fração de produto nos PRs
+  (≥ 50 %); PRs que evoluem o console por semana (≥ 1); PRs que entram na 1ª tentativa (≥ 70 %); repositórios de
+  equipe atendidos (≥ 2). O Norte é lido pelo loop, não escrito: a meta é decisão humana.
+- **Três perspectivas novas no conselho** (`perguntas.py`): **tech lead** (lead time, console em 10 s, 1ª
+  tentativa), **PM** (fração de produto) e **mercado**. Elas perguntam contra o Norte, com a medição como evidência,
+  e passam pelo Jev como qualquer outra. Eixo novo no Indagador: `produto`.
+- **Cota do Developer** (`self_dev.pick` via `revisor`): com a entrega saudável (sentinela quieta) e menos de 50 %
+  dos PRs das últimas 24 h sendo produto, um item de produto (pedido seu, ou pergunta de eixo produto/missão) vem
+  antes da manutenção. Só o erro "Urgente" do Médico passa na frente. Entrega parada desliga a cota.
+- **Pesquisa de mercado semanal** (`circulo/mercado.py`, tarefa de idle `pesquisar_mercado`, porteiro do Jev): o
+  Pesquisador busca na web o que as melhores fábricas de software com IA fazem para equipes (Devin, Copilot coding
+  agent, Cursor, Jules, OpenHands, Kiro, Claude Code…), compara com o Norte medido e os PRs recentes, e devolve 3–4
+  perguntas com fontes, que entram no conselho pela persona mercado.
+- **Painel**: cartão "Norte" no topo da aba Autoevolução (os 6 números com meta, a cota ao vivo, a última pesquisa
+  com fontes). `/api/norte`.
+- `tests/test_norte.py`: 5 testes (medição, cota com a entrega saudável/parada/Urgente, personas, pesquisa com LLM
+  falsa, pesquisa sem JSON).
+
 ## 1.67.0 — 2026-10-24
 
 **Giro preso 6 h e meia sem sinal de vida: prazo em tudo e um cão de guarda.**

@@ -344,6 +344,17 @@ def resumo(store, limite: int = 10) -> dict:
                                                  "ORDER BY id DESC LIMIT ?", (limite,))]}
 
 
+# ------------------------------------------------------------ o Norte, pela porta do revisor (self_dev é constituição e não importa norte)
+def item_de_produto(store, extra_sql: str = "", args: tuple = ()) -> dict | None:
+    from .norte import item_de_produto as _f
+    return _f(store, extra_sql, args)
+
+
+def prefere_produto(store) -> bool:
+    from .norte import prefere_produto as _f
+    return _f(store)
+
+
 # ------------------------------------------------------------ disjuntor do Developer
 DISJUNTOR_PRS = 3            # PRs seguidos abandonados pela mesma causa…
 DISJUNTOR_JANELA = 3 * 3600  # …dentro desta janela…

@@ -504,6 +504,15 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div id="decDetCorpo"><p class="empty">Clique numa decisão ao lado.</p></div>
     </section>
 
+    <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Norte" id="norte">
+      <div class="cabeca"><div><h2>Norte · fábrica de software para uma equipe <small class="sub" id="norteCota"></small></h2>
+        <p class="sub" style="margin:2px 0 0">Para onde o loop evolui, em números: cada resultado com o valor medido e a meta. Tech lead, PM e mercado perguntam contra isto.</p></div></div>
+      <div class="kpis4" id="norteKpis"></div>
+      <div class="duas">
+        <div><h3 class="h3">Pesquisa de mercado <small class="sub" id="norteMercadoMeta"></small></h3><ul class="lista" id="norteMercado"></ul></div>
+        <div><h3 class="h3">Como a cota funciona</h3><p class="sub" id="norteComo" style="margin:4px 0 0"></p></div>
+      </div>
+    </section>
     <section data-aba="evolucao" class="panel c12 zero-only" hidden aria-label="Funil da autoevolução">
       <div class="funil" id="evoFunil"></div>
       <div class="kpis4" id="evoKpis"></div>
@@ -1315,6 +1324,22 @@ async function refreshGraft() {
   } catch {}
 }
 setInterval(refreshGraft, 20000); refreshGraft();
+async function refreshNorte() {
+  try {
+    const n = await (await fetch("/api/norte")).json();
+    const fmt = (r) => r.valor == null ? "—" : (r.chave === "fracao_produto" || r.chave === "merge_sem_conserto") ? Math.round(r.valor * 100) + "%" : (r.chave === "lead_time_h" ? r.valor + " h" : String(r.valor));
+    const meta = (r) => (r.chave === "fracao_produto" || r.chave === "merge_sem_conserto") ? Math.round(r.meta * 100) + "%" : (r.chave === "lead_time_h" ? r.meta + " h" : String(r.meta));
+    $("#norteKpis").innerHTML = (n.resultados || []).map(r => `<div><b class="${r.distancia === 0 ? "ok" : r.distancia < 0.5 ? "warn" : "bad"}">${fmt(r)}</b><span>${esc(r.descricao)} · meta ${r.sentido === "menor" ? "≤" : "≥"} ${meta(r)}</span></div>`).join("");
+    const f = n.fracao_24h;
+    $("#norteCota").textContent = `· ${n.prs_7d || 0} PR(s) em 7 dias, ${n.produto_7d || 0} de produto · últimas 24 h: ${f == null ? "sem PR" : Math.round(f * 100) + "% produto"} · ${n.prefere_produto ? "Developer prefere produto agora" : "Developer na ordem normal"}`;
+    $("#norteComo").textContent = `Com a entrega saudável e menos de ${Math.round((n.cota || 0.5) * 100)}% dos PRs das últimas 24 h sendo produto, o Developer pega um item de produto (pedido seu ou pergunta de eixo produto/missão) antes da manutenção. Só o erro "Urgente" do Médico passa na frente. Com a entrega parada, a cota desliga e a correção vem primeiro.`;
+    const m = n.mercado || {};
+    $("#norteMercadoMeta").textContent = m.em ? `última ${new Date(m.em * 1000).toLocaleString("pt-BR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})} · ${(m.fontes || []).length} fonte(s) · ${m.viraram_item || 0} viraram item` : "ainda não rodou (semanal, quando o Jev autorizar o gasto)";
+    $("#norteMercado").innerHTML = (m.perguntas || []).map(p => `<li><span class="pt" data-e="ok"></span><div class="tx"><b>${esc(p.texto)}</b><small>${esc(p.pratica || "")}${(p.fontes || []).length ? " · " + p.fontes.slice(0, 2).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, "").slice(0, 40))}</a>`).join(" · ") : ""}</small></div></li>`).join("")
+      || `<li class="vazio">${m.erro ? "Última pesquisa sem JSON válido; tenta de novo na próxima semana." : "As perguntas da pesquisa aparecem aqui e entram no conselho pela persona mercado."}</li>`;
+  } catch {}
+}
+setInterval(refreshNorte, 30000); refreshNorte();
 async function refreshJev() {
   try {
     const j = await (await fetch("/api/jev")).json();

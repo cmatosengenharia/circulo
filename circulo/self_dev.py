@@ -308,8 +308,12 @@ class SelfDeveloper:
         if item_id is not None:
             r = self.s.one("SELECT * FROM roadmap WHERE id=?", (item_id,))
         else:
-            # primeiro erros recorrentes; depois pedidos do roteiro que não dependem de algo fora do código; item desativado por você no painel nunca é pego
-            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
+            # cota do Norte: com a entrega saudável e menos da metade dos PRs recentes sendo produto, um item de produto vem
+            # antes da manutenção (só o erro "Urgente" do Médico passa na frente); item desativado por você nunca é pego
+            from .revisor import item_de_produto, prefere_produto      # o Norte (norte.py), pela porta do revisor
+            r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0 AND titulo LIKE 'Urgente:%'" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
+                 or (item_de_produto(self.s, ESPERA_PR) if prefere_produto(self.s) else None)
+                 or self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
                  # pedido é hipótese: só entra depois de estudado (pesquisa em fontes confiáveis + veredito)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
                                "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + " ORDER BY ordem LIMIT 1")

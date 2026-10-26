@@ -52,6 +52,10 @@ PERSONAS = {
     "auditor": "Auditor: guardrail que nunca foi exercitado pode estar quebrado sem ninguém saber",
     "cetico": "Cético: que indicador diz 'tudo bem' e pode estar mentindo",
     "financeiro": "Financeiro da família: o cérebro financeiro só aprende com dados reais",
+    # o Norte (norte.py): o loop é uma fábrica de software para uma equipe de engenharia — quem pede por essa equipe
+    "tech_lead": "Tech lead da equipe: um pedido vira PR revisado, com testes, em horas; o console mostra em 10 s o que trava",
+    "pm": "PM do produto: o que o time ganha a cada semana precisa ser visível, pedido por alguém e medido no uso",
+    "mercado": "Mercado: o que as melhores fábricas de software com IA já fazem e o loop ainda não (com fontes)",
 }
 
 
@@ -196,7 +200,53 @@ def _financeiro(s, agora) -> list[Pergunta]:
     return []
 
 
-SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro]
+def _norte(s, agora) -> list[Pergunta]:
+    """Tech lead e PM perguntam contra o Norte: cada resultado longe da meta vira uma pergunta com a medição."""
+    from .norte import medir
+    m = medir(s, agora)
+    r = m.pop("_resumo")
+    out = []
+    lt = m["lead_time_h"]
+    if lt["distancia"] > 0:
+        out.append(Pergunta("tech_lead:lead_time", "tech_lead",
+                            f"Como tech lead, o que falta para um pedido virar PR revisado e mergeado em menos de {lt['meta']:.0f} h? "
+                            f"(mediana hoje: {lt['valor'] if lt['valor'] is not None else 'sem PR em 7 dias'} h; em que etapa o tempo some?)",
+                            min(1.0, 0.4 + 0.6 * lt["distancia"]), {"norte": "lead_time_h", **lt, "prs_7d": r["prs_7d"]}))
+    fp = m["fracao_produto"]
+    if fp["distancia"] > 0:
+        out.append(Pergunta("pm:fracao_produto", "pm",
+                            f"Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima semana e o loop ainda não tem? "
+                            f"(só {r['produto_7d']} de {r['prs_7d']} PRs em 7 dias foram produto; meta {fp['meta']:.0%})",
+                            min(1.0, 0.5 + 0.5 * fp["distancia"]), {"norte": "fracao_produto", **fp}, custo=1.5))
+    cs = m["console_semana"]
+    recusas = _um(s, "SELECT COUNT(*) FROM revisoes WHERE created_at>=?", (agora - 86400,))
+    if cs["distancia"] > 0:
+        out.append(Pergunta("tech_lead:console", "tech_lead",
+                            "Como tech lead, o que na Equipe ao vivo ou no painel me faria entender em 10 segundos por que um PR foi "
+                            f"recusado ou um item parou, sem abrir o GitHub? (o console não mudou em 7 dias; {recusas} recusa(s) do gate em 24 h)",
+                            min(1.0, 0.4 + 0.3 * cs["distancia"] + min(0.3, 0.05 * recusas)), {"norte": "console_semana", **cs, "recusas_24h": recusas}))
+    ms = m["merge_sem_conserto"]
+    if ms["valor"] is not None and ms["distancia"] > 0:
+        out.append(Pergunta("tech_lead:primeira_tentativa", "tech_lead",
+                            f"Como tech lead, por que só {ms['valor']:.0%} dos PRs entram na primeira tentativa (meta {ms['meta']:.0%}): "
+                            "o que o Developer deveria conferir antes de abrir o PR que o gate confere depois?",
+                            min(1.0, 0.3 + 0.7 * ms["distancia"]), {"norte": "merge_sem_conserto", **ms}))
+    return out
+
+
+def _mercado(s, agora) -> list[Pergunta]:
+    """O que a pesquisa de mercado semanal (norte_mercado.pesquisar) deixou: perguntas com fontes, cada uma uma vez."""
+    pesq = s.get("mercado_pesquisa") or {}
+    out = []
+    for i, p in enumerate((pesq.get("perguntas") or [])[:4]):
+        if not p.get("texto"):
+            continue
+        out.append(Pergunta(f"mercado:{pesq.get('em', 0):.0f}:{i}", "mercado", p["texto"][:300], float(p.get("relevancia", 0.6)),
+                            {"fontes": p.get("fontes", [])[:4], "pratica": p.get("pratica", "")[:200], "pesquisado_em": pesq.get("em")}, custo=1.5))
+    return out
+
+
+SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro, _norte, _mercado]
 
 
 # ------------------------------------------------------------------ o conselho

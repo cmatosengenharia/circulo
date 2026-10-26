@@ -474,6 +474,9 @@ def make_handler(db_path: str):
             elif u.path == "/api/memoria":
                 from .memoria import Memoria
                 self._json(Memoria(self._store()).resumo())
+            elif u.path == "/api/norte":
+                from . import mercado, norte
+                self._json({**norte.resumo(self._store()), "mercado": mercado.resumo(self._store())})
             elif u.path == "/api/indagador":
                 from .indagador import resumo as indag
                 self._json(indag(self._store()))

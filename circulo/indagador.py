@@ -32,6 +32,8 @@ from .decision import Decision, SN, Question, norm
 EIXOS = {
     "arquitetura": "muda como o loop/missão é construído: módulos, fronteiras, portões, testes, estrutura do código ou da entrega",
     "missao": "muda o que a missão entrega ao humano: conteúdo, qualidade medida pela régua, critérios, formato, utilidade",
+    "produto": "muda o que o loop entrega a uma equipe de engenharia: pedido → PR revisado, console do time, revisão, "
+               "integração com o repositório, o que um tech lead ou PM pediria (o Norte)",
     "operacao": "muda como roda: custo, tokens, tempo, falhas, recuperação, observabilidade, frequência das tarefas",
     "nenhum": "não leva a mudança nenhuma: genérica, já respondida, fora do alcance do loop ou sem evidência",
 }

@@ -37,7 +37,7 @@ from .orcamento_dia import avisar_marcos, com_tokens_dia
 from .policy import PolicyStore
 from .state import Store
 
-TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar")
+TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar", "pesquisar_mercado")
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
@@ -54,8 +54,9 @@ TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop
            "jardinagem": "Medindo padrões ruins se espalhando no próprio código",
            "checar_licoes": "Reexecutando no main os testes das lições para fechar ou reabrir",
            "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev",
-           "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana"}
-IDLE_COST = {"documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
+           "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana",
+           "pesquisar_mercado": "Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal)"}
+IDLE_COST = {"documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000, "pesquisar_mercado": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
 @dataclass
@@ -319,8 +320,7 @@ class Circle:
             self.ctx.reply(msg)
             return msg
         if proj is not None and proj["kit"] != "financas":
-            # orientação do humano para um projeto: vira feedback confiável na memória e reabre o projeto
-            self.memory.add("feedback", payload["text"], tipo=None, project_id=pid, source="Cássio", trust="confiavel")
+            self.memory.add("feedback", payload["text"], tipo=None, project_id=pid, source="Cássio", trust="confiavel")   # orientação do humano para um projeto: vira feedback confiável na memória e reabre o projeto
             self.engine.reopen(pid, "feedback do humano")
             msg = (f"Anotado em “{proj['nome']}”. Entra como orientação no próximo ciclo." if self.engine.ready else
                    f"Anotado em “{proj['nome']}”. O motor de construção precisa da chave da LLM (ANTHROPIC_API_KEY) para usar isso.")
@@ -411,7 +411,7 @@ class Circle:
         self._stage("idle")
         tasks = list(ctx.policy["idle"]["tasks"])
         if ctx.dl.llm is not None and "propor_feature" not in tasks:
-            tasks.append("propor_feature")
+            tasks += ["propor_feature", "pesquisar_mercado"]
         if self.engine.ready and self.engine.candidates() and "evoluir_projeto" not in tasks:
             tasks.append("evoluir_projeto")
         if self.store.one("SELECT COUNT(*) n FROM projects WHERE kit!='circulo' AND status!='arquivado'")["n"] >= 2 \
@@ -446,16 +446,14 @@ class Circle:
         tasks = [t for t in tasks if pode_rodar(s, self.incidents, t, seguro)]
         if not tasks:
             return None
-        # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
-        last = s.get("idle_last", {})
+        last = s.get("idle_last", {})   # Cascata: regra antes do Jev. Trabalho real tem precedência a cada giro; manutenção gira em rodízio. O Jev decide o gasto.
         staleness = {t: s.tick - int(last.get(t, -10**6)) for t in tasks}
         trabalho = self._trabalho_pronto(tasks)
         manut = sorted((t for t in tasks if t not in TRABALHO or t == "revisar_prs"),
                        key=lambda t: (-staleness[t], tasks.index(t)))
         manut = [t for t in manut if t not in trabalho]
         if not trabalho and len(manut) > 1:
-            # a regra estreita para as 3 mais esquecidas; o Jev escolhe entre elas (o rodízio é garantido)
-            top = manut[:3]
+            top = manut[:3]   # a regra estreita para as 3 mais esquecidas; o Jev escolhe entre elas (o rodízio é garantido)
             escolha = ctx.dl.ask("idle_task", Question("choice", "Qual tarefa de manutenção tem mais valor agora?",
                                                        {x: f"{TAREFAS.get(x, x.replace('_', ' '))} (esquecida há {min(staleness[x], 10**4)} giros)" for x in top}),
                                  {"staleness": {x: min(staleness[x], 10**4) for x in top}}).value
@@ -489,8 +487,7 @@ class Circle:
                     if item:   # o Jev vê o que seria feito: seu pedido no roteiro ou erro recorrente
                         contexto.update({"item": item["titulo"], "origem": item["origem"]})
                 if pick == "estudar_pedido":
-                    # o Jev vê o item e o que o estudo destrava (no Mac ele recusou o estudo por 4 h com p≈0,3 e o Developer parado)
-                    it = self.estudo.pendente() or {}
+                    it = self.estudo.pendente() or {}   # o Jev vê o item e o que o estudo destrava (no Mac ele recusou o estudo por 4 h com p≈0,3 e o Developer parado)
                     fila = 0 if self.self_dev is None or self.self_dev.pick() is None else 1
                     est = self.estudo.custo_estimado(it or None)          # custo medido do modo (dispensado = 0, leve, completo)
                     from .estudo import modo_do_estudo
@@ -508,8 +505,7 @@ class Circle:
                 d0 = gate.decision if gate else None
                 if gate is not None and not gate.allowed and contexto.get("desbloqueia_fila") and d0.source == "jev" \
                         and float(d0.confidence) < CONF_PARA_BARRAR and ctx.budget.can_spend(int(contexto["est_tokens"])):
-                    # "não" do Jev com confiança média só alerta: a regra decide e a resposta fica para o aprendiz.
-                    estado = {"action": "idle_evolution", **contexto, "budget_left_ratio": round(ctx.budget.left_ratio(), 3)}
+                    estado = {"action": "idle_evolution", **contexto, "budget_left_ratio": round(ctx.budget.left_ratio(), 3)}   # "não" do Jev com confiança média só alerta: a regra decide e a resposta fica para o aprendiz.
                     r = ctx.dl.local.ask_many(estado, {"worth_spending": Question("noul", "vale gastar agora?", SN("sim", "não"))})[0]["worth_spending"]
                     gate = Gate(float(r.value) >= gate.threshold, r, gate.threshold)
                     regra += f"; Jev disse não com confiança média ({float(d0.confidence):.2f}) numa tarefa que destrava a fila: a regra decidiu ({float(r.value):.2f})"
@@ -531,8 +527,7 @@ class Circle:
             if pick not in ("corrigir_codigo", "evoluir_projeto"):
                 self._stage("idle", {"detalhe": TAREFAS.get(pick, pick), "tarefa": pick})
             try:
-                # write-ahead: intenção (motivo, regra que decidiu, entradas) gravada antes; só então a tarefa roda
-                intencoes.executar(s, pick, lambda pick=pick: self._run_idle_task(pick), motivo=TAREFAS.get(pick, pick),
+                intencoes.executar(s, pick, lambda pick=pick: self._run_idle_task(pick), motivo=TAREFAS.get(pick, pick),   # write-ahead: intenção (motivo, regra que decidiu, entradas) gravada antes; só então a tarefa roda
                                    entradas=contexto, regra=regra)
             except Exception as exc:
                 last[pick] = s.tick
@@ -576,6 +571,9 @@ class Circle:
         if t == "indagar":
             from . import indagador
             return indagador.precisa(self.store, self.engine)
+        if t == "pesquisar_mercado":
+            from . import mercado
+            return self.ctx.dl.llm is not None and mercado.devida(self.store)
         return False
 
     # ------------------------------------------------------------ neurônio de progresso
@@ -692,6 +690,9 @@ class Circle:
             self.estudo.run_paralelo(autorizado=True)          # 1 trabalhador por padrão; o Escalador pode subir
         elif pick == "antecipar":
             jtbd.antecipar(self.store)
+        elif pick == "pesquisar_mercado":
+            from . import mercado
+            mercado.pesquisar(self.ctx)
         elif pick == "documentar":
             from . import documentador
             documentador.rodar(self.ctx, gh=getattr(self.gate, "gh", None))
