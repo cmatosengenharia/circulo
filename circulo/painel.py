@@ -493,6 +493,9 @@ def make_handler(db_path: str):
                 from .camadas import execucao
                 ex = execucao(self._store(), u.path.rsplit("/", 1)[1])
                 self._json(ex if ex else {"erro": "execução não encontrada"}, 200 if ex else 404)
+            elif u.path == "/api/links":
+                from .links import Links
+                self._json({"links": Links(self._store()).buscar(q.get("q", [""])[0][:300], sentido=q.get("sentido") != ["0"])})
             elif u.path == "/api/eventos":
                 self._sse(_int(q, "desde", 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
@@ -774,6 +777,9 @@ def make_handler(db_path: str):
                         ("controle", f"Você {'reativou' if ativo else 'desativou'} o item #{item} do roteiro: {titulo}", time.time(),
                          kit_project_id(store, "circulo")))
                 return self._json({"ok": True, "id": item, "ativo": ativo})
+            if u.path == "/api/links":
+                from .links import colar_e_guardar
+                return self._json(*colar_e_guardar(store, data))
             if u.path == "/api/projeto":
                 pedido = str(data.get("pedido", "")).strip()[:2000]
                 if len(pedido) < 8:
