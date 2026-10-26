@@ -1,6 +1,7 @@
 """O Redator técnico (circulo/documentador.py): documentação gerada do que o loop é e fez, classificada pelo Jev,
 publicada por PR só com docs/ — e o gate que só aceita essa porta para documentação."""
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -49,7 +50,8 @@ def test_gera_documentacao_profissional_do_codigo_do_banco_e_do_changelog(circle
     assert "Catálogo das" in dec and "| `decision.py:" in dec and "noul" in dec
     ev = docs["docs/evolucao.md"]
     assert "| #31 |" in ev and "pergunta do operador: “Por que a pergunta validada espera horas?”" in ev and "| #29 |" in ev
-    assert "## Versões" in ev and "| 1.39.0 |" in ev                                  # do CHANGELOG
+    atual = re.search(r'^## (\S+) —', (repo / "CHANGELOG.md").read_text(encoding="utf-8"), flags=re.M).group(1)
+    assert "## Versões" in ev and f"| {atual} |" in ev                                 # do CHANGELOG (a versão mais nova; só as 40 últimas entram)
     tipos = circle.store.get("documentador_tipos")
     assert set(tipos) == {"31", "29"} and all(v["tipo"] in documentador.TIPOS for v in tipos.values())   # o Jev classificou, uma vez
     assert "developer:lint:F811" in docs["docs/licoes.md"] and "Redator técnico" in docs["docs/README.md"]

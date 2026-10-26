@@ -10,6 +10,7 @@ marcados como exemplo em tudo que tocam, apagáveis com um clique. Nada aqui é 
 """
 from __future__ import annotations
 
+import os
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -134,6 +135,21 @@ def semear(store, data_dir: Path, agora: float | None = None) -> dict:
     store.set("gaia_mapa", {"exemplo": True, "etapas": [{"etapa": e, "exige": x, "portao": p} for e, x, p in GAIA]})
     store.set(KV, ids)
     return ids
+
+
+def semear_se_pedido(store, data_dir: Path, reply=None) -> bool:
+    """`CIRCULO_EXEMPLO=1` no arquivo de configuração: o SRE semeia o exemplo uma vez, na primeira passagem (sem
+    assunto nenhum ainda). Serve para preparar a tela sem abrir o painel; apagar depois é um clique."""
+    if os.environ.get("CIRCULO_EXEMPLO") != "1" or store.get(KV):
+        return False
+    assuntos.preparar(store)
+    if store.one("SELECT 1 FROM assuntos LIMIT 1"):
+        return False
+    r = semear(store, data_dir)
+    if reply:
+        reply(f"Meu trabalho: dados de exemplo semeados ({len(r['assuntos'])} assuntos, {len(r['notas'])} notas, "
+              f"{len(r['links'])} links, {GASTO_DIAS} dias de gasto do Cursor). Apague pela tela quando quiser começar com o seu.", "roteiro")
+    return True
 
 
 def apagar(store, data_dir: Path) -> dict:

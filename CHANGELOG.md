@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.69.1 — 2026-10-26
+
+- `CIRCULO_EXEMPLO=1` no arquivo de configuração: o SRE semeia o exemplo da tela Meu trabalho uma vez, na primeira
+  passagem sem assunto nenhum (a tela fica pronta sem abrir o painel; apagar depois é um clique).
+- tests/test_documentador.py: a tabela de versões confere a versão mais nova, não a 1.39.0 (só as 40 últimas entram).
+
 ## 1.69.0 — 2026-10-26
 
 **Meu trabalho: a tela que junta o dia a dia do engenheiro, com dados de exemplo para o esqueleto nascer pronto.**

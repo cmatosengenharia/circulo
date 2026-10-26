@@ -84,3 +84,15 @@ def test_tela_meu_trabalho_no_painel_e_no_menu(circle):
     finally:
         srv.shutdown()
     assert assuntos.ver(circle.store, "GAIA")["decisoes"][0]["texto"].startswith("toda PR")
+
+
+def test_configuracao_pede_o_exemplo_e_o_sre_semeia_uma_vez(circle, monkeypatch):
+    s, dados, avisos = circle.store, circle.data_dir, []
+    monkeypatch.delenv("CIRCULO_EXEMPLO", raising=False)
+    assert not trabalho.semear_se_pedido(s, dados, lambda m, k: avisos.append(m))
+    monkeypatch.setenv("CIRCULO_EXEMPLO", "1")
+    assert trabalho.semear_se_pedido(s, dados, lambda m, k: avisos.append(m)) and "semeados" in avisos[0]
+    assert not trabalho.semear_se_pedido(s, dados, lambda m, k: avisos.append(m)) and len(avisos) == 1
+    trabalho.apagar(s, dados)
+    assuntos.criar(s, "Meu assunto", "real")
+    assert not trabalho.semear_se_pedido(s, dados)                                   # já tem assunto seu: não mexe
