@@ -62,6 +62,18 @@ def registrar(store: Store, item: dict, agora: float | None = None) -> Veredito:
     return v
 
 
+def registrar_sem_veredito(store: Store) -> int:
+    """Pergunta #331: avalia pelo texto o item com PR ainda sem veredito (aberto antes do portão, ou sem passar pelo
+    pick), com a hora do próprio item, para a fração das 24 h não contar o passado como novo. O item sem PR recebe o
+    seu no pick, já com o detalhe reescrito pelo Estudo."""
+    store.x(ESQUEMA)
+    itens = store.q("SELECT * FROM roadmap r WHERE EXISTS (SELECT 1 FROM prs WHERE prs.item_id=r.id) "
+                    "AND NOT EXISTS (SELECT 1 FROM pedidos_claros p WHERE p.item=r.id)")
+    for it in itens:
+        registrar(store, dict(it), agora=it["created_at"])
+    return len(itens)
+
+
 def itens_com_veredito(store: Store) -> list[dict]:
     """Itens do roadmap com o veredito do portão ('completo' | 'incompleto' | None se nunca avaliado)."""
     store.x(ESQUEMA)

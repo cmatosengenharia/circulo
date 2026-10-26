@@ -254,6 +254,7 @@ class DeveloperComReparo(SelfDeveloper):
         item = self.pick(item_id)
         if item:
             pedido_claro.registrar(self.s, item)        # só mede quantos pedidos chegam sem os 3 campos; não bloqueia
+        pedido_claro.registrar_sem_veredito(self.s)
         veto = self._vetar(item) if item else None
         if veto:
             return veto
