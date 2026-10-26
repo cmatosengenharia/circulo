@@ -85,18 +85,22 @@ def provam_paralelismo_pelo_relogio(fonte: str) -> list[str]:
         arv = ast.parse(fonte)
     except SyntaxError:
         return []
+    def cronometro(e) -> bool:
+        return (isinstance(e, ast.BinOp) and isinstance(e.op, ast.Sub) and isinstance(e.left, ast.Call)
+                and isinstance(e.left.func, ast.Attribute) and isinstance(e.left.func.value, ast.Name)
+                and e.left.func.value.id == "time")
+
     out = []
     for f in ast.walk(arv):
         if not (isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith("test")
                 and ("paralel" in f.name or "ao_mesmo_tempo" in f.name)):
             continue
-        for n in ast.walk(f):
-            if isinstance(n, ast.Compare) and isinstance(n.left, ast.BinOp) and isinstance(n.left.op, ast.Sub):
-                c = n.left.left
-                if (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
-                        and isinstance(c.func.value, ast.Name) and c.func.value.id == "time"):
-                    out.append(f.name)
-                    break
+        # lição #81: `dt = time.time() - t0` e depois `assert dt < x` é o mesmo cronômetro
+        nomes = {a.targets[0].id for a in ast.walk(f) if isinstance(a, ast.Assign) and len(a.targets) == 1
+                 and isinstance(a.targets[0], ast.Name) and cronometro(a.value)}
+        if any(isinstance(n, ast.Compare) and (cronometro(n.left) or isinstance(n.left, ast.Name) and n.left.id in nomes)
+               for n in ast.walk(f)):
+            out.append(f.name)
     return out
 
 

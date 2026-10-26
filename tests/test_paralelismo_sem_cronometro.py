@@ -24,6 +24,23 @@ def test_licao_2_portao_recusa_paralelismo_provado_por_cronometro():
     assert provam_paralelismo_pelo_relogio(CRONOMETRADO) == ["test_tres_em_paralelo"]
 
 
+def test_licao_81_portao_recusa_cronometro_guardado_numa_variavel():
+    """Lição #81: test_missoes_evoluem_em_paralelo guardava `dt = time.time() - t0` e comparava `dt < 2.3`; o lint só
+    via a subtração escrita dentro da comparação, e o teste flaky estourou no CI (3,69 s)."""
+    fonte = '''
+import time
+def test_missoes_em_paralelo():
+    t0 = time.time()
+    rodar()
+    dt = time.time() - t0
+    assert dt < 2.3
+def test_outro_assunto():
+    dt = time.time() - t0
+    assert dt < 1
+'''
+    assert provam_paralelismo_pelo_relogio(fonte) == ["test_missoes_em_paralelo"]
+
+
 def test_licao_2_paralelismo_nao_se_prova_com_cronometro():
     culpados = [f"{arq.name}::{nome}" for arq in sorted(TESTES.glob("test_*.py"))
                 for nome in provam_paralelismo_pelo_relogio(arq.read_text())]

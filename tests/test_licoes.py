@@ -348,6 +348,20 @@ def test_licao_de_estrutura_com_item_fora_da_fila_nao_trava_a_evolucao_para_semp
     assert circle.store.one("SELECT status FROM licoes")["status"] == "validada" and not L.bloqueia_evolucao()
 
 
+def test_erro_que_volta_com_o_item_pendente_fora_da_fila_devolve_o_item_a_fila(circle):
+    """Vigia licao_bloqueia (item #219, 4 h): o item da lição saiu da fila sem sair de 'pendente' (desativado pelo
+    revisor sem mudança, "depende de você") e o erro segue acontecendo; o `sem_fila` chamava `_abrir_item`, que via
+    'pendente' e não fazia nada: a lição travava a evolução com um item que ninguém pega."""
+    from circulo.licoes import NA_FILA
+    L = lic(circle)
+    for i, (off, evid) in enumerate(((1, "depende de você: sem mudança 3×"), (0, "depende de você: exige a constituição"))):
+        licao = L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura=f"incidente:{i}")
+        circle.store.x("UPDATE roadmap SET desativado=?, evidencia=? WHERE id=?", (off, evid, licao["item_id"]))
+        L.verificar("execucao:meta", False, motivo="RuntimeError: x", assinatura=f"incidente:{i}")      # segue acontecendo
+        assert circle.store.one(f"SELECT 1 FROM roadmap WHERE id=? AND {NA_FILA}", (licao["item_id"],))
+    assert L.bloqueia_evolucao()
+
+
 def test_licao_de_estrutura_com_item_dividido_e_sub_item_fora_da_fila_nao_trava_a_evolucao_para_sempre(circle):
     """Vigia licao_bloqueia (item #139, 85 h): o item da lição foi dividido pelo fatiador e um sub-item saiu da fila
     (2º corte do teto, sem mudança); o pai fica 'dividido' para sempre (só vira feito com todos os subs feitos)."""

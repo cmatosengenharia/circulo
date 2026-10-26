@@ -1,6 +1,5 @@
 """Autonomia: missões em paralelo, missões que se conhecem e evidência de acerto antes de avançar."""
 import threading
-import time
 
 import pytest
 
@@ -11,20 +10,26 @@ from test_engine import LANDING_V1, LANDING_V2, FakeGen
 
 
 class SlowGen(FakeGen):
-    """Cada geração demora 0,3s; registra quantas rodam ao mesmo tempo."""
+    """Registra quantas gerações rodam ao mesmo tempo; com `juntos` (barreira), a 1ª geração de cada thread só segue
+    quando todas estão dentro (lição #81: paralelismo provado por barreira, não por cronômetro)."""
 
     def __init__(self):
         super().__init__()
         self.lock = threading.Lock()
         self.agora = 0
         self.pico = 0
+        self.juntos = None
+        self.esperaram = set()
 
     def generate(self, **kw):
         with self.lock:
             self.agora += 1
             self.pico = max(self.pico, self.agora)
-        time.sleep(0.3)
+            esperar = self.juntos is not None and threading.get_ident() not in self.esperaram
+            self.esperaram.add(threading.get_ident())
         try:
+            if esperar:
+                self.juntos.wait()
             return super().generate(**kw)
         finally:
             with self.lock:
@@ -49,11 +54,9 @@ def eco(tmp_path, clock):
 
 def test_missoes_evoluem_em_paralelo(eco):
     c, gen, lp, portal, plano = eco
-    t0 = time.time()
+    gen.juntos = threading.Barrier(3, timeout=10)             # em fila, a 1ª missão espera sozinha e a barreira quebra
     res = c.engine.run_parallel()
-    dt = time.time() - t0
-    assert len(res) == 3 and gen.pico >= 2                    # pesquisas rodaram ao mesmo tempo
-    assert dt < 3 * 2 * 0.3 + 0.5                             # mais rápido que em fila (3 missões × 2 gerações)
+    assert len(res) == 3 and gen.pico == 3 and not gen.juntos.broken   # as 3 pesquisas estiveram dentro ao mesmo tempo
     assert {r.project_id for r in res} == {lp, portal, plano}
     trilha = {r["project_id"] for r in c.store.q("SELECT project_id FROM trail WHERE etapa='projeto'")}
     assert {lp, portal, plano} <= trilha
