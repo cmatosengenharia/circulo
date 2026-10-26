@@ -52,6 +52,7 @@ def main(argv: list[str] | None = None) -> None:
     dv.add_argument("--item", type=int, default=None)
     rd = sub.add_parser("redrive", help="reabre um item descartado pelo portão de reincidência (os PRs fechados até aqui não contam)")
     rd.add_argument("--item", type=int, required=True)
+    sub.add_parser("digest", help="o que o time ganhou na semana: PRs de produto com o pedido de origem e a métrica")
     sub.add_parser("verificar", help="verificação de ponta a ponta do painel pelo mapa de funcionalidades")
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
@@ -136,6 +137,11 @@ def main(argv: list[str] | None = None) -> None:
         if c is None:
             raise SystemExit("pedido não encontrado (use o nome do arquivo que o `circulo pedir` mostrou ou ev<N>)")
         print(json.dumps(c, ensure_ascii=False, indent=2) if args.json else caminho.texto(c))
+        return
+    if args.cmd == "digest":
+        from . import digest_semanal
+        from .state import Store
+        print(digest_semanal.ler(Store(os.path.join(args.data, "circulo.db"))))
         return
     if args.cmd == "redrive":
         from .portao_previo import redrive
