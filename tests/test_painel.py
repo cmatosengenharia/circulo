@@ -303,3 +303,35 @@ def test_variacao_das_falhas_contra_as_24h_anteriores_com_cor_invertida_e_sem_ba
     assert ".delta.ruim{color:var(--bad)}" in pagina and ".delta.bom{color:var(--ok)}" in pagina
     vazia = pagina_saude(saude(Store(tmp_path / "v.db").db)).decode()
     assert '<em class="delta neutro">—</em>' in vazia
+
+
+def test_cada_causa_do_card_mostra_as_24h_anteriores_e_o_delta_nova_subiu_caiu(tmp_path):
+    """Pergunta #326 (item #234): toda causa do card de falhas traz a contagem das 24 h anteriores e o delta; a causa
+    que sumiu aparece com ×0 e ▼ em vez de se esconder em 'outras'; n e anterior somam os totais das duas janelas."""
+    import time
+
+    from circulo.painel import causas_vs_antes, pagina_saude, saude
+    from circulo.state import Store
+    atual = {"total": 13, "causas": [{"causa": "sse", "n": 8}, {"causa": "api", "n": 3}], "outras": 2}
+    antes = {"total": 17, "por_causa": {"sse": 5, "frescor": 7, "api": 2, "x": 3}}
+    g = causas_vs_antes(atual, antes, top=2)
+    assert g == [{"causa": "sse", "n": 8, "anterior": 5}, {"causa": "api", "n": 3, "anterior": 2},
+                 {"causa": "frescor", "n": 0, "anterior": 7}, {"causa": "outras", "n": 2, "anterior": 3}]
+    assert sum(c["n"] for c in g) == atual["total"] and sum(c["anterior"] for c in g) == antes["total"]
+    assert causas_vs_antes({"total": 0, "causas": [], "outras": 0}, {"total": 0, "por_causa": {}}) == []
+
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    for sig, n, ts in (("painel:nova", 2, t), ("painel:subiu", 3, t), ("painel:subiu", 1, t - 86400 - 60),
+                       ("painel:caiu", 1, t), ("painel:caiu", 4, t - 86400 - 60), ("painel:sumiu", 2, t - 86400 - 60)):
+        for _ in range(n):
+            st.x("INSERT INTO verificacoes(tick,ponto,ok,assinatura,created_at) VALUES(1,'painel:x',0,?,?)", (sig, ts))
+    pagina = pagina_saude(saude(st.db)).decode()
+    causa = pagina[pagina.index('aria-label="Falhas do painel por causa"'):]
+    lista = causa[causa.index("<ol><li>") + 8:causa.index("</li></ol>")].split("</li><li>")
+    itens = {li.split(" <b>")[0]: li for li in lista}
+    assert set(itens) == {"painel:nova", "painel:subiu", "painel:caiu", "painel:sumiu"}
+    assert '×2</b> <small>antes 0</small> <em class="delta ruim">▲ +2 novo</em>' in itens["painel:nova"]
+    assert '×3</b> <small>antes 1</small> <em class="delta ruim">▲ +2 (+200%)</em>' in itens["painel:subiu"]
+    assert '×1</b> <small>antes 4</small> <em class="delta bom">▼ −3 (−75%)</em>' in itens["painel:caiu"]
+    assert '×0</b> <small>antes 2</small> <em class="delta bom">▼ −2 (−100%)</em>' in itens["painel:sumiu"]
