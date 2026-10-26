@@ -432,7 +432,8 @@ CREATE TRIGGER IF NOT EXISTS intencoes_sem_delete BEFORE DELETE ON intencoes
 CREATE TABLE IF NOT EXISTS frescor (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   atraso_ms REAL NOT NULL,        -- atraso dado → tela medido pelo próprio painel (SLO: p99 ≤ 3 s em 24 h)
-  em REAL NOT NULL
+  em REAL NOT NULL,
+  versao TEXT                     -- versão da página que mediu; só a página no ar entra no SLO
 );
 CREATE INDEX IF NOT EXISTS frescor_em ON frescor(em);
 
@@ -580,7 +581,8 @@ class Store:
                   ("llm_calls", "job", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
-                  ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"))
+                  ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"),
+                  ("frescor", "versao", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:

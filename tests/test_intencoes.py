@@ -97,7 +97,7 @@ def test_frescor_e_slo_em_p99_de_24h(circle):
     s.set("painel_frescor_em", 0)
     registrar_frescor(s, 3500, v)
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
-    s.x("INSERT INTO frescor(atraso_ms, em) VALUES(4000, ?)", (time.time(),))
+    s.x("INSERT INTO frescor(atraso_ms, em, versao) VALUES(4000, ?, ?)", (time.time(), v))
     s.set("painel_frescor_em", 0)
     registrar_frescor(s, 200, v)
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 0

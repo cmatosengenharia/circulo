@@ -60,14 +60,14 @@ def test_projecao_mostra_o_que_vem(circle):
 
 def test_frescor_do_painel_e_um_neuronio_monitorado(circle):
     s = circle.store
-    for _ in range(99):
-        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(400, ?)", (time.time(),))
     v = versao_painel()
+    for _ in range(99):
+        s.x("INSERT INTO frescor(atraso_ms, em, versao) VALUES(400, ?, ?)", (time.time(), v))
     assert registrar_frescor(s, 400, v)                                 # 100ª amostra: o p99 passa a valer
     assert not registrar_frescor(s, 400, v)                             # no máximo 1 por minuto
     s.set("painel_frescor_em", 0)
     for _ in range(5):
-        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?, ?)", (FRESCOR_MAX_MS + 1, time.time()))
+        s.x("INSERT INTO frescor(atraso_ms, em, versao) VALUES(?, ?, ?)", (FRESCOR_MAX_MS + 1, time.time(), v))
     registrar_frescor(s, FRESCOR_MAX_MS + 1, v)
     oks = s.q("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id")
     assert [x["ok"] for x in oks] == [1, 0]
@@ -86,7 +86,7 @@ def test_frescor_julga_so_o_codigo_atual_do_painel(circle, monkeypatch):
     s = circle.store
     monkeypatch.setattr(cf, "versao_painel", lambda: "velha")
     for _ in range(100):
-        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(120000, ?)", (time.time(),))
+        s.x("INSERT INTO frescor(atraso_ms, em, versao) VALUES(120000, ?, 'velha')", (time.time(),))
     assert registrar_frescor(s, 120000, versao="velha")
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 0
     monkeypatch.setattr(cf, "versao_painel", lambda: "nova")
@@ -95,6 +95,21 @@ def test_frescor_julga_so_o_codigo_atual_do_painel(circle, monkeypatch):
         s.set("painel_frescor_em", 0)
         registrar_frescor(s, 400, versao="nova")
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
+
+
+def test_amostra_da_pagina_antiga_nao_conta_no_p99_nem_na_primeira_versao(circle):
+    """lição #60 (painel:frescor_atrasado): depois do #173 e do #175 o motivo seguiu em p99 4795 ms. A janela só
+    recomeçava quando a versão gravada mudava; na primeira versão gravada não havia anterior e as amostras da página
+    antiga (sem versão) ficaram no p99. A versão é da amostra e o p99 (lição e card) só lê a página no ar."""
+    s = circle.store
+    for _ in range(100):
+        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(4795, ?)", (time.time(),))    # página de antes do #173
+    v = versao_painel()
+    for _ in range(100):
+        s.set("painel_frescor_em", 0)
+        registrar_frescor(s, 400, v)
+    assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
+    assert ids(confianca(s))["frescor"]["estado"] == "ok"
 
 
 def test_frescor_sem_versao_da_pagina_nao_entra_na_janela(circle, painel):  # noqa: F811
