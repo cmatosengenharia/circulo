@@ -55,12 +55,38 @@ def _importar(store: Store, arquivo: Path, emails: dict[Path, Linha | ValueError
     return gravar(store, [lin])
 
 
+def _extratos(pasta: Path) -> list[Path]:
+    return sorted(a for a in pasta.iterdir() if a.is_file() and a.suffix.lower() in FORMATOS) if pasta.is_dir() else []
+
+
+def diagnosticar(pasta: str | Path) -> str:
+    """Por que a pasta deu (ou não) lançamentos: 'pasta_inexistente', 'vazia', 'so_rejeitados(n)' ou 'ok(n)'.
+
+    `ok(n)` conta os extratos pendentes e os já em `processados/`; um extrato só duplicado também é ok."""
+    pasta = Path(pasta)
+    if not pasta.is_dir():
+        return "pasta_inexistente"
+    bons = len(_extratos(pasta)) + len(_extratos(pasta / "processados"))
+    if bons:
+        return f"ok({bons})"
+    rejeitados = len(_extratos(pasta / "rejeitados"))
+    return f"so_rejeitados({rejeitados})" if rejeitados else "vazia"
+
+
 def ingerir_pasta(pasta: str | Path, store: Store) -> int:
     """Importa os extratos da pasta (em ordem de nome) e devolve quantos lançamentos novos entraram.
 
     Cada varredura com extrato vira evento do loop (trilha de intenções, ação `lancamentos:varredura`) e fica em
-    kv `lancamentos_pasta`: novos, total do ledger, importados por arquivo e ignorados com motivo."""
+    kv `lancamentos_pasta`: novos, total do ledger, importados por arquivo e ignorados com motivo. Toda chamada,
+    com ou sem extrato, grava em kv `lancamentos_motivo` o `diagnosticar` da pasta depois da passada."""
     pasta = Path(pasta)
+    try:
+        return _ingerir(pasta, store)
+    finally:
+        store.set("lancamentos_motivo", diagnosticar(pasta))
+
+
+def _ingerir(pasta: Path, store: Store) -> int:
     arquivos = sorted(a for a in pasta.iterdir() if a.is_file()) if pasta.is_dir() else []
     extratos = [a for a in arquivos if a.suffix.lower() in FORMATOS]
     if not extratos:
