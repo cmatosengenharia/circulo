@@ -82,3 +82,23 @@ def test_tokens_por_pr_somados_por_veredito_do_portao(circle):
     assert tokens_por_veredito([], [])["razao_incompleto_completo"] is None
     _, ctx = METRICAS["tokens_por_pr"][1](s, agora)
     assert ctx["por_veredito"] == r["por_veredito"]                  # publicada na métrica que a pergunta #327 lê
+
+
+def test_item_sem_veredito_previo_recebe_veredito_ao_ser_escalado(circle, repo, tmp_path):  # noqa: F811
+    """Pergunta #331: 27 de 38 PRs sem veredito (itens entregues antes do portão ou sem passar pelo pick). Ao escalar o
+    Developer, o item com PR ainda sem veredito é avaliado pelo texto, com a hora do próprio item."""
+    s, antes = circle.store, time.time() - 3 * 86400
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+        "VALUES('Entregue antes do portão','melhorar o loop','loop','feito','',1,?,?)", (antes, antes))
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,item_id,created_at,updated_at) "
+        "VALUES(7,1,'Entregue antes do portão','b','mergeado',(SELECT id FROM roadmap WHERE titulo=?),?,?)",
+        ("Entregue antes do portão", antes, antes))
+    item = erro_recorrente(circle)
+    dev, _ = dev_de(circle, repo, tmp_path, ZipAgent(conserta_na=1))
+    dev.run_once()
+    vereditos = {r["titulo"]: r["veredito"] for r in itens_com_veredito(s)}
+    assert vereditos["Entregue antes do portão"] == "incompleto" and vereditos[item["titulo"]] is not None
+    r = tokens_por_veredito([{"entrada": "Entregue antes do portão", "tokens": 1_000}], itens_com_veredito(s))
+    assert r["prs_sem_veredito"] == 0 and r["por_veredito"]["incompleto"]["prs"] == 1
+    assert s.one("SELECT p.created_at FROM pedidos_claros p JOIN roadmap r ON r.id=p.item "
+                 "WHERE r.titulo='Entregue antes do portão'")["created_at"] == antes   # não infla a fração das 24 h
