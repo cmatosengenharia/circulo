@@ -4,19 +4,30 @@ from __future__ import annotations
 
 from collections import Counter
 
+from .licoes import normalizar
+
 TOP_CAUSAS = 5
 
 
 def _por_causa(linhas) -> Counter:
-    return Counter(causa or sig or ponto for ponto, sig, causa in linhas)
+    """Causa mais específica que houver, normalizada (números e ids não separam a mesma causa)."""
+    return Counter(normalizar(causa or sig or ponto) or ponto for ponto, sig, causa in linhas)
+
+
+def agrupar_por_causa(linhas) -> list[dict]:
+    """Todas as falhas (ponto, assinatura, causa) por causa normalizada, com n e fração do total, da maior para a
+    menor; empate pelo nome, então a ordem não depende da ordem das linhas. A primeira é a dominante."""
+    n = _por_causa(linhas)
+    total = sum(n.values())
+    return [{"causa": c, "n": k, "fracao": k / total} for c, k in sorted(n.items(), key=lambda ck: (-ck[1], ck[0]))]
 
 
 def falhas_por_causa(linhas, top: int = TOP_CAUSAS) -> dict:
     """Agrupa falhas (ponto, assinatura, causa) pela causa mais específica que houver, então toda falha tem causa;
     o que passa do top vai em 'outras', e top + outras = total."""
-    n = _por_causa(linhas)
-    causas = [{"causa": c, "n": k} for c, k in n.most_common(top)]
-    total = sum(n.values())
+    grupos = agrupar_por_causa(linhas)
+    causas = [{"causa": c["causa"], "n": c["n"]} for c in grupos[:top]]
+    total = sum(c["n"] for c in grupos)
     return {"total": total, "causas": causas, "outras": total - sum(c["n"] for c in causas)}
 
 

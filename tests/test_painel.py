@@ -335,3 +335,43 @@ def test_cada_causa_do_card_mostra_as_24h_anteriores_e_o_delta_nova_subiu_caiu(t
     assert '×3</b> <small>antes 1</small> <em class="delta ruim">▲ +2 (+200%)</em>' in itens["painel:subiu"]
     assert '×1</b> <small>antes 4</small> <em class="delta bom">▼ −3 (−75%)</em>' in itens["painel:caiu"]
     assert '×0</b> <small>antes 2</small> <em class="delta bom">▼ −2 (−100%)</em>' in itens["painel:sumiu"]
+
+
+def test_falhas_agrupadas_por_causa_normalizada_com_fracao_e_dominante_no_topo(tmp_path):
+    """Pergunta #330: as 205 falhas painel:% das 24 h caem em causas normalizadas (números e ids não separam a mesma
+    causa), com n e fração somando o total, ordem estável (empate pelo nome) e 'outras' abaixo de 20%; o card mostra
+    a causa dominante e o total no topo."""
+    import random
+    import time
+
+    from circulo.painel import agrupar_por_causa, falhas_por_causa, pagina_saude, saude
+    from circulo.state import Store
+    linhas = ([("painel:frescor", "painel:frescor_atrasado", None)] * 120
+              + [("painel:sse", None, f"timeout após {3000 + i} ms") for i in range(40)]
+              + [("painel:api", None, f"HTTP 500 no pedido {i}") for i in range(30)]
+              + [("painel:z", "painel:z_b", None)] * 5 + [("painel:z", "painel:z_a", None)] * 5
+              + [(f"painel:p{i}", f"sig{i}", None) for i in range(5)])
+    g = agrupar_por_causa(linhas)
+    assert sum(c["n"] for c in g) == 205 and abs(sum(c["fracao"] for c in g) - 1) < 1e-9
+    assert g[0] == {"causa": "painel:frescor_atrasado", "n": 120, "fracao": 120 / 205}
+    assert [c["causa"] for c in g[1:3]] == ["timeout após n ms", "http n no pedido n"]
+    assert [c["causa"] for c in g[3:5]] == ["painel:z_a", "painel:z_b"]               # empate: pelo nome
+    embaralhadas = linhas[:]
+    random.Random(7).shuffle(embaralhadas)
+    assert agrupar_por_causa(embaralhadas) == g and falhas_por_causa(embaralhadas) == falhas_por_causa(linhas)
+    f = falhas_por_causa(linhas)
+    assert f["total"] == 205 and f["outras"] / f["total"] < 0.2
+    assert agrupar_por_causa([]) == []
+
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    for sig, n in (("painel:sse_timeout", 3), ("painel:api_500", 1)):
+        for _ in range(n):
+            st.x("INSERT INTO verificacoes(tick,ponto,ok,assinatura,created_at) VALUES(1,'painel:x',0,?,?)", (sig, t))
+    h = saude(st.db)
+    assert h["falhas_dominante"] == {"causa": "painel:sse_timeout", "n": 3, "fracao": 0.75}
+    pagina = pagina_saude(h).decode()
+    card = pagina[pagina.index('aria-label="Falhas do painel por causa"'):]
+    assert card.index("Dominante: <strong>painel:sse_timeout</strong> ×3 (75% de 4)") < card.index("<ol>")
+    vazia = Store(tmp_path / "v.db").db
+    assert saude(vazia)["falhas_dominante"] is None and "Dominante" not in pagina_saude(saude(vazia)).decode()
