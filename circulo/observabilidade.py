@@ -146,8 +146,9 @@ def slos(store: Store, now: float | None = None) -> list[dict]:
             validas = [r for r in rows if r["ok"] or not AMBIENTE.search(r["erro"] or "")]
             n, bons = len(validas), sum(1 for r in validas if r["ok"])
         elif id_ == "painel_frescor":
-            r = store.one("SELECT COUNT(*) n, SUM(atraso_ms<=?) b FROM frescor WHERE em>=?", (LIMITE_FRESCOR_MS, ini))
-            n, bons = r["n"] or 0, r["b"] or 0
+            from .confianca import amostras_frescor
+            fr = amostras_frescor(store, ini)
+            n, bons = len(fr), sum(1 for a in fr if a <= LIMITE_FRESCOR_MS)
         else:
             from .rastro import completude
             c = completude(store, janela // DIA, now)

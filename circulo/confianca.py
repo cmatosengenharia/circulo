@@ -137,7 +137,7 @@ def confianca(store: Store, now: float | None = None) -> dict:
                          f"{frac:.0%} ({usado:,} de {limite:,} tokens)".replace(",", "."),
                          f"{s.pending_count()} pedido(s) na fila", now,
                          projecao="no fim do orçamento o loop pausa sozinho até a meia-noite"))
-    fr = [r["atraso_ms"] for r in s.q("SELECT atraso_ms FROM frescor WHERE em>=?", (now - 86400,))]
+    fr = amostras_frescor(s, now - 86400)
     if fr:
         f99 = p99(fr)
         ck.append(_c("frescor", "agora", "Frescor do painel (p99, 24 h)", "ok" if f99 <= FRESCOR_MAX_MS else "atencao",
@@ -334,11 +334,16 @@ def versao_painel() -> str:
     return hashlib.sha256(resources.files("circulo").joinpath("painel.html").read_bytes()).hexdigest()[:12]
 
 
+def amostras_frescor(store: Store, desde: float) -> list[float]:
+    """A única leitura das medições de frescor: só as da página no ar (um conserto não reabre a lição com dado velho)."""
+    return [r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=? AND versao=?",
+                                            (desde, versao_painel()))]
+
+
 def registrar_frescor(store: Store, atraso_ms: float, versao: str | None) -> bool:
     """Neurônio `painel:frescor`: o próprio painel informa o atraso entre o dado e a tela. Cada medição fica guardada
-    e o SLO é o p99 das últimas 24 h, não a média nem a última leitura. A verificação roda no máximo 1 vez por
-    minuto; p99 acima de FRESCOR_MAX_MS vira lição. Só a página no ar é julgada: amostra sem versão ou de aba com
-    página antiga é descartada e a janela recomeça quando a página muda (um conserto não reabre a lição com dado velho)."""
+    com a versão da página e o SLO é o p99 das últimas 24 h, não a média nem a última leitura. A verificação roda no
+    máximo 1 vez por minuto; p99 acima de FRESCOR_MAX_MS vira lição. Amostra sem versão ou de página antiga é descartada."""
     now = time.time()
     import math
     try:
@@ -347,13 +352,9 @@ def registrar_frescor(store: Store, atraso_ms: float, versao: str | None) -> boo
         return False
     if not math.isfinite(atraso_ms) or atraso_ms < 0 or atraso_ms > 600_000:
         return False                      # NaN/inf/negativo ou aba parada por mais de 10 min (Mac dormiu): não é medição do painel
-    atual = versao_painel()
-    if versao != atual:
+    if versao != versao_painel():
         return False
-    if store.get("frescor_versao") not in (None, atual):
-        store.set("frescor_desde", now)
-    store.set("frescor_versao", atual)
-    sid = store.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso_ms, now))
+    sid = store.x("INSERT INTO frescor(atraso_ms, em, versao) VALUES(?,?,?)", (atraso_ms, now, versao))
     if sid % 500 == 0:
         store.x("DELETE FROM frescor WHERE em < ?", (now - 2 * 86400,))
     ultimo = store.get("painel_frescor_em") or 0
@@ -361,8 +362,7 @@ def registrar_frescor(store: Store, atraso_ms: float, versao: str | None) -> boo
         return False
     store.set("painel_frescor_em", now)
     from .licoes import Licoes
-    desde = max(now - 86400, float(store.get("frescor_desde") or 0))
-    amostras = [r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=?", (desde,))]
+    amostras = amostras_frescor(store, now - 86400)
     if len(amostras) < 100:
         return False                      # com poucas amostras o p99 é o máximo: uma aba em segundo plano viraria lição
     f99 = p99(amostras) or 0
