@@ -51,10 +51,24 @@ MENU = (("/", "Missões", "As missões suas e a do próprio loop"),
 SELO = '<span class="selo" id="seloAprov" hidden></span>'     # contagem do "Precisa de você", em toda tela
 NAV = (f'{NAV_INI}<nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links">'
        + "".join(f'<a href="{h}" title="{t}">{n}{SELO if h == "/aprovacoes" else ""}</a>' for h, n, t in MENU)
-       + '</div><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav>'
+       + '</div><form class="busca topo-busca" role="search" id="linkForm"><input id="linkBusca" type="search" autocomplete="off" '
+       'placeholder="Links da empresa  /" aria-label="Links da empresa: digite para buscar (tecla /); cole link, rótulo e #assunto e Enter para guardar">'
+       '<ul class="topo-res" id="linkRes" aria-live="polite" hidden></ul></form>'
+       '<span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav>'
        '<script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}'
        'var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});'
        'function selo(){fetch("/api/aprovacoes?so=n").then(function(r){return r.json()}).then(function(j){var s=document.getElementById("seloAprov");if(!s)return;s.hidden=!j.total;s.textContent=j.total;s.dataset.u=j.urgentes>0?"1":"0";}).catch(function(){});}selo();setInterval(selo,15000);})();</script>'
+       # catálogo de links: `/` foca a busca em qualquer tela; palavra na hora, significado (Graft) depois de uma pausa
+       '<script>(function(){var i=document.getElementById("linkBusca"),u=document.getElementById("linkRes"),f=document.getElementById("linkForm"),t=0,n=0,LINK=/https?:\\/\\//i;if(!i)return;'
+       'document.addEventListener("keydown",function(e){var a=document.activeElement;if(e.key==="/"&&!e.metaKey&&!e.ctrlKey&&!(a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))){e.preventDefault();i.focus();i.select();}else if(e.key==="Escape"&&a===i){u.hidden=true;i.blur();}});'
+       'document.addEventListener("click",function(e){if(!f.contains(e.target))u.hidden=true;});'
+       'function mostrar(l,msg){u.textContent="";l.forEach(function(h){var li=document.createElement("li"),a=document.createElement("a"),s=document.createElement("small");a.href=h.url;a.target="_blank";a.rel="noopener";a.textContent=h.rotulo;s.textContent=(h.assunto?h.assunto+" · ":"")+h.url;li.append(a,s);u.appendChild(li);});'
+       'if(msg||!l.length){var m=document.createElement("li");m.className="topo-msg";m.textContent=msg||"Nada achado. Para guardar: cole o link com um rótulo curto (#assunto opcional) e Enter.";u.appendChild(m);}u.hidden=false;}'
+       'function buscar(sentido){var q=i.value.trim(),m=++n;if(!q){u.hidden=true;return;}if(LINK.test(q)){mostrar([],"Enter guarda este link com o rótulo (#assunto opcional).");return;}'
+       'fetch("/api/links?q="+encodeURIComponent(q)+(sentido?"":"&sentido=0")).then(function(r){return r.json()}).then(function(j){if(m===n)mostrar(j.links||[]);}).catch(function(){});}'
+       'i.addEventListener("input",function(){clearTimeout(t);buscar(false);t=setTimeout(function(){buscar(true);},600);});'
+       'f.addEventListener("submit",function(e){e.preventDefault();var q=i.value.trim();if(!LINK.test(q)){var a=u.querySelector("a");if(a)window.open(a.href,"_blank","noopener");return;}'
+       'fetch("/api/links",{method:"POST",headers:{"Content-Type":"application/json","X-Circulo":"1"},body:JSON.stringify({texto:q})}).then(function(r){return r.json()}).then(function(j){if(j.erro){mostrar([],j.erro);return;}i.value="";mostrar([j.link],"Guardado.");}).catch(function(){});});})();</script>'
        f'{NAV_FIM}\n')
 
 
@@ -79,6 +93,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helveti
 .topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
 .topo-links .selo{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--jev);color:var(--surface);font-size:11.5px;font-weight:800;text-align:center;vertical-align:1px}
 .topo-links .selo[data-u="1"]{background:var(--bad)}
+.topo-busca{position:relative;margin-left:auto}
+.topo-busca input{width:220px;min-height:32px;padding:5px 10px;border-radius:6px;font-size:14px}
+.topo-res{position:absolute;right:0;top:calc(100% + 6px);width:420px;max-width:90vw;max-height:60vh;overflow:auto;margin:0;padding:6px;list-style:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg)}
+.topo-res li{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:6px}
+.topo-res li:hover{background:var(--hover)}
+.topo-res a{color:var(--ink);font-weight:600;text-decoration:underline}
+.topo-res small,.topo-res .topo-msg{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.topo-busca+.topo-estado{margin-left:0}
 a.back{display:none !important}
 @media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
 .btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
