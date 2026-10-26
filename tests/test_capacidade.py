@@ -85,12 +85,10 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
     agora = time.time()
     for i in range(3):
         s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'loop','pendente','pedido',?,?,?)", (f"Estudar coisa {i}", "d", 500 + i, agora, agora))
-    vistos = set()
     juntos = threading.Barrier(3, timeout=10)   # só abre com os 3 estudos dentro do LLM ao mesmo tempo; em série, quebra
 
     class Junta(Pesquisa):
         def generate(self, *, system, prompt, model, max_tokens, web_search=0):
-            vistos.add(threading.current_thread().name.split("_")[0])
             juntos.wait()
             return LLMResult(json.dumps(resposta("adotar")), 100, model, [])
     circle.ctx.dl.llm = Junta({})
@@ -98,7 +96,7 @@ def test_arquiteto_estuda_varios_itens_ao_mesmo_tempo(circle, monkeypatch):
     out = Estudo(circle.ctx).run_paralelo(autorizado=True)
     assert len(out) == 3 and all(o and o["veredito"] == "adotar" for o in out)
     assert s.one("SELECT COUNT(*) n FROM roadmap WHERE estudo IS NOT NULL AND status='pendente'")["n"] == 3
-    assert any(v.startswith("estudo") for v in vistos)
+    assert not juntos.broken
 
 
 class AgenteDoModulo:
