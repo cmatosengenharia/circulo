@@ -208,3 +208,32 @@ def test_faixa_de_saude_verde_sem_sinal_ruim(tmp_path):
     from circulo.state import Store
     h = saude(Store(tmp_path / "s.db").db)
     assert h["semaforo"] == "verde" and h["causa"] is None and h["gate"] is None
+
+
+def test_falhas_do_painel_agrupadas_por_causa_somam_o_total_e_aparecem_no_topo(tmp_path):
+    """Pergunta #302: as falhas painel:% das últimas 24 h viram top 5 causas + 'outras', sem falha sem causa."""
+    import time
+
+    from circulo.painel import falhas_por_causa, pagina_saude, saude
+    from circulo.state import Store
+    linhas = ([("painel:frescor", "painel:frescor_atrasado", None)] * 150 + [("painel:sse", None, "timeout")] * 30
+              + [("painel:api", "painel:api_500", None)] * 12 + [("painel:x", None, None)] * 6
+              + [(f"painel:p{i}", f"sig{i}", None) for i in range(7)])
+    g = falhas_por_causa(linhas)
+    assert g["total"] == 205 and len(g["causas"]) == 5
+    assert sum(c["n"] for c in g["causas"]) + g["outras"] == g["total"]
+    assert g["causas"][0] == {"causa": "painel:frescor_atrasado", "n": 150}
+    assert {"timeout", "painel:x"} <= {c["causa"] for c in g["causas"]} and g["outras"] / g["total"] < 0.1
+    assert falhas_por_causa([]) == {"total": 0, "causas": [], "outras": 0}
+
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+    for ponto, sig, ts in (("painel:frescor", "painel:frescor_atrasado", agora),
+                           ("painel:frescor", "painel:frescor_atrasado", agora),
+                           ("painel:frescor", "painel:frescor_atrasado", agora - 2 * 86400),
+                           ("gate:ci", "gate:ci:x", agora)):
+        st.x("INSERT INTO verificacoes(tick,ponto,ok,assinatura,created_at) VALUES(1,?,0,?,?)", (ponto, sig, ts))
+    h = saude(st.db)
+    assert h["falhas_24h"] == {"total": 2, "causas": [{"causa": "painel:frescor_atrasado", "n": 2}], "outras": 0}
+    pagina = pagina_saude(h).decode()
+    assert pagina.index("Falhas do painel (24 h)") < pagina.index("Semáforo") and "painel:frescor_atrasado" in pagina
