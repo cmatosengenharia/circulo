@@ -55,6 +55,7 @@ import sys
 import time
 from pathlib import Path
 
+from . import pedido_claro
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
 from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
@@ -251,6 +252,8 @@ class DeveloperComReparo(SelfDeveloper):
         if bloqueado:
             return DevResult(item_id, bloqueado["status"], bloqueado["evidencia"])
         item = self.pick(item_id)
+        if item:
+            pedido_claro.registrar(self.s, item)        # só mede quantos pedidos chegam sem os 3 campos; não bloqueia
         veto = self._vetar(item) if item else None
         if veto:
             return veto
