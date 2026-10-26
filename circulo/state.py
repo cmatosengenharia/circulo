@@ -393,6 +393,21 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 CREATE INDEX IF NOT EXISTS llm_calls_papel ON llm_calls(papel, nivel);
 
+CREATE TABLE IF NOT EXISTS gasto_cursor (
+  -- gasto do Cursor em centavos de US$ por dia, assunto e tipo de tarefa (circulo/gasto_cursor.py)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dia TEXT NOT NULL,
+  assunto TEXT,
+  tipo TEXT,
+  modelo TEXT,
+  tokens INTEGER NOT NULL DEFAULT 0,
+  centavos INTEGER NOT NULL,
+  origem TEXT NOT NULL,           -- manual | csv
+  chave TEXT UNIQUE,              -- hash da linha do CSV: reimportar não duplica
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gasto_cursor_dia ON gasto_cursor(dia);
+
 -- trilha write-ahead (circulo/intencoes.py): a intenção entra antes da ação; só de acréscimo, encadeada por hash
 CREATE TABLE IF NOT EXISTS intencoes (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
