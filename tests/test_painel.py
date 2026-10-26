@@ -237,3 +237,35 @@ def test_falhas_do_painel_agrupadas_por_causa_somam_o_total_e_aparecem_no_topo(t
     assert h["falhas_24h"] == {"total": 2, "causas": [{"causa": "painel:frescor_atrasado", "n": 2}], "outras": 0}
     pagina = pagina_saude(h).decode()
     assert pagina.index("Falhas do painel (24 h)") < pagina.index("Semáforo") and "painel:frescor_atrasado" in pagina
+
+
+def test_falhas_do_painel_por_componente_com_variacao_ordenadas_do_mais_afetado(tmp_path):
+    """Pergunta #307: toda falha painel:% das últimas 24 h cai num componente (o ponto), com a variação contra as 24 h
+    anteriores, do mais afetado para o menos; janela vazia é lista vazia."""
+    import time
+
+    from circulo.painel import falhas_por_componente, pagina_saude, saude
+    from circulo.state import Store
+    agora = 1_000_000.0
+    linhas = ([("painel:frescor", agora - 60)] * 150 + [("painel:sse", agora - 3600)] * 30
+              + [("painel:api", agora - 10)] * 25 + [("painel:frescor", agora - 86400 - 60)] * 100
+              + [("painel:sse", agora - 86400 - 5)] * 40 + [("painel:velho", agora - 86400 - 1)] * 9)
+    g = falhas_por_componente(linhas, agora)
+    assert [c["componente"] for c in g] == ["painel:frescor", "painel:sse", "painel:api"]
+    assert sum(c["n"] for c in g) == 205
+    assert g[0] == {"componente": "painel:frescor", "n": 150, "anterior": 100, "variacao": 50}
+    assert g[1]["variacao"] == -10 and g[2] == {"componente": "painel:api", "n": 25, "anterior": 0, "variacao": 25}
+    assert falhas_por_componente([], agora) == []
+    assert falhas_por_componente([("painel:x", agora - 86400 - 5)], agora) == []
+
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    for ponto, ts in (("painel:frescor", t), ("painel:sse", t), ("painel:sse", t), ("painel:sse", t - 86400 - 60),
+                      ("painel:sse", t - 3 * 86400), ("gate:ci", t)):
+        st.x("INSERT INTO verificacoes(tick,ponto,ok,created_at) VALUES(1,?,0,?)", (ponto, ts))
+    h = saude(st.db)
+    assert h["componentes_24h"] == [{"componente": "painel:sse", "n": 2, "anterior": 1, "variacao": 1},
+                                    {"componente": "painel:frescor", "n": 1, "anterior": 0, "variacao": 1}]
+    pagina = pagina_saude(h).decode()
+    assert pagina.index("Falhas por componente (24 h)") < pagina.index("Semáforo")
+    assert pagina.index("painel:sse") < pagina.index("painel:frescor") and "▲ +1" in pagina
