@@ -1112,6 +1112,7 @@ function renderAoVivo() {
 setInterval(renderAoVivo, 1000);
 // SLO de frescor em p99: manda a pior idade vista na janela (a cauda), não a média nem a última
 // aba escondida: nada está na tela e o navegador congela timers e SSE; a idade só conta o tempo com a tela visível
+const VERSAO_PAINEL = "__VERSAO_PAINEL__";
 let piorAtraso = null, visivelDesde = document.hidden ? null : 0;
 document.addEventListener("visibilitychange", () => { visivelDesde = document.hidden ? null : Date.now(); });
 function idadeNaTela(geradoEm) {
@@ -1120,7 +1121,7 @@ function idadeNaTela(geradoEm) {
 function medirAtraso() { const idade = CF && idadeNaTela(CF.gerado_em); if (idade != null) piorAtraso = Math.max(piorAtraso || 0, atrasoMs || 0, idade); }
 setInterval(medirAtraso, 1000);
 setInterval(() => { if (piorAtraso != null) { const a = Math.round(piorAtraso); piorAtraso = null;
-  fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a})}).catch(() => {}); } }, 10000);
+  fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a, versao: VERSAO_PAINEL})}).catch(() => {}); } }, 10000);
 document.addEventListener("click", e => {
   if (e.target.closest("#orcBtn")) { $("#orcForm").hidden = false; $("#orcLimite").value = S && S.orcamento ? S.orcamento.limite : ""; document.querySelectorAll("[data-modo]").forEach(b => b.setAttribute("aria-pressed", S && S.orcamento && b.dataset.modo === S.orcamento.modo)); $("#orcLimite").focus(); }
 });

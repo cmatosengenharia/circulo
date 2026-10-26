@@ -77,6 +77,34 @@ def test_frescor_do_painel_e_um_neuronio_monitorado(circle):
     assert s.one("SELECT COUNT(*) n FROM frescor WHERE atraso_ms > 600000")["n"] == 0
 
 
+def test_frescor_julga_so_o_codigo_atual_do_painel(circle, monkeypatch):
+    """lição #60 (painel:frescor_atrasado): o conserto do painel (#172) entrou e a lição reincidiu 1 min depois
+    (p99 4795 ms) com amostras medidas pela página velha. O SLO só julga a versão do painel que está no ar:
+    amostra de aba com página antiga é descartada e a janela de 24 h recomeça quando a página muda."""
+    from circulo import confianca as cf
+    s = circle.store
+    monkeypatch.setattr(cf, "versao_painel", lambda: "velha")
+    for _ in range(100):
+        s.x("INSERT INTO frescor(atraso_ms, em) VALUES(120000, ?)", (time.time(),))
+    assert registrar_frescor(s, 120000, versao="velha")
+    assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 0
+    monkeypatch.setattr(cf, "versao_painel", lambda: "nova")
+    assert not registrar_frescor(s, 120000, versao="velha")            # aba que ainda roda a página antiga
+    for _ in range(100):
+        s.set("painel_frescor_em", 0)
+        registrar_frescor(s, 400, versao="nova")
+    assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
+
+
+def test_painel_manda_a_propria_versao_com_o_frescor():
+    """lição #60: a página servida carrega a versão do código e a devolve em cada medição de frescor."""
+    from circulo.confianca import versao_painel
+    from circulo.painel import _page
+    html = _page("painel.html").decode()
+    assert versao_painel() in html and "__VERSAO_PAINEL__" not in html
+    assert "versao: VERSAO_PAINEL" in html
+
+
 def test_frescor_com_poucas_amostras_nao_julga(circle):
     for _ in range(10):
         registrar_frescor(circle.store, FRESCOR_MAX_MS * 10)

@@ -327,10 +327,18 @@ def confianca(store: Store, now: float | None = None) -> dict:
 FRESCOR_MAX_MS = 3000       # SLO do painel: p99 do atraso dado → tela ≤ 3 s numa janela de 24 h
 
 
-def registrar_frescor(store: Store, atraso_ms: float) -> bool:
+def versao_painel() -> str:
+    """Versão da página do painel no ar: a página servida a carrega e a devolve em cada medição de frescor."""
+    import hashlib
+    from importlib import resources
+    return hashlib.sha256(resources.files("circulo").joinpath("painel.html").read_bytes()).hexdigest()[:12]
+
+
+def registrar_frescor(store: Store, atraso_ms: float, versao: str | None = None) -> bool:
     """Neurônio `painel:frescor`: o próprio painel informa o atraso entre o dado e a tela. Cada medição fica guardada
     e o SLO é o p99 das últimas 24 h, não a média nem a última leitura. A verificação roda no máximo 1 vez por
-    minuto; p99 acima de FRESCOR_MAX_MS vira lição."""
+    minuto; p99 acima de FRESCOR_MAX_MS vira lição. Só a página no ar é julgada: amostra de aba com página antiga
+    é descartada e a janela recomeça quando a página muda (um conserto não reabre a lição com dado velho)."""
     now = time.time()
     import math
     try:
@@ -339,6 +347,12 @@ def registrar_frescor(store: Store, atraso_ms: float) -> bool:
         return False
     if not math.isfinite(atraso_ms) or atraso_ms < 0 or atraso_ms > 600_000:
         return False                      # NaN/inf/negativo ou aba parada por mais de 10 min (Mac dormiu): não é medição do painel
+    atual = versao_painel()
+    if versao is not None and versao != atual:
+        return False
+    if store.get("frescor_versao") not in (None, atual):
+        store.set("frescor_desde", now)
+    store.set("frescor_versao", atual)
     sid = store.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso_ms, now))
     if sid % 500 == 0:
         store.x("DELETE FROM frescor WHERE em < ?", (now - 2 * 86400,))
@@ -347,7 +361,8 @@ def registrar_frescor(store: Store, atraso_ms: float) -> bool:
         return False
     store.set("painel_frescor_em", now)
     from .licoes import Licoes
-    amostras = [r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=?", (now - 86400,))]
+    desde = max(now - 86400, float(store.get("frescor_desde") or 0))
+    amostras = [r["atraso_ms"] for r in store.q("SELECT atraso_ms FROM frescor WHERE em>=?", (desde,))]
     if len(amostras) < 100:
         return False                      # com poucas amostras o p99 é o máximo: uma aba em segundo plano viraria lição
     f99 = p99(amostras) or 0
