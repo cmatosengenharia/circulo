@@ -1111,8 +1111,13 @@ function renderAoVivo() {
 }
 setInterval(renderAoVivo, 1000);
 // SLO de frescor em p99: manda a pior idade vista na janela (a cauda), não a média nem a última
-let piorAtraso = null;
-function medirAtraso() { if (CF) piorAtraso = Math.max(piorAtraso || 0, atrasoMs || 0, Date.now() - CF.gerado_em * 1000); }
+// aba escondida: nada está na tela e o navegador congela timers e SSE; a idade só conta o tempo com a tela visível
+let piorAtraso = null, visivelDesde = document.hidden ? null : 0;
+document.addEventListener("visibilitychange", () => { visivelDesde = document.hidden ? null : Date.now(); });
+function idadeNaTela(geradoEm) {
+  return visivelDesde == null ? null : Math.max(0, Date.now() - Math.max(geradoEm * 1000, visivelDesde));
+}
+function medirAtraso() { const idade = CF && idadeNaTela(CF.gerado_em); if (idade != null) piorAtraso = Math.max(piorAtraso || 0, atrasoMs || 0, idade); }
 setInterval(medirAtraso, 1000);
 setInterval(() => { if (piorAtraso != null) { const a = Math.round(piorAtraso); piorAtraso = null;
   fetch("/api/frescor", {method:"POST", headers:{"Content-Type":"application/json","X-Circulo":"1"}, body: JSON.stringify({atraso_ms: a})}).catch(() => {}); } }, 10000);
@@ -1146,7 +1151,7 @@ function connect() {
   es.addEventListener("trilha", m => { const e = JSON.parse(m.data); if (ZERO || !PID || !e.project_id || String(e.project_id) === PID) { if (ZERO || !PID || String(e.project_id) === PID) addPasso(e); } });
   es.addEventListener("status", m => { ultimoDado = Date.now(); if (S) { S.loop.vivo = JSON.parse(m.data); } });
   es.addEventListener("capacidade", m => { renderCapacidade(JSON.parse(m.data)); });
-  es.addEventListener("confianca", m => { CF = JSON.parse(m.data); ultimoDado = Date.now(); atrasoMs = Math.max(0, Date.now() - CF.gerado_em * 1000); renderAoVivo(); });
+  es.addEventListener("confianca", m => { CF = JSON.parse(m.data); ultimoDado = Date.now(); atrasoMs = idadeNaTela(CF.gerado_em) || 0; renderAoVivo(); });
   es.onerror = () => { es.close(); setTimeout(connect, 2000); };
 }
 /* ---------- dash em camadas: saúde → etapas → execução (run_id) ---------- */

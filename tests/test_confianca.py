@@ -130,6 +130,22 @@ def test_sse_reempurra_confianca_parada_dentro_do_slo_de_frescor(circle, painel)
     assert pior * 1000 <= FRESCOR_MAX_MS, f"card ficou {pior:.1f} s sem renovar"
 
 
+def test_frescor_so_mede_a_idade_enquanto_a_aba_esta_visivel():
+    """lição #60 (painel:frescor_atrasado, reincidente: p99 123923 ms): aba em segundo plano congela timers e SSE e,
+    ao voltar, o card velho entrava na medição com o tempo escondido (minutos). O atraso dado → tela só conta o tempo
+    em que a tela estava visível: toda idade medida passa por idadeNaTela, que respeita a visibilidade da aba."""
+    import re
+    from pathlib import Path
+    html = (Path(__file__).parent.parent / "circulo" / "painel.html").read_text()
+    assert 'addEventListener("visibilitychange"' in html and "document.hidden" in html
+    corpo = re.search(r"function idadeNaTela\([^)]*\) \{(.*?)\n?\}\n", html, re.S)
+    assert corpo and "visivelDesde" in corpo.group(1), "idadeNaTela precisa descontar o tempo com a aba escondida"
+    cru = [m.group(0) for m in re.finditer(r"Date\.now\(\) - CF\.gerado_em \* 1000", html)]
+    assert not cru, f"idade do card medida sem olhar a visibilidade da aba: {cru}"
+    medir = re.search(r"function medirAtraso\(\) \{(.*?)\}\n", html, re.S).group(1)
+    assert "idadeNaTela(" in medir
+
+
 def test_api_confianca_e_frescor(circle, painel):  # noqa: F811
     circle.tick()
     with urllib.request.urlopen(painel + "/api/confianca", timeout=5) as r:
