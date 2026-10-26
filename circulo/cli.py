@@ -55,6 +55,11 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("verificar", help="verificação de ponta a ponta do painel pelo mapa de funcionalidades")
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
+    asu = sub.add_parser("assunto", help="espaço por assunto: novo NOME | anotar FRASE | perguntar PERGUNTA | ver NOME")
+    asu.add_argument("acao", choices=("novo", "anotar", "perguntar", "ver"))
+    asu.add_argument("texto", nargs="+")
+    asu.add_argument("--descricao", default="")
+    asu.add_argument("--link", action="append", default=[])
     args = ap.parse_args(argv)
     carregar_env()                        # configuração única: o loop lê as chaves sozinho
     from .graft import PASTAS_PADRAO      # serviço com PATH antigo: ferramentas instaladas depois (graft, claude) ficam visíveis
@@ -185,6 +190,21 @@ def main(argv: list[str] | None = None) -> None:
             r = c.tick()
             print(json.dumps({"tick": r.tick, "pausado": r.paused, "evento": r.handled_event, "idle": r.idle_task,
                               "evolucoes": r.evolutions, "shadow": r.shadow, "erros": r.errors}, ensure_ascii=False))
+    elif args.cmd == "assunto":
+        from . import assuntos
+        texto = " ".join(args.texto)
+        try:
+            if args.acao == "novo":
+                print(f"assunto #{assuntos.criar(c.store, texto, args.descricao, args.link)}: {texto}")
+            elif args.acao == "anotar":
+                n = assuntos.anotar(c.store, c.ctx.dl, texto)
+                print(f"nota #{n['id']} ({n['tipo']}) arquivada em {n['assunto']}")
+            elif args.acao == "perguntar":
+                print(assuntos.responder(assuntos.perguntar(c.store, texto)))
+            else:
+                print(json.dumps(assuntos.ver(c.store, texto), ensure_ascii=False, indent=2))
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
     elif args.cmd == "add":
         print(f"enfileirado #{c.submit(' '.join(args.texto))}")
     elif args.cmd == "status":
