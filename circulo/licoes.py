@@ -84,6 +84,13 @@ def teste_que_falhou(motivo: str) -> str | None:
     return m.group(1) if m else None
 
 
+def assinatura_com_teste(assinatura: str | None, motivo: str) -> str | None:
+    """Lição #2: a assinatura fixa de quem chama (ex.: `corpo:validacao_falhou`) ganha o teste que falhou, se a saída o
+    cita: cada teste é uma lição de teste (regra 7), não a reincidência de uma lição genérica que nunca fecha."""
+    falhou = assinatura and not NODE_ID.search(assinatura) and teste_que_falhou(erro_legivel(motivo or ""))
+    return f"{assinatura}:teste:{falhou}" if falhou and "::" in falhou else assinatura
+
+
 def normalizar(texto: str, n: int = 70) -> str:
     t = (texto or "").lower()
     t = re.sub(r"[0-9a-f]{7,40}", "#", t)
@@ -393,7 +400,7 @@ class Licoes:
         tick, agora = self.s.tick, time.time()
         if not ok and ponto == "gate:ci" and CI_INTEIRO.search(motivo or ""):
             assinatura, classe = "gate:ci:nao_rodou", "ambiente"
-        sig = (assinatura or assinatura_de(ponto, motivo)) if not ok else assinatura
+        sig = (assinatura_com_teste(assinatura, motivo) or assinatura_de(ponto, motivo)) if not ok else assinatura
         item, item_titulo = item_de(self.s, sujeito, item_id)
         vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo,causa) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?)", (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig,
