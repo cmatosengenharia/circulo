@@ -37,6 +37,7 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
   12. developer:abrir_pr:adiar com teto (pergunta #296, 13 falhas em 13): cada adiamento grava no item a causa
      normalizada (`adiado_do_item`). A mesma causa LIMITE_ADIAR vezes seguidas → o item sai da fila como 'bloqueado'
      para triagem (dead-letter queue com maxReceiveCount), em vez de adiar de novo; causa diferente ou PR aberto zeram.
+     A quarentena apaga a barra antiga do item no DISJUNTOR: senão a sonda de reabertura o devolvia à fila (pergunta #300).
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -582,6 +583,9 @@ class DeveloperComReparo(SelfDeveloper):
         texto = (f"- CI da main ou dos últimos PRs: adiado ({d.causa}, {n}/{LIMITE_ADIAR} seguidas); um PR agora "
                  "falharia por motivo externo, nada foi enviado")
         if n >= LIMITE_ADIAR:
+            barras = self.s.get(DISJUNTOR) or {}
+            if barras.pop(str(item_id), None):        # a barra antiga reabriria a quarentena quando a main mudasse
+                self.s.set(DISJUNTOR, barras)
             self._disjuntor = f"triagem: adiado {n}x seguidas pela mesma causa ({d.causa}); não adia de novo"
             texto += f"\n({self._disjuntor})"
         monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
