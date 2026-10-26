@@ -103,6 +103,8 @@ h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;co
 .card .dono{position:absolute;right:6px;top:6px;width:22px;height:22px;font-size:10px;transition:transform .4s}
 .card .dono.carrega{transform:scale(1.25);box-shadow:0 0 0 3px var(--ok-soft)}
 .card .ev{display:block;color:var(--muted);font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .motivo{display:block;margin-top:4px;padding:3px 5px;border-left:3px solid var(--bad);background:var(--bad-soft);color:var(--ink);font-size:11.5px;border-radius:0 var(--r-sm) var(--r-sm) 0}
+.card .motivo b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700}
 .coluna .nada{color:var(--muted);font-size:12px;padding:6px 2px}
 .voo{position:fixed;z-index:60;pointer-events:none;width:26px;height:26px;font-size:11px;border:2px solid var(--surface);box-shadow:0 6px 16px rgba(0,0,0,.25);will-change:transform}
 .crit{margin-top:14px;font-size:13.5px}
@@ -317,7 +319,12 @@ function desenharQuadro(r) {
 }
 function cardHtml(k) {
   return `<div class="card" data-id="${esc(k.id)}" title="${esc(k.evidencia)}"><span class="id">${String(k.id).startsWith("p") ? "pergunta" : "item"} #${String(k.id).replace(/^p/, "")}${k.pr ? ` · PR #${k.pr}` : ""}</span>
-    ${avatar(k.dono, "dono")}<div>${esc(k.titulo)}</div><span class="ev">${esc(k.evidencia)}</span></div>`;
+    ${avatar(k.dono, "dono")}<div>${esc(k.titulo)}</div><span class="ev">${esc(k.evidencia)}</span>${motivoHtml(k.motivo)}</div>`;
+}
+function motivoHtml(m) {
+  if (!m) return "";
+  if (m.codigo === "sem_motivo") return `<span class="motivo" data-codigo="sem_motivo">⚠ <b>sem_motivo</b> · nenhum registro do porquê (alerta enviado)</span>`;
+  return `<span class="motivo" data-codigo="${esc(m.codigo)}" title="${esc(m.causa)}">✕ <b>${esc(m.codigo)}</b> · ${esc(m.check)} · → ${esc(m.proxima_acao)}</span>`;
 }
 async function moverCard(itemId, coluna, quem, tom, m) {
   const cols = $("#colunas"), destino = cols.querySelector(`.coluna[data-k="${coluna}"] .cards`);
