@@ -2,7 +2,7 @@ import json
 import shutil
 from pathlib import Path
 
-from circulo.lancamentos_pasta import ingerir_pasta
+from circulo.lancamentos_pasta import diagnosticar, ingerir_pasta
 from circulo.perguntas import _m_lancamentos
 
 FIX = Path(__file__).parent / "fixtures"
@@ -96,3 +96,36 @@ def test_giro_sem_extrato_novo_nao_registra_varredura(circle):
     (circle.data_dir / "extratos").mkdir()
     circle.tick()
     assert _varreduras(circle.store) == []
+
+
+def test_diagnostico_da_pasta_separa_os_quatro_motivos_de_zero_lancamentos(tmp_path):
+    """lancamentos=0 com a ingestão pronta não dizia se faltava arquivo ou se o parser recusava tudo."""
+    pasta = tmp_path / "extratos"
+    assert diagnosticar(pasta) == "pasta_inexistente"
+    pasta.mkdir()
+    (pasta / "notas.txt").write_text("ignorar", encoding="utf-8")
+    assert diagnosticar(pasta) == "vazia"
+    (pasta / "rejeitados").mkdir()
+    for nome in ("a.csv", "b.ofx"):
+        (pasta / "rejeitados" / nome).write_text("x", encoding="utf-8")
+    assert diagnosticar(pasta) == "so_rejeitados(2)"
+    (pasta / "c.csv").write_text("x", encoding="utf-8")
+    (pasta / "processados").mkdir()
+    (pasta / "processados" / "d.ofx").write_text("x", encoding="utf-8")
+    assert diagnosticar(pasta) == "ok(2)"
+
+
+def test_todo_giro_grava_o_motivo_da_ingestao_no_estado(circle):
+    s = circle.store
+    pasta = circle.data_dir / "extratos"
+    circle.tick()
+    assert s.get("lancamentos_motivo") == "pasta_inexistente"
+    pasta.mkdir()
+    circle.tick()
+    assert s.get("lancamentos_motivo") == "vazia"
+    (pasta / "a_quebrado.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    circle.tick()
+    assert lancamentos(s) == 0 and s.get("lancamentos_motivo") == "so_rejeitados(1)"
+    shutil.copy(FIX / "extrato_anonimo.csv", pasta / "extrato_anonimo.csv")
+    circle.tick()
+    assert lancamentos(s) > 0 and s.get("lancamentos_motivo") == "ok(1)"
