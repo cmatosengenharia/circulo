@@ -265,6 +265,16 @@ def falhas_por_causa(linhas, top: int = TOP_CAUSAS) -> dict:
     return {"total": total, "causas": causas, "outras": total - sum(c["n"] for c in causas)}
 
 
+def falhas_por_componente(linhas, agora: float) -> list[dict]:
+    """Agrupa falhas (ponto, created_at) das últimas 48 h pelo componente (o ponto papel:etapa, sempre presente):
+    n nas últimas 24 h, anterior nas 24 h antes, do mais afetado para o menos."""
+    n, anterior = Counter(), Counter()
+    for ponto, em in linhas:
+        (n if em >= agora - 86400 else anterior)[ponto] += 1
+    return [{"componente": c, "n": k, "anterior": anterior[c], "variacao": k - anterior[c]}
+            for c, k in sorted(n.items(), key=lambda ck: (-ck[1], ck[0]))]
+
+
 def saude(conn) -> dict:
     """Semáforo + 5 números do loop, lidos só do SQLite (sqlite3.Connection), e a causa quando não está verde."""
     agora = time.time()
@@ -279,6 +289,9 @@ def saude(conn) -> dict:
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
            "falhas_24h": falhas_por_causa(conn.execute("SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE "
                                                        "'painel:%' AND ok=0 AND created_at >= ?", (agora - 86400,))),
+           "componentes_24h": falhas_por_componente(conn.execute(
+               "SELECT ponto, created_at FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
+               (agora - 2 * 86400,)), agora),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -312,6 +325,12 @@ def pagina_saude(h: dict) -> bytes:
     falhas = (f'<section class="card falhas" aria-label="Falhas do painel por causa"><span>Falhas do painel (24 h)</span>'
               f'<b>{f["total"]}</b><ol>' + "".join(f"<li>{escape(c)} <b>×{k}</b></li>" for c, k in itens)
               + "</ol></section>")
+    var = {True: "▲ +", False: "▼ −"}
+    componentes = ('<section class="card falhas" aria-label="Falhas do painel por componente"><span>Falhas por componente '
+                   '(24 h)</span><ol>' + "".join(
+                       f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> '
+                       + ("= 0" if not c["variacao"] else f'{var[c["variacao"] > 0]}{abs(c["variacao"])}')
+                       + " vs 24 h antes</li>" for c in h["componentes_24h"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -320,7 +339,7 @@ def pagina_saude(h: dict) -> bytes:
             ".card b{display:block;font-size:22px}.card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}"
             ".falhas{margin:0 0 12px}.falhas ol{margin:6px 0 0;padding-left:20px}.falhas li b{display:inline;font-size:inherit}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{falhas}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{falhas}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
