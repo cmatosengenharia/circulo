@@ -4,6 +4,7 @@ import pytest
 
 from circulo.lancamentos_email import importar_emails, parse_email, parse_emails
 from circulo.lancamentos_import import Linha, chave_hash, importar
+from circulo.lancamentos_pasta import ingerir_pasta
 from circulo.perguntas import _m_lancamentos
 
 FIX = Path(__file__).parent / "fixtures"
@@ -42,6 +43,39 @@ def test_extrato_e_email_do_mesmo_lancamento_resultam_em_1(circle):
     assert importar(s, EXTRATO, "csv") == 1
     assert importar_emails(s, [EMAIL]) == 0
     assert lancamentos(s) == 1
+
+
+OFX_SEM_FITID = ("<OFX><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261002120000[-3:BRT]<TRNAMT>-12.50"
+                 "<MEMO>PADARIA PAO BOM</STMTTRN></BANKTRANLIST></OFX>")
+
+
+def test_eml_na_pasta_do_loop_vira_lancamento_e_nao_duplica_com_reimportacao_nem_com_o_ofx(circle):
+    """Ponta a ponta: o e-mail exportado cai em <data>/extratos e o giro o ingere (lancamentos 0 → 1); o mesmo
+    e-mail de novo e o mesmo lançamento no OFX sem FITID somam 0."""
+    s = circle.store
+    pasta = circle.data_dir / "extratos"
+    pasta.mkdir()
+    (pasta / "compra.eml").write_text(EMAIL, encoding="utf-8")
+    assert lancamentos(s) == 0
+    circle.tick()
+    assert lancamentos(s) == 1
+    assert (pasta / "processados" / "compra.eml").exists()
+
+    (pasta / "compra.eml").write_text(EMAIL, encoding="utf-8")
+    (pasta / "extrato.ofx").write_text(OFX_SEM_FITID, encoding="utf-8")
+    circle.tick()
+    assert s.get("lancamentos_pasta")["novos"] == 0
+    assert lancamentos(s) == 1
+
+
+def test_dois_eml_identicos_na_mesma_passada_sao_duas_compras(circle):
+    pasta = circle.data_dir / "extratos"
+    pasta.mkdir()
+    (pasta / "a.eml").write_text(EMAIL, encoding="utf-8")
+    (pasta / "b.eml").write_text(OUTRA_DA_TARDE, encoding="utf-8")
+    (pasta / "c.eml").write_text(EMAIL.replace("Valor: R$ 12,50", ""), encoding="utf-8")
+    assert ingerir_pasta(pasta, circle.store) == 2
+    assert [p.name for p in (pasta / "rejeitados").iterdir()] == ["c.eml"]
 
 
 def test_duas_compras_identicas_legitimas_resultam_em_2(circle):
