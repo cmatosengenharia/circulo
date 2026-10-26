@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.68.1 — 2026-10-25
+
+- **Prazo de 2 dias do Norte** (`norte.marco`/`norte.cobrar`, no SRE): o loop grava o ponto de partida (fração de
+  produto, PRs de produto, console) e, 48 h depois, compara. Evoluiu → avisa e o prazo recomeça. Não evoluiu → aviso,
+  item no topo do "Precisa de você" ("a solução precisa ser reescrita, não insistida") e o painel marca o prazo
+  vencido. Decisão do Cássio em 25/10: reduzir a janela de 1 semana para 2 dias.
+
 ## 1.68.0 — 2026-10-25
 
 **O Norte: o loop passa a evoluir em direção ao produto, medido, e não só a si mesmo.**

@@ -116,3 +116,25 @@ def test_pesquisa_sem_json_registra_e_nao_derruba(circle):
     circle.ctx.reply = lambda m, k="": None
     assert mercado.pesquisar(circle.ctx) is None
     assert circle.store.get("mercado_pesquisa")["erro"] and not mercado.devida(circle.store)
+
+
+def test_prazo_de_dois_dias_cobra_evolucao_ou_pede_reescrita(circle):
+    s = circle.store
+    agora = time.time()
+    s.x("UPDATE roadmap SET status='feito'")
+    m = norte.marco(s, agora)
+    assert m["prazo_em"] == agora + norte.PRAZO_H * 3600 and not m["cobrado"]
+    avisos = []
+    assert norte.cobrar(s, lambda t, k: avisos.append(t), agora + 3600) is None           # antes do prazo: nada
+    v = norte.cobrar(s, lambda t, k: avisos.append(t), agora + norte.PRAZO_H * 3600 + 1)
+    assert v["cobrado"] and not v["evoluiu"] and "reescrita" in avisos[-1]
+    from circulo import aprovacoes
+    assert any(i["tipo"] == "norte_sem_evolucao" for i in aprovacoes.pendentes(s, agora + norte.PRAZO_H * 3600 + 2, diagnostico=False))
+    # reescrita: marco novo; com um PR de produto dentro do prazo, evoluiu e o prazo recomeça
+    s.set("norte_marco", None)
+    t0 = agora + 3 * 86400
+    norte.marco(s, t0)
+    prod = _item(s, "Resumo de impacto no PR", eixo="produto", agora=t0)
+    _pr(s, prod, t0 + 3600, n=7)
+    v = norte.cobrar(s, lambda t, k: avisos.append(t), t0 + norte.PRAZO_H * 3600 + 1)
+    assert v["evoluiu"] and "A direção mudou" in avisos[-1] and not s.get("norte_marco")["cobrado"]

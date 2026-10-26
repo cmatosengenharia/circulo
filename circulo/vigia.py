@@ -436,8 +436,9 @@ class Vigia:
         if mem is not None and mem.graft:
             mem.espelhar_pendentes()                                 # linhas antigas ganham nó no Graft, 50 por passagem
             graft.manter(self.s, now)                                # apply-safe a cada 6 h; duplicata do mesmo registro resolvida
-        from . import sentinela
+        from . import norte, sentinela
         sentinela.checar(self.s, self.ctx.reply, now)                # fila pronta e nada entrou na main há 4 h: avisa você
+        norte.cobrar(self.s, self.ctx.reply, now)                    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita
         from . import conta
         try:
             conta.vigiar(self.s, self.ctx.reply, now)              # assinatura: sessão do Claude de pé, relogin quando cai

@@ -49,6 +49,12 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
     for r in store.q("SELECT id, titulo, evidencia, updated_at FROM roadmap WHERE status='contestado' ORDER BY updated_at DESC"):
         out.append(_item("item_contestado", f"Item #{r['id']} contestado pelo estudo: {r['titulo']}", r["evidencia"], r["updated_at"],
                          [{"acao": "reafirmar_item", "rotulo": "Executar mesmo assim"}, {"acao": "desativar_item", "rotulo": "Deixar de lado"}], 1, ref=r["id"], link="/loop#evolucao"))
+    nm = store.get("norte_marco") or {}
+    if nm.get("cobrado") and not nm.get("evoluiu"):
+        d = nm.get("depois") or {}
+        out.append(_item("norte_sem_evolucao", "Norte: 2 dias sem evolução de produto — a solução precisa ser reescrita",
+                         f"Fração de produto {nm.get('fracao_produto')} → {d.get('fracao_produto')}; {d.get('prs_produto')} PR(s) de produto na semana; "
+                         f"{d.get('console')} no console. Reescrever o desenho (perspectivas, cota, pesquisa), não insistir.", nm.get("cobrado_em"), [], 0, link="/loop#evolucao"))
     par = store.get("entrega_parada") or {}
     if par:
         out.append(_item("entrega_parada", f"Entrega parada há {par.get('horas', '?')} h com {par.get('prontos', '?')} item(ns) prontos",

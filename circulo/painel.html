@@ -1331,7 +1331,9 @@ async function refreshNorte() {
     const meta = (r) => (r.chave === "fracao_produto" || r.chave === "merge_sem_conserto") ? Math.round(r.meta * 100) + "%" : (r.chave === "lead_time_h" ? r.meta + " h" : String(r.meta));
     $("#norteKpis").innerHTML = (n.resultados || []).map(r => `<div><b class="${r.distancia === 0 ? "ok" : r.distancia < 0.5 ? "warn" : "bad"}">${fmt(r)}</b><span>${esc(r.descricao)} · meta ${r.sentido === "menor" ? "≤" : "≥"} ${meta(r)}</span></div>`).join("");
     const f = n.fracao_24h;
-    $("#norteCota").textContent = `· ${n.prs_7d || 0} PR(s) em 7 dias, ${n.produto_7d || 0} de produto · últimas 24 h: ${f == null ? "sem PR" : Math.round(f * 100) + "% produto"} · ${n.prefere_produto ? "Developer prefere produto agora" : "Developer na ordem normal"}`;
+    const mk = n.marco || {}, restam = mk.prazo_em ? Math.max(0, (mk.prazo_em * 1000 - Date.now()) / 3600000) : null;
+    const prazo = mk.cobrado ? (mk.evoluiu ? " · prazo de 48 h: evoluiu ✓" : " · prazo de 48 h vencido SEM evolução: reescrever") : (restam != null ? ` · prazo: ${Math.round(restam)} h para a fração de produto sair de ${Math.round((mk.fracao_produto || 0) * 100)}%` : "");
+    $("#norteCota").textContent = prazo + ` · ${n.prs_7d || 0} PR(s) em 7 dias, ${n.produto_7d || 0} de produto · últimas 24 h: ${f == null ? "sem PR" : Math.round(f * 100) + "% produto"} · ${n.prefere_produto ? "Developer prefere produto agora" : "Developer na ordem normal"}`;
     $("#norteComo").textContent = `Com a entrega saudável e menos de ${Math.round((n.cota || 0.5) * 100)}% dos PRs das últimas 24 h sendo produto, o Developer pega um item de produto (pedido seu ou pergunta de eixo produto/missão) antes da manutenção. Só o erro "Urgente" do Médico passa na frente. Com a entrega parada, a cota desliga e a correção vem primeiro.`;
     const m = n.mercado || {};
     $("#norteMercadoMeta").textContent = m.em ? `última ${new Date(m.em * 1000).toLocaleString("pt-BR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})} · ${(m.fontes || []).length} fonte(s) · ${m.viraram_item || 0} viraram item` : "ainda não rodou (semanal, quando o Jev autorizar o gasto)";

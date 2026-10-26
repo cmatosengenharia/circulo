@@ -117,8 +117,48 @@ def item_de_produto(store, extra_sql: str = "", args: tuple = ()) -> dict | None
     return dict(r) if r else None
 
 
+PRAZO_H = 48                 # Cássio (25/10): se em 2 dias a fração de produto não evoluiu, a solução é reescrita
+
+
+def marco(store, agora: float | None = None) -> dict:
+    """O ponto de partida do prazo: gravado uma vez (primeiro giro com o Norte) e a cada reescrita."""
+    agora = agora or time.time()
+    m = store.get("norte_marco")
+    if m:
+        return m
+    med = medir(store, agora)
+    m = {"em": agora, "fracao_produto": med["fracao_produto"]["valor"], "prs_produto": med["prs_produto_semana"]["valor"],
+         "console": med["console_semana"]["valor"], "prazo_em": agora + PRAZO_H * 3600, "cobrado": False}
+    store.set("norte_marco", m)
+    return m
+
+
+def cobrar(store, reply, agora: float | None = None) -> dict | None:
+    """No fim do prazo, compara com o marco: evoluiu (mais PRs de produto, fração maior ou console mexido) ou não.
+    Sem evolução, avisa e põe no "Precisa de você": a solução precisa ser reescrita, não insistida."""
+    agora = agora or time.time()
+    m = marco(store, agora)
+    if m.get("cobrado") or agora < float(m["prazo_em"]):
+        return None
+    med = medir(store, agora)
+    depois = {"fracao_produto": med["fracao_produto"]["valor"], "prs_produto": med["prs_produto_semana"]["valor"], "console": med["console_semana"]["valor"]}
+    evoluiu = (depois["prs_produto"] or 0) > (m.get("prs_produto") or 0) or (depois["fracao_produto"] or 0) > (m.get("fracao_produto") or 0) + 0.1 \
+        or (depois["console"] or 0) > (m.get("console") or 0)
+    veredito = {**m, "cobrado": True, "cobrado_em": agora, "depois": depois, "evoluiu": evoluiu}
+    store.set("norte_marco", veredito)
+    if evoluiu:
+        reply(f"Norte: em {PRAZO_H} h a fração de produto foi de {m.get('fracao_produto')} para {depois['fracao_produto']} "
+              f"({m.get('prs_produto')} → {depois['prs_produto']} PRs de produto na semana). A direção mudou; o prazo recomeça.", "saude")
+        store.set("norte_marco", None)
+        marco(store, agora)
+    else:
+        reply(f"Norte: {PRAZO_H} h e a fração de produto não evoluiu ({m.get('fracao_produto')} → {depois['fracao_produto']}; "
+              f"{depois['prs_produto']} PR(s) de produto, {depois['console']} no console). A solução precisa ser reescrita, não insistida.", "saude")
+    return veredito
+
+
 def resumo(store) -> dict:
     m = medir(store)
     r = m.pop("_resumo")
-    return {"resultados": [{"chave": k, **v} for k, v in m.items()], "cota": COTA_PRODUTO,
+    return {"resultados": [{"chave": k, **v} for k, v in m.items()], "cota": COTA_PRODUTO, "marco": store.get("norte_marco"),
             "fracao_24h": fracao_produto_recente(store), "prefere_produto": prefere_produto(store), **r}
