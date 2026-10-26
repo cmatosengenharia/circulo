@@ -20,7 +20,8 @@ from . import __version__, finance
 from . import atividade as atv
 from . import registro, repo_stats
 from .budget import TZ
-from .falhas_painel import _falhas_antes, causas_vs_antes, falhas_por_causa, falhas_por_componente, variacao
+from .falhas_painel import (_falhas_antes, agrupar_por_causa, causas_vs_antes, falhas_por_causa, falhas_por_componente,
+                            variacao)
 from .money import fmt_brl
 from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
@@ -267,8 +268,10 @@ def saude(conn) -> dict:
     g = _um(conn, "SELECT ponto, ok, sujeito, motivo, created_at FROM verificacoes WHERE ponto LIKE 'gate:%' ORDER BY id DESC LIMIT 1")
     out = {"giros": int(json.loads(tick[0])) if tick else 0, "jev_duvida_pct": _pct(jev), "incidentes_abertos": len(abertos),
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
-           "falhas_24h": falhas_por_causa(conn.execute("SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE "
-                                                       "'painel:%' AND ok=0 AND created_at >= ?", (agora - 86400,))),
+           "falhas_24h": falhas_por_causa(f24 := conn.execute(
+               "SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
+               (agora - 86400,)).fetchall()),
+           "falhas_dominante": next(iter(agrupar_por_causa(f24)), None),
            "falhas_antes": _falhas_antes(conn.execute(
                "SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ? "
                "AND created_at < ?", (agora - 2 * 86400, agora - 86400))),
@@ -308,9 +311,11 @@ def pagina_saude(h: dict) -> bytes:
         v = variacao(atual, anterior)
         return f'<em class="delta {v["classe"]}">{v["texto"]}</em>'
 
-    f, antes = h["falhas_24h"], h["falhas_antes"]
+    f, antes, d = h["falhas_24h"], h["falhas_antes"], h["falhas_dominante"]
+    dominante = (f'<p>Dominante: <strong>{escape(d["causa"])}</strong> ×{d["n"]} ({round(100 * d["fracao"])}% de '
+                 f'{f["total"]})</p>' if d else "")
     falhas = (f'<section class="card falhas" aria-label="Falhas do painel por causa"><span>Falhas do painel (24 h)</span>'
-              f'<b>{f["total"]} {delta(f["total"], antes["total"])}</b><ol>'
+              f'<b>{f["total"]} {delta(f["total"], antes["total"])}</b>{dominante}<ol>'
               + "".join(f'<li>{escape(c["causa"])} <b>×{c["n"]}</b> <small>antes {c["anterior"]}</small> '
                         f'{delta(c["n"], c["anterior"])}</li>' for c in causas_vs_antes(f, antes)) + "</ol></section>")
     componentes = ('<section class="card falhas" aria-label="Falhas do painel por componente"><span>Falhas por componente '
