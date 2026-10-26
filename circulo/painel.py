@@ -384,9 +384,9 @@ def make_handler(db_path: str):
                 self.send_header("Location", f"/missao/{kit_project_id(self._store(), 'circulo')}")
                 self.end_headers()
                 return
-            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes") or u.path.startswith(("/projeto/", "/missao/")):
+            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes", "/trabalho") or u.path.startswith(("/projeto/", "/missao/")):
                 inicio = "equipe.html" if os.environ.get("CIRCULO_ENTRADA") == "equipe" else "home.html"   # produto: a equipe é a porta de entrada
-                body = _page({"/": inicio, "/integracoes": "integracoes.html", "/rastros": "rastros.html",
+                body = _page({"/": inicio, "/integracoes": "integracoes.html", "/rastros": "rastros.html", "/trabalho": "trabalho.html",
                               "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -535,6 +535,10 @@ def make_handler(db_path: str):
             elif u.path == "/api/links":
                 from .links import Links
                 self._json({"links": Links(self._store()).buscar(q.get("q", [""])[0][:300], sentido=q.get("sentido") != ["0"])})
+            elif u.path.startswith("/api/trabalho"):
+                from .trabalho import api_get
+                r = api_get(self._store(), Path(db_path).parent, u.path, q)
+                self._json(r if r is not None else {"erro": "rota desconhecida"}, 200 if r is not None else 404)
             elif u.path == "/api/eventos":
                 self._sse(_int(q, "desde", 0), projeto, so_status=q.get("tipo", [""])[0] == "status")
             else:
@@ -819,6 +823,10 @@ def make_handler(db_path: str):
             if u.path == "/api/links":
                 from .links import colar_e_guardar
                 return self._json(*colar_e_guardar(store, data))
+            if u.path.startswith("/api/trabalho/"):
+                from .trabalho import api_post
+                r = api_post(store, Path(db_path).parent, u.path, data)
+                return self._json(*(r if r is not None else ({"erro": "rota desconhecida"}, 404)))
             if u.path == "/api/projeto":
                 pedido = str(data.get("pedido", "")).strip()[:2000]
                 if len(pedido) < 8:

@@ -56,6 +56,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("verificar", help="verificação de ponta a ponta do painel pelo mapa de funcionalidades")
     rs = sub.add_parser("restaurar", help="restaura um snapshot (o banco atual é guardado antes)")
     rs.add_argument("arquivo")
+    ex = sub.add_parser("exemplo", help="dados de exemplo da tela Meu trabalho: semear | apagar")
+    ex.add_argument("acao", choices=("semear", "apagar"))
     asu = sub.add_parser("assunto", help="espaço por assunto: novo NOME | anotar FRASE | perguntar PERGUNTA | ver NOME")
     asu.add_argument("acao", choices=("novo", "anotar", "perguntar", "ver"))
     asu.add_argument("texto", nargs="+")
@@ -196,6 +198,10 @@ def main(argv: list[str] | None = None) -> None:
             r = c.tick()
             print(json.dumps({"tick": r.tick, "pausado": r.paused, "evento": r.handled_event, "idle": r.idle_task,
                               "evolucoes": r.evolutions, "shadow": r.shadow, "erros": r.errors}, ensure_ascii=False))
+    elif args.cmd == "exemplo":
+        from . import trabalho
+        r = trabalho.semear(c.store, c.ctx.data_dir) if args.acao == "semear" else trabalho.apagar(c.store, c.ctx.data_dir)
+        print(json.dumps(r, ensure_ascii=False))
     elif args.cmd == "assunto":
         from . import assuntos
         texto = " ".join(args.texto)

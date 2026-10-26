@@ -42,6 +42,7 @@ INI, FIM = "/*TEMA:ini*/", "/*TEMA:fim*/"
 NAV_INI, NAV_FIM = "<!--NAV:ini-->", "<!--NAV:fim-->"
 # o menu de cima, igual em todas as telas (1.31): nomes dizem o que a tela é, não como foi feita
 MENU = (("/", "Missões", "As missões suas e a do próprio loop"),
+        ("/trabalho", "Meu trabalho", "Seus assuntos, a daily, os links, o orçamento de IA e o contexto para o Cursor"),
         ("/equipe", "Equipe ao vivo", "Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas"),
         ("/loop", "Gestão do loop", "Saúde, decisões, evolução e segurança do loop"),
         ("/fluxo", "Bastidores do giro", "O giro passo a passo: raias, obras e cada verificação"),
@@ -164,7 +165,7 @@ def aplicar(html: str) -> str:
     return corpo.replace("</style>", bloco + "</style>", 1)
 
 
-PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html", "aprovacoes.html")
+PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html", "aprovacoes.html", "trabalho.html")
 
 
 def reescrever(pasta: Path | None = None) -> list[str]:

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Círculo — meu trabalho</title>
+<style>
+:root{--r-sm:6px;--r-lg:12px;--bg:#f6f8fa;--surface:#ffffff;--line:#d1d9e0;--border:#59636e;--hover:#eff2f5;--ink:#1f2328;--muted:#59636e;--jev:#8250df;--jev-soft:#fbefff;--llm:#9a6700;--llm-soft:#fff8c5;--ok:#1a7f37;--ok-soft:#dafbe1;--bad:#d1242f;--bad-soft:#ffebe9;--idle:#59636e;--gh:#1f2328;--node:#ffffff;--accent:#0969da;--on-accent:#ffffff;--primary:#1f883d;--on-primary:#ffffff;}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--surface:#151b23;--line:#3d444d;--border:#9198a1;--hover:#1c232c;--ink:#f0f6fc;--muted:#9198a1;--jev:#ab7df8;--jev-soft:#2a1f47;--llm:#d29922;--llm-soft:#372e12;--ok:#3fb950;--ok-soft:#12361f;--bad:#f85149;--bad-soft:#3c1a1d;--idle:#9198a1;--gh:#f0f6fc;--node:#1c232c;--accent:#1f6feb;--on-accent:#ffffff;--primary:#238636;--on-primary:#ffffff;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,-apple-system,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 56px}
+h1{font-size:26px;margin:4px 0 2px}
+h2{font-size:16px;margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 14px;max-width:90ch}
+.aviso{background:var(--llm-soft);color:var(--llm);border:1.5px solid currentColor;border-radius:var(--r-lg);padding:10px 14px;margin:0 0 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.aviso b{color:inherit}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;min-width:0}
+.card.larga{grid-column:1/-1}
+.card ul,.card ol{margin:0;padding-left:18px}
+.card li{margin:3px 0;overflow-wrap:anywhere}
+.muted{color:var(--muted);font-size:13px}
+.k{display:inline-block;min-width:22px;text-align:center;font-weight:700;font-size:12px;border-radius:999px;padding:0 6px;border:1.5px solid currentColor;margin-left:4px}
+.k.bad{color:var(--bad)}.k.ok{color:var(--ok)}.k.jev{color:var(--jev)}
+form.ask{display:flex;gap:8px;margin:8px 0 0}
+form.ask input{flex:1;min-width:0;min-height:36px;padding:6px 10px;border-radius:var(--r-sm);font:inherit}
+button{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
+button:hover{background:var(--hover);border-color:var(--ink)}
+button.primaria{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.resp{white-space:pre-wrap;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;margin-top:8px;font-size:13.5px;overflow-wrap:anywhere}
+.resp:empty{display:none}
+.barra{height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0 4px}
+.barra i{display:block;height:100%;background:var(--ok)}
+.barra i.bad{background:var(--bad)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12.5px}
+td.n{text-align:right;white-space:nowrap}
+pre{margin:6px 0 0;padding:8px 10px;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:12.5px;overflow:auto;max-height:260px;white-space:pre-wrap}
+.msg{min-height:22px;color:var(--muted);font-size:13.5px;margin:6px 0}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;border:1.5px solid currentColor;margin-right:6px;color:var(--muted)}
+a{color:var(--accent)}
+/*TEMA:ini*/
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:14px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.topo{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--surface);border-bottom:1.5px solid var(--line);margin:0 0 14px}
+.topo .marca{font-weight:800;letter-spacing:.2px;color:var(--ink);text-decoration:none;font-size:17px;padding:6px 8px 6px 0}
+.topo .marca::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-right:8px;vertical-align:-1px}
+.topo-links{display:flex;flex-wrap:wrap;gap:2px}
+.topo-links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 11px;border-radius:8px;border:1.5px solid transparent}
+.topo-links a:hover{background:var(--hover);color:var(--ink)}
+.topo-links a[aria-current=page]{color:var(--ink);background:var(--bg);border-color:var(--border)}
+.topo-estado{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+.topo-links .selo{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--jev);color:var(--surface);font-size:11.5px;font-weight:800;text-align:center;vertical-align:1px}
+.topo-links .selo[data-u="1"]{background:var(--bad)}
+.topo-busca{position:relative;margin-left:auto}
+.topo-busca input{width:220px;min-height:32px;padding:5px 10px;border-radius:6px;font-size:14px}
+.topo-res{position:absolute;right:0;top:calc(100% + 6px);width:420px;max-width:90vw;max-height:60vh;overflow:auto;margin:0;padding:6px;list-style:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg)}
+.topo-res li{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:6px}
+.topo-res li:hover{background:var(--hover)}
+.topo-res a{color:var(--ink);font-weight:600;text-decoration:underline}
+.topo-res small,.topo-res .topo-msg{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.topo-busca+.topo-estado{margin-left:0}
+a.back{display:none !important}
+@media (max-width:720px){.topo{gap:8px;padding:6px 12px}.topo-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.topo-links a{padding:6px 8px;font-size:13px;white-space:nowrap}.topo-estado{display:none}}
+.btn,.abas button,.sugestoes button,.vel button,.giros button,.seg button{transition:background .12s,border-color .12s,color .12s}
+.btn,.abas button,.seg button,.vel button,.giros button,.sugestoes button,.acoes button,.enviar{border-radius:6px}
+.btn{border:1px solid var(--border);background:var(--bg);color:var(--ink);min-height:32px;padding:5px 16px;font-weight:500;font-size:14px;box-shadow:0 1px 0 rgba(31,35,40,.04)}
+.btn:hover{background:var(--hover);border-color:var(--ink)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary);filter:brightness(1.08);border-color:var(--ink)}
+.btn.perigo:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.btn:disabled,.btn[aria-disabled=true]{opacity:1;background:var(--bg);color:var(--muted);border:1.5px dashed var(--border);cursor:not-allowed;filter:none}
+.abas button,.vel button,.giros button,.seg button,.sugestoes button{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+.abas button{color:var(--muted)}
+.abas button:hover,.vel button:hover,.giros button:hover,.seg button:hover,.sugestoes button:hover{background:var(--hover);border-color:var(--ink);color:var(--ink)}
+.abas button[aria-pressed=true],.vel button[aria-pressed=true],.giros button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.giros button.bad{border-color:var(--bad);color:var(--bad)}
+.giros button.bad[aria-pressed=true]{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+input,select,textarea{border-color:var(--border)}
+form.ask input,.orc-form input,.ligar select,.paralelo select,.linha input,.campos input,form.busca input{border:1.5px solid var(--border);background:var(--surface);color:var(--ink)}
+form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:focus,.linha input:focus,.campos input:focus,form.busca input:focus{border-color:var(--accent);outline:3px solid var(--accent);outline-offset:0}
+::placeholder{color:var(--muted);opacity:1}
+.chip,.tag,.vg-chip{border:1px solid currentColor;border-radius:999px;font-size:12px;font-weight:500;line-height:18px;padding:0 7px}
+.legenda,.legend{color:var(--ink);font-size:13px;gap:8px 18px}
+.legenda span,.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:12px;height:12px;flex:none}
+.lg.c{border-radius:50%}.lg.d{transform:rotate(45deg) scale(.8)}.lg.q{border-radius:3px}.lg.a{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid currentColor}
+.lg.o{border-radius:50%;border:2px solid currentColor;background:transparent}.lg.t{border-radius:50%;border:2px dashed currentColor;background:transparent}
+
+/*TEMA:fim*/
+</style>
+</head>
+<body>
+<!--NAV:ini--><nav class="topo" id="navTopo" aria-label="Telas do círculo"><a class="marca" href="/">Círculo</a><div class="topo-links"><a href="/" title="As missões suas e a do próprio loop">Missões</a><a href="/trabalho" title="Seus assuntos, a daily, os links, o orçamento de IA e o contexto para o Cursor">Meu trabalho</a><a href="/equipe" title="Os agentes como um time: quem faz o quê agora, a conversa e o quadro de entregas">Equipe ao vivo</a><a href="/loop" title="Saúde, decisões, evolução e segurança do loop">Gestão do loop</a><a href="/fluxo" title="O giro passo a passo: raias, obras e cada verificação">Bastidores do giro</a><a href="/rastros" title="Rastro de ponta a ponta de cada mudança, sinais de ouro e SLOs">Rastros e SLOs</a><a href="/integracoes" title="Chaves do Jev, da LLM e do GitHub no cofre do sistema">Integrações</a><a href="/aprovacoes" title="Tudo o que está parado esperando uma decisão sua, com a ação do lado">Precisa de você<span class="selo" id="seloAprov" hidden></span></a></div><form class="busca topo-busca" role="search" id="linkForm"><input id="linkBusca" type="search" autocomplete="off" placeholder="Links da empresa  /" aria-label="Links da empresa: digite para buscar (tecla /); cole link, rótulo e #assunto e Enter para guardar"><ul class="topo-res" id="linkRes" aria-live="polite" hidden></ul></form><span class="topo-estado" id="topoEstado" aria-live="polite"></span></nav><script>(function(){var p=location.pathname,e=/embed=1/.test(location.search),n=document.getElementById("navTopo");if(!n)return;if(e){n.hidden=true;return;}var atual=p==="/"?"/":p.startsWith("/missao/")||p==="/loop"?"/loop":"/"+p.split("/")[1];n.querySelectorAll("a[href]").forEach(function(a){if(a.getAttribute("href")===atual)a.setAttribute("aria-current","page");});function selo(){fetch("/api/aprovacoes?so=n").then(function(r){return r.json()}).then(function(j){var s=document.getElementById("seloAprov");if(!s)return;s.hidden=!j.total;s.textContent=j.total;s.dataset.u=j.urgentes>0?"1":"0";}).catch(function(){});}selo();setInterval(selo,15000);})();</script><script>(function(){var i=document.getElementById("linkBusca"),u=document.getElementById("linkRes"),f=document.getElementById("linkForm"),t=0,n=0,LINK=/https?:\/\//i;if(!i)return;document.addEventListener("keydown",function(e){var a=document.activeElement;if(e.key==="/"&&!e.metaKey&&!e.ctrlKey&&!(a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))){e.preventDefault();i.focus();i.select();}else if(e.key==="Escape"&&a===i){u.hidden=true;i.blur();}});document.addEventListener("click",function(e){if(!f.contains(e.target))u.hidden=true;});function mostrar(l,msg){u.textContent="";l.forEach(function(h){var li=document.createElement("li"),a=document.createElement("a"),s=document.createElement("small");a.href=h.url;a.target="_blank";a.rel="noopener";a.textContent=h.rotulo;s.textContent=(h.assunto?h.assunto+" · ":"")+h.url;li.append(a,s);u.appendChild(li);});if(msg||!l.length){var m=document.createElement("li");m.className="topo-msg";m.textContent=msg||"Nada achado. Para guardar: cole o link com um rótulo curto (#assunto opcional) e Enter.";u.appendChild(m);}u.hidden=false;}function buscar(sentido){var q=i.value.trim(),m=++n;if(!q){u.hidden=true;return;}if(LINK.test(q)){mostrar([],"Enter guarda este link com o rótulo (#assunto opcional).");return;}fetch("/api/links?q="+encodeURIComponent(q)+(sentido?"":"&sentido=0")).then(function(r){return r.json()}).then(function(j){if(m===n)mostrar(j.links||[]);}).catch(function(){});}i.addEventListener("input",function(){clearTimeout(t);buscar(false);t=setTimeout(function(){buscar(true);},600);});f.addEventListener("submit",function(e){e.preventDefault();var q=i.value.trim();if(!LINK.test(q)){var a=u.querySelector("a");if(a)window.open(a.href,"_blank","noopener");return;}fetch("/api/links",{method:"POST",headers:{"Content-Type":"application/json","X-Circulo":"1"},body:JSON.stringify({texto:q})}).then(function(r){return r.json()}).then(function(j){if(j.erro){mostrar([],j.erro);return;}i.value="";mostrar([j.link],"Guardado.");}).catch(function(){});});})();</script><!--NAV:fim-->
+<div class="wrap">
+  <h1>Meu trabalho</h1>
+  <p class="sub">O seu dia a dia de engenheiro em uma tela: os assuntos pelos quais você responde, a pauta da daily, o orçamento de IA, os links da empresa, o contexto enxuto para o Cursor e o mapa do GAIA. Anote em uma frase; o loop arquiva no assunto certo. Só notas, links e decisões: código, credenciais e dados da empresa não entram.</p>
+  <div class="aviso" id="aviso" hidden><b>Dados de exemplo.</b><span>Uma squad de comunicação fictícia para você ver o esqueleto funcionando. Quando quiser, apague e comece com o seu.</span><button type="button" id="apagarExemplo">Apagar o exemplo</button></div>
+  <div class="aviso" id="vazio" hidden><b>Nada anotado ainda.</b><span>Crie um assunto e anote, ou semeie o exemplo para ver tudo preenchido.</span><button type="button" class="primaria" id="semearExemplo">Semear o exemplo</button></div>
+  <div class="msg" id="msg"></div>
+  <div class="grade">
+    <section class="card larga" aria-label="Anotar e perguntar">
+      <h2>Anotar · perguntar</h2>
+      <form class="ask" id="anotar"><input id="frase" autocomplete="off" placeholder="decidimos X no svc-sms · pendência: Y · link https://… · nota: comando: make test"><button type="submit" class="primaria">Anotar</button></form>
+      <form class="ask" id="perguntar"><input id="pergunta" autocomplete="off" placeholder="o que decidimos sobre SMS? · pendências da migração?"><button type="submit">Perguntar</button></form>
+      <div class="resp" id="resposta"></div>
+    </section>
+    <section class="card" aria-label="Assuntos">
+      <h2>Assuntos <span class="muted" id="pastas"></span></h2>
+      <table><thead><tr><th>Assunto</th><th>Decisões</th><th>Pendências</th><th>Notas</th><th>Links</th><th>Última</th></tr></thead><tbody id="assuntos"></tbody></table>
+      <form class="ask" id="novoAssunto"><input id="nomeAssunto" autocomplete="off" placeholder="novo assunto: nome — descrição"><button type="submit">Criar</button></form>
+    </section>
+    <section class="card" aria-label="Daily de hoje">
+      <h2>Daily de hoje</h2>
+      <p class="muted">Das suas notas em <span id="notasPasta"></span>: ontem, hoje (pendências abertas) e bloqueios. Às 8 h vai ao console e à notificação.</p>
+      <ol id="daily"></ol>
+    </section>
+    <section class="card" aria-label="Pendências">
+      <h2>Pendências abertas</h2>
+      <ul id="pendencias"></ul>
+    </section>
+    <section class="card" aria-label="Decisões recentes">
+      <h2>Decisões recentes</h2>
+      <ul id="decisoes"></ul>
+    </section>
+    <section class="card" aria-label="Orçamento de IA">
+      <h2>Orçamento de IA (Cursor)</h2>
+      <div id="orcTexto" class="muted"></div>
+      <div class="barra"><i id="orcBarra" style="width:0"></i></div>
+      <div class="muted" id="orcLegenda"></div>
+      <table style="margin-top:8px"><thead><tr><th>Por assunto (mês)</th><th class="n">US$</th></tr></thead><tbody id="orcAssunto"></tbody></table>
+      <table style="margin-top:8px"><thead><tr><th>Por tipo de tarefa</th><th class="n">US$</th></tr></thead><tbody id="orcTipo"></tbody></table>
+      <p class="muted">Lançar: <code>python -m circulo.gasto_cursor 3,20 --assunto svc-sms --tipo bugfix</code> ou importar o CSV do Cursor com <code>--csv</code>.</p>
+    </section>
+    <section class="card" aria-label="Links da empresa">
+      <h2>Links da empresa <span class="muted" id="linksInfo"></span></h2>
+      <p class="muted">Busque com a tecla <b>/</b> em qualquer tela; cole <i>link rótulo #assunto</i> e Enter para guardar.</p>
+      <ul id="links"></ul>
+    </section>
+    <section class="card" aria-label="Contexto para o Cursor">
+      <h2>Contexto para o Cursor</h2>
+      <p class="muted">AGENTS.md e regras <code>.cursor/rules</code> gerados da memória do assunto (só comandos, convenções e armadilhas; muda só por PR).</p>
+      <form class="ask" id="contextoForm"><select id="contextoAssunto" style="flex:1;min-height:36px;border-radius:6px;padding:6px 10px;font:inherit"></select><button type="submit">Gerar</button></form>
+      <div id="contexto"></div>
+    </section>
+    <section class="card" aria-label="GAIA">
+      <h2>GAIA na esteira <span class="pill" id="gaiaPill" hidden>exemplo</span></h2>
+      <p class="muted">O que cada etapa exige e onde o loop já tem o portão. Os comandos de cada etapa entram em <code>[tool.circulo.etapas]</code> do repositório.</p>
+      <table><thead><tr><th>Etapa</th><th>Exige</th><th>Portão no loop</th></tr></thead><tbody id="gaia"></tbody></table>
+    </section>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const usd = c => "US$ " + (c / 100).toLocaleString("pt-BR", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const dia = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) : "";
+const POST = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify(body)}).then(r => r.json());
+let V = null;
+function lista(sel, itens, f, vazio) { $(sel).innerHTML = itens.length ? itens.map(f).join("") : `<li class="muted">${vazio}</li>`; }
+async function carregar() {
+  try {
+    V = await (await fetch("/api/trabalho")).json();
+    const t = $("#topoEstado"); if (t) t.textContent = `${V.assuntos.length} assunto(s) · ${V.pendencias.length} pendência(s)`;
+    $("#aviso").hidden = !V.exemplo; $("#vazio").hidden = V.exemplo || V.assuntos.length > 0;
+    $("#pastas").textContent = `· pastas em ${V.pastas}`; $("#notasPasta").textContent = V.notas_pasta;
+    $("#assuntos").innerHTML = V.assuntos.map(a => `<tr><td><b>${esc(a.nome)}</b><div class="muted">${esc(a.descricao)}</div></td><td class="n">${a.decisoes}</td><td class="n">${a.pendencias ? `<span class="k bad">${a.pendencias}</span>` : 0}</td><td class="n">${a.notas}</td><td class="n">${a.links}</td><td class="n">${esc(a.ultima || "—")}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">nenhum assunto ainda</td></tr>`;
+    $("#contextoAssunto").innerHTML = V.assuntos.map(a => `<option ${V.contexto && V.contexto.assunto === a.nome ? "selected" : ""}>${esc(a.nome)}</option>`).join("");
+    lista("#daily", V.daily.slice(1), l => `<li>${esc(l)}</li>`, V.daily[0] ? esc(V.daily[0]) : "sem pasta de notas ainda");
+    lista("#pendencias", V.pendencias, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span></li>`, "nenhuma pendência aberta");
+    lista("#decisoes", V.decisoes, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span></li>`, "nenhuma decisão anotada");
+    const o = V.orcamento, pct = Math.min(100, Math.round(100 * o.gasto_mes / Math.max(1, o.limite)));
+    $("#orcTexto").textContent = o.texto; $("#orcBarra").style.width = pct + "%"; $("#orcBarra").className = o.antes_do_fim ? "bad" : "";
+    $("#orcLegenda").textContent = `${usd(o.gasto_mes)} de ${usd(o.limite)} (${pct} %)` + (o.esgota_em ? ` · esgota em ${dia(o.esgota_em)}${o.antes_do_fim ? ", ANTES do fim do mês" : ""}` : "");
+    $("#orcAssunto").innerHTML = o.por_assunto.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">sem gasto lançado no mês</td></tr>`;
+    $("#orcTipo").innerHTML = o.por_tipo.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("");
+    $("#linksInfo").textContent = `· ${V.links.total} guardado(s) · palavra${V.links.fts ? " (FTS5)" : ""}${V.links.graft ? " + significado (Graft)" : ""}`;
+    lista("#links", V.links.recentes, l => `<li>${l.assunto ? `<span class="pill">${esc(l.assunto)}</span>` : ""}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.rotulo)}</a></li>`, "nenhum link guardado");
+    mostrarContexto(V.contexto);
+    $("#gaiaPill").hidden = !V.gaia.exemplo;
+    $("#gaia").innerHTML = V.gaia.etapas.map(e => `<tr><td><b>${esc(e.etapa)}</b></td><td>${esc(e.exige)}</td><td>${esc(e.portao)}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">sem mapa do GAIA ainda: forneça a parte compartilhável e o loop monta os portões</td></tr>`;
+  } catch { $("#msg").textContent = "sem conexão com o painel"; }
+}
+function mostrarContexto(c) {
+  $("#contexto").innerHTML = c ? Object.entries(c.arquivos).map(([k, v]) => `<div class="muted" style="margin-top:6px">${esc(k)}</div><pre>${esc(v)}</pre>`).join("") : `<p class="muted">sem assunto com notas ainda</p>`;
+}
+$("#anotar").addEventListener("submit", async e => {
+  e.preventDefault(); const j = await POST("/api/trabalho/anotar", {texto: $("#frase").value});
+  $("#resposta").textContent = j.erro ? j.erro : `✓ ${j.nota.tipo} arquivada em ${j.nota.assunto}: ${j.nota.texto}`; if (!j.erro) { $("#frase").value = ""; carregar(); }
+});
+$("#perguntar").addEventListener("submit", async e => {
+  e.preventDefault(); const j = await (await fetch("/api/trabalho/perguntar?q=" + encodeURIComponent($("#pergunta").value))).json();
+  $("#resposta").textContent = j.texto;
+});
+$("#novoAssunto").addEventListener("submit", async e => {
+  e.preventDefault(); const [nome, ...resto] = $("#nomeAssunto").value.split(/\s[—–-]\s/);
+  const j = await POST("/api/trabalho/assunto", {nome: nome.trim(), descricao: resto.join(" - ").trim()});
+  $("#msg").textContent = j.erro || `✓ assunto #${j.id} criado`; if (!j.erro) { $("#nomeAssunto").value = ""; carregar(); }
+});
+$("#contextoForm").addEventListener("submit", async e => {
+  e.preventDefault(); const j = await (await fetch("/api/trabalho/contexto?assunto=" + encodeURIComponent($("#contextoAssunto").value))).json();
+  if (j.erro) $("#msg").textContent = j.erro; else mostrarContexto(j);
+});
+$("#apagarExemplo").addEventListener("click", async () => { const j = await POST("/api/trabalho/exemplo", {acao: "apagar"}); $("#msg").textContent = j.erro || `✓ exemplo apagado (${j.apagado.notas} notas, ${j.apagado.links} links, ${j.apagado.gastos} gastos)`; carregar(); });
+$("#semearExemplo").addEventListener("click", async () => { const j = await POST("/api/trabalho/exemplo", {acao: "semear"}); $("#msg").textContent = j.erro || "✓ exemplo semeado"; carregar(); });
+carregar(); setInterval(carregar, 30000);
+</script>
+</body>
+</html>

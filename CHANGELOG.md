@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.69.0 — 2026-10-26
+
+**Meu trabalho: a tela que junta o dia a dia do engenheiro, com dados de exemplo para o esqueleto nascer pronto.**
+
+- Na madrugada de 26/10 o loop entregou os 7 pedidos do Cássio como PRs #164–#170: assuntos (`assuntos.py`), pauta
+  da daily (`daily.py`), catálogo de links (`links.py`), gasto do Cursor com projeção (`gasto_cursor.py`), contexto
+  enxuto para o Cursor (`contexto_cursor.py`), pastas por assunto (`pastas.py`) e etapas do GAIA no kit. Cada peça
+  com a própria entrada (CLI, barra de busca, arquivo) e nenhuma no painel.
+- `circulo/trabalho.py` + `trabalho.html` (`/trabalho`, "Meu trabalho" no menu): uma visão só (`/api/trabalho`) com
+  assuntos (decisões, pendências, notas, links, última nota), daily de hoje, pendências abertas, decisões recentes,
+  orçamento de IA (barra, por assunto e por tipo, dia em que esgota), links guardados, AGENTS.md + regras do Cursor
+  geradas da memória do assunto escolhido e o mapa do GAIA por etapa. Anotar e perguntar pela tela: sem o Jev, a
+  regra local de `assuntos.py` (sobreposição de palavras) escolhe o assunto e recusa quando não sabe.
+- Semente de exemplo (`circulo exemplo semear|apagar`, botões na tela): uma squad de comunicação fictícia — tribo,
+  squad, três microsserviços, a migração Blip → Amazon Connect e o GAIA — com 16 notas, 12 links `*.exemplo`, 14 dias
+  de gasto do Cursor num ritmo que esgota antes do fim do mês, notas de ontem para a daily e o mapa do GAIA. Tudo
+  marcado como exemplo; `apagar` tira só isso e deixa o que você anotou (um assunto do exemplo com nota sua fica).
+- Vigia: `gasto_cursor.avisar` uma vez por dia (antes só rodava pela CLI).
+- Testes: `tests/test_trabalho.py` (semente completa e idempotente, apagar seletivo, anotar/perguntar sem Jev,
+  rotas e menu no painel).
+
 ## 1.68.2 — 2026-10-26
 
 **Caixa de entrada por arquivo — e a lição do banco corrompido.**
