@@ -80,26 +80,39 @@ def _csv(texto: str) -> list[tuple[str, int, str, str | None]]:
     return [(_data(r[i_data]), _centavos(r[i_valor]), _descricao(r[i_desc]), None) for r in rows[1:]]
 
 
-def parse_extrato(texto: str, formato: str) -> list[Linha]:
-    """Linhas do extrato na ordem do arquivo. `formato` é 'ofx' ou 'csv'."""
-    brutas = {"ofx": _ofx, "csv": _csv}[formato.lower()](texto)
+def chave_hash(data: str, centavos: int, descricao: str, ocorrencia: int) -> str:
+    """Chave sem FITID. Fontes diferentes (extrato, e-mail) só casam o mesmo lançamento se `descricao` vier
+    normalizada por `_descricao` e a ocorrência for contada na mesma ordem."""
+    return hashlib.sha256(f"{data}|{centavos}|{descricao}|{ocorrencia}".encode()).hexdigest()
+
+
+def linhas(brutas: list[tuple[str, int, str, str | None]]) -> list[Linha]:
+    """(data, centavos, descrição normalizada, FITID ou None) → Linha, com a ocorrência de cada data+valor+descrição."""
     vistas: Counter[tuple[str, int, str]] = Counter()
     out = []
     for data, centavos, desc, fitid in brutas:
         ocorrencia = vistas[(data, centavos, desc)]
         vistas[(data, centavos, desc)] += 1
-        chave = fitid or hashlib.sha256(f"{data}|{centavos}|{desc}|{ocorrencia}".encode()).hexdigest()
-        out.append(Linha(data, centavos, desc, chave))
+        out.append(Linha(data, centavos, desc, fitid or chave_hash(data, centavos, desc, ocorrencia)))
     return out
 
 
+def parse_extrato(texto: str, formato: str) -> list[Linha]:
+    """Linhas do extrato na ordem do arquivo. `formato` é 'ofx' ou 'csv'."""
+    return linhas({"ofx": _ofx, "csv": _csv}[formato.lower()](texto))
+
+
 def importar(store: Store, texto: str, formato: str) -> int:
+    return gravar(store, parse_extrato(texto, formato))
+
+
+def gravar(store: Store, novas: list[Linha]) -> int:
     """Grava as linhas novas no ledger e devolve quantas entraram. Despesa entra em aberto e com confiança 0:
     o loop a reclassifica (`reclassificar_pendentes`); receita entra como renda, igual ao lançamento por mensagem."""
     version, _ = PolicyStore(store).active()
     n = 0
     with store.tx():
-        for lin in parse_extrato(texto, formato):
+        for lin in novas:
             if lin.centavos == 0:
                 continue
             receita = lin.centavos > 0

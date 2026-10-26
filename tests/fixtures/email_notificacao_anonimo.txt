@@ -1,0 +1,14 @@
+From: Banco Exemplo <avisos@banco.exemplo>
+To: cliente@exemplo.invalid
+Subject: Compra aprovada no seu cartão final 0000
+Date: Fri, 02 Oct 2026 12:31:07 -0300
+
+Olá, CLIENTE ANÔNIMO.
+
+Uma compra foi aprovada no seu cartão de crédito final 0000.
+
+Estabelecimento: Padaria  Pão Bom
+Valor: R$ 12,50
+Data: 02/10/2026 às 12:31
+
+Se não reconhece esta compra, ligue para a central.
