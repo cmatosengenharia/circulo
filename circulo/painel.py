@@ -256,13 +256,34 @@ def _pct(r) -> float:
     return round(100 * (r[1] or 0) / r[0], 1) if r[0] else 0.0
 
 
+def _por_causa(linhas) -> Counter:
+    return Counter(causa or sig or ponto for ponto, sig, causa in linhas)
+
+
 def falhas_por_causa(linhas, top: int = TOP_CAUSAS) -> dict:
     """Agrupa falhas (ponto, assinatura, causa) pela causa mais específica que houver, então toda falha tem causa;
     o que passa do top vai em 'outras', e top + outras = total."""
-    n = Counter(causa or sig or ponto for ponto, sig, causa in linhas)
+    n = _por_causa(linhas)
     causas = [{"causa": c, "n": k} for c, k in n.most_common(top)]
     total = sum(n.values())
     return {"total": total, "causas": causas, "outras": total - sum(c["n"] for c in causas)}
+
+
+def _falhas_antes(linhas) -> dict:
+    """As mesmas falhas da janela de 24 h anterior, por causa inteira (sem top), base do delta do card por causa."""
+    n = _por_causa(linhas)
+    return {"total": sum(n.values()), "por_causa": dict(n)}
+
+
+def variacao(atual: int, anterior: int) -> dict:
+    """Delta de falhas contra a janela anterior, com cor invertida (alta é ruim, queda é boa); sem base não há
+    percentual: 'novo' quando só a atual tem falhas, '—' quando as duas estão zeradas."""
+    d = atual - anterior
+    if not d:
+        return {"seta": "●" if atual else "", "delta": 0, "texto": "● 0" if atual else "—", "classe": "neutro"}
+    seta, sinal = ("▲", "+") if d > 0 else ("▼", "−")
+    base = f"({sinal}{round(100 * abs(d) / anterior)}%)" if anterior else "novo"
+    return {"seta": seta, "delta": d, "texto": f"{seta} {sinal}{abs(d)} {base}", "classe": "ruim" if d > 0 else "bom"}
 
 
 def falhas_por_componente(linhas, agora: float) -> list[dict]:
@@ -289,6 +310,9 @@ def saude(conn) -> dict:
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
            "falhas_24h": falhas_por_causa(conn.execute("SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE "
                                                        "'painel:%' AND ok=0 AND created_at >= ?", (agora - 86400,))),
+           "falhas_antes": _falhas_antes(conn.execute(
+               "SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ? "
+               "AND created_at < ?", (agora - 2 * 86400, agora - 86400))),
            "componentes_24h": falhas_por_componente(conn.execute(
                "SELECT ponto, created_at FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
                (agora - 2 * 86400,)), agora),
@@ -320,17 +344,24 @@ def pagina_saude(h: dict) -> bytes:
             ("Incidentes abertos", str(h["incidentes_abertos"])),
             ("Falhas de LLM (7 d)", f"{h['llm_falhas_7d_pct']}% de {h['llm_chamadas_7d']}"), ("Gate (último)", gate))
     causa = f'<p class="causa" style="color:var(--{tom})"><b>Causa:</b> {escape(h["causa"])}</p>' if h["causa"] else ""
-    f = h["falhas_24h"]
-    itens = [(c["causa"], c["n"]) for c in f["causas"]] + ([("outras", f["outras"])] if f["outras"] else [])
+
+    def delta(atual, anterior):
+        v = variacao(atual, anterior)
+        return f'<em class="delta {v["classe"]}">{v["texto"]}</em>'
+
+    f, antes = h["falhas_24h"], h["falhas_antes"]
+    base = antes["por_causa"]
+    itens = [(c["causa"], c["n"], base.get(c["causa"], 0)) for c in f["causas"]]
+    outras_antes = antes["total"] - sum(a for _, _, a in itens)
+    if f["outras"] or outras_antes:
+        itens.append(("outras", f["outras"], outras_antes))
     falhas = (f'<section class="card falhas" aria-label="Falhas do painel por causa"><span>Falhas do painel (24 h)</span>'
-              f'<b>{f["total"]}</b><ol>' + "".join(f"<li>{escape(c)} <b>×{k}</b></li>" for c, k in itens)
-              + "</ol></section>")
-    var = {True: "▲ +", False: "▼ −"}
+              f'<b>{f["total"]} {delta(f["total"], antes["total"])}</b><ol>'
+              + "".join(f"<li>{escape(c)} <b>×{k}</b> {delta(k, a)}</li>" for c, k, a in itens) + "</ol></section>")
     componentes = ('<section class="card falhas" aria-label="Falhas do painel por componente"><span>Falhas por componente '
                    '(24 h)</span><ol>' + "".join(
-                       f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> '
-                       + ("= 0" if not c["variacao"] else f'{var[c["variacao"] > 0]}{abs(c["variacao"])}')
-                       + " vs 24 h antes</li>" for c in h["componentes_24h"]) + "</ol></section>")
+                       f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> {delta(c["n"], c["anterior"])} vs 24 h antes</li>'
+                       for c in h["componentes_24h"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -338,6 +369,8 @@ def pagina_saude(h: dict) -> bytes:
             ".card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:14px 18px;min-width:140px}"
             ".card b{display:block;font-size:22px}.card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}"
             ".falhas{margin:0 0 12px}.falhas ol{margin:6px 0 0;padding-left:20px}.falhas li b{display:inline;font-size:inherit}"
+            ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
+            ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
             f'<main>{componentes}{falhas}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'

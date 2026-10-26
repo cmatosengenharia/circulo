@@ -269,3 +269,37 @@ def test_falhas_do_painel_por_componente_com_variacao_ordenadas_do_mais_afetado(
     pagina = pagina_saude(h).decode()
     assert pagina.index("Falhas por componente (24 h)") < pagina.index("Semáforo")
     assert pagina.index("painel:sse") < pagina.index("painel:frescor") and "▲ +1" in pagina
+
+
+def test_variacao_das_falhas_contra_as_24h_anteriores_com_cor_invertida_e_sem_base(tmp_path):
+    """Item #230: alta de falhas é ruim (▲ vermelho), queda é boa (▼ verde), igual é '● 0', sem base é 'novo' ou '—',
+    sem dividir por zero; os dois cards de falhas (causa e componente) mostram o delta."""
+    import time
+
+    from circulo.painel import pagina_saude, saude, variacao
+    from circulo.state import Store
+    assert variacao(150, 100) == {"seta": "▲", "delta": 50, "texto": "▲ +50 (+50%)", "classe": "ruim"}
+    assert variacao(30, 40) == {"seta": "▼", "delta": -10, "texto": "▼ −10 (−25%)", "classe": "bom"}
+    assert variacao(0, 9)["texto"] == "▼ −9 (−100%)"
+    assert variacao(7, 7) == {"seta": "●", "delta": 0, "texto": "● 0", "classe": "neutro"}
+    assert variacao(25, 0) == {"seta": "▲", "delta": 25, "texto": "▲ +25 novo", "classe": "ruim"}
+    assert variacao(0, 0) == {"seta": "", "delta": 0, "texto": "—", "classe": "neutro"}
+
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    for ponto, sig, ts in (("painel:sse", "painel:sse_timeout", t), ("painel:sse", "painel:sse_timeout", t),
+                           ("painel:sse", "painel:sse_timeout", t - 86400 - 60), ("painel:api", "painel:api_500", t),
+                           ("painel:frescor", "painel:frescor_atrasado", t - 86400 - 60)):
+        st.x("INSERT INTO verificacoes(tick,ponto,ok,assinatura,created_at) VALUES(1,?,0,?,?)", (ponto, sig, ts))
+    h = saude(st.db)
+    assert h["falhas_antes"] == {"total": 2, "por_causa": {"painel:sse_timeout": 1, "painel:frescor_atrasado": 1}}
+    pagina = pagina_saude(h).decode()
+    inicio_causa = pagina.index('aria-label="Falhas do painel por causa"')
+    componente = pagina[pagina.index('aria-label="Falhas do painel por componente"'):inicio_causa]
+    causa = pagina[inicio_causa:]
+    assert '<em class="delta ruim">▲ +1 (+50%)</em>' in causa                      # total 3 vs 2
+    assert '<em class="delta ruim">▲ +1 (+100%)</em>' in causa and "▲ +1 novo" in causa
+    assert '<em class="delta ruim">▲ +1 (+100%)</em>' in componente and "▲ +1 novo" in componente
+    assert ".delta.ruim{color:var(--bad)}" in pagina and ".delta.bom{color:var(--ok)}" in pagina
+    vazia = pagina_saude(saude(Store(tmp_path / "v.db").db)).decode()
+    assert '<em class="delta neutro">—</em>' in vazia
