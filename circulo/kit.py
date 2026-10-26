@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import tomllib
 from dataclasses import asdict, dataclass, field
@@ -26,6 +27,9 @@ PADRAO_PROTEGIDOS = (".github/",)
 PADRAO_TESTES = "python -m pytest -q -x"
 PADRAO_CHECKS = ("Testes",)
 PADRAO_PEDIDO = "entregar qualquer pedido do humano com evidência, pelo menor custo, sem babá: registrar todo erro, aprender com ele e se autocorrigir"
+# As etapas da esteira onde um framework de governança (ex.: GAIA) entra como portão: `[tool.circulo.etapas]` declara
+# os comandos de cada uma; sem declaração a etapa fica vazia e passa — nenhuma regra é inventada.
+ETAPAS = ("pedido", "estudo", "desenvolvimento", "pr", "merge")
 
 WORKFLOW = """name: CI
 
@@ -61,6 +65,7 @@ class Kit:
     lint: str | None = None
     checks: tuple[str, ...] = PADRAO_CHECKS
     pedido: str = PADRAO_PEDIDO
+    etapas: dict[str, tuple[str, ...]] = field(default_factory=lambda: {e: () for e in ETAPAS})
     avisos: list[str] = field(default_factory=list)
 
     def env(self) -> dict[str, str]:
@@ -104,9 +109,29 @@ def carregar(pasta: str | Path, pedido: str | None = None, nome: str | None = No
             protegidos=tuple(cfg.get("protegidos", PADRAO_PROTEGIDOS)) or PADRAO_PROTEGIDOS, testes=cfg.get("testes", PADRAO_TESTES),
             lint=cfg.get("lint"), checks=tuple(cfg.get("checks", PADRAO_CHECKS)) or PADRAO_CHECKS,
             pedido=pedido or cfg.get("pedido") or PADRAO_PEDIDO, avisos=avisos)
+    for etapa, comandos in (cfg.get("etapas") or {}).items():
+        if etapa in k.etapas:
+            k.etapas[etapa] = tuple(comandos)
+        else:
+            k.avisos.append(f"etapa {etapa!r} em [tool.circulo.etapas] não é da esteira ({', '.join(ETAPAS)}): ignorada")
     if not k.repo:
         k.avisos.append("remoto do GitHub não encontrado: defina `repo = \"owner/nome\"` em [tool.circulo] ou CIRCULO_REPO")
     return k
+
+
+def checar(k: Kit, etapa: str, timeout: int = 600) -> list[str]:
+    """O portão da etapa: roda na pasta do repositório cada comando declarado e devolve os que falharam (vazio = passa)."""
+    if etapa not in k.etapas:
+        raise ValueError(f"etapa {etapa!r} não é da esteira: {', '.join(ETAPAS)}")
+    falhos = []
+    for cmd in k.etapas[etapa]:
+        try:
+            ok = subprocess.run(shlex.split(cmd), cwd=k.pasta, capture_output=True, timeout=timeout).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            ok = False
+        if not ok:
+            falhos.append(cmd)
+    return falhos
 
 
 def preparar_repositorio(k: Kit, escrever_ci: bool = True) -> list[str]:
@@ -168,4 +193,4 @@ def resumo_json(r: dict) -> str:
     return json.dumps(r, ensure_ascii=False, indent=1)
 
 
-__all__ = ["Kit", "carregar", "preparar_repositorio", "gravar_env", "init"]
+__all__ = ["ETAPAS", "Kit", "carregar", "checar", "preparar_repositorio", "gravar_env", "init"]
