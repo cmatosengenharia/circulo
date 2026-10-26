@@ -505,13 +505,13 @@ class Licoes:
             if detalhe_item and "Subir de camada" in detalhe_item:
                 self.s.x("UPDATE roadmap SET detalhe=detalhe || ? WHERE id=? AND instr(detalhe, ?)=0",
                          ("\n" + detalhe_item[-600:], lic["item_id"], instrucao_camada(lic.get("camada") or "")[:60] or "@@"))
-            r = self.s.one("SELECT status FROM roadmap WHERE id=?", (lic["item_id"],))
-            if r and r["status"] in ("pendente", "em_andamento"):   # o detalhe pode ser o do estudo: não é reescrito
+            r = self.s.one(f"SELECT {NA_FILA} na_fila FROM roadmap WHERE id=?", (lic["item_id"],))
+            if r and r["na_fila"]:   # o detalhe pode ser o do estudo: não é reescrito
                 if topo:
                     self.s.x("UPDATE roadmap SET ordem=0, updated_at=? WHERE id=?", (agora, lic["item_id"]))
                 return
             if r:   # reabre o mesmo item com o motivo desta ocorrência: a história do erro fica num lugar só
-                self.s.x("UPDATE roadmap SET status='pendente', detalhe=?, ordem=?, evidencia=?, updated_at=? WHERE id=?",
+                self.s.x("UPDATE roadmap SET status='pendente', desativado=0, detalhe=?, ordem=?, evidencia=?, updated_at=? WHERE id=?",
                          (detalhe, 0 if topo else self._proxima_ordem(), f"reincidência da lição #{lic['id']}",
                           agora, lic["item_id"]))
                 return
