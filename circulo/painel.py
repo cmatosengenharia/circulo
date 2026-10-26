@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import time
+from collections import Counter
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -244,6 +245,7 @@ LIMIAR_JEV_DUVIDA = (20.0, 40.0)
 LIMIAR_LLM_FALHAS = (5.0, 20.0)
 INCIDENTES_VERMELHO = 3
 SEMAFORO = {"verde": ("ok", "✓"), "amarelo": ("llm", "!"), "vermelho": ("bad", "✕")}
+TOP_CAUSAS = 5
 
 
 def _um(conn, sql: str, args: tuple = ()):
@@ -252,6 +254,15 @@ def _um(conn, sql: str, args: tuple = ()):
 
 def _pct(r) -> float:
     return round(100 * (r[1] or 0) / r[0], 1) if r[0] else 0.0
+
+
+def falhas_por_causa(linhas, top: int = TOP_CAUSAS) -> dict:
+    """Agrupa falhas (ponto, assinatura, causa) pela causa mais específica que houver, então toda falha tem causa;
+    o que passa do top vai em 'outras', e top + outras = total."""
+    n = Counter(causa or sig or ponto for ponto, sig, causa in linhas)
+    causas = [{"causa": c, "n": k} for c, k in n.most_common(top)]
+    total = sum(n.values())
+    return {"total": total, "causas": causas, "outras": total - sum(c["n"] for c in causas)}
 
 
 def saude(conn) -> dict:
@@ -266,6 +277,8 @@ def saude(conn) -> dict:
     g = _um(conn, "SELECT ponto, ok, sujeito, motivo, created_at FROM verificacoes WHERE ponto LIKE 'gate:%' ORDER BY id DESC LIMIT 1")
     out = {"giros": int(json.loads(tick[0])) if tick else 0, "jev_duvida_pct": _pct(jev), "incidentes_abertos": len(abertos),
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
+           "falhas_24h": falhas_por_causa(conn.execute("SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE "
+                                                       "'painel:%' AND ok=0 AND created_at >= ?", (agora - 86400,))),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -294,14 +307,20 @@ def pagina_saude(h: dict) -> bytes:
             ("Incidentes abertos", str(h["incidentes_abertos"])),
             ("Falhas de LLM (7 d)", f"{h['llm_falhas_7d_pct']}% de {h['llm_chamadas_7d']}"), ("Gate (último)", gate))
     causa = f'<p class="causa" style="color:var(--{tom})"><b>Causa:</b> {escape(h["causa"])}</p>' if h["causa"] else ""
+    f = h["falhas_24h"]
+    itens = [(c["causa"], c["n"]) for c in f["causas"]] + ([("outras", f["outras"])] if f["outras"] else [])
+    falhas = (f'<section class="card falhas" aria-label="Falhas do painel por causa"><span>Falhas do painel (24 h)</span>'
+              f'<b>{f["total"]}</b><ol>' + "".join(f"<li>{escape(c)} <b>×{k}</b></li>" for c, k in itens)
+              + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
             ".faixa{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}"
             ".card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:14px 18px;min-width:140px}"
             ".card b{display:block;font-size:22px}.card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}"
+            ".falhas{margin:0 0 12px}.falhas ol{margin:6px 0 0;padding-left:20px}.falhas li b{display:inline;font-size:inherit}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main><div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{falhas}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
