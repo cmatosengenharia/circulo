@@ -334,11 +334,11 @@ def versao_painel() -> str:
     return hashlib.sha256(resources.files("circulo").joinpath("painel.html").read_bytes()).hexdigest()[:12]
 
 
-def registrar_frescor(store: Store, atraso_ms: float, versao: str | None = None) -> bool:
+def registrar_frescor(store: Store, atraso_ms: float, versao: str | None) -> bool:
     """Neurônio `painel:frescor`: o próprio painel informa o atraso entre o dado e a tela. Cada medição fica guardada
     e o SLO é o p99 das últimas 24 h, não a média nem a última leitura. A verificação roda no máximo 1 vez por
-    minuto; p99 acima de FRESCOR_MAX_MS vira lição. Só a página no ar é julgada: amostra de aba com página antiga
-    é descartada e a janela recomeça quando a página muda (um conserto não reabre a lição com dado velho)."""
+    minuto; p99 acima de FRESCOR_MAX_MS vira lição. Só a página no ar é julgada: amostra sem versão ou de aba com
+    página antiga é descartada e a janela recomeça quando a página muda (um conserto não reabre a lição com dado velho)."""
     now = time.time()
     import math
     try:
@@ -348,7 +348,7 @@ def registrar_frescor(store: Store, atraso_ms: float, versao: str | None = None)
     if not math.isfinite(atraso_ms) or atraso_ms < 0 or atraso_ms > 600_000:
         return False                      # NaN/inf/negativo ou aba parada por mais de 10 min (Mac dormiu): não é medição do painel
     atual = versao_painel()
-    if versao is not None and versao != atual:
+    if versao != atual:
         return False
     if store.get("frescor_versao") not in (None, atual):
         store.set("frescor_desde", now)

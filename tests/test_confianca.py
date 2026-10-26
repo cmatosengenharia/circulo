@@ -4,7 +4,7 @@ import threading
 import time
 import urllib.request
 
-from circulo.confianca import FRESCOR_MAX_MS, confianca, registrar_frescor
+from circulo.confianca import FRESCOR_MAX_MS, confianca, registrar_frescor, versao_painel
 
 from test_painel import painel, post  # noqa: F401 — fixture do servidor do painel
 
@@ -62,18 +62,19 @@ def test_frescor_do_painel_e_um_neuronio_monitorado(circle):
     s = circle.store
     for _ in range(99):
         s.x("INSERT INTO frescor(atraso_ms, em) VALUES(400, ?)", (time.time(),))
-    assert registrar_frescor(s, 400)                                    # 100ª amostra: o p99 passa a valer
-    assert not registrar_frescor(s, 400)                                # no máximo 1 por minuto
+    v = versao_painel()
+    assert registrar_frescor(s, 400, v)                                 # 100ª amostra: o p99 passa a valer
+    assert not registrar_frescor(s, 400, v)                             # no máximo 1 por minuto
     s.set("painel_frescor_em", 0)
     for _ in range(5):
         s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?, ?)", (FRESCOR_MAX_MS + 1, time.time()))
-    registrar_frescor(s, FRESCOR_MAX_MS + 1)
-    v = s.q("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id")
-    assert [x["ok"] for x in v] == [1, 0]
+    registrar_frescor(s, FRESCOR_MAX_MS + 1, v)
+    oks = s.q("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id")
+    assert [x["ok"] for x in oks] == [1, 0]
     # painel atrasado é ambiente, não defeito do código: não bloqueia a evolução
     assert s.one("SELECT classe FROM licoes WHERE assinatura='painel:frescor_atrasado'")["classe"] == "ambiente"
     # aba parada (Mac dormiu), NaN e inf não são medição e nunca viram lição
-    assert not registrar_frescor(s, 3_600_000) and not registrar_frescor(s, float("inf")) and not registrar_frescor(s, "x")
+    assert not registrar_frescor(s, 3_600_000, v) and not registrar_frescor(s, float("inf"), v) and not registrar_frescor(s, "x", v)
     assert s.one("SELECT COUNT(*) n FROM frescor WHERE atraso_ms > 600000")["n"] == 0
 
 
@@ -96,9 +97,19 @@ def test_frescor_julga_so_o_codigo_atual_do_painel(circle, monkeypatch):
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
 
 
+def test_frescor_sem_versao_da_pagina_nao_entra_na_janela(circle, painel):  # noqa: F811
+    """lição #60 (painel:frescor_atrasado, reincidiu com p99 4795 ms depois do #173): aba aberta antes do #173 não
+    manda versão e `versao=None` contava como a página atual. Amostra sem a versão da página não é medição do painel
+    no ar: nem a função nem a API a aceitam."""
+    s = circle.store
+    assert not registrar_frescor(s, 120000, None)
+    code, body = post(painel + "/api/frescor", {"atraso_ms": 120000}, {"X-Circulo": "1"})
+    assert code == 200 and body["registrado"] is False
+    assert s.one("SELECT COUNT(*) n FROM frescor")["n"] == 0
+
+
 def test_painel_manda_a_propria_versao_com_o_frescor():
     """lição #60: a página servida carrega a versão do código e a devolve em cada medição de frescor."""
-    from circulo.confianca import versao_painel
     from circulo.painel import _page
     html = _page("painel.html").decode()
     assert versao_painel() in html and "__VERSAO_PAINEL__" not in html
@@ -107,7 +118,7 @@ def test_painel_manda_a_propria_versao_com_o_frescor():
 
 def test_frescor_com_poucas_amostras_nao_julga(circle):
     for _ in range(10):
-        registrar_frescor(circle.store, FRESCOR_MAX_MS * 10)
+        registrar_frescor(circle.store, FRESCOR_MAX_MS * 10, versao_painel())
         circle.store.set("painel_frescor_em", 0)
     assert circle.store.one("SELECT COUNT(*) n FROM verificacoes WHERE ponto='painel:frescor'")["n"] == 0
 
