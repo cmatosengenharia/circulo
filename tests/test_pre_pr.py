@@ -3,10 +3,11 @@ o developer:abrir_pr adia com a causa normalizada em vez de abrir um PR que falh
 import time
 
 from test_reparo import ZipAgent, dev_de
-from test_self_dev import erro_recorrente, repo  # noqa: F401 — fixture do repositório
+from test_self_dev import erro_recorrente, git, repo  # noqa: F401 — fixture do repositório
 
 from circulo.merge_gate import REQUIRED_CHECKS
 from circulo.pre_pr import ABRIR, ADIAR, ADIAR_PONTO, CI_NAO_INICIOU, MAIN_VERMELHA, SISTEMICO, checks_dos_prs, decidir
+from circulo.reparo import BLOQUEADO, LIMITE_ADIAR, adiado_do_item
 
 COBRANCA = "The job was not started because your spending limit needs to be increased"
 
@@ -124,3 +125,30 @@ def test_abrir_pr_adiado_registra_adiado_sistemico_e_nao_gasta_portoes(circle, r
     assert r.status == "testes_falharam" and not gh.prs and SISTEMICO in r.detalhe
     assert circle.store.q("SELECT 1 FROM verificacoes WHERE ponto='developer:testes'") == []
     assert _adiados(circle) == [{"causa": SISTEMICO}]
+
+
+# pergunta do conselho #296: developer:abrir_pr:adiar falhou 13 de 13; a mesma causa 3x seguidas tira o item da fila
+def _giro(dev, repo):  # noqa: F811
+    for b in git(repo, "branch", "--list", "circulo/*", "--format=%(refname:short)").splitlines():
+        git(repo, "branch", "-D", b)        # o nome da branch leva o segundo: dois giros no mesmo segundo colidem
+    return dev.run_once()
+
+
+def test_tres_adiamentos_com_a_mesma_causa_bloqueiam_o_item_para_triagem(circle, repo, tmp_path):  # noqa: F811
+    item = erro_recorrente(circle)
+    dev, gh = _dev_com_main(circle, repo, tmp_path, "failure")
+    assert [_giro(dev, repo).status for _ in range(LIMITE_ADIAR)] == ["testes_falharam"] * LIMITE_ADIAR
+    st = circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))
+    assert st["status"] == BLOQUEADO and MAIN_VERMELHA in st["evidencia"] and "triagem" in st["evidencia"]
+    assert _giro(dev, repo).status == "nada" and not gh.prs                   # bloqueado não adia de novo
+    assert _adiados(circle) == [{"causa": MAIN_VERMELHA}] * LIMITE_ADIAR       # toda falha com a causa registrada
+
+
+def test_causa_diferente_de_adiamento_zera_a_contagem(circle):
+    s = circle.store
+    assert [adiado_do_item(s, 7, MAIN_VERMELHA) for _ in range(2)] == [1, 2]
+    assert adiado_do_item(s, 7, CI_NAO_INICIOU) == 1                          # outra causa: recomeça
+    assert [adiado_do_item(s, 7, CI_NAO_INICIOU) for _ in range(2)] == [2, 3]
+    assert adiado_do_item(s, 8, CI_NAO_INICIOU) == 1                          # por item
+    adiado_do_item(s, 7, None)                                                # abriu: os adiamentos deixam de ser seguidos
+    assert adiado_do_item(s, 7, CI_NAO_INICIOU) == 1
