@@ -34,10 +34,11 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      (`licoes.assinatura_de`). A mesma 2x seguidas → o item vai para 'bloqueado', sem nova chamada ao agente nem ao
      pytest. A sonda de reabertura, no início de cada giro, devolve o item à fila quando os arquivos citados na barra
      (ou a main inteira, se ela não cita arquivo) mudam. Falha de lint/testes repetida segue para o fatiador (item 7).
-  12. developer:abrir_pr:adiar com teto (pergunta #296, 13 falhas em 13): cada adiamento grava no item a causa
-     normalizada (`adiado_do_item`). A mesma causa LIMITE_ADIAR vezes seguidas → o item sai da fila como 'bloqueado'
-     para triagem (dead-letter queue com maxReceiveCount), em vez de adiar de novo; causa diferente ou PR aberto zeram.
-     A quarentena apaga a barra antiga do item no DISJUNTOR: senão a sonda de reabertura o devolvia à fila (pergunta #300).
+  12. developer:abrir_pr:adiar com teto (pergunta #296, 13 falhas em 13): cada adiamento grava a causa normalizada
+     (`adiado_do_item`) na tarefa pela impressão digital do título, não pelo id: o mesmo pedido recriado com outro id
+     seguia adiando (pergunta #309). A mesma causa LIMITE_ADIAR vezes seguidas → a tarefa sai da fila como 'escalada'
+     e abre um incidente por impressão (título + causa), sem novo adiamento (dead-letter queue com maxReceiveCount);
+     causa diferente ou PR aberto zeram. 'escalada' não é 'bloqueado': a sonda do disjuntor não a reabre (pergunta #300).
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -85,8 +86,9 @@ BLOQUEADO_BASE = "bloqueado_base"
 BASE_VERMELHA = "developer_base_vermelha"       # {item: {"sig", "n", "chave"}}: a última base vermelha do pré-voo
 TETO_RAIZ = "developer_teto_raiz"              # {item raiz: {"n", "escopo"}}: tetos seguidos do item e dos sub-itens
 CONFIRMADA = 2                                 # execuções vermelhas no mesmo sha da main até o pré-voo parar de rodar
-ADIADO = "developer_adiado"                    # {item: {"causa", "n"}}: os adiamentos seguidos do abrir_pr
+ADIADO = "developer_adiado"                    # {título normalizado: {"causa", "n"}}: os adiamentos seguidos do abrir_pr
 LIMITE_ADIAR = 3
+ESCALADA = "escalada"
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
@@ -136,14 +138,24 @@ def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") ->
     return n >= 2
 
 
-def adiado_do_item(store, item_id: int, causa: str | None) -> int:
-    """Conta mais um adiamento do item com a causa; devolve os seguidos com ela. `causa=None` (o PR passou do
-    adiamento) zera a contagem."""
+def adiado_do_item(store, chave, causa: str | None) -> int:
+    """Conta mais um adiamento da tarefa (`chave`) com a causa; devolve os seguidos com ela. `causa=None` (o PR passou
+    do adiamento) zera a contagem."""
     todos = store.get(ADIADO) or {}
-    antes = todos.pop(str(item_id), None) or {}
+    antes = todos.pop(str(chave), None) or {}
     n = 0 if causa is None else antes.get("n", 0) + 1 if antes.get("causa") == causa else 1
-    store.set(ADIADO, {**todos, **({str(item_id): {"causa": causa, "n": n}} if n else {})})
+    store.set(ADIADO, {**todos, **({str(chave): {"causa": causa, "n": n}} if n else {})})
     return n
+
+
+def incidente_de_adiamento(store, digital: str, titulo: str, motivo: str) -> None:
+    """Abre (ou soma no aberto) o incidente da tarefa escalada: um por impressão digital."""
+    from .pre_pr import ADIAR_PONTO
+    agora, tick = time.time(), store.tick
+    store.x("INSERT INTO incidents(fingerprint,stage,kind,message,count,first_seen,last_seen,first_tick,last_tick,status) "
+            "VALUES(?,?,'Escalada',?,1,?,?,?,?,'aberto') ON CONFLICT(fingerprint) DO UPDATE SET count=count+1, "
+            "last_seen=excluded.last_seen, last_tick=excluded.last_tick, status='aberto'",
+            (f"adiar:{digital}", ADIAR_PONTO, f"{titulo}: {motivo}"[:500], agora, agora, tick, tick))
 
 
 def registrar_base(store, item_id: int, sig: str, sha: str, causa: str = "") -> int:
@@ -228,21 +240,21 @@ class DeveloperComReparo(SelfDeveloper):
         self._cortado = ""
         self._base_quebrada = ""
         self._base_status = "pendente"
-        self._disjuntor = ""
+        self._disjuntor = self._escalada = ""
         self._teto_bloqueado: tuple[int, str] | None = None
 
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()
         self._reabrir_base()
-        bloqueado = self.s.one("SELECT status, evidencia FROM roadmap WHERE id=? AND status IN (?,?)",
-                               (item_id, BLOQUEADO, BLOQUEADO_BASE))
+        bloqueado = self.s.one("SELECT status, evidencia FROM roadmap WHERE id=? AND status IN (?,?,?)",
+                               (item_id, BLOQUEADO, BLOQUEADO_BASE, ESCALADA))
         if bloqueado:
             return DevResult(item_id, bloqueado["status"], bloqueado["evidencia"])
         item = self.pick(item_id)
         veto = self._vetar(item) if item else None
         if veto:
             return veto
-        self._rodada, self._cortado, self._base_quebrada, self._disjuntor = 0, "", "", ""
+        self._rodada, self._cortado, self._base_quebrada, self._disjuntor, self._escalada = 0, "", "", "", ""
         self._teto_bloqueado = None
         r = super().run_once(item_id=item_id, autorizado=autorizado)
         if self._teto_bloqueado:                 # o SelfDeveloper devolveu o item à fila depois do corte: bloqueia de novo
@@ -252,6 +264,9 @@ class DeveloperComReparo(SelfDeveloper):
             todos = self.s.get(TETO_RAIZ) or {}
             if todos.pop(str((raiz_do_item(self.s, r.item_id) or {"id": r.item_id})["id"]), None):
                 self.s.set(TETO_RAIZ, todos)     # entregou: os tetos deixam de ser seguidos
+        if self._escalada and r.status == "testes_falharam":
+            self._set_item(r.item_id, ESCALADA, self._escalada[:300])
+            return r
         if self._disjuntor and r.status == "testes_falharam":
             self._set_item(r.item_id, BLOQUEADO, self._disjuntor[:300])
             return r
@@ -574,21 +589,22 @@ class DeveloperComReparo(SelfDeveloper):
         disjuntor manda o item para triagem."""
         from .licoes import registrar as monitorar
         from .merge_gate import required_checks
+        from .impressao_pr import impressao
         from .pre_pr import ADIAR, ADIAR_PONTO, checks_dos_prs, conserta_main, decidir, ler_main
         d = decidir(*ler_main(self.gh), conserta_main=conserta_main(self.s, item_id),
                     historico=checks_dos_prs(self.s, time.time()), obrigatorios=required_checks())
-        n = 0 if item_id is None else adiado_do_item(self.s, item_id, d.causa if d.acao == ADIAR else None)
+        tarefa = PREFIXO_TITULO.sub("", titulo)          # o mesmo pedido recriado com outro id segue a mesma contagem
+        n = adiado_do_item(self.s, impressao(tarefa, ()), d.causa if d.acao == ADIAR else None)
         if d.acao != ADIAR:
             return ""
         texto = (f"- CI da main ou dos últimos PRs: adiado ({d.causa}, {n}/{LIMITE_ADIAR} seguidas); um PR agora "
                  "falharia por motivo externo, nada foi enviado")
         if n >= LIMITE_ADIAR:
-            barras = self.s.get(DISJUNTOR) or {}
-            if barras.pop(str(item_id), None):        # a barra antiga reabriria a quarentena quando a main mudasse
-                self.s.set(DISJUNTOR, barras)
-            self._disjuntor = f"triagem: adiado {n}x seguidas pela mesma causa ({d.causa}); não adia de novo"
-            texto += f"\n({self._disjuntor})"
-        monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
+            self._escalada = f"escalada para triagem: adiado {n}x seguidas pela mesma causa ({d.causa}); não adia de novo"
+            texto += f"\n({self._escalada})"
+            incidente_de_adiamento(self.s, impressao(tarefa, (d.causa,)), tarefa, self._escalada)
+        if n <= LIMITE_ADIAR:
+            monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
         return texto
 
     def portao_pr(self, wt: Path, base: str, item_id: int | None, titulo: str) -> tuple[bool, str]:

@@ -10,7 +10,7 @@ from collections import Counter
 from .reparo import PREFIXO_TITULO
 
 DESFECHO = {"feito": "mergeado", "dividido": "dividido", "descartado": "descartado", "contestado": "descartado",
-            "bloqueado": "bloqueado", "bloqueado_base": "bloqueado"}
+            "bloqueado": "bloqueado", "bloqueado_base": "bloqueado", "escalada": "bloqueado"}
 SEM_PR = ("descartado", "dividido", "bloqueado")
 
 

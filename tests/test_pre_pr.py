@@ -7,7 +7,7 @@ from test_self_dev import erro_recorrente, git, repo  # noqa: F401 — fixture d
 
 from circulo.merge_gate import REQUIRED_CHECKS
 from circulo.pre_pr import ABRIR, ADIAR, ADIAR_PONTO, CI_NAO_INICIOU, MAIN_VERMELHA, SISTEMICO, checks_dos_prs, decidir
-from circulo.reparo import BLOQUEADO, DISJUNTOR, LIMITE_ADIAR, adiado_do_item
+from circulo.reparo import DISJUNTOR, ESCALADA, LIMITE_ADIAR, adiado_do_item
 
 COBRANCA = "The job was not started because your spending limit needs to be increased"
 
@@ -139,8 +139,8 @@ def test_tres_adiamentos_com_a_mesma_causa_bloqueiam_o_item_para_triagem(circle,
     dev, gh = _dev_com_main(circle, repo, tmp_path, "failure")
     assert [_giro(dev, repo).status for _ in range(LIMITE_ADIAR)] == ["testes_falharam"] * LIMITE_ADIAR
     st = circle.store.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))
-    assert st["status"] == BLOQUEADO and MAIN_VERMELHA in st["evidencia"] and "triagem" in st["evidencia"]
-    assert _giro(dev, repo).status == "nada" and not gh.prs                   # bloqueado não adia de novo
+    assert st["status"] == ESCALADA and MAIN_VERMELHA in st["evidencia"] and "triagem" in st["evidencia"]
+    assert _giro(dev, repo).status == "nada" and not gh.prs                   # escalada não adia de novo
     assert _adiados(circle) == [{"causa": MAIN_VERMELHA}] * LIMITE_ADIAR       # toda falha com a causa registrada
 
 
@@ -153,7 +153,7 @@ def test_item_em_quarentena_por_adiamento_nao_volta_pela_barra_antiga_do_abrir_p
     for _ in range(LIMITE_ADIAR):
         _giro(dev, repo)
     assert _giro(dev, repo).status == "nada" and not gh.prs
-    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == BLOQUEADO
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == ESCALADA
     assert len(_adiados(circle)) == LIMITE_ADIAR
 
 
@@ -165,3 +165,24 @@ def test_causa_diferente_de_adiamento_zera_a_contagem(circle):
     assert adiado_do_item(s, 8, CI_NAO_INICIOU) == 1                          # por item
     adiado_do_item(s, 7, None)                                                # abriu: os adiamentos deixam de ser seguidos
     assert adiado_do_item(s, 7, CI_NAO_INICIOU) == 1
+
+
+def test_tres_adiamentos_com_a_mesma_impressao_escalam_com_um_incidente_e_sem_quarto_adiamento(circle, repo, tmp_path):  # noqa: F811
+    """Pergunta do conselho #309: a contagem era por id do item, e o mesmo pedido recriado com outro id voltava a adiar
+    (13/13 em 24 h). Conta por impressão digital (título + causa): na 3ª a tarefa sai da fila como 'escalada' e abre
+    um incidente; o mesmo título com outro id escala sem um 4º adiamento."""
+    s = circle.store
+    item = erro_recorrente(circle)
+    dev, gh = _dev_com_main(circle, repo, tmp_path, "failure")
+    for _ in range(LIMITE_ADIAR):
+        _giro(dev, repo)
+    st = s.one("SELECT status, evidencia FROM roadmap WHERE id=?", (item["id"],))
+    assert st["status"] == ESCALADA and MAIN_VERMELHA in st["evidencia"]
+    novo = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+               "SELECT titulo,detalhe,origem,'pendente','',ordem+1,created_at,updated_at FROM roadmap WHERE id=?",
+               (item["id"],))
+    assert _giro(dev, repo).status == "testes_falharam" and not gh.prs
+    assert s.one("SELECT status FROM roadmap WHERE id=?", (novo,))["status"] == ESCALADA
+    assert _giro(dev, repo).status == "nada"
+    assert len(_adiados(circle)) == LIMITE_ADIAR                               # nenhum 4º adiamento
+    assert len(s.q("SELECT 1 FROM incidents WHERE stage=?", (ADIAR_PONTO,))) == 1
