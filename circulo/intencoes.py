@@ -42,11 +42,13 @@ def registrar(store: Store, acao: str, motivo: str, entradas: Any = None, ator: 
     return _gravar(store, "intencao", ator, acao, motivo, regra, entradas)
 
 
-def concluir(store: Store, seq: int, ok: bool, detalhe: str = "") -> int:
+def concluir(store: Store, seq: int, ok: bool, detalhe: str = "", **saida: Any) -> int:
+    """`saida` é o que a ação mediu (vai junto do detalhe nas entradas do resultado)."""
     r = store.one("SELECT ator, acao FROM intencoes WHERE seq=? AND tipo='intencao'", (seq,))
     if r is None:
         raise ValueError(f"resultado sem intenção registrada (seq {seq})")
-    return _gravar(store, "resultado", r["ator"], r["acao"], "ok" if ok else "falhou", "", {"detalhe": str(detalhe)[:300]}, ref=seq)
+    return _gravar(store, "resultado", r["ator"], r["acao"], "ok" if ok else "falhou", "",
+                   {"detalhe": str(detalhe)[:300], **saida}, ref=seq)
 
 
 def executar(store: Store, acao: str, fn: Callable[[], Any], motivo: str, entradas: Any = None, ator: str = "loop",
