@@ -10,7 +10,7 @@ import json
 import pytest
 
 from circulo import intencoes, parada
-from circulo.confianca import FRESCOR_MAX_MS, confianca, p99, registrar_frescor
+from circulo.confianca import FRESCOR_MAX_MS, confianca, p99, registrar_frescor, versao_painel
 
 from conftest import say
 from test_painel import painel, post  # noqa: F401 — fixture do servidor do painel
@@ -91,14 +91,15 @@ def test_frescor_e_slo_em_p99_de_24h(circle):
     assert p99([100] * 99 + [5000]) == 100                             # um ponto fora em 100 não estoura o p99
     assert p99([100] * 98 + [5000] * 2) == 5000
     s = circle.store
+    v = versao_painel()
     for _ in range(99):
-        registrar_frescor(s, 200)
+        registrar_frescor(s, 200, v)
     s.set("painel_frescor_em", 0)
-    registrar_frescor(s, 3500)
+    registrar_frescor(s, 3500, v)
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 1
     s.x("INSERT INTO frescor(atraso_ms, em) VALUES(4000, ?)", (time.time(),))
     s.set("painel_frescor_em", 0)
-    registrar_frescor(s, 200)
+    registrar_frescor(s, 200, v)
     assert s.one("SELECT ok FROM verificacoes WHERE ponto='painel:frescor' ORDER BY id DESC LIMIT 1")["ok"] == 0
     assert ids(confianca(s))["frescor"]["estado"] == "atencao"
 

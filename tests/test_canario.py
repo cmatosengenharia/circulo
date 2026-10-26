@@ -22,7 +22,7 @@ def test_painel_velho_falha_e_painel_fresco_passa_em_estado_temporario(tmp_path)
     def medir(s, atraso):                                        # o SLO só julga com 100 amostras na janela (1.61.0)
         for _ in range(99):
             s.x("INSERT INTO frescor(atraso_ms, em) VALUES(?,?)", (atraso, time.time()))
-        confianca.registrar_frescor(s, atraso)
+        confianca.registrar_frescor(s, atraso, confianca.versao_painel())
 
     velho = Store(tmp_path / "velho.db")
     dado_em = time.time() - 60                                   # o painel mostra um dado de um minuto atrás
@@ -46,7 +46,7 @@ def test_canario_acusa_checagem_sempre_verde(monkeypatch):
 
 
 def test_canario_acusa_checagem_removida(monkeypatch):
-    monkeypatch.setattr(confianca, "registrar_frescor", lambda store, atraso_ms: True)
+    monkeypatch.setattr(confianca, "registrar_frescor", lambda store, atraso_ms, versao: True)
     assert not canario.injetar("painel:frescor")["ok"]
 
 
