@@ -77,3 +77,42 @@ def test_semana_registra_cada_consulta_em_uso_resumo_e_conta_so_7_dias(circle):
     assert "## Produto sem uso (0)" in t
     recursos = [r["recurso"] for r in s.q("SELECT recurso FROM uso_resumo WHERE created_at>=?", (agora,))]
     assert sorted(recursos) == ["pr:701", "pr:701", "pr:702", "pr:702", "resumo", "resumo"]
+
+
+def test_pedidos_sem_pr_de_produto_mergeado_saem_do_mais_velho_ao_mais_novo():
+    agora = NOON.timestamp()
+    pedidos = [{"id": 1, "titulo": "Exportar CSV", "created_at": agora - 10 * 86400},
+               {"id": 2, "titulo": "Filtro por assunto", "created_at": agora - 2 * 86400},
+               {"id": 3, "titulo": "Alerta no Slack", "created_at": agora - 30 * 86400},
+               {"id": 4, "titulo": "Painel ao vivo", "created_at": agora - 5 * 86400}]
+    prs = [{"item_id": 1}, {"item_id": None}, {"item_id": 99}]
+    assert resumo_semanal.pedidos_sem_entrega(pedidos, prs, agora) == [
+        {"id": 3, "titulo": "Alerta no Slack", "dias": 30}, {"id": 4, "titulo": "Painel ao vivo", "dias": 5},
+        {"id": 2, "titulo": "Filtro por assunto", "dias": 2}]
+
+
+def test_todo_resumo_traz_a_secao_pedidos_sem_entrega():
+    assert "## Pedidos sem entrega (0)" in resumo_semanal.texto(PRS, leituras=0)
+    t = resumo_semanal.texto(PRS, leituras=0, sem_entrega=[{"id": 3, "titulo": "Alerta no Slack", "dias": 30},
+                                                           {"id": 7, "titulo": "Painel", "dias": 1}])
+    assert [linha for linha in _secao(t, "Pedidos sem entrega (2)").splitlines() if linha.startswith("- ")] == [
+        "- item #3 Alerta no Slack · 30 dias", "- item #7 Painel · 1 dia"]
+
+
+def test_semana_lista_pedidos_abertos_sem_pr_mergeado_de_qualquer_idade(circle):
+    s, agora = circle.store, NOON.timestamp()
+    s.x("DELETE FROM roadmap")                         # sem o roteiro semente
+    ids = {}
+    for titulo, status, dias in [("Entregue", "pendente", 40), ("Aberto velho", "pendente", 20),
+                                 ("Aberto novo", "em_andamento", 1), ("Já feito", "feito", 50)]:
+        ids[titulo] = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                          "VALUES(?,?,'pedido_cassio',?,'',1,?,?)",
+                          (titulo, titulo, status, agora - dias * 86400, agora - dias * 86400))
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+        "VALUES('Item do loop','x','loop','pendente','',1,?,?)", (agora - 9 * 86400, agora))
+    s.x("INSERT INTO prs(number,titulo,branch,status,item_id,created_at,updated_at) VALUES(801,'PR 801','b801',"
+        "'mergeado',?,?,?)", (ids["Entregue"], agora - 30 * 86400, agora - 30 * 86400))
+    linhas = [linha for linha in _secao(resumo_semanal.semana(s, agora), "Pedidos sem entrega").splitlines()
+              if linha.startswith("- ")]
+    assert linhas == [f"- item #{ids['Aberto velho']} Aberto velho · 20 dias",
+                      f"- item #{ids['Aberto novo']} Aberto novo · 1 dia"]
