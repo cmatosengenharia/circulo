@@ -1,4 +1,4 @@
-"""circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | status | resumo | respostas"""
+"""circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | status | resumo | respostas"""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +25,11 @@ def main(argv: list[str] | None = None) -> None:
     t.add_argument("-n", type=int, default=1)
     a = sub.add_parser("add", help="enfileira uma mensagem")
     a.add_argument("texto", nargs="+")
+    pd = sub.add_parser("pedir", help="pede uma feature em uma frase (vai pela caixa de entrada; o loop lê no próximo giro)")
+    pd.add_argument("texto", nargs="+")
+    cm = sub.add_parser("caminho", help="o caminho de um pedido até o merge, com o tempo de cada etapa e o que espera agora")
+    cm.add_argument("ref", nargs="?", default=None, help="arquivo do pedido ou ev<N> (padrão: o último pedido do console)")
+    cm.add_argument("--json", action="store_true")
     sub.add_parser("status")
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
@@ -111,6 +116,22 @@ def main(argv: list[str] | None = None) -> None:
         run_demo(args.data + "-demo", args.porta)
         return
 
+    if args.cmd == "pedir":
+        from . import caminho
+        try:
+            arq = caminho.pedir(args.data, " ".join(args.texto))
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
+        print(f"Pedido deixado na caixa: {arq.name}\nO loop lê no próximo giro. Acompanhe: circulo caminho {arq.name}")
+        return
+    if args.cmd == "caminho":
+        from . import caminho
+        from .state import Store
+        c = caminho.caminho(Store(os.path.join(args.data, "circulo.db")), args.ref, args.data)
+        if c is None:
+            raise SystemExit("pedido não encontrado (use o nome do arquivo que o `circulo pedir` mostrou ou ev<N>)")
+        print(json.dumps(c, ensure_ascii=False, indent=2) if args.json else caminho.texto(c))
+        return
     if args.cmd == "redrive":
         from .portao_previo import redrive
         from .state import Store
