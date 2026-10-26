@@ -17,7 +17,7 @@ from . import finance, intencoes, jobs, jtbd, lancamentos_pasta, parada, revisor
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
-from . import cao_de_guarda
+from . import caixa, cao_de_guarda
 from .llm import build_llm
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
@@ -180,6 +180,8 @@ class Circle:
     # ------------------------------------------------------------ um giro do círculo
     def tick(self) -> TickResult:
         s, ctx = self.store, self.ctx
+        if getattr(self, "dono", True):
+            caixa.ler(s, self.data_dir)              # pedidos deixados como arquivo em <dados>/caixa/ viram eventos (só o dono do banco escreve)
         ctl = self.controls()
         avisar_marcos(s, ctx.budget, ctx.reply)
         if ctl["pausado"] or ctx.budget.exhausted():
@@ -701,8 +703,7 @@ class Circle:
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
             from . import fatiador
-            # conserto de PR reprovado vem antes de tudo (o sub-item seguinte esperava o PR que ninguém consertava: 45 min parado)
-            livre = not (self.self_dev.busy() or self.self_dev.em_espera()) and self.self_dev._conserto() is None
+            livre = not (self.self_dev.busy() or self.self_dev.em_espera()) and self.self_dev._conserto() is None   # conserto de PR reprovado vem antes de tudo (o sub-item seguinte esperava o PR que ninguém consertava: 45 min parado)
             item_id = fatiador.proximo(self.ctx, self.self_dev, self.planejador) if livre else None
             if livre and item_id is None:
                 return
@@ -712,8 +713,7 @@ class Circle:
                                       "detalhe": f"Claude Code trabalhando em: {item['titulo']}" if item else None})
             res = self.self_dev.run_paralelo(item_id=item_id, autorizado=True) if livre else self.self_dev.run_once(item_id=item_id, autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
-                # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
-                self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")
+                self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")   # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "jardinagem":

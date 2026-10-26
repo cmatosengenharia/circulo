@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.68.2 — 2026-10-26
+
+**Caixa de entrada por arquivo — e a lição do banco corrompido.**
+
+- 25/10 23:52: o banco foi corrompido ("database disk image is malformed") por uma escrita direta no SQLite feita
+  de fora, pela ponte do Mac, enquanto o loop escrevia. Restaurado pelo mecanismo do próprio loop (`restaurar.json`
+  + reinício) do snapshot das 23:51; perdeu-se só o lote de pedidos daquele minuto. Regra a partir daqui: o loop é o
+  ÚNICO que escreve no banco.
+- `circulo/caixa.py`: um `.md`/`.txt` em `<dados>/caixa/` vira evento no começo do giro (pedido ao roteiro do loop,
+  pedido a uma missão por `projeto:`, ou `tipo: missao` para uma missão nova); lido vai para `caixa/lidos/` com o id
+  do evento no nome, inválido para `caixa/invalidos/`. Serve ao Claude, a scripts, a atalhos do macOS e a pastas
+  sincronizadas. `tests/test_caixa.py`.
+
 ## 1.68.1 — 2026-10-25
 
 - **Prazo de 2 dias do Norte** (`norte.marco`/`norte.cobrar`, no SRE): o loop grava o ponto de partida (fração de
