@@ -7,7 +7,7 @@ from test_self_dev import erro_recorrente, git, repo  # noqa: F401 — fixture d
 
 from circulo.merge_gate import REQUIRED_CHECKS
 from circulo.pre_pr import ABRIR, ADIAR, ADIAR_PONTO, CI_NAO_INICIOU, MAIN_VERMELHA, SISTEMICO, checks_dos_prs, decidir
-from circulo.reparo import BLOQUEADO, LIMITE_ADIAR, adiado_do_item
+from circulo.reparo import BLOQUEADO, DISJUNTOR, LIMITE_ADIAR, adiado_do_item
 
 COBRANCA = "The job was not started because your spending limit needs to be increased"
 
@@ -142,6 +142,19 @@ def test_tres_adiamentos_com_a_mesma_causa_bloqueiam_o_item_para_triagem(circle,
     assert st["status"] == BLOQUEADO and MAIN_VERMELHA in st["evidencia"] and "triagem" in st["evidencia"]
     assert _giro(dev, repo).status == "nada" and not gh.prs                   # bloqueado não adia de novo
     assert _adiados(circle) == [{"causa": MAIN_VERMELHA}] * LIMITE_ADIAR       # toda falha com a causa registrada
+
+
+def test_item_em_quarentena_por_adiamento_nao_volta_pela_barra_antiga_do_abrir_pr(circle, repo, tmp_path):  # noqa: F811
+    """Pergunta do conselho #300: a barra antiga do item no disjuntor do abrir_pr reabria a quarentena do adiar assim que
+    a main mudava, e o item adiava de novo pela mesma causa."""
+    item = erro_recorrente(circle)
+    circle.store.set(DISJUNTOR, {str(item["id"]): {"sig": "x", "n": 1, "chave": "main antiga", "texto": ""}})
+    dev, gh = _dev_com_main(circle, repo, tmp_path, "failure")
+    for _ in range(LIMITE_ADIAR):
+        _giro(dev, repo)
+    assert _giro(dev, repo).status == "nada" and not gh.prs
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item["id"],))["status"] == BLOQUEADO
+    assert len(_adiados(circle)) == LIMITE_ADIAR
 
 
 def test_causa_diferente_de_adiamento_zera_a_contagem(circle):
