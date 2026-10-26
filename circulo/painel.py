@@ -10,7 +10,6 @@ import os
 import re
 import threading
 import time
-from collections import Counter
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -21,6 +20,7 @@ from . import __version__, finance
 from . import atividade as atv
 from . import registro, repo_stats
 from .budget import TZ
+from .falhas_painel import _falhas_antes, causas_vs_antes, falhas_por_causa, falhas_por_componente, variacao
 from .money import fmt_brl
 from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
@@ -245,7 +245,6 @@ LIMIAR_JEV_DUVIDA = (20.0, 40.0)
 LIMIAR_LLM_FALHAS = (5.0, 20.0)
 INCIDENTES_VERMELHO = 3
 SEMAFORO = {"verde": ("ok", "✓"), "amarelo": ("llm", "!"), "vermelho": ("bad", "✕")}
-TOP_CAUSAS = 5
 
 
 def _um(conn, sql: str, args: tuple = ()):
@@ -254,46 +253,6 @@ def _um(conn, sql: str, args: tuple = ()):
 
 def _pct(r) -> float:
     return round(100 * (r[1] or 0) / r[0], 1) if r[0] else 0.0
-
-
-def _por_causa(linhas) -> Counter:
-    return Counter(causa or sig or ponto for ponto, sig, causa in linhas)
-
-
-def falhas_por_causa(linhas, top: int = TOP_CAUSAS) -> dict:
-    """Agrupa falhas (ponto, assinatura, causa) pela causa mais específica que houver, então toda falha tem causa;
-    o que passa do top vai em 'outras', e top + outras = total."""
-    n = _por_causa(linhas)
-    causas = [{"causa": c, "n": k} for c, k in n.most_common(top)]
-    total = sum(n.values())
-    return {"total": total, "causas": causas, "outras": total - sum(c["n"] for c in causas)}
-
-
-def _falhas_antes(linhas) -> dict:
-    """As mesmas falhas da janela de 24 h anterior, por causa inteira (sem top), base do delta do card por causa."""
-    n = _por_causa(linhas)
-    return {"total": sum(n.values()), "por_causa": dict(n)}
-
-
-def variacao(atual: int, anterior: int) -> dict:
-    """Delta de falhas contra a janela anterior, com cor invertida (alta é ruim, queda é boa); sem base não há
-    percentual: 'novo' quando só a atual tem falhas, '—' quando as duas estão zeradas."""
-    d = atual - anterior
-    if not d:
-        return {"seta": "●" if atual else "", "delta": 0, "texto": "● 0" if atual else "—", "classe": "neutro"}
-    seta, sinal = ("▲", "+") if d > 0 else ("▼", "−")
-    base = f"({sinal}{round(100 * abs(d) / anterior)}%)" if anterior else "novo"
-    return {"seta": seta, "delta": d, "texto": f"{seta} {sinal}{abs(d)} {base}", "classe": "ruim" if d > 0 else "bom"}
-
-
-def falhas_por_componente(linhas, agora: float) -> list[dict]:
-    """Agrupa falhas (ponto, created_at) das últimas 48 h pelo componente (o ponto papel:etapa, sempre presente):
-    n nas últimas 24 h, anterior nas 24 h antes, do mais afetado para o menos."""
-    n, anterior = Counter(), Counter()
-    for ponto, em in linhas:
-        (n if em >= agora - 86400 else anterior)[ponto] += 1
-    return [{"componente": c, "n": k, "anterior": anterior[c], "variacao": k - anterior[c]}
-            for c, k in sorted(n.items(), key=lambda ck: (-ck[1], ck[0]))]
 
 
 def saude(conn) -> dict:
@@ -350,14 +309,10 @@ def pagina_saude(h: dict) -> bytes:
         return f'<em class="delta {v["classe"]}">{v["texto"]}</em>'
 
     f, antes = h["falhas_24h"], h["falhas_antes"]
-    base = antes["por_causa"]
-    itens = [(c["causa"], c["n"], base.get(c["causa"], 0)) for c in f["causas"]]
-    outras_antes = antes["total"] - sum(a for _, _, a in itens)
-    if f["outras"] or outras_antes:
-        itens.append(("outras", f["outras"], outras_antes))
     falhas = (f'<section class="card falhas" aria-label="Falhas do painel por causa"><span>Falhas do painel (24 h)</span>'
               f'<b>{f["total"]} {delta(f["total"], antes["total"])}</b><ol>'
-              + "".join(f"<li>{escape(c)} <b>×{k}</b> {delta(k, a)}</li>" for c, k, a in itens) + "</ol></section>")
+              + "".join(f'<li>{escape(c["causa"])} <b>×{c["n"]}</b> <small>antes {c["anterior"]}</small> '
+                        f'{delta(c["n"], c["anterior"])}</li>' for c in causas_vs_antes(f, antes)) + "</ol></section>")
     componentes = ('<section class="card falhas" aria-label="Falhas do painel por componente"><span>Falhas por componente '
                    '(24 h)</span><ol>' + "".join(
                        f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> {delta(c["n"], c["anterior"])} vs 24 h antes</li>'
@@ -368,7 +323,7 @@ def pagina_saude(h: dict) -> bytes:
             ".faixa{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}"
             ".card{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:14px 18px;min-width:140px}"
             ".card b{display:block;font-size:22px}.card span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}"
-            ".falhas{margin:0 0 12px}.falhas ol{margin:6px 0 0;padding-left:20px}.falhas li b{display:inline;font-size:inherit}"
+            ".falhas{margin:0 0 12px}.falhas ol{margin:6px 0 0;padding-left:20px}.falhas li b{display:inline;font-size:inherit}.falhas li small{color:var(--muted)}"
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
