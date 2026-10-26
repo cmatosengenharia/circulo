@@ -23,8 +23,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import jobs, jtbd
-from .custo import tokens_por_desfecho
+from . import jobs, jtbd, pedido_claro
+from .custo import tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
 from .json_llm import objeto
 from .licoes import item_de
@@ -344,7 +344,9 @@ def _m_falha_neuronio(s, agora):
 def _m_tokens_por_pr(s, agora):
     t = _um(s, "SELECT SUM(tokens) FROM llm_calls WHERE created_at>=?", (agora - 86400,))
     prs = _um(s, "SELECT COUNT(DISTINCT pr) FROM merges WHERE merged=1 AND created_at>=?", (agora - 86400,))
-    return (min(1.0, t / max(prs, 1) / 100_000), {"tokens_24h": t, "prs_24h": prs})
+    v = tokens_por_veredito(s.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' AND created_at>=?",
+                                (agora - 86400,)), pedido_claro.itens_com_veredito(s))
+    return (min(1.0, t / max(prs, 1) / 100_000), {"tokens_24h": t, "prs_24h": prs, **v})
 
 
 def _m_regra_decide(s, agora):
