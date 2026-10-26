@@ -51,3 +51,29 @@ def test_semana_monta_da_base_e_conta_a_leitura(circle):
     t = resumo_semanal.semana(s, agora)
     assert "- #601 PR 601 · pedido: exportar lançamentos" in _secao(t, "Produto (1)")
     assert "Lido 2 vezes nos últimos 7 dias." in t
+
+
+def test_cada_pr_de_produto_mostra_consultas_7d_e_os_sem_uso_ficam_sinalizados():
+    t = resumo_semanal.texto(PRS, leituras=0, consultas={21: 2})
+    linhas = [linha for linha in _secao(t, "Consultas 7d").splitlines() if linha.startswith("- ")]
+    assert linhas == ["- #20 Painel da equipe ao vivo · consultas 7d: 0", "- #21 Exportar CSV · consultas 7d: 2",
+                      "- #24 Filtro por assunto · consultas 7d: 0"]
+    assert [linha for linha in _secao(t, "Produto sem uso (2)").splitlines() if linha.startswith("- ")] == [
+        "- #20 Painel da equipe ao vivo", "- #24 Filtro por assunto"]
+
+
+def test_semana_registra_cada_consulta_em_uso_resumo_e_conta_so_7_dias(circle):
+    s, agora = circle.store, NOON.timestamp()
+    for n in (701, 702):
+        item = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                   "VALUES(?,?,'pedido_cassio','feito','',1,?,?)", (f"Item {n}", f"pedido {n}", agora, agora))
+        s.x("INSERT INTO prs(number,titulo,branch,status,item_id,created_at,updated_at) VALUES(?,?,?,'mergeado',?,?,?)",
+            (n, f"PR {n}", f"b{n}", item, agora - 600, agora - 600))
+    resumo_semanal.semana(s, agora - 8 * 86400)
+    primeira = resumo_semanal.semana(s, agora)
+    assert "## Produto sem uso (2)" in primeira
+    t = resumo_semanal.semana(s, agora + 60)
+    assert "- #701 PR 701 · consultas 7d: 1" in _secao(t, "Consultas 7d")
+    assert "## Produto sem uso (0)" in t
+    recursos = [r["recurso"] for r in s.q("SELECT recurso FROM uso_resumo WHERE created_at>=?", (agora,))]
+    assert sorted(recursos) == ["pr:701", "pr:701", "pr:702", "pr:702", "resumo", "resumo"]
