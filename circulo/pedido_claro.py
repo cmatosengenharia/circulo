@@ -62,6 +62,13 @@ def registrar(store: Store, item: dict, agora: float | None = None) -> Veredito:
     return v
 
 
+def itens_com_veredito(store: Store) -> list[dict]:
+    """Itens do roadmap com o veredito do portão ('completo' | 'incompleto' | None se nunca avaliado)."""
+    store.x(ESQUEMA)
+    return store.q("SELECT r.titulo, r.status, CASE p.completo WHEN 1 THEN 'completo' WHEN 0 THEN 'incompleto' END veredito "
+                   "FROM roadmap r LEFT JOIN pedidos_claros p ON p.item=r.id")
+
+
 def fracao_incompletos(store: Store, agora: float | None = None) -> float | None:
     """Fração dos pedidos avaliados nas últimas 24 h sem algum dos 3 campos; None sem pedido avaliado."""
     store.x(ESQUEMA)
