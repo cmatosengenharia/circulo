@@ -308,7 +308,8 @@ def pagina_saude(h: dict) -> bytes:
 
 
 def _page(name: str = "painel.html") -> bytes:
-    return resources.files("circulo").joinpath(name).read_bytes()
+    from .confianca import versao_painel
+    return resources.files("circulo").joinpath(name).read_bytes().replace(b"__VERSAO_PAINEL__", versao_painel().encode())
 
 
 def make_handler(db_path: str):
@@ -750,7 +751,7 @@ def make_handler(db_path: str):
                     atraso = float(data.get("atraso_ms"))
                 except (TypeError, ValueError):
                     return self._json({"erro": "atraso_ms inválido"}, 400)
-                return self._json({"ok": True, "registrado": registrar_frescor(store, atraso)})
+                return self._json({"ok": True, "registrado": registrar_frescor(store, atraso, data.get("versao"))})
             if u.path == "/api/pedido":
                 texto = str(data.get("texto", "")).strip()[:500]
                 if not texto:
