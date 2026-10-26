@@ -24,6 +24,7 @@ from pathlib import Path
 PASTA = "caixa"
 MAX_POR_GIRO = 20
 MAX_TEXTO = 4000
+MIN_TEXTO = 8
 
 
 def _cabecalho(texto: str) -> tuple[dict, str]:
@@ -55,7 +56,7 @@ def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
             shutil.move(str(arq), str(pasta / "invalidos" / arq.name))
             continue
         texto = corpo.strip()[:MAX_TEXTO]
-        if len(texto) < 8:
+        if len(texto) < MIN_TEXTO:
             shutil.move(str(arq), str(pasta / "invalidos" / arq.name))
             continue
         tipo = cab.get("tipo", "pedido").lower()
