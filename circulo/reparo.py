@@ -34,6 +34,9 @@ Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
      (`licoes.assinatura_de`). A mesma 2x seguidas → o item vai para 'bloqueado', sem nova chamada ao agente nem ao
      pytest. A sonda de reabertura, no início de cada giro, devolve o item à fila quando os arquivos citados na barra
      (ou a main inteira, se ela não cita arquivo) mudam. Falha de lint/testes repetida segue para o fatiador (item 7).
+  12. developer:abrir_pr:adiar com teto (pergunta #296, 13 falhas em 13): cada adiamento grava no item a causa
+     normalizada (`adiado_do_item`). A mesma causa LIMITE_ADIAR vezes seguidas → o item sai da fila como 'bloqueado'
+     para triagem (dead-letter queue com maxReceiveCount), em vez de adiar de novo; causa diferente ou PR aberto zeram.
 
 `ruff format` só roda em arquivos criados pela mudança: o repositório não segue o `ruff format` e formatar um arquivo
 existente reescreveria o arquivo inteiro (diff gigante, estilo da casa perdido, portão de tamanho estourado).
@@ -81,6 +84,8 @@ BLOQUEADO_BASE = "bloqueado_base"
 BASE_VERMELHA = "developer_base_vermelha"       # {item: {"sig", "n", "chave"}}: a última base vermelha do pré-voo
 TETO_RAIZ = "developer_teto_raiz"              # {item raiz: {"n", "escopo"}}: tetos seguidos do item e dos sub-itens
 CONFIRMADA = 2                                 # execuções vermelhas no mesmo sha da main até o pré-voo parar de rodar
+ADIADO = "developer_adiado"                    # {item: {"causa", "n"}}: os adiamentos seguidos do abrir_pr
+LIMITE_ADIAR = 3
 ARQUIVO_CITADO = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)*[\w-]+\.py)\b")
 
 
@@ -128,6 +133,16 @@ def barra_do_item(store, item_id: int, sig: str, chave: str, texto: str = "") ->
     n = antes.get("n", 0) + 1 if antes.get("sig") == sig else 1
     store.set(DISJUNTOR, {**todos, str(item_id): {"sig": sig, "n": n, "chave": chave, "texto": texto[:2000]}})
     return n >= 2
+
+
+def adiado_do_item(store, item_id: int, causa: str | None) -> int:
+    """Conta mais um adiamento do item com a causa; devolve os seguidos com ela. `causa=None` (o PR passou do
+    adiamento) zera a contagem."""
+    todos = store.get(ADIADO) or {}
+    antes = todos.pop(str(item_id), None) or {}
+    n = 0 if causa is None else antes.get("n", 0) + 1 if antes.get("causa") == causa else 1
+    store.set(ADIADO, {**todos, **({str(item_id): {"causa": causa, "n": n}} if n else {})})
+    return n
 
 
 def registrar_base(store, item_id: int, sig: str, sha: str, causa: str = "") -> int:
@@ -553,19 +568,33 @@ class DeveloperComReparo(SelfDeveloper):
         lic = licao_de(self.s, sig)
         return lic is not None and lic["status"] in ("aberta", "em_correcao", "reincidente")
 
+    def _adiar(self, item_id: int | None, titulo: str) -> str:
+        """Portão pré-PR: o motivo do adiamento ('' = abre). Na LIMITE_ADIAR-ésima vez seguida com a mesma causa, o
+        disjuntor manda o item para triagem."""
+        from .licoes import registrar as monitorar
+        from .merge_gate import required_checks
+        from .pre_pr import ADIAR, ADIAR_PONTO, checks_dos_prs, conserta_main, decidir, ler_main
+        d = decidir(*ler_main(self.gh), conserta_main=conserta_main(self.s, item_id),
+                    historico=checks_dos_prs(self.s, time.time()), obrigatorios=required_checks())
+        n = 0 if item_id is None else adiado_do_item(self.s, item_id, d.causa if d.acao == ADIAR else None)
+        if d.acao != ADIAR:
+            return ""
+        texto = (f"- CI da main ou dos últimos PRs: adiado ({d.causa}, {n}/{LIMITE_ADIAR} seguidas); um PR agora "
+                 "falharia por motivo externo, nada foi enviado")
+        if n >= LIMITE_ADIAR:
+            self._disjuntor = f"triagem: adiado {n}x seguidas pela mesma causa ({d.causa}); não adia de novo"
+            texto += f"\n({self._disjuntor})"
+        monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
+        return texto
+
     def portao_pr(self, wt: Path, base: str, item_id: int | None, titulo: str) -> tuple[bool, str]:
         from .licoes import assinatura_de
         from .licoes import registrar as monitorar
         from .neuronios import (ABRIR_PR, Resultado, avaliar_aprendidos, causa_da_falha, diff_do_worktree, portoes_natos_pr,
                                 registrar)
-        from .merge_gate import required_checks
-        from .pre_pr import ADIAR, ADIAR_PONTO, checks_dos_prs, conserta_main, decidir, ler_main
-        d = decidir(*ler_main(self.gh), conserta_main=conserta_main(self.s, item_id),
-                    historico=checks_dos_prs(self.s, time.time()), obrigatorios=required_checks())
-        if d.acao == ADIAR:
-            texto = f"- CI da main ou dos últimos PRs: adiado ({d.causa}); um PR agora falharia por motivo externo, nada foi enviado"
-            monitorar(self.ctx, ADIAR_PONTO, False, sujeito=titulo, motivo=texto, causa=d.causa, licao=False)
-            return False, texto
+        adiado = self._adiar(item_id, titulo)
+        if adiado:
+            return False, adiado
         self._base, self._item_id, self._repetida = base, item_id, False
         texto, rodada = "", None          # rodada = {"sig", "tokens"} depois que o agente reparou
         try:
