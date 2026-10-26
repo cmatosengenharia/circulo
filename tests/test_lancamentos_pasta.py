@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -55,3 +56,43 @@ def test_arquivo_corrompido_vai_para_rejeitados_e_nao_interrompe_os_demais(circl
 def test_pasta_inexistente_ou_vazia_insere_zero(circle, tmp_path):
     assert ingerir_pasta(tmp_path / "nao_existe", circle.store) == 0
     assert ingerir_pasta(tmp_path, circle.store) == 0
+
+
+def _varreduras(s) -> list[dict]:
+    rows = s.q("SELECT r.entradas FROM intencoes r JOIN intencoes i ON i.seq=r.ref "
+               "WHERE r.tipo='resultado' AND i.acao='lancamentos:varredura' ORDER BY r.seq")
+    return [{k: v for k, v in json.loads(r["entradas"]).items() if k != "detalhe"} for r in rows]
+
+
+def test_giro_do_loop_ingere_a_pasta_de_extratos_e_registra_a_varredura(circle):
+    """Ponta a ponta: a fixture cai em <data>/extratos, o giro a ingere (lancamentos 0 → >0) e a varredura vira
+    evento do loop com total, importados e ignorados com motivo; a segunda varredura com os mesmos arquivos soma 0."""
+    s = circle.store
+    pasta = circle.data_dir / "extratos"
+    pasta.mkdir()
+    for nome in ("extrato_anonimo.csv", "extrato_anonimo.ofx"):
+        shutil.copy(FIX / nome, pasta / nome)
+    (pasta / "a_quebrado.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    assert lancamentos(s) == 0
+    circle.tick()
+    total = lancamentos(s)
+    assert total >= 1
+    [v1] = _varreduras(s)
+    assert v1["novos"] == v1["total"] == total
+    assert sorted(a["arquivo"] for a in v1["importados"]) == ["extrato_anonimo.csv", "extrato_anonimo.ofx"]
+    assert [i["arquivo"] for i in v1["ignorados"]] == ["a_quebrado.csv"] and v1["ignorados"][0]["motivo"]
+    assert s.get("lancamentos_pasta") == v1
+
+    for nome in ("extrato_anonimo.csv", "extrato_anonimo.ofx"):
+        shutil.copy(FIX / nome, pasta / nome)
+    circle.tick()
+    v2 = _varreduras(s)[-1]
+    assert v2["novos"] == 0 and v2["total"] == total == lancamentos(s)
+    assert s.one("SELECT COUNT(*) AS n FROM (SELECT import_key FROM ledger GROUP BY import_key HAVING COUNT(*)>1)")["n"] == 0
+
+
+def test_giro_sem_extrato_novo_nao_registra_varredura(circle):
+    circle.tick()
+    (circle.data_dir / "extratos").mkdir()
+    circle.tick()
+    assert _varreduras(circle.store) == []

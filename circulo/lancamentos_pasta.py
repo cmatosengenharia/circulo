@@ -9,10 +9,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from . import intencoes
 from .lancamentos_import import importar
 from .state import Store
 
 FORMATOS = {".ofx": "ofx", ".csv": "csv"}
+LISTA = 8              # arquivos por lista no evento: as entradas da trilha cabem em 2000 caracteres e seguem JSON válido
 
 
 def _texto(arquivo: Path) -> str:
@@ -30,19 +32,31 @@ def _mover(arquivo: Path, destino: str) -> None:
 
 
 def ingerir_pasta(pasta: str | Path, store: Store) -> int:
-    """Importa os extratos da pasta (em ordem de nome) e devolve quantos lançamentos novos entraram."""
+    """Importa os extratos da pasta (em ordem de nome) e devolve quantos lançamentos novos entraram.
+
+    Cada varredura com extrato vira evento do loop (trilha de intenções, ação `lancamentos:varredura`) e fica em
+    kv `lancamentos_pasta`: novos, total do ledger, importados por arquivo e ignorados com motivo."""
     pasta = Path(pasta)
-    if not pasta.is_dir():
+    arquivos = sorted(a for a in pasta.iterdir() if a.is_file()) if pasta.is_dir() else []
+    extratos = [a for a in arquivos if a.suffix.lower() in FORMATOS]
+    if not extratos:
         return 0
-    n = 0
-    for arquivo in sorted(pasta.iterdir()):
-        formato = FORMATOS.get(arquivo.suffix.lower())
-        if formato is None or not arquivo.is_file():
-            continue
+    seq = intencoes.registrar(store, "lancamentos:varredura", "extrato na pasta monitorada",
+                              {"pasta": str(pasta), "arquivos": [a.name for a in extratos]})
+    n, importados = 0, []
+    ignorados = [{"arquivo": a.name, "motivo": "formato não é .ofx/.csv"} for a in arquivos if a not in extratos]
+    for arquivo in extratos:
         try:
-            n += importar(store, _texto(arquivo), formato)
-        except (ValueError, KeyError, IndexError):     # extrato ilegível; UnicodeDecodeError é ValueError
+            novos = importar(store, _texto(arquivo), FORMATOS[arquivo.suffix.lower()])
+        except (ValueError, KeyError, IndexError) as exc:     # extrato ilegível; UnicodeDecodeError é ValueError
             _mover(arquivo, "rejeitados")
+            ignorados.append({"arquivo": arquivo.name, "motivo": f"rejeitado: {type(exc).__name__}: {exc}"[:200]})
             continue
         _mover(arquivo, "processados")
+        importados.append({"arquivo": arquivo.name, "novos": novos})
+        n += novos
+    total = store.one("SELECT COUNT(*) AS n FROM ledger")["n"]
+    resumo = {"novos": n, "total": total, "importados": importados[:LISTA], "ignorados": ignorados[:LISTA]}
+    store.set("lancamentos_pasta", resumo)
+    intencoes.concluir(store, seq, True, f"{n} novos, {total} no ledger", **resumo)
     return n
