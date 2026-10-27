@@ -1,6 +1,7 @@
 """Entregas de produto sem uso: os PRs de produto mergeados há 7 dias ou mais sem nenhum evento com o nome do
 `evento_esperado` gravado no merge depois do `merged_at`. Uso anterior ao merge não conta: é de antes da entrega.
-O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, nos `events` do loop (kind)."""
+O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, em `entrega_uso` (gravado pela
+rota do painel chamada, com o último instante por nome) e nos `events` do loop (kind)."""
 from __future__ import annotations
 
 import sqlite3
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS entrega_uso_esperado (
   merged_em REAL NOT NULL
 )
 """
+USO = "CREATE TABLE IF NOT EXISTS entrega_uso (nome TEXT PRIMARY KEY, em REAL NOT NULL)"
 
 
 def entregas_sem_uso(prs: list[dict], eventos: list[dict], agora: float) -> list[dict]:
@@ -35,11 +37,28 @@ def registrar_esperado(conn: sqlite3.Connection, pr: int, evento: str, agora: fl
                  (pr, evento, time.time() if agora is None else agora))
 
 
+def nome_uso(caminho: str) -> str:
+    """O nome de uso de uma rota do painel: `endpoint:<caminho>` para /api, `tela:<caminho>` para as páginas."""
+    return ("endpoint:" if caminho.startswith("/api/") else "tela:") + caminho
+
+
+def registrar_uso(conn: sqlite3.Connection, nome: str, agora: float | None = None) -> None:
+    """Grava o uso real (nome, instante) só se alguma entrega o espera; uma linha por nome, com o último uso."""
+    conn.execute(ESQUEMA)
+    conn.execute(USO)
+    conn.execute("INSERT INTO entrega_uso(nome, em) SELECT ?, ? WHERE EXISTS "
+                 "(SELECT 1 FROM entrega_uso_esperado WHERE evento = ?) "
+                 "ON CONFLICT(nome) DO UPDATE SET em = MAX(em, excluded.em)",
+                 (nome, time.time() if agora is None else agora, nome))
+
+
 def listar_sem_uso(conn: sqlite3.Connection, agora: float) -> list[dict]:
     """As entregas gravadas há 7+ dias sem evento de uso depois do merge, por número de PR."""
     conn.execute(ESQUEMA)
+    conn.execute(USO)
     prs = [{"number": pr, "produto": True, "evento_esperado": evento, "merged_at": em} for pr, evento, em in
            conn.execute("SELECT pr, evento, merged_em FROM entrega_uso_esperado ORDER BY pr")]
     eventos = [{"nome": kind, "created_at": em} for kind, em in conn.execute(
-        "SELECT kind, created_at FROM events WHERE kind IN (SELECT evento FROM entrega_uso_esperado)")]
+        "SELECT kind, created_at FROM events WHERE kind IN (SELECT evento FROM entrega_uso_esperado) "
+        "UNION ALL SELECT nome, em FROM entrega_uso")]
     return entregas_sem_uso(prs, eventos, agora)

@@ -27,7 +27,7 @@ from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
-from .uso_entregas import listar_sem_uso
+from .uso_entregas import listar_sem_uso, nome_uso, registrar_uso
 
 HOST = "127.0.0.1"
 
@@ -373,6 +373,7 @@ def make_handler(db_path: str):
                 return self._json({"erro": "proibido"}, 403)
             u = urlparse(self.path)
             q = parse_qs(u.query)
+            registrar_uso(self._store().db, nome_uso(u.path))
             projeto = int(q["projeto"][0]) if q.get("projeto", [""])[0].isdigit() else None
             m = re.fullmatch(r"/(?:projeto|missao)/(\d+)/entrega", u.path)
             if m:
@@ -672,6 +673,7 @@ def make_handler(db_path: str):
                 return self._json({"erro": "corpo precisa ser um objeto"}, 400)
             store = self._store()
             u = urlparse(self.path)
+            registrar_uso(store.db, nome_uso(u.path))
             if u.path in ("/api/controle", "/api/parada"):
                 from . import parada
                 c = store.get("controle", {}) or {}

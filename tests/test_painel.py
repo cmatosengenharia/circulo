@@ -399,3 +399,24 @@ def test_painel_lista_entregas_sem_uso_apos_7_dias(tmp_path):
     assert "PR #11" not in pagina and "PR #13" not in pagina
     vazia = saude(Store(tmp_path / "v.db").db)
     assert vazia["entregas_sem_uso"] == [] and "<b>0</b>" in pagina_saude(vazia).decode()
+
+
+def test_chamar_endpoint_do_painel_grava_uso_e_a_entrega_sai_de_sem_uso(circle, painel):
+    """Pergunta #351: a rota do painel chamada grava o uso real (nome, instante) casado com o evento esperado; a
+    entrega com evento esperado X sai de 'sem uso' depois de um uso X posterior ao merge, e a que não foi usada fica."""
+    import time
+
+    from circulo.painel import saude
+    from circulo.uso_entregas import nome_uso, registrar_esperado
+    st = circle.store
+    oito_dias = time.time() - 8 * 86400
+    registrar_esperado(st.db, 21, nome_uso("/api/norte"), oito_dias)
+    registrar_esperado(st.db, 22, nome_uso("/painel"), oito_dias)
+    registrar_esperado(st.db, 23, "endpoint:/api/nunca_chamado", oito_dias)
+    assert [e["number"] for e in saude(st.db)["entregas_sem_uso"]] == [21, 22, 23]
+    for caminho in ("/api/norte", "/painel", "/api/estado"):
+        with urllib.request.urlopen(painel + caminho, timeout=5) as r:
+            r.read()
+    assert [e["number"] for e in saude(st.db)["entregas_sem_uso"]] == [23]
+    usos = [n for (n,) in st.db.execute("SELECT nome FROM entrega_uso ORDER BY nome")]
+    assert usos == ["endpoint:/api/norte", "tela:/painel"]          # só o que alguma entrega espera é gravado
