@@ -5,14 +5,15 @@ lançamentos e a pasta inexistente ou vazia por GIROS giros seguidos, abre um pe
 parcial deixa no máximo 1 pedido aberto por causa (como o Alertmanager agrupa por rótulo); quando a causa some
 (extrato solto, pasta criada), o pedido fecha sozinho. Os abertos aparecem em "Precisa de você" (`aprovacoes`).
 Todo giro grava a causa da rodada em kv `ingestao_causas` (as últimas RODADAS e a dominante entre elas) e, mesmo com
-zeros, o registro da rodada em `ultima` (carimbo, arquivos vistos, rejeitados com motivo, lançamentos novos): sem
+zeros, o registro da rodada em `ultima` (carimbo, arquivos vistos, rejeitados com motivo, lançamentos novos e, por fonte
+pasta/e-mail, `lancamentos_pasta.contadores` com o último descarte): sem
 registro nas últimas RECENTE horas, `estado` diz 'nunca_rodou', como o heartbeat que não chegou."""
 from __future__ import annotations
 
 import time
 from pathlib import Path
 
-from .lancamentos_pasta import FORMATOS, _extratos, ingerir_pasta
+from .lancamentos_pasta import FORMATOS, _extratos, contadores, ingerir_pasta
 from .state import Store
 
 GIROS = 3
@@ -80,7 +81,7 @@ def girar(pasta: str | Path, store: Store, agora: float | None = None) -> int:
                       if i["motivo"].startswith("rejeitado")]
         _registrar(store, causa_da_rodada(store.get("lancamentos_motivo"), pendentes, novos),
                    {"timestamp": agora, "arquivos_vistos": pendentes, "arquivos_rejeitados": rejeitados,
-                    "lancamentos_novos": novos})
+                    "lancamentos_novos": novos, "fontes": resumo.get("fontes") or contadores()})
     causa = store.get("lancamentos_motivo")
     causa = causa if causa in CAUSAS and not store.one("SELECT 1 FROM ledger LIMIT 1") else None
     _esquema(store)
