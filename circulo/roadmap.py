@@ -136,6 +136,27 @@ def _licao_verde_no_main(ctx, item: dict, repo, agora: float) -> bool:
     return True
 
 
+def titulo_sem_uso(evento: str) -> str:
+    return f"Decidir: divulgar ou remover a entrega sem uso após 7 dias (evento esperado: {evento})"
+
+
+def decidir_sem_uso(s, pergunta_id: int, agora: float | None = None) -> list[int]:
+    """Cada entrega sem uso há 7+ dias vira um item de decisão preso à pergunta do PM; o título é a chave do evento
+    esperado, então um item já existente (aberto ou resolvido) não é duplicado. Devolve os itens criados."""
+    from .planejador import gravar_item
+    from .uso_entregas import listar_sem_uso
+    novos = []
+    for e in listar_sem_uso(s.db, time.time() if agora is None else agora):
+        titulo = titulo_sem_uso(e["evento_esperado"])
+        if s.one("SELECT 1 FROM roadmap WHERE titulo=?", (titulo,)):
+            continue
+        novos.append(gravar_item(s, pergunta_id, titulo,
+                                 f"O PR #{e['number']} foi mergeado há 7+ dias e nenhum evento "
+                                 f"'{e['evento_esperado']}' foi registrado depois: divulgar a entrega ou removê-la.",
+                                 f"entrega sem uso: PR #{e['number']}, evento esperado {e['evento_esperado']}"))
+    return novos
+
+
 def fora_da_fila(ctx, item: dict, repo=None, agora: float | None = None) -> bool:
     """True = o item não vai para o Developer agora: o disjuntor abriu, ou a lição dele já está fechada e verde no main."""
     agora = agora or time.time()
