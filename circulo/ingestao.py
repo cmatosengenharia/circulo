@@ -6,8 +6,11 @@ parcial deixa no máximo 1 pedido aberto por causa (como o Alertmanager agrupa p
 (extrato solto, pasta criada), o pedido fecha sozinho. Os abertos aparecem em "Precisa de você" (`aprovacoes`).
 Todo giro grava a causa da rodada em kv `ingestao_causas` (as últimas RODADAS e a dominante entre elas) e, mesmo com
 zeros, o registro da rodada em `ultima` (carimbo, arquivos vistos, rejeitados com motivo, lançamentos novos e, por fonte
-pasta/e-mail, `lancamentos_pasta.contadores` com o último descarte): sem
-registro nas últimas RECENTE horas, `estado` diz 'nunca_rodou', como o heartbeat que não chegou."""
+pasta/e-mail, `lancamentos_pasta.contadores` com o último descarte) e as linhas: `lancamentos` (total do ledger),
+`lancamentos_novos` e `lancamentos_duplicados` (linhas que já tinham chave no ledger): sem
+registro nas últimas RECENTE horas, `estado` diz 'nunca_rodou', como o heartbeat que não chegou.
+`ingerir_pendentes` é o que o giro chama: a pasta <dados>/PASTA, onde extrato (.ofx/.csv) e e-mail exportado (.eml)
+entram sem LLM, com a dedupe de `lancamentos_import.linhas` (FITID ou data+valor+descrição+ocorrência)."""
 from __future__ import annotations
 
 import time
@@ -17,6 +20,7 @@ from .lancamentos_pasta import FORMATOS, _extratos, contadores, ingerir_pasta
 from .state import Store
 
 GIROS = 3
+PASTA = "extratos"     # dentro do diretório de dados do loop
 RODADAS = 10           # giros guardados em kv `ingestao_causas`; a mais frequente explica lancamentos=0
 RECENTE = 24 * 3600    # registro mais velho que isto: a ingestão parou de girar
 CAUSAS = {"pasta_inexistente": "a pasta de extratos não existe", "vazia": "a pasta de extratos está vazia"}
@@ -81,7 +85,9 @@ def girar(pasta: str | Path, store: Store, agora: float | None = None) -> int:
                       if i["motivo"].startswith("rejeitado")]
         _registrar(store, causa_da_rodada(store.get("lancamentos_motivo"), pendentes, novos),
                    {"timestamp": agora, "arquivos_vistos": pendentes, "arquivos_rejeitados": rejeitados,
-                    "lancamentos_novos": novos, "fontes": resumo.get("fontes") or contadores()})
+                    "lancamentos_novos": novos, "lancamentos_duplicados": resumo.get("duplicados", 0),
+                    "lancamentos": store.one("SELECT COUNT(*) AS n FROM ledger")["n"],
+                    "fontes": resumo.get("fontes") or contadores()})
     causa = store.get("lancamentos_motivo")
     causa = causa if causa in CAUSAS and not store.one("SELECT 1 FROM ledger LIMIT 1") else None
     _esquema(store)
@@ -93,6 +99,11 @@ def girar(pasta: str | Path, store: Store, agora: float | None = None) -> int:
         store.x("INSERT OR IGNORE INTO pedidos_ingestao(causa, pasta, mensagem, aberto_em) VALUES(?,?,?,?)",
                 (causa, str(pasta), mensagem(causa, pasta), agora))
     return novos
+
+
+def ingerir_pendentes(dados: str | Path, store: Store, agora: float | None = None) -> int:
+    """Tarefa do giro: varre a pasta monitorada (extratos e e-mails .eml), registra a rodada e devolve os novos."""
+    return girar(Path(dados) / PASTA, store, agora)
 
 
 def abertos(store: Store) -> list[dict]:

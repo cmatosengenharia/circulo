@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import intencoes
 from .lancamentos_email import parse_email
-from .lancamentos_import import Linha, gravar, importar, linhas
+from .lancamentos_import import Linha, gravar, linhas, parse_extrato
 from .state import Store
 
 FORMATOS = {".ofx": "ofx", ".csv": "csv", ".eml": "eml"}
@@ -52,14 +52,13 @@ def _emails(arquivos: list[Path]) -> dict[Path, Linha | ValueError]:
     return {**lidos, **dict(zip(bons, linhas([(*lidos[a], None) for a in bons]), strict=True))}
 
 
-def _importar(store: Store, arquivo: Path, emails: dict[Path, Linha | ValueError]) -> int:
+def _importar(store: Store, arquivo: Path, emails: dict[Path, Linha | ValueError]) -> tuple[int, int]:
+    """(lançamentos novos, linhas com valor lidas do arquivo); a diferença são as duplicadas por chave."""
     formato = FORMATOS[arquivo.suffix.lower()]
-    if formato != "eml":
-        return importar(store, _texto(arquivo), formato)
-    lin = emails[arquivo]
-    if isinstance(lin, ValueError):
-        raise lin
-    return gravar(store, [lin])
+    lin = parse_extrato(_texto(arquivo), formato) if formato != "eml" else [emails[arquivo]]
+    if isinstance(lin[0], ValueError):
+        raise lin[0]
+    return gravar(store, lin), sum(1 for x in lin if x.centavos)
 
 
 def _extratos(pasta: Path) -> list[Path]:
@@ -101,13 +100,13 @@ def _ingerir(pasta: Path, store: Store) -> int:
     seq = intencoes.registrar(store, "lancamentos:varredura", "extrato na pasta monitorada",
                               {"pasta": str(pasta), "arquivos": [a.name for a in extratos]})
     emails = _emails([a for a in extratos if FORMATOS[a.suffix.lower()] == "eml"])
-    n, importados, fontes = 0, [], contadores()
+    n, lidas, importados, fontes = 0, 0, [], contadores()
     ignorados = [{"arquivo": a.name, "motivo": "formato não é .ofx/.csv/.eml"} for a in arquivos if a not in extratos]
     for arquivo in extratos:
         fonte = fontes["email" if FORMATOS[arquivo.suffix.lower()] == "eml" else "pasta"]
         fonte["vistos"] += 1
         try:
-            novos = _importar(store, arquivo, emails)
+            novos, linhas_arquivo = _importar(store, arquivo, emails)
         except (ValueError, KeyError, IndexError) as exc:     # extrato ilegível; UnicodeDecodeError é ValueError
             _mover(arquivo, "rejeitados")
             motivo = f"rejeitado: {type(exc).__name__}: {exc}"[:200]
@@ -118,14 +117,15 @@ def _ingerir(pasta: Path, store: Store) -> int:
         _mover(arquivo, "processados")
         importados.append({"arquivo": arquivo.name, "novos": novos})
         n += novos
+        lidas += linhas_arquivo
         if novos:
             fonte["novos"] += 1
         else:
             fonte["duplicados_por_hash"] += 1
             fonte["ultimo_descarte"] = f"{arquivo.name}: duplicado por hash"
     total = store.one("SELECT COUNT(*) AS n FROM ledger")["n"]
-    resumo = {"novos": n, "total": total, "importados": importados[:LISTA], "ignorados": ignorados[:LISTA],
-              "fontes": fontes}
+    resumo = {"novos": n, "duplicados": lidas - n, "total": total, "importados": importados[:LISTA],
+              "ignorados": ignorados[:LISTA], "fontes": fontes}
     store.set("lancamentos_pasta", resumo)
     intencoes.concluir(store, seq, True, f"{n} novos, {total} no ledger", **resumo)
     return n
