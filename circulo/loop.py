@@ -282,7 +282,7 @@ class Circle:
                 r.errors.append(f"corpo:{exc!r}")
         self._record(r)
         telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
-        seguro(revisao_uso.abrir_pedidos_revisao_uso, s.db)   # entrega de produto 7+ dias sem uso: 1 pedido por PR
+        seguro(revisao_uso.cobrar_no_giro, s)   # entrega de produto 7+ dias sem uso: 1 pedido e 1 item por PR
         try:
             from . import observabilidade, rastro
             observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
