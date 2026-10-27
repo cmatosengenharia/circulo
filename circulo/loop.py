@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, intencoes, jobs, jtbd, lancamentos_pasta, parada, revisor, telemetria
+from . import finance, ingestao, intencoes, jobs, jtbd, parada, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
@@ -210,7 +210,7 @@ class Circle:
             guardrails.daily_snapshot(s, self.data_dir)
             guardrails.check_stagnation(s, ctx.reply)
         finance.age_open_transactions(s)
-        seguro(lancamentos_pasta.ingerir_pasta, self.data_dir / "extratos", s)   # extrato solto em <data>/extratos vira lançamento
+        seguro(ingestao.girar, self.data_dir / "extratos", s)   # extrato em <data>/extratos vira lançamento; sem ele, pedido
 
         ev = s.claim_next_event()   # 1) pedido (prioridade) ou 2) evolução natural
         if ev:

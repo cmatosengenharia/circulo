@@ -9,6 +9,7 @@ evidência de item ou num alerta já rolado. Fontes (cada uma com a ação que r
 - peças de configuração paradas (chave faltando, Claude Code ausente): o como-ligar;
 - travas do SRE abertas há mais de LONGA_H horas com gravidade alta: ver e decidir;
 - etapas em quarentena (incidente repetido isolou a etapa): o incidente a tratar;
+- pasta de extratos inexistente ou vazia há giros (`ingestao`): soltar o extrato e o pedido fecha sozinho;
 - lançamentos de finanças esperando revisão: o comando `ok`;
 - avisos ainda não lidos (merge, saúde, orçamento, controle): marcar como visto.
 """
@@ -74,6 +75,9 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
     for r in store.q("SELECT chave, titulo, gravidade, sugestao, primeira_em FROM vigia WHERE status='aberta' AND gravidade>=0.7 AND primeira_em<=? ORDER BY gravidade DESC",
                      (agora - LONGA_H * 3600,)):
         out.append(_item("trava", f"Trava há {int((agora - r['primeira_em']) / 3600)} h: {r['titulo']}", r["sugestao"] or "", r["primeira_em"], [], 1, ref=r["chave"], link="/loop"))
+    if store.one("SELECT 1 FROM sqlite_master WHERE name='pedidos_ingestao'"):
+        for r in store.q("SELECT id, causa, mensagem, aberto_em FROM pedidos_ingestao WHERE fechado_em IS NULL ORDER BY id"):
+            out.append(_item("extratos", "Finanças sem lançamentos: falta o extrato na pasta", r["mensagem"], r["aberto_em"], [], 1, ref=r["causa"], link="/"))
     if store.one("SELECT 1 FROM sqlite_master WHERE name='ledger'"):
         for r in store.q("SELECT id, description, amount_cents, category, created_at FROM ledger WHERE status='open' AND auto_accepted=0 ORDER BY id DESC LIMIT 8"):
             out.append(_item("revisao", f"Lançamento #{r['id']}: {r['description']} → {r['category']}?", f"R$ {r['amount_cents'] / 100:.2f}. Confirme ou corrija na missão Finanças.",
