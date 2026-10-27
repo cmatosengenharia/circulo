@@ -18,7 +18,7 @@ from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
 from . import caixa, cao_de_guarda
-from .llm import build_llm
+from .disjuntor import protegida
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from . import guardrails
@@ -92,7 +92,7 @@ class Circle:
         now = now or (lambda: datetime.now(TZ))
         budget = Budget(store, lambda: com_tokens_dia(policies.get()), now)
         dl = DecisionLayer(store, policies.get, budget, jev=jev if jev is not None else build_jev(),
-                           llm=llm if llm is not None else build_llm())
+                           llm=protegida(store, llm))
         if jev is None and not os.environ.get("JEV_MODEL") and store.get("jev_modelo") and getattr(dl.jev, "source", "") == "jev":
             dl.jev.model = store.get("jev_modelo")    # doc da TypeSafe: versão fixa para os limiares calibrados não derivarem (pin automático)
         dl.metricas = self.metricas
