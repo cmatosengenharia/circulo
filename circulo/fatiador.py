@@ -15,6 +15,10 @@ funções/testes vira um sub-item por módulo, por regra, sem a LLM (o sub-item 
 limites são um palpite inicial: a estimativa de cada fatia fica guardada e `medicoes` a compara com os tokens reais,
 para recalibrar. O teto de tokens segue como rede de segurança: a fatia que ainda é cortada (ADaPT: dividir quando a
 execução falha) é redividida sozinha pelo Planejador, uma vez, e as outras fatias seguem.
+
+Passos (lição #59): a pré-divisão também acontece quando a fração prevista do limite de passos do agente
+(`developer.estimar_passos`) passa do limiar calibrado; e a tarefa cuja execução parou no máximo de passos volta
+para cá como corte, em vez de ser repetida inteira.
 """
 from __future__ import annotations
 
@@ -66,9 +70,9 @@ def grande_demais(est: dict) -> bool:
     return len(est["modulos"]) > LIMITE_MODULOS or len(est["simbolos"]) > LIMITE_SIMBOLOS
 
 
-def _fatias(item: dict, est: dict) -> list[tuple[dict, dict]]:
+def _fatias(item: dict, est: dict, passos_demais: bool = False) -> list[tuple[dict, dict]]:
     """Um sub-item por módulo citado, com o seu trecho e o seu teste; [] = pequeno ou um módulo só."""
-    if not grande_demais(est) or len(est["modulos"]) < 2:
+    if not (grande_demais(est) or passos_demais) or len(est["modulos"]) < 2:
         return []
     out = []
     for mod in est["modulos"]:
@@ -112,7 +116,11 @@ def motivo_de_dividir(s, item_id: int) -> str:
               "ORDER BY id DESC LIMIT 1", (*CORTES, sujeito(item_id)))
     if r:
         return r["motivo"] or "corte pedido pelo Developer"
-    return f"falhou {LIMITE}x nos testes locais" if falhas(s, item_id) >= LIMITE else ""
+    if falhas(s, item_id) >= LIMITE:
+        return f"falhou {LIMITE}x nos testes locais"
+    from .developer import ultima_parou_no_maximo
+    t = s.one("SELECT titulo FROM roadmap WHERE id=?", (item_id,))
+    return "parou no máximo de passos do agente" if t and ultima_parou_no_maximo(s, t["titulo"]) else ""
 
 
 def sub_ativo(s) -> dict | None:
@@ -177,11 +185,16 @@ def proximo(ctx, dev, planejador) -> int | None:
                       "o item ficou desativado para você decidir.", "saude")
         return None
     if item["origem"] in PRE_ORIGENS:
+        from .developer import LIMITE_PASSOS, estimar_passos, limiar_calibrado, registrar_passos
         est = estimar_tamanho(item["titulo"], item["detalhe"])
-        fatias = _fatias(item, est)
+        limite = getattr(getattr(dev, "agent", None), "max_turns", LIMITE_PASSOS)
+        fracao = estimar_passos(est["modulos"], est["simbolos"], limite)
+        registrar_passos(s, item["titulo"], fracao, limite)
+        fatias = _fatias(item, est, passos_demais=fracao > limiar_calibrado(s))
         if fatias:
             ids = _dividir(ctx, item, [p for p, _ in fatias], f"cita {len(est['modulos'])} módulos e "
-                           f"{len(est['simbolos'])} símbolos (~{est['linhas']} linhas): um sub-item por módulo, sem a LLM")
+                           f"{len(est['simbolos'])} símbolos (~{est['linhas']} linhas, {fracao:.0%} do limite de "
+                           f"{limite} passos): um sub-item por módulo, sem a LLM")
             s.set(ESTIMATIVAS, {**(s.get(ESTIMATIVAS) or {}), **{str(i): e for i, (_, e) in zip(ids, fatias, strict=True)}})
             return ids[0]
     return item["id"]
