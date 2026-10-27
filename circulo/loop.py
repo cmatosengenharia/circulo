@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, ingestao, intencoes, jobs, jtbd, parada, revisor, telemetria
+from . import finance, ingestao, intencoes, jobs, jtbd, parada, revisao_uso, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
@@ -282,6 +282,7 @@ class Circle:
                 r.errors.append(f"corpo:{exc!r}")
         self._record(r)
         telemetria.registrar_ciclo(s, self.data_dir, r.run_id, r.tick, r.inicio, erros=r.errors)
+        seguro(revisao_uso.abrir_pedidos_revisao_uso, s.db)   # entrega de produto 7+ dias sem uso: 1 pedido por PR
         try:
             from . import observabilidade, rastro
             observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
