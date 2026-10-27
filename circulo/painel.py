@@ -27,6 +27,7 @@ from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
+from .uso_entregas import listar_sem_uso
 
 HOST = "127.0.0.1"
 
@@ -278,6 +279,7 @@ def saude(conn) -> dict:
            "componentes_24h": falhas_por_componente(conn.execute(
                "SELECT ponto, created_at FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
                (agora - 2 * 86400,)), agora),
+           "entregas_sem_uso": listar_sem_uso(conn, agora),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -322,6 +324,10 @@ def pagina_saude(h: dict) -> bytes:
                    '(24 h)</span><ol>' + "".join(
                        f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> {delta(c["n"], c["anterior"])} vs 24 h antes</li>'
                        for c in h["componentes_24h"]) + "</ol></section>")
+    sem_uso = ('<section class="card falhas" aria-label="Entregas sem uso após 7 dias"><span>Entregas sem uso após 7 dias'
+               f'</span><b>{len(h["entregas_sem_uso"])}</b><ol>' + "".join(
+                   f'<li>PR #{e["number"]} <small>esperava {escape(e["evento_esperado"])}</small></li>'
+                   for e in h["entregas_sem_uso"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -332,7 +338,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{componentes}{falhas}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{falhas}{sem_uso}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()

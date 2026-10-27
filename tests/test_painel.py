@@ -375,3 +375,27 @@ def test_falhas_agrupadas_por_causa_normalizada_com_fracao_e_dominante_no_topo(t
     assert card.index("Dominante: <strong>painel:sse_timeout</strong> ×3 (75% de 4)") < card.index("<ol>")
     vazia = Store(tmp_path / "v.db").db
     assert saude(vazia)["falhas_dominante"] is None and "Dominante" not in pagina_saude(saude(vazia)).decode()
+
+
+def test_painel_lista_entregas_sem_uso_apos_7_dias(tmp_path):
+    """Pergunta #338: o painel lê entrega_uso_esperado e lista cada entrega mergeada há 7+ dias sem evento de uso
+    depois do merge; a usada e a de menos de 7 dias ficam de fora, e a contagem aparece no card."""
+    import time
+
+    from circulo.painel import pagina_saude, saude
+    from circulo.state import Store
+    from circulo.uso_entregas import registrar_esperado
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    registrar_esperado(st.db, 11, "comando:circulo_assunto", t - 8 * 86400)
+    registrar_esperado(st.db, 12, "tela:painel_saude", t - 9 * 86400)
+    registrar_esperado(st.db, 13, "endpoint:api_uso", t - 2 * 86400)
+    st.x("INSERT INTO events(kind,payload,created_at) VALUES('comando:circulo_assunto','{}',?)", (t - 86400,))
+    h = saude(st.db)
+    assert [e["number"] for e in h["entregas_sem_uso"]] == [12]
+    pagina = pagina_saude(h).decode()
+    card = pagina[pagina.index('aria-label="Entregas sem uso após 7 dias"'):]
+    assert "<b>1</b>" in card[:card.index("</section>")] and "PR #12" in card and "tela:painel_saude" in card
+    assert "PR #11" not in pagina and "PR #13" not in pagina
+    vazia = saude(Store(tmp_path / "v.db").db)
+    assert vazia["entregas_sem_uso"] == [] and "<b>0</b>" in pagina_saude(vazia).decode()
