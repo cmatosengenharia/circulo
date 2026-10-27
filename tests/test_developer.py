@@ -1,10 +1,15 @@
 """Lição #26: o reparo rodava o pytest num id inventado ('ERROR: file or directory not found'). O id é conferido por
 `ast` antes (arquivo, classes, função, sem o sufixo `[...]`), e a recusa devolve os `test_*` reais do arquivo."""
+import json
 import time
 from pathlib import Path
 
-from circulo.developer import alvo_pytest_existe, listar_testes
+from circulo import fatiador
+from circulo.developer import alvo_pytest_existe, estimar_passos, limiar_calibrado, limiar_de_passos, listar_testes
 from circulo.neuronios import ABRIR_PR, avaliar_aprendidos, criar_portao
+
+from test_fatiador import preparar, subs
+from test_self_dev import repo  # noqa: F401 — fixture do repositório
 
 RAIZ = Path(__file__).resolve().parent.parent
 REAL = "test_200_decisoes_do_worth_spending_saem_da_duvida_concordando_com_a_regra"
@@ -82,3 +87,47 @@ def test_licao_26_reparo_recusa_alvo_inexistente_sem_rodar_o_pytest(circle, tmp_
     assert r.ok and "alvo_inexistente" in r.motivo and "não existe mais" in r.motivo
     assert "test_solto" in r.motivo and "TestFora::test_metodo" in r.motivo
     assert s.one("SELECT status FROM licoes WHERE id=?", (lid,))["status"] == "obsoleta"
+
+
+MAX_TURNS = json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 41,
+                        "terminal_reason": "max_turns"})
+
+
+def test_licao_59_estimar_passos_com_entradas_conhecidas():
+    """lição #59: o Developer parava no máximo de passos (38 em 709). A fração prevista sai por regra, antes de rodar."""
+    assert estimar_passos([], [], 40) == 0.2                                         # ler, testar, lint, commit
+    assert estimar_passos(["circulo/a.py", "circulo/b.py"], ["f", "g", "h", "i", "j"], 40) == 0.875
+    assert estimar_passos(["circulo/a.py"], ["f"], 80) == 17 / 80
+    assert limiar_de_passos([]) == limiar_de_passos([0.3, 0.4]) == 0.8                # poucas amostras: o palpite inicial
+    assert limiar_de_passos([0.9, 0.5, 0.7, 1.0, 0.6]) == 0.5                         # p20 das que estouraram
+
+
+def test_licao_59_risco_de_passos_acima_do_limiar_vai_ao_fatiador_antes(circle, repo):  # noqa: F811
+    """lição #59: 2 módulos e 5 funções não passam dos limites do fatiador, mas preveem 87,5% dos passos: divide."""
+    item, dev, agent, llm = preparar(circle, repo)
+    circle.store.x("UPDATE roadmap SET detalhe=? WHERE id=?", (
+        "Em circulo/alfa.py mudar contar() e somar() e medir(); em circulo/beta.py mudar ler() e gravar()", item))
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    partes = subs(circle, item)
+    assert len(partes) == 2 and alvo == partes[0]["id"] and llm.prompts == []
+    assert (circle.store.get("developer_passos") or {})["Item grande demais"]["fracao"] == 0.875
+
+
+def test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador(circle, repo):  # noqa: F811
+    """lição #59, reserva: a tarefa que parou no máximo de passos não volta inteira; o fatiador a divide."""
+    item, dev, agent, llm = preparar(circle, repo)
+    circle.licoes.verificar("developer:agente", False, sujeito="Item grande demais", motivo=MAX_TURNS, licao=False)
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    a, b = subs(circle, item)
+    assert alvo == a["id"] and len(llm.prompts) == 1 and "máximo de passos" in llm.prompts[0]
+    assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "dividido"
+
+
+def test_licao_59_limiar_recalibrado_pelas_tarefas_que_estouraram(circle):
+    s = circle.store
+    assert limiar_calibrado(s) == 0.8
+    s.set("developer_passos", {f"t{i}": {"fracao": f, "limite": 40} for i, f in enumerate([0.9, 0.5, 0.7, 1.0, 0.6, 0.2])})
+    for i in range(5):
+        circle.licoes.verificar("developer:agente", False, sujeito=f"t{i}", motivo=MAX_TURNS, licao=False)
+    circle.licoes.verificar("developer:agente", False, sujeito="t5", motivo="AssertionError", licao=False)   # outra causa
+    assert limiar_calibrado(s) == 0.5
