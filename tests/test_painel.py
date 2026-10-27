@@ -420,3 +420,28 @@ def test_chamar_endpoint_do_painel_grava_uso_e_a_entrega_sai_de_sem_uso(circle, 
     assert [e["number"] for e in saude(st.db)["entregas_sem_uso"]] == [23]
     usos = [n for (n,) in st.db.execute("SELECT nome FROM entrega_uso ORDER BY nome")]
     assert usos == ["endpoint:/api/norte", "tela:/painel"]          # só o que alguma entrega espera é gravado
+
+
+def test_painel_expoe_entregas_sem_uso_7d_com_toda_entrega_madura_classificada(tmp_path):
+    """Pergunta #364: saude() expõe entregas_sem_uso_7d; cada entrega mergeada há 7+ dias cai em 'com uso' ou
+    'sem uso' (0 sem classificação), a de menos de 7 dias fica de fora, e o cálculo cabe na meta de frescor (3000 ms)."""
+    import time
+
+    from circulo.painel import pagina_saude, saude
+    from circulo.state import Store
+    from circulo.uso_entregas import registrar_esperado
+    st = Store(tmp_path / "s.db")
+    t = time.time()
+    registrar_esperado(st.db, 31, "comando:circulo_assunto", t - 8 * 86400)
+    registrar_esperado(st.db, 32, "tela:painel_saude", t - 9 * 86400)
+    registrar_esperado(st.db, 33, "endpoint:api_uso", t - 2 * 86400)
+    st.x("INSERT INTO events(kind,payload,created_at) VALUES('comando:circulo_assunto','{}',?)", (t - 86400,))
+    r = saude(st.db)["entregas_sem_uso_7d"]
+    assert r["com_uso"] == [31] and r["sem_uso"] == [32] and r["maduras"] == 2
+    assert "Com uso: <b>1</b> de 2" in pagina_saude(saude(st.db)).decode()
+    for pr in range(1000, 3000):
+        registrar_esperado(st.db, pr, f"tela:x{pr % 50}", t - 10 * 86400)
+    inicio = time.perf_counter()
+    r = saude(st.db)["entregas_sem_uso_7d"]
+    assert (time.perf_counter() - inicio) * 1000 < 3000
+    assert sorted(r["com_uso"] + r["sem_uso"]) == [31, 32, *range(1000, 3000)]    # 0 maduras sem classificação
