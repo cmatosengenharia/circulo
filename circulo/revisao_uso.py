@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS revisao_uso (
   status TEXT NOT NULL DEFAULT 'aberto' CHECK (status IN ('aberto', 'fechado')),
   destino TEXT CHECK (destino IN ('usar', 'ajustar', 'remover')),
   aberto_em REAL NOT NULL,
-  fechado_em REAL
+  fechado_em REAL,
+  item_id INTEGER
 )
 """
 DIVERGENCIA = """
@@ -30,11 +31,54 @@ CREATE TABLE IF NOT EXISTS revisao_uso_divergencia (
 """
 
 
+def _esquema(conn: sqlite3.Connection) -> None:
+    conn.execute(ESQUEMA)
+    if "item_id" not in {r[1] for r in conn.execute("PRAGMA table_info(revisao_uso)")}:
+        conn.execute("ALTER TABLE revisao_uso ADD COLUMN item_id INTEGER")
+
+
+def titulo(pr: int, evento: str) -> str:
+    return f"Revisar a entrega #{pr} sem uso após 7 dias: divulgar ou remover (evento esperado: {evento})"
+
+
+def cobrar_no_roteiro(store, pergunta_id: int, agora: float | None = None) -> list[int]:
+    """Cada pedido aberto ainda sem item vira um item de revisão no roteiro, preso à pergunta do PM (lição #15). O
+    `item_id` gravado no pedido é a marca de já cobrada: a chave é o PR (não o evento esperado), então o item resolvido
+    não volta e duas entregas com o mesmo evento têm um item cada. O pedido é reservado (item_id=0) antes de gravar o
+    item, para que duas execuções em paralelo não cobrem o mesmo PR duas vezes. Devolve os itens criados."""
+    from .planejador import exigir_pergunta, gravar_item
+    pid = exigir_pergunta(store, pergunta_id)
+    abrir_pedidos_revisao_uso(store.db, agora)
+    novos = []
+    for pr, evento in store.db.execute("SELECT pr_numero, evento FROM revisao_uso WHERE status='aberto' "
+                                       "AND item_id IS NULL ORDER BY pr_numero").fetchall():
+        if not store.db.execute("UPDATE revisao_uso SET item_id=0 WHERE pr_numero=? AND item_id IS NULL",
+                                (pr,)).rowcount:
+            continue
+        try:
+            rid = gravar_item(store, pid, titulo(pr, evento),
+                              f"O PR #{pr} foi mergeado há 7+ dias e nenhum evento '{evento}' foi registrado depois: "
+                              "divulgar a entrega ou removê-la.", f"entrega sem uso: PR #{pr}, evento esperado {evento}")
+        except Exception:
+            store.db.execute("UPDATE revisao_uso SET item_id=NULL WHERE pr_numero=?", (pr,))
+            raise
+        store.db.execute("UPDATE revisao_uso SET item_id=? WHERE pr_numero=?", (rid, pr))
+        novos.append(rid)
+    return novos
+
+
+def cobrar_no_giro(store, agora: float | None = None) -> list[int]:
+    """O giro abre os pedidos e, se o conselho já tem pergunta do PM, cobra cada um no roteiro (uma vez por PR)."""
+    abrir_pedidos_revisao_uso(store.db, agora)
+    r = store.one("SELECT id FROM perguntas WHERE persona='pm' ORDER BY id DESC LIMIT 1")
+    return cobrar_no_roteiro(store, r["id"], agora) if r else []
+
+
 def abrir_pedidos_revisao_uso(conn: sqlite3.Connection, agora: float | None = None) -> list[int]:
     """Abre um pedido para cada entrega de produto com 7+ dias e sem evento de uso que ainda não tem pedido (aberto ou
     fechado). Devolve os PRs abertos por esta chamada."""
     agora = time.time() if agora is None else agora
-    conn.execute(ESQUEMA)
+    _esquema(conn)
     abertos = []
     for e in listar_sem_uso(conn, agora):
         cur = conn.execute("INSERT INTO revisao_uso(pr_numero, evento, aberto_em) VALUES(?,?,?) "
