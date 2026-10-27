@@ -19,15 +19,23 @@ CREATE TABLE IF NOT EXISTS entrega_uso_esperado (
 USO = "CREATE TABLE IF NOT EXISTS entrega_uso (nome TEXT PRIMARY KEY, em REAL NOT NULL)"
 
 
-def entregas_sem_uso(prs: list[dict], eventos: list[dict], agora: float) -> list[dict]:
-    """Os PRs de produto (produto, evento_esperado, merged_at) com 7+ dias de merge e nenhum evento (nome, created_at)
-    de mesmo nome estritamente depois do merge, na ordem recebida. Pura."""
+def classificar_entregas(prs: list[dict], eventos: list[dict], agora: float) -> dict[str, list[dict]]:
+    """Separa os PRs de produto (produto, evento_esperado, merged_at) com 7+ dias de merge em 'com_uso' (algum evento
+    (nome, created_at) de mesmo nome estritamente depois do merge) e 'sem_uso', na ordem recebida. Pura."""
     usos: dict[str, list[float]] = {}
     for ev in eventos:
         usos.setdefault(ev["nome"], []).append(ev["created_at"])
-    return [pr for pr in prs
-            if pr["produto"] and agora - pr["merged_at"] >= SEMANA
-            and not any(t > pr["merged_at"] for t in usos.get(pr["evento_esperado"], ()))]
+    out: dict[str, list[dict]] = {"com_uso": [], "sem_uso": []}
+    for pr in prs:
+        if pr["produto"] and agora - pr["merged_at"] >= SEMANA:
+            usada = any(t > pr["merged_at"] for t in usos.get(pr["evento_esperado"], ()))
+            out["com_uso" if usada else "sem_uso"].append(pr)
+    return out
+
+
+def entregas_sem_uso(prs: list[dict], eventos: list[dict], agora: float) -> list[dict]:
+    """Os PRs de produto com 7+ dias de merge e nenhum evento de mesmo nome depois do merge. Pura."""
+    return classificar_entregas(prs, eventos, agora)["sem_uso"]
 
 
 def registrar_esperado(conn: sqlite3.Connection, pr: int, evento: str, agora: float | None = None) -> None:
@@ -52,8 +60,8 @@ def registrar_uso(conn: sqlite3.Connection, nome: str, agora: float | None = Non
                  (nome, time.time() if agora is None else agora, nome))
 
 
-def listar_sem_uso(conn: sqlite3.Connection, agora: float) -> list[dict]:
-    """As entregas gravadas há 7+ dias sem evento de uso depois do merge, por número de PR."""
+def classificar(conn: sqlite3.Connection, agora: float) -> dict[str, list[dict]]:
+    """As entregas gravadas há 7+ dias, por número de PR, separadas em 'com_uso' e 'sem_uso' (uso depois do merge)."""
     conn.execute(ESQUEMA)
     conn.execute(USO)
     prs = [{"number": pr, "produto": True, "evento_esperado": evento, "merged_at": em} for pr, evento, em in
@@ -61,4 +69,15 @@ def listar_sem_uso(conn: sqlite3.Connection, agora: float) -> list[dict]:
     eventos = [{"nome": kind, "created_at": em} for kind, em in conn.execute(
         "SELECT kind, created_at FROM events WHERE kind IN (SELECT evento FROM entrega_uso_esperado) "
         "UNION ALL SELECT nome, em FROM entrega_uso")]
-    return entregas_sem_uso(prs, eventos, agora)
+    return classificar_entregas(prs, eventos, agora)
+
+
+def listar_sem_uso(conn: sqlite3.Connection, agora: float) -> list[dict]:
+    """As entregas gravadas há 7+ dias sem evento de uso depois do merge, por número de PR."""
+    return classificar(conn, agora)["sem_uso"]
+
+
+def resumo_7d(classes: dict[str, list[dict]]) -> dict:
+    """Os números de PR com e sem uso e o total de entregas maduras; toda madura cai em uma das duas listas."""
+    com, sem = ([e["number"] for e in classes[k]] for k in ("com_uso", "sem_uso"))
+    return {"com_uso": com, "sem_uso": sem, "maduras": len(com) + len(sem)}

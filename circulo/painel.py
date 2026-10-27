@@ -27,7 +27,7 @@ from .orcamento_dia import limite_hoje, tokens_dia
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
-from .uso_entregas import listar_sem_uso, nome_uso, registrar_uso
+from .uso_entregas import classificar, nome_uso, registrar_uso, resumo_7d
 
 HOST = "127.0.0.1"
 
@@ -279,7 +279,7 @@ def saude(conn) -> dict:
            "componentes_24h": falhas_por_componente(conn.execute(
                "SELECT ponto, created_at FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
                (agora - 2 * 86400,)), agora),
-           "entregas_sem_uso": listar_sem_uso(conn, agora),
+           "entregas_sem_uso": (uso := classificar(conn, agora))["sem_uso"], "entregas_sem_uso_7d": resumo_7d(uso),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -325,7 +325,8 @@ def pagina_saude(h: dict) -> bytes:
                        f'<li>{escape(c["componente"])} <b>×{c["n"]}</b> {delta(c["n"], c["anterior"])} vs 24 h antes</li>'
                        for c in h["componentes_24h"]) + "</ol></section>")
     sem_uso = ('<section class="card falhas" aria-label="Entregas sem uso após 7 dias"><span>Entregas sem uso após 7 dias'
-               f'</span><b>{len(h["entregas_sem_uso"])}</b><ol>' + "".join(
+               f'</span><b>{len(h["entregas_sem_uso"])}</b><small>Com uso: <b>{len(h["entregas_sem_uso_7d"]["com_uso"])}</b> de '
+               f'{h["entregas_sem_uso_7d"]["maduras"]}</small><ol>' + "".join(
                    f'<li>PR #{e["number"]} <small>esperava {escape(e["evento_esperado"])}</small></li>'
                    for e in h["entregas_sem_uso"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
