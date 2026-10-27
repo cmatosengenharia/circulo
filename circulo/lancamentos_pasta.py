@@ -20,6 +20,13 @@ FORMATOS = {".ofx": "ofx", ".csv": "csv", ".eml": "eml"}
 LISTA = 8              # arquivos por lista no evento: as entradas da trilha cabem em 2000 caracteres e seguem JSON válido
 
 
+def contadores() -> dict[str, dict]:
+    """Arquivos da passada por fonte: vistos = rejeitados_por_parser + duplicados_por_hash + novos (o arquivo que deu
+    ao menos 1 lançamento novo), e o último descarte da fonte com o motivo."""
+    return {fonte: {"vistos": 0, "rejeitados_por_parser": 0, "duplicados_por_hash": 0, "novos": 0,
+                    "ultimo_descarte": None} for fonte in ("pasta", "email")}
+
+
 def _texto(arquivo: Path) -> str:
     bruto = arquivo.read_bytes()
     try:
@@ -94,20 +101,31 @@ def _ingerir(pasta: Path, store: Store) -> int:
     seq = intencoes.registrar(store, "lancamentos:varredura", "extrato na pasta monitorada",
                               {"pasta": str(pasta), "arquivos": [a.name for a in extratos]})
     emails = _emails([a for a in extratos if FORMATOS[a.suffix.lower()] == "eml"])
-    n, importados = 0, []
+    n, importados, fontes = 0, [], contadores()
     ignorados = [{"arquivo": a.name, "motivo": "formato não é .ofx/.csv/.eml"} for a in arquivos if a not in extratos]
     for arquivo in extratos:
+        fonte = fontes["email" if FORMATOS[arquivo.suffix.lower()] == "eml" else "pasta"]
+        fonte["vistos"] += 1
         try:
             novos = _importar(store, arquivo, emails)
         except (ValueError, KeyError, IndexError) as exc:     # extrato ilegível; UnicodeDecodeError é ValueError
             _mover(arquivo, "rejeitados")
-            ignorados.append({"arquivo": arquivo.name, "motivo": f"rejeitado: {type(exc).__name__}: {exc}"[:200]})
+            motivo = f"rejeitado: {type(exc).__name__}: {exc}"[:200]
+            ignorados.append({"arquivo": arquivo.name, "motivo": motivo})
+            fonte["rejeitados_por_parser"] += 1
+            fonte["ultimo_descarte"] = f"{arquivo.name}: {motivo}"
             continue
         _mover(arquivo, "processados")
         importados.append({"arquivo": arquivo.name, "novos": novos})
         n += novos
+        if novos:
+            fonte["novos"] += 1
+        else:
+            fonte["duplicados_por_hash"] += 1
+            fonte["ultimo_descarte"] = f"{arquivo.name}: duplicado por hash"
     total = store.one("SELECT COUNT(*) AS n FROM ledger")["n"]
-    resumo = {"novos": n, "total": total, "importados": importados[:LISTA], "ignorados": ignorados[:LISTA]}
+    resumo = {"novos": n, "total": total, "importados": importados[:LISTA], "ignorados": ignorados[:LISTA],
+              "fontes": fontes}
     store.set("lancamentos_pasta", resumo)
     intencoes.concluir(store, seq, True, f"{n} novos, {total} no ledger", **resumo)
     return n

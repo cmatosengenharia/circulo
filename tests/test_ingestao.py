@@ -5,6 +5,7 @@ from pathlib import Path
 
 from circulo.aprovacoes import pendentes
 from circulo.ingestao import GIROS, RODADAS, abertos, girar
+from circulo.lancamentos_pasta import contadores
 from circulo.perguntas import _m_lancamentos
 
 FIX = Path(__file__).parent / "fixtures"
@@ -111,7 +112,7 @@ def test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_r
 
     girar(pasta, s, agora=1000.0)
     assert ultima() == {"timestamp": 1000.0, "causa": "vazia", "arquivos_vistos": 0, "arquivos_rejeitados": [],
-                        "lancamentos_novos": 0}                 # rodada com zeros também grava
+                        "lancamentos_novos": 0, "fontes": contadores()}   # rodada com zeros também grava
     assert estado(s, agora=1000.0) == "vazia"
     assert estado(s, agora=1000.0 + RECENTE + 1) == "nunca_rodou"   # sem sinal recente não é "vazia"
 
@@ -126,11 +127,44 @@ def test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_r
     shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")
     novos = girar(pasta, s, agora=3000.0)
     assert novos > 0 and lancamentos(s) == novos
+    fontes = contadores()
+    fontes["pasta"].update(vistos=1, novos=1)
     assert ultima() == {"timestamp": 3000.0, "causa": "importados", "arquivos_vistos": 1, "arquivos_rejeitados": [],
-                        "lancamentos_novos": novos}
+                        "lancamentos_novos": novos, "fontes": fontes}
     assert estado(s, agora=3000.0) == "importados"
 
     shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")   # reexecução com o mesmo extrato
     assert girar(pasta, s, agora=4000.0) == 0
     assert lancamentos(s) == novos and ultima()["lancamentos_novos"] == 0
     assert ultima()["arquivos_rejeitados"] == []              # a rodada anterior com rejeitado não vaza para esta
+
+
+def test_contadores_por_fonte_fecham_vistos_igual_rejeitados_mais_duplicados_mais_novos(circle, tmp_path):
+    s = circle.store
+    pasta = tmp_path / "extratos"
+    pasta.mkdir()
+    email = (FIX / "email_notificacao_anonimo.txt").read_text(encoding="utf-8")
+
+    def fonte(nome: str) -> tuple:
+        f = s.get("ingestao_causas")["ultima"]["fontes"][nome]
+        assert f["vistos"] == f["rejeitados_por_parser"] + f["duplicados_por_hash"] + f["novos"]   # fecha sempre
+        return f["vistos"], f["rejeitados_por_parser"], f["duplicados_por_hash"], f["novos"], f["ultimo_descarte"]
+
+    girar(pasta, s)
+    assert fonte("pasta") == fonte("email") == (0, 0, 0, 0, None)            # rodada com zeros também grava
+
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "a_valido.ofx")
+    (pasta / "b_corrompido.ofx").write_text("<OFX><BANKTRANLIST><STMTTRN><DTPOSTED>2026", encoding="utf-8")
+    (pasta / "c_corrompido.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    (pasta / "d_aviso.eml").write_text(email, encoding="utf-8")
+    novos = girar(pasta, s)
+    *contas, descarte = fonte("pasta")
+    assert contas == [3, 2, 0, 1]                                            # o OFX truncado não conta como duplicado
+    assert descarte.startswith("c_corrompido.csv: rejeitado")
+    assert fonte("email") == (1, 0, 0, 1, None) and lancamentos(s) == novos > 1
+
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "reenvio.ofx")          # o mesmo extrato de novo
+    (pasta / "reenvio.eml").write_text(email, encoding="utf-8")
+    assert girar(pasta, s) == 0 and lancamentos(s) == novos
+    assert fonte("pasta") == (1, 0, 1, 0, "reenvio.ofx: duplicado por hash")
+    assert fonte("email") == (1, 0, 1, 0, "reenvio.eml: duplicado por hash")

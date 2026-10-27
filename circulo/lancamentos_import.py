@@ -98,8 +98,12 @@ def linhas(brutas: list[tuple[str, int, str, str | None]]) -> list[Linha]:
 
 
 def parse_extrato(texto: str, formato: str) -> list[Linha]:
-    """Linhas do extrato na ordem do arquivo. `formato` é 'ofx' ou 'csv'."""
-    return linhas({"ofx": _ofx, "csv": _csv}[formato.lower()](texto))
+    """Linhas do extrato na ordem do arquivo. `formato` é 'ofx' ou 'csv'. Sem nenhuma transação (OFX truncado, CSV só
+    com cabeçalho) é ValueError: 0 linhas não se distingue de reenvio só com duplicatas."""
+    out = linhas({"ofx": _ofx, "csv": _csv}[formato.lower()](texto))
+    if not out:
+        raise ValueError(f"extrato {formato} sem nenhuma transação")
+    return out
 
 
 def importar(store: Store, texto: str, formato: str) -> int:
