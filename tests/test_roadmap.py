@@ -176,3 +176,26 @@ def test_entrega_sem_uso_apos_7_dias_vira_um_item_de_decisao_por_evento_esperado
     assert itens[0]["status"] == "pendente" and itens[0]["origem_status"] == "ok"
     s.x("UPDATE roadmap SET status='feito' WHERE id=?", (novos[0],))
     assert roadmap.decidir_sem_uso(s, pm, agora) == []                      # resolvido também não duplica
+
+
+def test_cobertura_conta_cada_entrega_sem_uso_com_exatamente_um_item_e_aponta_a_duplicata(circle):
+    """Pergunta do conselho #370 (pm): a medida do sucesso sai do DB do loop: 100% das entregas sem uso 7+ dias com
+    exatamente 1 item de revisão; a entrega com uso fica fora e um item repetido conta como duplicata."""
+    from circulo.planejador import gravar_item
+    from circulo.revisao_uso import titulo
+    from circulo.uso_entregas import registrar_esperado
+    s, agora = circle.store, time.time()
+    pm = s.x("INSERT INTO perguntas(chave,persona,texto,status,created_at,updated_at) "
+             "VALUES('uso','pm','Quantas entregas têm uso depois do merge?','feita',0,0)")
+    registrar_esperado(s.db, 40, "changelog_aberto", agora=agora - 8 * 86400)
+    registrar_esperado(s.db, 41, "changelog_aberto", agora=agora - 9 * 86400)
+    registrar_esperado(s.db, 42, "assunto_executado", agora=agora - 8 * 86400)
+    s.x("INSERT INTO events(kind,payload,created_at) VALUES('assunto_executado','{}',?)", (agora - 86400,))
+    assert roadmap.cobertura_sem_uso(s, agora) == {"sem_uso": 2, "com_1_item": 0, "duplicadas": 0, "cobertura": 0.0}
+
+    roadmap.decidir_sem_uso(s, pm, agora)
+    roadmap.decidir_sem_uso(s, pm, agora)
+    assert roadmap.cobertura_sem_uso(s, agora) == {"sem_uso": 2, "com_1_item": 2, "duplicadas": 0, "cobertura": 1.0}
+
+    gravar_item(s, pm, titulo(41, "changelog_aberto"), "repetido", "repetido")
+    assert roadmap.cobertura_sem_uso(s, agora) == {"sem_uso": 2, "com_1_item": 1, "duplicadas": 1, "cobertura": 0.5}
