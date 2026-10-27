@@ -20,6 +20,8 @@ from pathlib import Path
 from .agents import Ctx
 from .decision import Question, SN
 from .memory import Memory
+from .missao import PONTO as PONTO_SAIDA
+from .missao import causa_da_barra
 from .registro import marcar_resultado
 from .registro import registrar as registrar_llm
 
@@ -443,8 +445,9 @@ class Engine:
             text, _ = self._gen(role, prompts[i], res, p)
             content = _strip_fences(text)
             ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
-            monitorar(self.ctx, "missao:verificacao_saida", ok, sujeito=p.get("nome") or f"missão {p['id']}",
-                      motivo="" if ok else f"checagens reprovadas: {checks}", licao=False)
+            monitorar(self.ctx, PONTO_SAIDA, ok, sujeito=p.get("nome") or f"missão {p['id']}",
+                      motivo="" if ok else f"checagens reprovadas: {checks}",
+                      causa=None if ok else causa_da_barra(content, checks), licao=False)
             if not ok:
                 falhas = [k for k, v in checks.items() if v < 0.5]
                 text, _ = self._gen(role, prompts[i] + f"\n\nA versão anterior foi reprovada nas checagens: {', '.join(falhas)}. Corrija.", res, p)
