@@ -1,6 +1,10 @@
 """Portão de pedido (pergunta do conselho #323): antes da LLM, o pedido do Developer (título + detalhe do item) cita
 critério de aceite, arquivo alvo (.py) e resultado esperado? Se falta algum, sai UMA pergunta de esclarecimento, a do
-primeiro campo ausente. Por ora só mede: o veredito de cada item fica em `pedidos_claros`, sem bloquear o Developer."""
+primeiro campo ausente. O veredito de cada item fica em `pedidos_claros`.
+
+Item do loop (planejador/conselho) incompleto não chega à LLM do Developer (`esclarecer`): a pergunta volta ao gerador
+(o item volta ao Estudo, que o reescreve) e fica em `esclarecimentos`. No máximo 1 rodada: incompleto de novo, o item é
+descartado com motivo, sem ficar pendente. Erro, pedido humano e item sem a pergunta de origem seguem só medidos."""
 from __future__ import annotations
 
 import re
@@ -30,6 +34,17 @@ CREATE TABLE IF NOT EXISTS pedidos_claros (
   created_at REAL NOT NULL
 )
 """
+ESQUEMA_ESCLARECIMENTOS = """
+CREATE TABLE IF NOT EXISTS esclarecimentos (
+  item INTEGER PRIMARY KEY,
+  campo TEXT NOT NULL,
+  pergunta TEXT NOT NULL,
+  para TEXT,
+  created_at REAL NOT NULL
+)
+"""
+ESCLARECER, DESCARTADO = "esclarecer", "descartado"
+BLOQUEIA = ("loop",)        # só o item que o próprio loop gerou tem a quem devolver a pergunta sem esperar um humano
 
 
 @dataclass(frozen=True)
@@ -62,6 +77,32 @@ def registrar(store: Store, item: dict, agora: float | None = None) -> Veredito:
     return v
 
 
+def esclarecer(store: Store, item: dict, v: Veredito, agora: float | None = None) -> tuple[str, str] | None:
+    """None = o item segue para o Developer. Senão (ESCLARECER | DESCARTADO, texto), sem chamar a LLM: a 1ª vez a
+    pergunta do 1º campo faltante volta ao gerador (o item volta ao Estudo com ela no detalhe); a 2ª, descarta."""
+    if v.completo or item.get("origem") not in BLOQUEIA:
+        return None
+    origem = store.one("SELECT persona FROM perguntas WHERE id=?", (item.get("pergunta_id"),))
+    if not origem:                  # item legado, sem a pergunta que o gerou: não há a quem devolver, segue só medido
+        return None
+    agora = time.time() if agora is None else agora
+    store.x(ESQUEMA_ESCLARECIMENTOS)
+    feita = store.one("SELECT pergunta FROM esclarecimentos WHERE item=?", (item["id"],))
+    if feita:
+        texto = (f"descartado (pedido incompleto depois de 1 rodada de esclarecimento): ainda falta {', '.join(v.faltando)}; "
+                 f"a pergunta “{feita['pergunta']}” não foi respondida na reescrita")
+        store.x("UPDATE roadmap SET status=?, evidencia=?, updated_at=? WHERE id=?", (DESCARTADO, texto[:300], agora, item["id"]))
+        return DESCARTADO, texto
+    para = origem["persona"]
+    store.x("INSERT INTO esclarecimentos(item, campo, pergunta, para, created_at) VALUES(?,?,?,?,?)",
+            (item["id"], v.faltando[0], v.pergunta, para, agora))
+    texto = f"esclarecimento ao gerador ({para}): {v.pergunta}"
+    store.x("UPDATE roadmap SET detalhe=?, estudo=NULL, evidencia=?, updated_at=? WHERE id=?",
+            ((f"{item.get('detalhe') or ''}\n\nPortão de pedido, responda reescrevendo o item: {v.pergunta}")[:4000],
+             texto[:300], agora, item["id"]))
+    return ESCLARECER, texto
+
+
 def registrar_sem_veredito(store: Store) -> int:
     """Pergunta #331: avalia pelo texto o item com PR ainda sem veredito (aberto antes do portão, ou sem passar pelo
     pick), com a hora do próprio item, para a fração das 24 h não contar o passado como novo. O item sem PR recebe o
@@ -75,10 +116,13 @@ def registrar_sem_veredito(store: Store) -> int:
 
 
 def itens_com_veredito(store: Store) -> list[dict]:
-    """Itens do roadmap com o veredito do portão ('completo' | 'incompleto' | None se nunca avaliado)."""
+    """Itens do roadmap com o veredito do portão ('completo' | 'incompleto' | None se nunca avaliado); o completo que
+    passou pela rodada de esclarecimento é 'esclarecido' (o originalmente incompleto que chegou ao Developer)."""
     store.x(ESQUEMA)
-    return store.q("SELECT r.titulo, r.status, CASE p.completo WHEN 1 THEN 'completo' WHEN 0 THEN 'incompleto' END veredito "
-                   "FROM roadmap r LEFT JOIN pedidos_claros p ON p.item=r.id")
+    store.x(ESQUEMA_ESCLARECIMENTOS)
+    return store.q("SELECT r.titulo, r.status, CASE WHEN p.completo=1 AND e.item IS NOT NULL THEN 'esclarecido' "
+                   "WHEN p.completo=1 THEN 'completo' WHEN p.completo=0 THEN 'incompleto' END veredito "
+                   "FROM roadmap r LEFT JOIN pedidos_claros p ON p.item=r.id LEFT JOIN esclarecimentos e ON e.item=r.id")
 
 
 def fracao_incompletos(store: Store, agora: float | None = None) -> float | None:
