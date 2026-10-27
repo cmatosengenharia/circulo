@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from . import jobs, jtbd, pedido_claro
-from .custo import tokens_por_desfecho, tokens_por_veredito
+from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
 from .json_llm import objeto
 from .licoes import item_de
@@ -346,7 +346,9 @@ def _m_tokens_por_pr(s, agora):
     prs = _um(s, "SELECT COUNT(DISTINCT pr) FROM merges WHERE merged=1 AND created_at>=?", (agora - 86400,))
     v = tokens_por_veredito(s.q("SELECT entrada, tokens FROM llm_calls WHERE papel='developer' AND created_at>=?",
                                 (agora - 86400,)), pedido_claro.itens_com_veredito(s))
-    return (min(1.0, t / max(prs, 1) / 100_000), {"tokens_24h": t, "prs_24h": prs, **v})
+    p = tokens_com_e_sem_pr(s.q("SELECT papel, entrada, tokens, ok FROM llm_calls WHERE created_at>=?", (agora - 86400,)),
+                            pedido_claro.itens_com_veredito(s))
+    return (min(1.0, t / max(prs, 1) / 100_000), {"tokens_24h": t, "prs_24h": prs, **v, **p})
 
 
 def _m_regra_decide(s, agora):

@@ -5,6 +5,7 @@ Função pura sobre as linhas de llm_calls (papel='developer') e do roadmap; a c
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from .reparo import PREFIXO_TITULO
@@ -56,3 +57,28 @@ def tokens_por_veredito(chamadas, itens) -> dict:
     return {"por_veredito": por_veredito,
             "razao_incompleto_completo": round(tpp["incompleto"] / tpp["completo"], 2) if tpp["completo"] and tpp["incompleto"] else None,
             "prs_sem_veredito": len(prs.get("sem_veredito", ()))}
+
+
+PREFIXO_ESTUDO = re.compile(r"^\[[^\]]*\] ")
+DESFECHO_SEM_PR = {"descartado": "descartado", "contestado": "descartado", "dividido": "descartado",
+                   "bloqueado": "falha", "bloqueado_base": "falha", "escalada": "falha"}
+
+
+def tokens_com_e_sem_pr(chamadas, itens) -> dict:
+    """{com_pr_por_veredito, sem_pr}: partição de TODAS as chamadas (qualquer papel): a que se liga a item 'feito' vai
+    para o veredito do item; o resto vai para 'sem_pr' por papel e por desfecho (falha se a chamada ou o item falhou,
+    descartado, ou pendente: item aberto ou chamada sem item). As duas partes somam o total das chamadas."""
+    por_titulo = {it["titulo"]: it for it in itens}
+    com_pr: Counter = Counter()
+    por_papel: Counter = Counter()
+    por_desfecho: Counter = Counter()
+    for c in chamadas:
+        it = por_titulo.get(PREFIXO_ESTUDO.sub("", PREFIXO_TITULO.sub("", c["entrada"] or "")))
+        tokens = int(c["tokens"] or 0)
+        if it and it["status"] == "feito":
+            com_pr[it["veredito"] or "sem_veredito"] += tokens
+            continue
+        por_papel[c["papel"]] += tokens
+        por_desfecho["falha" if not c["ok"] else DESFECHO_SEM_PR.get(it["status"], "pendente") if it else "pendente"] += tokens
+    return {"com_pr_por_veredito": dict(com_pr),
+            "sem_pr": {"tokens": sum(por_papel.values()), "por_papel": dict(por_papel), "por_desfecho": dict(por_desfecho)}}
