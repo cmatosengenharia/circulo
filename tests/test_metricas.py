@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 import urllib.request
 
 from circulo.projects import cards, kit_project_id
@@ -78,3 +79,33 @@ def test_falar_com_o_loop_vira_pedido_no_roteiro(circle):
     r = circle.store.one("SELECT * FROM roadmap ORDER BY id DESC LIMIT 1")
     assert r["titulo"] == "Priorize pesquisar antes de construir" and r["origem"] == "pedido_cassio" and r["status"] == "pendente"
     assert circle.store.one("SELECT COUNT(*) n FROM ledger")["n"] == 0
+
+
+def test_tokens_por_pr_fecha_com_tokens_24h_atribuindo_o_sem_pr_a_papel_e_desfecho(circle):
+    """Pergunta #352: 79% de tokens_24h não estavam em PR nenhum. Os tokens que chegaram a PR (por veredito) mais
+    'sem_pr' (por papel e por desfecho do item) somam exatamente tokens_24h."""
+    from circulo.pedido_claro import registrar
+    from circulo.perguntas import METRICAS
+    s, agora = circle.store, time.time()
+    for titulo, detalhe, status in (("Entregue", "Mudar circulo/loop.py; teste de regressão.\nSucesso: giro", "feito"),
+                                    ("Vago entregue", "melhorar", "feito"), ("Jogado fora", "", "descartado"),
+                                    ("Travado", "", "bloqueado"), ("Em curso", "", "pendente")):
+        s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+            "VALUES(?,?,'erro',?,'',1,?,?)", (titulo, detalhe, status, agora, agora))
+        registrar(s, dict(s.one("SELECT * FROM roadmap WHERE titulo=?", (titulo,))), agora=agora)
+    s.x("DELETE FROM llm_calls")
+    for papel, entrada, tokens, ok, quando in (
+            ("developer", "Entregue", 30_000, 1, agora), ("developer", "reparo: Entregue", 10_000, 1, agora),
+            ("estudo", "[rapido] Entregue", 4_000, 1, agora), ("developer", "Vago entregue", 20_000, 1, agora),
+            ("developer", "Jogado fora", 50_000, 1, agora), ("planejador", "Jogado fora", 3_000, 1, agora),
+            ("developer", "Travado", 40_000, 1, agora), ("developer", "Em curso", 7_000, 0, agora),
+            ("developer", "Em curso", 9_000, 1, agora), ("planejador", "evidência do loop", 2_000, 1, agora),
+            ("estudo", "[profundo] Em curso", 6_000, 1, agora), ("developer", "Entregue", 999_999, 1, agora - 2 * 86400)):
+        s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) "
+            "VALUES(1,?,'m','fixo',?,?,?,?)", (papel, tokens, ok, entrada, quando))
+    _, ctx = METRICAS["tokens_por_pr"][1](s, agora)
+    assert ctx["com_pr_por_veredito"] == {"completo": 44_000, "incompleto": 20_000}
+    assert ctx["sem_pr"] == {"tokens": 117_000,
+                             "por_papel": {"developer": 106_000, "planejador": 5_000, "estudo": 6_000},
+                             "por_desfecho": {"descartado": 53_000, "falha": 47_000, "pendente": 17_000}}
+    assert sum(ctx["com_pr_por_veredito"].values()) + ctx["sem_pr"]["tokens"] == ctx["tokens_24h"] == 181_000
