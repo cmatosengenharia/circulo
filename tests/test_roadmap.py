@@ -154,3 +154,25 @@ def test_base_vermelha_repetida_6_vezes_bloqueia_mesmo_com_um_unico_evento(circl
     assert _proximo(circle) == preso                                       # meio-aberto: o contador antigo não conta
     s.set(reparo.BASE_VERMELHA, {str(preso): {**base, "n": 7}})
     assert _proximo(circle) == livre                                       # a mesma base vermelha de novo: bloqueia
+
+
+def test_entrega_sem_uso_apos_7_dias_vira_um_item_de_decisao_por_evento_esperado(circle):
+    """Pergunta do conselho #342 (pm): a entrega sem uso há 7+ dias vira 1 item de decisão (divulgar ou remover) preso
+    à pergunta; uma segunda execução não duplica e a entrega com uso não gera nenhum."""
+    from circulo.uso_entregas import registrar_esperado
+    s, agora = circle.store, time.time()
+    pm = s.x("INSERT INTO perguntas(chave,persona,texto,status,created_at,updated_at) "
+             "VALUES('uso','pm','Quantas entregas têm uso depois do merge?','feita',0,0)")
+    registrar_esperado(s.db, 10, "changelog_aberto", agora=agora - 8 * 86400)
+    registrar_esperado(s.db, 11, "assunto_executado", agora=agora - 8 * 86400)
+    s.x("INSERT INTO events(kind,payload,created_at) VALUES('assunto_executado','{}',?)", (agora - 86400,))
+
+    novos = roadmap.decidir_sem_uso(s, pm, agora)
+    assert roadmap.decidir_sem_uso(s, pm, agora) == []
+
+    itens = s.q("SELECT * FROM roadmap WHERE pergunta_id=?", (pm,))
+    assert [i["id"] for i in itens] == novos and len(novos) == 1
+    assert "changelog_aberto" in itens[0]["titulo"] and "divulgar ou remover" in itens[0]["titulo"]
+    assert itens[0]["status"] == "pendente" and itens[0]["origem_status"] == "ok"
+    s.x("UPDATE roadmap SET status='feito' WHERE id=?", (novos[0],))
+    assert roadmap.decidir_sem_uso(s, pm, agora) == []                      # resolvido também não duplica
