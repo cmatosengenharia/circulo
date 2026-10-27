@@ -12,6 +12,7 @@ import time
 
 from .licoes import assinatura_de, titulo_curto
 from .state import Store
+from .telemetria_sem_erro import CAUSA, telemetria_sem_erro
 
 EXPIRA_DIAS = 7
 A_CADA = 3600
@@ -61,17 +62,32 @@ def unir_licoes_de_json(store: Store, agora: float) -> int:
     return n
 
 
+def tirar_licoes_de_telemetria(store: Store, agora: float) -> int:
+    """Lição #83: lição aberta cujo texto (ou o último motivo) é JSON de estatística sem erro não é erro: fica obsoleta."""
+    n = 0
+    for r in store.q("SELECT id, ponto, assinatura, descricao FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')"):
+        ultimo = store.one("SELECT motivo FROM verificacoes WHERE assinatura=? AND ok=0 ORDER BY id DESC LIMIT 1", (r["assinatura"],))
+        textos = ((r["descricao"] or "").removeprefix(f"{r['ponto']}: "), ultimo["motivo"] if ultimo else "")
+        if any(map(telemetria_sem_erro, textos)):
+            store.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=?",
+                    (f"Obsoleta ({CAUSA}): o texto é JSON de estatística sem failed/killed>0, exceção ou exit≠0", agora, r["id"]))
+            n += 1
+    return n
+
+
 def rodar(store: Store, agora: float | None = None, forcar: bool = False) -> dict | None:
     agora = agora or time.time()
     ult = store.get(KV) or {}
     if not forcar and agora - float(ult.get("em", 0)) < A_CADA:
         return None
-    rel = {"em": agora, "expirados": expirar_dependentes(store, agora), "titulos": encurtar_titulos(store, agora), "licoes_unidas": unir_licoes_de_json(store, agora)}
+    rel = {"em": agora, "expirados": expirar_dependentes(store, agora), "titulos": encurtar_titulos(store, agora), "licoes_unidas": unir_licoes_de_json(store, agora),
+           "licoes_telemetria": tirar_licoes_de_telemetria(store, agora)}
     store.set(KV, rel)
-    if any(rel[k] for k in ("expirados", "titulos", "licoes_unidas")):
+    if any(rel[k] for k in ("expirados", "titulos", "licoes_unidas", "licoes_telemetria")):
         store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('controle',?,?,1)",
-                (f"Higiene: {rel['expirados']} item(ns) 'depende de você' expirado(s), {rel['titulos']} título(s) encurtado(s), {rel['licoes_unidas']} lição(ões) de JSON unida(s).", agora))
+                (f"Higiene: {rel['expirados']} item(ns) 'depende de você' expirado(s), {rel['titulos']} título(s) encurtado(s), {rel['licoes_unidas']} lição(ões) de JSON unida(s), "
+                 f"{rel['licoes_telemetria']} lição(ões) de telemetria sem erro obsoleta(s).", agora))
     return rel
 
 
-__all__ = ["rodar", "expirar_dependentes", "encurtar_titulos", "unir_licoes_de_json", "EXPIRA_DIAS"]
+__all__ = ["rodar", "expirar_dependentes", "encurtar_titulos", "unir_licoes_de_json", "tirar_licoes_de_telemetria", "EXPIRA_DIAS"]

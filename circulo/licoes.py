@@ -45,6 +45,7 @@ import time
 from pathlib import Path
 
 from .causas import node_por_causa
+from .telemetria_sem_erro import CAUSA as CAUSA_TELEMETRIA, telemetria_sem_erro
 
 EVID_GIROS = 200            # sem reaparecer por tantos giros depois de corrigida = evidenciada
 AMBIENTE_RECORRENTE = 5     # ocorrências de erro de ambiente em 24h que pedem código mais resiliente
@@ -401,13 +402,15 @@ class Licoes:
         if not ok and ponto == "gate:ci" and CI_INTEIRO.search(motivo or ""):
             assinatura, classe = "gate:ci:nao_rodou", "ambiente"
         sig = (assinatura_com_teste(assinatura, motivo) or assinatura_de(ponto, motivo)) if not ok else assinatura
+        telemetria = not ok and licao and telemetria_sem_erro(motivo)
+        causa = CAUSA_TELEMETRIA if telemetria else causa
         item, item_titulo = item_de(self.s, sujeito, item_id)
         vid = self.s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at,item_id,item_titulo,causa) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?)", (tick, ponto, (sujeito or "")[:200], int(bool(ok)), sig,
                                                        (motivo or "")[:1000], agora, item, item_titulo, causa))
         if vid % 500 == 0:
             self.s.x("DELETE FROM verificacoes WHERE id <= ?", (vid - MAX_VERIFICACOES,))
-        if ok or not licao:
+        if ok or not licao or telemetria:
             return None
         return self._aprender(ponto, sig, classe or classificar(ponto, motivo), motivo, sujeito, detalhe_item, titulo)
 
