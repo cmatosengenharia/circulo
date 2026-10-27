@@ -1,6 +1,7 @@
 """Resumo semanal para a equipe: o changelog (produto/infra com o pedido de origem e a fração contra a meta), os PRs
 sem pedido listados à parte e o uso medido do digest. Reaproveita `changelog` e `digest_semanal`, não refaz."""
-from circulo import resumo_semanal
+from circulo import norte, resumo_semanal
+from circulo.cli import main
 from conftest import NOON
 
 PRS = [
@@ -116,3 +117,21 @@ def test_semana_lista_pedidos_abertos_sem_pr_mergeado_de_qualquer_idade(circle):
               if linha.startswith("- ")]
     assert linhas == [f"- item #{ids['Aberto velho']} Aberto velho · 20 dias",
                       f"- item #{ids['Aberto novo']} Aberto novo · 1 dia"]
+
+
+def test_comando_relatorio_imprime_o_resumo_com_a_mesma_fracao_do_norte(circle, capsys):
+    """`circulo relatorio`: o resumo semanal sai pela linha de comando, cada PR com o pedido de origem ou 'sem
+    pedido', e a fração de produto é a mesma que o Norte mede (pergunta #387)."""
+    s, agora = circle.store, NOON.timestamp()
+    item = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+               "VALUES('Exportar CSV','exportar lançamentos','pedido_cassio','feito','',1,?,?)", (agora, agora))
+    for n, item_id in ((901, item), (902, None), (903, None), (904, None)):
+        s.x("INSERT INTO prs(number,titulo,branch,status,item_id,created_at,updated_at) VALUES(?,?,?,'mergeado',?,?,?)",
+            (n, f"PR {n}", f"b{n}", item_id, agora - 600, agora - 600))
+    main(["--data", str(circle.data_dir), "relatorio"])
+    out = capsys.readouterr().out
+    assert norte.medir(s)["fracao_produto"]["valor"] == 0.25
+    assert "1 de 4 PRs foram produto (fração 0.25, meta 0.5)" in out
+    assert "- #901 PR 901 · pedido: exportar lançamentos" in _secao(out, "Produto (1)")
+    assert "- #902 PR 902 · sem pedido" in _secao(out, "Infra (3)")
+    assert s.one("SELECT COUNT(*) n FROM uso_resumo WHERE recurso='resumo'")["n"] == 1
