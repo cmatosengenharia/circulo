@@ -143,6 +143,18 @@ def decidir_sem_uso(s, pergunta_id: int, agora: float | None = None) -> list[int
     return cobrar_no_roteiro(s, pergunta_id, agora)
 
 
+def cobertura_sem_uso(s, agora: float | None = None) -> dict:
+    """A medida do sucesso, lida do DB: quantas entregas sem uso há 7+ dias têm exatamente 1 item de revisão no roteiro
+    e quantas têm mais de 1 (duplicadas); `cobertura` é a fração com exatamente 1 (1.0 sem nenhuma entrega sem uso)."""
+    from .revisao_uso import titulo
+    from .uso_entregas import listar_sem_uso
+    n = [s.one("SELECT COUNT(*) AS n FROM roadmap WHERE titulo=?", (titulo(e["number"], e["evento_esperado"]),))["n"]
+         for e in listar_sem_uso(s.db, time.time() if agora is None else agora)]
+    um = n.count(1)
+    return {"sem_uso": len(n), "com_1_item": um, "duplicadas": sum(1 for k in n if k > 1),
+            "cobertura": um / len(n) if n else 1.0}
+
+
 def fora_da_fila(ctx, item: dict, repo=None, agora: float | None = None) -> bool:
     """True = o item não vai para o Developer agora: o disjuntor abriu, ou a lição dele já está fechada e verde no main."""
     agora = agora or time.time()
