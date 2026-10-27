@@ -96,3 +96,41 @@ def test_pedido_so_abre_com_lancamentos_0_e_fecha_quando_o_ledger_ganha_lancamen
         girar(pasta, s)
     assert abertos(s) == []                                   # pasta ausente com ledger cheio não é falta de dado
     assert "extratos" not in [i["tipo"] for i in pendentes(s, diagnostico=False)]
+
+
+def test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_rodou(circle, tmp_path):
+    from circulo.ingestao import RECENTE, estado
+
+    s = circle.store
+    pasta = tmp_path / "extratos"
+    pasta.mkdir()
+    assert estado(s, agora=1000.0) == "nunca_rodou"            # nenhum giro gravou registro
+
+    def ultima() -> dict:
+        return s.get("ingestao_causas")["ultima"]
+
+    girar(pasta, s, agora=1000.0)
+    assert ultima() == {"timestamp": 1000.0, "causa": "vazia", "arquivos_vistos": 0, "arquivos_rejeitados": [],
+                        "lancamentos_novos": 0}                 # rodada com zeros também grava
+    assert estado(s, agora=1000.0) == "vazia"
+    assert estado(s, agora=1000.0 + RECENTE + 1) == "nunca_rodou"   # sem sinal recente não é "vazia"
+
+    (pasta / "quebrado.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    girar(pasta, s, agora=2000.0)
+    r = ultima()
+    assert (r["timestamp"], r["arquivos_vistos"], r["lancamentos_novos"]) == (2000.0, 1, 0)
+    rejeitado, = r["arquivos_rejeitados"]
+    assert rejeitado["nome"] == "quebrado.csv" and rejeitado["motivo"].startswith("rejeitado")
+    assert estado(s, agora=2000.0) == "so_rejeitados" and lancamentos(s) == 0
+
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")
+    novos = girar(pasta, s, agora=3000.0)
+    assert novos > 0 and lancamentos(s) == novos
+    assert ultima() == {"timestamp": 3000.0, "causa": "importados", "arquivos_vistos": 1, "arquivos_rejeitados": [],
+                        "lancamentos_novos": novos}
+    assert estado(s, agora=3000.0) == "importados"
+
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")   # reexecução com o mesmo extrato
+    assert girar(pasta, s, agora=4000.0) == 0
+    assert lancamentos(s) == novos and ultima()["lancamentos_novos"] == 0
+    assert ultima()["arquivos_rejeitados"] == []              # a rodada anterior com rejeitado não vaza para esta
