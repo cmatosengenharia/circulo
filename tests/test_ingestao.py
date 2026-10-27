@@ -112,7 +112,8 @@ def test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_r
 
     girar(pasta, s, agora=1000.0)
     assert ultima() == {"timestamp": 1000.0, "causa": "vazia", "arquivos_vistos": 0, "arquivos_rejeitados": [],
-                        "lancamentos_novos": 0, "fontes": contadores()}   # rodada com zeros também grava
+                        "lancamentos_novos": 0, "lancamentos_duplicados": 0, "lancamentos": 0,
+                        "fontes": contadores()}                              # rodada com zeros também grava
     assert estado(s, agora=1000.0) == "vazia"
     assert estado(s, agora=1000.0 + RECENTE + 1) == "nunca_rodou"   # sem sinal recente não é "vazia"
 
@@ -130,7 +131,8 @@ def test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_r
     fontes = contadores()
     fontes["pasta"].update(vistos=1, novos=1)
     assert ultima() == {"timestamp": 3000.0, "causa": "importados", "arquivos_vistos": 1, "arquivos_rejeitados": [],
-                        "lancamentos_novos": novos, "fontes": fontes}
+                        "lancamentos_novos": novos, "lancamentos_duplicados": 0, "lancamentos": novos,
+                        "fontes": fontes}
     assert estado(s, agora=3000.0) == "importados"
 
     shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")   # reexecução com o mesmo extrato
@@ -168,3 +170,33 @@ def test_contadores_por_fonte_fecham_vistos_igual_rejeitados_mais_duplicados_mai
     assert girar(pasta, s) == 0 and lancamentos(s) == novos
     assert fonte("pasta") == (1, 0, 1, 0, "reenvio.ofx: duplicado por hash")
     assert fonte("email") == (1, 0, 1, 0, "reenvio.eml: duplicado por hash")
+
+
+def test_giro_ocioso_ingere_pendentes_lancamentos_0_a_n_e_o_segundo_giro_so_duplica(circle):
+    """O giro chama `ingerir_pendentes` (pasta + .eml, sem LLM) e o estado do loop conta `lancamentos`: a fixture com
+    duas linhas idênticas no mesmo dia dá N no 1º giro, sem fundir as gêmeas, e 0 novos com N duplicados no 2º."""
+    from circulo.ingestao import ingerir_pendentes
+    from circulo.lancamentos_import import parse_extrato
+
+    s = circle.store
+    pasta = circle.data_dir / "extratos"
+    pasta.mkdir()
+    csv = (FIX / "extrato_anonimo.csv").read_text(encoding="utf-8")
+    fixture = parse_extrato(csv, "csv")
+    assert len({(lin.data, lin.centavos, lin.descricao) for lin in fixture}) < len(fixture)   # há gêmeas no mesmo dia
+
+    def estado() -> dict:
+        return s.get("ingestao_causas")["ultima"]
+
+    shutil.copy(FIX / "extrato_anonimo.csv", pasta / "extrato_anonimo.csv")
+    circle.tick()
+    assert estado()["lancamentos"] == lancamentos(s) >= len(fixture)
+    assert estado()["lancamentos_novos"] == len(fixture) and estado()["lancamentos_duplicados"] == 0
+    assert s.one("SELECT COUNT(*) AS n FROM ledger WHERE description='padaria pao bom'")["n"] == 2
+
+    shutil.copy(FIX / "extrato_anonimo.csv", pasta / "extrato_anonimo.csv")   # o mesmo extrato de novo
+    circle.tick()
+    assert estado()["lancamentos_novos"] == 0 and estado()["lancamentos_duplicados"] == len(fixture)
+    assert estado()["lancamentos"] == lancamentos(s) == len(fixture)
+    assert ingerir_pendentes(circle.data_dir, s) == 0                          # sem pendente: nada novo
+    assert estado()["lancamentos"] == len(fixture) and estado()["lancamentos_duplicados"] == 0

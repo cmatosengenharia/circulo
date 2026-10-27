@@ -210,7 +210,7 @@ class Circle:
             guardrails.daily_snapshot(s, self.data_dir)
             guardrails.check_stagnation(s, ctx.reply)
         finance.age_open_transactions(s)
-        seguro(ingestao.girar, self.data_dir / "extratos", s)   # extrato em <data>/extratos vira lançamento; sem ele, pedido
+        seguro(ingestao.ingerir_pendentes, self.data_dir, s)   # extrato/e-mail em <data>/extratos vira lançamento; sem ele, pedido
 
         ev = s.claim_next_event()   # 1) pedido (prioridade) ou 2) evolução natural
         if ev:
