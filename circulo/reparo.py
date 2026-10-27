@@ -55,7 +55,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import pedido_claro
+from . import disjuntor, pedido_claro
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
 from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
@@ -259,9 +259,13 @@ class DeveloperComReparo(SelfDeveloper):
         veto = self._vetar(item) if item else None
         if veto:
             return veto
+        if item and not disjuntor.passo(self.s, "consulta"):
+            return DevResult(item["id"], "pausa_llm", "LLM em pausa pelo disjuntor: a conta está sem crédito")
         self._rodada, self._cortado, self._base_quebrada, self._disjuntor, self._escalada = 0, "", "", "", ""
         self._teto_bloqueado = None
         r = super().run_once(item_id=item_id, autorizado=autorizado)
+        if item:
+            disjuntor.passo(self.s, disjuntor.evento_do_developer(r.status, r.detalhe))
         if self._teto_bloqueado:                 # o SelfDeveloper devolveu o item à fila depois do corte: bloqueia de novo
             bloquear_arvore(self.s, *self._teto_bloqueado)
             return DevResult(r.item_id, BLOQUEADO, self._teto_bloqueado[1])
