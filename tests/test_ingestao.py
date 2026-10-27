@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from circulo.aprovacoes import pendentes
-from circulo.ingestao import GIROS, abertos, girar
+from circulo.ingestao import GIROS, RODADAS, abertos, girar
 from circulo.perguntas import _m_lancamentos
 
 FIX = Path(__file__).parent / "fixtures"
@@ -48,3 +48,34 @@ def test_causa_que_muda_fecha_o_pedido_antigo_e_conta_de_novo(circle, tmp_path):
     for _ in range(GIROS - 1):
         girar(pasta, s)
     assert [p["causa"] for p in abertos(s)] == ["vazia"]
+
+
+def test_cada_giro_grava_a_causa_da_rodada_e_a_dominante_das_ultimas_explica_lancamentos_0(circle, tmp_path):
+    s = circle.store
+    pasta = tmp_path / "extratos"
+
+    def causas() -> list[str]:
+        return s.get("ingestao_causas")["rodadas"]
+
+    girar(pasta, s)
+    assert causas() == ["pasta_inexistente"]
+    pasta.mkdir()
+    girar(pasta, s)
+    girar(pasta, s)
+    assert causas() == ["pasta_inexistente", "vazia", "vazia"]
+    assert s.get("ingestao_causas")["dominante"] == "vazia" and lancamentos(s) == 0
+    (pasta / "a_quebrado.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    girar(pasta, s)
+    assert causas()[-1] == "so_rejeitados" and lancamentos(s) == 0
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")
+    assert girar(pasta, s) > 0
+    assert causas()[-1] == "importados" and lancamentos(s) > 0
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "de_novo.ofx")
+    assert girar(pasta, s) == 0
+    assert causas()[-1] == "so_duplicata"                    # antes, "ok(n)": igual a uma rodada que importou
+    girar(pasta, s)
+    assert causas()[-1] == "sem_extrato_novo"
+    for _ in range(RODADAS):
+        girar(pasta, s)
+    assert causas() == ["sem_extrato_novo"] * RODADAS         # 1 causa por giro, só as últimas RODADAS
+    assert s.get("ingestao_causas")["dominante"] == "sem_extrato_novo"
