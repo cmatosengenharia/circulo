@@ -110,16 +110,25 @@ def _economista(s, agora) -> list[Pergunta]:
     return out
 
 
+def _top_causa(s, ponto, desde) -> dict:
+    r = s.one("SELECT causa FROM verificacoes WHERE ponto=? AND ok=0 AND created_at>=? AND causa IS NOT NULL "
+              "GROUP BY causa ORDER BY COUNT(*) DESC, MAX(id) DESC LIMIT 1", (ponto, desde))
+    return {"top_causa": r["causa"]} if r else {}
+
+
 def _operador(s, agora) -> list[Pergunta]:
     out = []
     pontos = s.q("SELECT ponto, COUNT(*) n, SUM(ok=0) f FROM verificacoes WHERE created_at>=? GROUP BY ponto "
                  "HAVING f > 0 ORDER BY f*1.0/n DESC LIMIT 3", (agora - 86400,))
     if pontos:
         p = pontos[0]
+        com_causa = [dict(x) | _top_causa(s, x["ponto"], agora - 86400) for x in pontos]
+        causa = com_causa[0].get("top_causa")
         out.append(Pergunta("operador:neuronio_que_mais_barra", "operador",
-                            f"Por que o neurônio {p['ponto']} é barrado tanto, e o que evitaria a falha antes de ela acontecer?",
+                            f"Por que o neurônio {p['ponto']} é barrado tanto" + (f" (causa que mais se repete: {causa})" if causa else "") +
+                            ", e o que evitaria a falha antes de ela acontecer?",
                             min(1.0, (p["f"] or 0) / max(p["n"], 1) + 0.1),
-                            {"pontos_com_falha_24h": [dict(x) for x in pontos]}))
+                            {"pontos_com_falha_24h": com_causa}))
     lead = s.q("SELECT r.created_at c, MIN(m.created_at) m FROM roadmap r JOIN prs p ON p.titulo=r.titulo "
                "JOIN merges m ON m.pr=p.number AND m.merged=1 WHERE r.created_at>=? GROUP BY r.id", (agora - 7 * 86400,))
     if lead:
