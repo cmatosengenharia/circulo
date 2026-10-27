@@ -1,5 +1,6 @@
 from circulo.norte import SEMANA
-from circulo.uso_entregas import entregas_sem_uso
+from circulo.state import Store
+from circulo.uso_entregas import entregas_sem_uso, listar_sem_uso, registrar_esperado
 
 AGORA = 1_000_000_000.0
 DIA = 86400
@@ -28,3 +29,19 @@ def test_lista_so_entregas_de_produto_com_7_dias_sem_uso_depois_do_merge():
 def test_exatamente_7_dias_ja_conta_e_evento_no_instante_do_merge_nao_e_uso():
     pr = {"number": 7, "produto": True, "evento_esperado": "x", "merged_at": AGORA - SEMANA}
     assert entregas_sem_uso([pr], [{"nome": "x", "created_at": pr["merged_at"]}], AGORA) == [pr]
+
+
+def test_registro_duplicado_nao_cria_linha_e_entrega_sem_uso_ha_7_dias_aparece():
+    conn = Store().db
+    registrar_esperado(conn, 10, "assunto_executado", agora=AGORA - 8 * DIA)
+    registrar_esperado(conn, 10, "assunto_executado", agora=AGORA - 2 * DIA)
+    registrar_esperado(conn, 11, "painel_aberto", agora=AGORA - 9 * DIA)
+    registrar_esperado(conn, 12, "tela_nova", agora=AGORA - 3 * DIA)
+    conn.execute("INSERT INTO events(kind,payload,created_at) VALUES('painel_aberto','{}',?)", (AGORA - DIA,))
+
+    assert conn.execute("SELECT COUNT(*) FROM entrega_uso_esperado WHERE pr=10").fetchone()[0] == 1
+    assert [p["number"] for p in listar_sem_uso(conn, AGORA)] == [10]
+
+
+def test_listar_sem_uso_sem_nada_gravado_e_vazio():
+    assert listar_sem_uso(Store().db, AGORA) == []
