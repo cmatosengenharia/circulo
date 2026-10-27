@@ -494,3 +494,53 @@ def test_licao_70_outro_neuronio_ou_outro_codigo_nao_reabre(circle):
     L.verificar("gate:ci", False, motivo=LINT_76)
     L.verificar("developer:abrir_pr", False, motivo="circulo/c.py:1:1: F811 redefinition of `f` (ruff)")
     assert s.one("SELECT status, reincidencias FROM licoes WHERE id=70")["status"] == "validada"
+
+
+# ------------------------------------------------------------ lição #83: JSON de estatística sem erro não é lição
+STATS_83 = json.dumps({"type": "system", "subagent_stats": {"spawned": 0, "completed": 0, "failed": 0, "killed": 0}})
+
+
+def test_licao_83_json_de_estatistica_sem_erro_nao_vira_licao(circle):
+    """lição #83: um dump de subagent_stats com tudo em 0 é telemetria, não erro: não grava lição e o motivo fica."""
+    s, L = circle.store, lic(circle)
+    for dump in (STATS_83, json.dumps({"completed": 0, "failed": 0, "killed": 0})):
+        assert L.verificar("developer:agente", False, motivo=dump) is None
+    assert s.one("SELECT COUNT(*) n FROM licoes")["n"] == 0
+    causas = [r["causa"] for r in s.q("SELECT causa FROM verificacoes WHERE ok=0")]
+    assert causas == ["telemetria_sem_erro", "telemetria_sem_erro"]
+
+
+def test_licao_83_estatistica_com_sinal_de_erro_vira_licao(circle):
+    """lição #83: failed>0, killed>0, exceção ou exit≠0 no mesmo dump é erro e a lição é gravada."""
+    s, L = circle.store, lic(circle)
+    com_erro = (
+        {"subagent_stats": {"spawned": 1, "completed": 0, "failed": 1, "killed": 0}},
+        {"completed": 0, "failed": 0, "killed": 2},
+        {"completed": 1, "failed": 0, "exception": "RuntimeError: x"},
+        {"completed": 1, "failed": 0, "exit_code": 2},
+        {"type": "result", "is_error": True, "subagent_stats": {"completed": 0, "failed": 0}},
+        {"type": "result", "subtype": "error_max_turns", "is_error": False, "subagent_stats": {"completed": 0, "failed": 0}},
+        {"type": "result", "terminal_reason": "max_turns", "subagent_stats": {"completed": 0, "failed": 0}},
+    )
+    for i, dado in enumerate(com_erro):
+        assert L.verificar(f"developer:agente{i}", False, motivo=json.dumps(dado)) is not None, dado
+    assert s.one("SELECT COUNT(*) n FROM licoes")["n"] == len(com_erro)
+
+
+def test_licao_83_higiene_tira_das_abertas_a_licao_de_telemetria(circle):
+    """lição #83: a lição de telemetria que já está aberta sai das abertas na higiene; a com failed>0 fica."""
+    from circulo import higiene
+    from circulo.perguntas import _m_licoes_abertas
+    s = circle.store
+    erro = json.dumps({"subagent_stats": {"completed": 0, "failed": 1, "killed": 0}})
+    for lid, descricao, motivo in ((83, f"developer:agente: {STATS_83}", ""), (84, "developer:agente: log cortado", STATS_83),
+                                   (85, f"developer:agente: {erro}", erro)):
+        s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,primeira_tick,"
+            "ultima_tick,created_at,updated_at) VALUES(?,?,'developer:agente','ambiente',?,'aberta',1,0,0,0,0,0)",
+            (lid, f"developer:agente:x{lid}", descricao))
+        if motivo:
+            s.x("INSERT INTO verificacoes(tick,ponto,sujeito,ok,assinatura,motivo,created_at) VALUES(0,'developer:agente','',0,?,?,0)",
+                (f"developer:agente:x{lid}", motivo))
+    assert higiene.rodar(s, forcar=True)["licoes_telemetria"] == 2
+    assert [r["status"] for r in s.q("SELECT status FROM licoes ORDER BY id")] == ["obsoleta", "obsoleta", "aberta"]
+    assert _m_licoes_abertas(s, 0)[1]["licoes_abertas"] == 1
