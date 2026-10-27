@@ -1,7 +1,7 @@
 """Pedido ao humano quando a pasta de extratos não dá lançamentos: o código de ingestão existe, falta o arquivo.
 
-A cada giro, `girar` passa a pasta (`lancamentos_pasta.ingerir_pasta`) e lê o diagnóstico. Com a pasta inexistente
-ou vazia por GIROS giros seguidos, abre um pedido com a causa, o caminho da pasta e o formato aceito. Um índice único
+A cada giro, `girar` passa a pasta (`lancamentos_pasta.ingerir_pasta`) e lê o diagnóstico. Com o ledger sem
+lançamentos e a pasta inexistente ou vazia por GIROS giros seguidos, abre um pedido com a causa, o caminho da pasta e o formato aceito. Um índice único
 parcial deixa no máximo 1 pedido aberto por causa (como o Alertmanager agrupa por rótulo); quando a causa some
 (extrato solto, pasta criada), o pedido fecha sozinho. Os abertos aparecem em "Precisa de você" (`aprovacoes`).
 Todo giro grava a causa da rodada em kv `ingestao_causas` (as últimas RODADAS e a dominante entre elas)."""
@@ -66,7 +66,7 @@ def girar(pasta: str | Path, store: Store, agora: float | None = None) -> int:
     finally:
         _registrar(store, causa_da_rodada(store.get("lancamentos_motivo"), pendentes, novos))
     causa = store.get("lancamentos_motivo")
-    causa = causa if causa in CAUSAS else None
+    causa = causa if causa in CAUSAS and not store.one("SELECT 1 FROM ledger LIMIT 1") else None
     agora = time.time() if agora is None else agora
     _esquema(store)
     store.x("UPDATE pedidos_ingestao SET fechado_em=? WHERE fechado_em IS NULL AND causa IS NOT ?", (agora, causa))

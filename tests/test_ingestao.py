@@ -79,3 +79,20 @@ def test_cada_giro_grava_a_causa_da_rodada_e_a_dominante_das_ultimas_explica_lan
         girar(pasta, s)
     assert causas() == ["sem_extrato_novo"] * RODADAS         # 1 causa por giro, só as últimas RODADAS
     assert s.get("ingestao_causas")["dominante"] == "sem_extrato_novo"
+
+
+def test_pedido_so_abre_com_lancamentos_0_e_fecha_quando_o_ledger_ganha_lancamento(circle, tmp_path):
+    from circulo.lancamentos_import import importar
+
+    s = circle.store
+    pasta = tmp_path / "extratos"
+    for _ in range(GIROS):
+        girar(pasta, s)
+    assert [p["causa"] for p in abertos(s)] == ["pasta_inexistente"]
+    importar(s, (FIX / "extrato_anonimo.ofx").read_text(encoding="utf-8"), "ofx")   # entrou por outro caminho
+    girar(pasta, s)
+    assert lancamentos(s) > 0 and abertos(s) == []           # o dono já mandou dados: o pedido fecha
+    for _ in range(GIROS * 2):
+        girar(pasta, s)
+    assert abertos(s) == []                                   # pasta ausente com ledger cheio não é falta de dado
+    assert "extratos" not in [i["tipo"] for i in pendentes(s, diagnostico=False)]
