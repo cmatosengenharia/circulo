@@ -490,6 +490,16 @@ CREATE TABLE IF NOT EXISTS vigia_disparos (
 );
 CREATE INDEX IF NOT EXISTS vigia_disparos_chave ON vigia_disparos(chave, em);
 
+-- rodadas de comentário de revisão seguidas de commit de correção, medidas uma vez por PR mergeado (rodadas_revisao.py)
+CREATE TABLE IF NOT EXISTS rodadas_revisao (
+  pr INTEGER PRIMARY KEY,
+  rodadas INTEGER NOT NULL,
+  comentarios INTEGER NOT NULL,
+  commits INTEGER NOT NULL,
+  mergeado_em REAL NOT NULL,
+  medido_em REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS run_errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT,                    -- execução (giro) em que o erro aconteceu: o painel abre o erro por ele

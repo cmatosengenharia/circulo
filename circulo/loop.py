@@ -286,8 +286,9 @@ class Circle:
             observabilidade.exportar_em_segundo_plano(s.path, self.data_dir)
             if r.tick % RASTRO_A_CADA == 0:
                 rastro.verificar(ctx)
-                from . import jev_lab
+                from . import jev_lab, rodadas_revisao
                 jev_lab.avaliar(s, ctx.reply)        # adota (ou desfaz) a forma de perguntar ao Jev que provou ganho
+                rodadas_revisao.sincronizar(s, getattr(self.gate, "gh", None))   # rodadas de revisão dos PRs mergeados
         except Exception as exc:  # observar nunca derruba o giro
             r.errors.append(f"rastro: {exc!r}")
         self._stage("descanso")

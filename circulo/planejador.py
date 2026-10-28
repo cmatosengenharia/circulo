@@ -27,7 +27,7 @@ import sqlite3
 import time
 import urllib.error
 
-from . import limite_uso, pedidos, rastro
+from . import limite_uso, pedidos, rastro, rodadas_revisao
 from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
@@ -170,6 +170,7 @@ class Planejador:
             "saude": json.loads(saude["body"]).get("health") if saude else None,
             "lancamentos": s.one("SELECT COUNT(*) n FROM ledger")["n"],
             "pedidos_7d_por_canal": pedidos.por_canal_7d(s),
+            "rodadas_revisao_7d": rodadas_revisao.resumo_7d(s),
             "verificacoes_24h": (getattr(self.ctx, "licoes", None).resumo()["verificacoes_24h"]
                                  if getattr(self.ctx, "licoes", None) is not None else []),
         }
