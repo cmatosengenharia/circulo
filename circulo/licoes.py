@@ -535,7 +535,7 @@ class Licoes:
     def revisar(self) -> list[str]:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
         from .gemeas import gemea_aberta, reabrir_todas
-        from .prevencao import checagem_de, exigir, sem_prevencao
+        from .prevencao import checagem_de, cobrar_teste, exigir, sem_prevencao
         log = self.unir_duplicatas()
         tick, agora = self.s.tick, time.time()
         for lic in self.s.q("""SELECT l.*, r.status item_status, r.evidencia item_evidencia FROM licoes l
@@ -565,7 +565,7 @@ class Licoes:
             if node_por_causa(lic["assinatura"]) or gemea_aberta(self.s, lic):
                 continue                  # o alias dá um teste à lição (só fecha pela reexecução); a gêmea, o erro vivo
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
-        log += exigir(self.s, tick, agora)
+        log += exigir(self.s, tick, agora) + cobrar_teste(self.s)
         log += reabrir_todas(self.s, self.reply)
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
