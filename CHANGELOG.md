@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.69.2 — 2026-10-28
+
+**Cobrança do prazo de 48 h do Norte: a cadeia girava em falso — o conselho para de insistir.**
+
+- Diagnóstico (28/10 02:42 UTC): desde o marco, 61 PRs mergeados; os 10 de produto são os pedidos do Cássio de 26/10.
+  Depois deles, 49 PRs do próprio loop: a pergunta `pm:fracao_produto` virou 7 PRs de "resumo/digest/changelog
+  semanal" e outra do PM, 10 PRs de "entregas sem uso" — o conselho repergunta a mesma chave logo após cada entrega
+  (`entregue` não contava como "em andamento") e o Planejador gera um item quase igual. O Norte nem contava esses PRs
+  como produto (as perguntas do PM nasciam sem eixo). O tech lead não perguntou porque, por métrica, está satisfeito;
+  as 4 perguntas do mercado o Jev descartou (score 0,05–0,11: histórias grandes demais).
+- `perguntas.py`: chave entregue descansa 3 dias (`DESCANSO`); 2 entregas em 14 dias sem a dor cair = pergunta
+  **esgotada** (`Conselho.esgotada`): o conselho para de repeti-la, avisa uma vez (kv `perguntas_esgotadas`) e põe no
+  "Precisa de você" (`pergunta_esgotada`) — a resposta está no desenho, não em mais um item igual.
+- Perguntas das personas do Norte (tech lead, PM, mercado) nascem com `eixo="produto"` e o eixo é gravado em
+  `perguntas` (antes não era): o item que nasce delas conta no Norte.
+- Teste: `test_conselho_descansa_a_chave_entregue_e_para_de_insistir`.
+
 ## 1.69.1 — 2026-10-26
 
 - `CIRCULO_EXEMPLO=1` no arquivo de configuração: o SRE semeia o exemplo da tela Meu trabalho uma vez, na primeira

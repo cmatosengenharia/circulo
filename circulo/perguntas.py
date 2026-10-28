@@ -30,6 +30,12 @@ from .json_llm import objeto
 from .licoes import item_de
 
 DIVERSIDADE = 0.35        # a persona das últimas 3 perguntas pesa só isso (o conselho não fica preso num olhar só)
+# 27/10: a mesma chave (pm:fracao_produto) foi entregue 7 vezes em 2 dias — 7 PRs de "resumo semanal" quase iguais, e a
+# métrica não mexeu. Entregue não é resolvido: a chave descansa DESCANSO depois de cada entrega e, com INSISTENCIA
+# entregas em JANELA_INSISTENCIA sem a dor cair, está esgotada — o conselho para de repetir e avisa uma vez.
+DESCANSO = 3 * 86400
+INSISTENCIA = 2
+JANELA_INSISTENCIA = 14 * 86400
 
 
 @dataclass
@@ -41,6 +47,7 @@ class Pergunta:
     evidencia: dict = field(default_factory=dict)
     custo: float = 1.0                    # custo relativo de responder (1 = um item pequeno)
     score: float = 0.0
+    eixo: str | None = None               # "produto" nas perguntas do Norte: o item que nasce delas conta como produto
 
 
 PERSONAS = {
@@ -220,26 +227,26 @@ def _norte(s, agora) -> list[Pergunta]:
         out.append(Pergunta("tech_lead:lead_time", "tech_lead",
                             f"Como tech lead, o que falta para um pedido virar PR revisado e mergeado em menos de {lt['meta']:.0f} h? "
                             f"(mediana hoje: {lt['valor'] if lt['valor'] is not None else 'sem PR em 7 dias'} h; em que etapa o tempo some?)",
-                            min(1.0, 0.4 + 0.6 * lt["distancia"]), {"norte": "lead_time_h", **lt, "prs_7d": r["prs_7d"]}))
+                            min(1.0, 0.4 + 0.6 * lt["distancia"]), {"norte": "lead_time_h", **lt, "prs_7d": r["prs_7d"]}, eixo="produto"))
     fp = m["fracao_produto"]
     if fp["distancia"] > 0:
         out.append(Pergunta("pm:fracao_produto", "pm",
                             f"Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima semana e o loop ainda não tem? "
                             f"(só {r['produto_7d']} de {r['prs_7d']} PRs em 7 dias foram produto; meta {fp['meta']:.0%})",
-                            min(1.0, 0.5 + 0.5 * fp["distancia"]), {"norte": "fracao_produto", **fp}, custo=1.5))
+                            min(1.0, 0.5 + 0.5 * fp["distancia"]), {"norte": "fracao_produto", **fp}, custo=1.5, eixo="produto"))
     cs = m["console_semana"]
     recusas = _um(s, "SELECT COUNT(*) FROM revisoes WHERE created_at>=?", (agora - 86400,))
     if cs["distancia"] > 0:
         out.append(Pergunta("tech_lead:console", "tech_lead",
                             "Como tech lead, o que na Equipe ao vivo ou no painel me faria entender em 10 segundos por que um PR foi "
                             f"recusado ou um item parou, sem abrir o GitHub? (o console não mudou em 7 dias; {recusas} recusa(s) do gate em 24 h)",
-                            min(1.0, 0.4 + 0.3 * cs["distancia"] + min(0.3, 0.05 * recusas)), {"norte": "console_semana", **cs, "recusas_24h": recusas}))
+                            min(1.0, 0.4 + 0.3 * cs["distancia"] + min(0.3, 0.05 * recusas)), {"norte": "console_semana", **cs, "recusas_24h": recusas}, eixo="produto"))
     ms = m["merge_sem_conserto"]
     if ms["valor"] is not None and ms["distancia"] > 0:
         out.append(Pergunta("tech_lead:primeira_tentativa", "tech_lead",
                             f"Como tech lead, por que só {ms['valor']:.0%} dos PRs entram na primeira tentativa (meta {ms['meta']:.0%}): "
                             "o que o Developer deveria conferir antes de abrir o PR que o gate confere depois?",
-                            min(1.0, 0.3 + 0.7 * ms["distancia"]), {"norte": "merge_sem_conserto", **ms}))
+                            min(1.0, 0.3 + 0.7 * ms["distancia"]), {"norte": "merge_sem_conserto", **ms}, eixo="produto"))
     return out
 
 
@@ -251,7 +258,7 @@ def _mercado(s, agora) -> list[Pergunta]:
         if not p.get("texto"):
             continue
         out.append(Pergunta(f"mercado:{pesq.get('em', 0):.0f}:{i}", "mercado", p["texto"][:300], float(p.get("relevancia", 0.6)),
-                            {"fontes": p.get("fontes", [])[:4], "pratica": p.get("pratica", "")[:200], "pesquisado_em": pesq.get("em")}, custo=1.5))
+                            {"fontes": p.get("fontes", [])[:4], "pratica": p.get("pratica", "")[:200], "pesquisado_em": pesq.get("em")}, custo=1.5, eixo="produto"))
     return out
 
 
@@ -281,6 +288,8 @@ class Conselho:
                                                    "ORDER BY id DESC LIMIT 3")]
         abertas = {r["chave"] for r in self.s.q("SELECT chave FROM perguntas WHERE status IN ('feita','virou_item') "
                                                 "AND created_at>=?", (agora - 3 * 86400,))}
+        abertas |= {r["chave"] for r in self.s.q("SELECT chave FROM perguntas WHERE status='entregue' AND updated_at>=?",
+                                                 (agora - DESCANSO,))}                          # entregue há pouco: descansa
         pesos = self.pesos()
         out = []
         for sinal in SINAIS:
@@ -289,12 +298,27 @@ class Conselho:
             except Exception:  # um sinal quebrado não cala o conselho
                 continue
             for p in ps:
-                if p.relevancia <= 0.05 or p.id in abertas:     # sem dor ou já em andamento: não pergunta de novo
+                if p.relevancia <= 0.05 or p.id in abertas or self.esgotada(p, agora):   # sem dor, em andamento ou insistindo
                     continue
                 div = DIVERSIDADE if p.persona in recentes else 1.0
                 p.score = round(p.relevancia * pesos.get(p.persona, 1.0) * div / max(p.custo, 0.1), 4)
                 out.append(p)
         return sorted(out, key=lambda p: -p.score)
+
+    def esgotada(self, p: Pergunta, agora: float) -> bool:
+        """A chave já virou INSISTENCIA entregas em JANELA_INSISTENCIA e a dor (relevância) não caiu: repetir não resolve.
+        Avisa uma vez por chave (kv `perguntas_esgotadas`) e deixa a decisão para quem muda o desenho."""
+        rs = self.s.q("SELECT relevancia FROM perguntas WHERE chave=? AND status='entregue' AND updated_at>=? ORDER BY id",
+                      (p.id, agora - JANELA_INSISTENCIA))
+        if len(rs) < INSISTENCIA or p.relevancia < float(rs[0]["relevancia"] or 0) - 0.1:
+            return False
+        avisadas = self.s.get("perguntas_esgotadas") or {}
+        if p.id not in avisadas:
+            avisadas[p.id] = {"em": agora, "entregas": len(rs), "relevancia": p.relevancia}
+            self.s.set("perguntas_esgotadas", avisadas)
+            self.ctx.reply(f"Conselho: a pergunta “{p.texto[:90]}” já virou {len(rs)} entregas em 14 dias e a dor não caiu "
+                           f"({p.relevancia:.2f}). Parei de repeti-la: a resposta não está em mais um item igual, está no desenho.", "saude")
+        return True
 
     def escolher(self) -> Pergunta | None:
         """A regra estreita para as 3 melhores; o Jev escolhe entre elas (sem LLM)."""
@@ -312,10 +336,10 @@ class Conselho:
 
     def registrar(self, p: Pergunta) -> int:
         agora = time.time()
-        return self.s.x("INSERT INTO perguntas(chave,persona,texto,relevancia,score,evidencia,status,cerebro,created_at,updated_at) "
-                        "VALUES(?,?,?,?,?,?,'feita','loop',?,?)",
+        return self.s.x("INSERT INTO perguntas(chave,persona,texto,relevancia,score,evidencia,status,cerebro,eixo,created_at,updated_at) "
+                        "VALUES(?,?,?,?,?,?,'feita','loop',?,?,?)",
                         (p.id, p.persona, p.texto, p.relevancia, p.score, json.dumps(p.evidencia, ensure_ascii=False, default=str),
-                         agora, agora))
+                         p.eixo, agora, agora))
 
     def marcar(self, pid: int, status: str, item_id: int | None = None) -> None:
         self.s.x("UPDATE perguntas SET status=?, item_id=COALESCE(?, item_id), updated_at=? WHERE id=?",

@@ -138,3 +138,35 @@ def test_prazo_de_dois_dias_cobra_evolucao_ou_pede_reescrita(circle):
     _pr(s, prod, t0 + 3600, n=7)
     v = norte.cobrar(s, lambda t, k: avisos.append(t), t0 + norte.PRAZO_H * 3600 + 1)
     assert v["evoluiu"] and "A direção mudou" in avisos[-1] and not s.get("norte_marco")["cobrado"]
+
+
+def test_conselho_descansa_a_chave_entregue_e_para_de_insistir(circle):
+    """27/10: pm:fracao_produto virou 7 PRs de "resumo semanal" em 2 dias sem mover a métrica. Entregue descansa 3 dias;
+    2 entregas em 14 dias com a dor igual = esgotada, avisada uma vez e no "Precisa de você"."""
+    s = circle.store
+    agora = time.time()
+    s.x("UPDATE roadmap SET status='feito'")
+    c = perguntas.Conselho(circle.ctx)
+    avisos = []
+    circle.ctx.reply = lambda m, k="": avisos.append((k, m))
+    cand = {p.id: p for p in c.candidatas()}
+    assert "pm:fracao_produto" in cand and cand["pm:fracao_produto"].eixo == "produto"
+    pid = c.registrar(cand["pm:fracao_produto"])
+    assert s.one("SELECT eixo FROM perguntas WHERE id=?", (pid,))["eixo"] == "produto"     # o item que nasce dela é produto
+    c.marcar(pid, "entregue")
+    assert "pm:fracao_produto" not in {p.id for p in c.candidatas()}                        # entregue há pouco: descansa
+    s.x("UPDATE perguntas SET updated_at=? WHERE id=?", (agora - perguntas.DESCANSO - 1, pid))
+    assert "pm:fracao_produto" in {p.id for p in c.candidatas()} and not avisos                # descansou: volta uma vez
+    pid2 = c.registrar(cand["pm:fracao_produto"])
+    c.marcar(pid2, "entregue")
+    s.x("UPDATE perguntas SET updated_at=? WHERE id=?", (agora - perguntas.DESCANSO - 1, pid2))
+    assert "pm:fracao_produto" not in {p.id for p in c.candidatas()}                         # 2 entregas, dor igual: esgotada
+    assert len(avisos) == 1 and avisos[0][0] == "saude" and "Parei de repeti-la" in avisos[0][1]
+    assert "pm:fracao_produto" not in {p.id for p in c.candidatas()} and len(avisos) == 1    # avisa uma vez só
+    from circulo import aprovacoes
+    assert any(i["tipo"] == "pergunta_esgotada" and i["ref"] == "pm:fracao_produto" for i in aprovacoes.pendentes(s, agora, diagnostico=False))
+    prod = _item(s, "Pedido do time", origem="pedido_cassio", agora=agora - 3600)             # a dor caiu de verdade: 1 em 4 é produto
+    for n, it in enumerate([prod] + [_item(s, f"m{i}") for i in range(3)], start=1):
+        _pr(s, it, agora - 600 * n, n=n)
+    s.set("perguntas_esgotadas", None)
+    assert "pm:fracao_produto" in {p.id for p in c.candidatas()}                               # dor menor: pode perguntar de novo

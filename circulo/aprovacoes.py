@@ -56,6 +56,10 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
         out.append(_item("norte_sem_evolucao", "Norte: 2 dias sem evolução de produto — a solução precisa ser reescrita",
                          f"Fração de produto {nm.get('fracao_produto')} → {d.get('fracao_produto')}; {d.get('prs_produto')} PR(s) de produto na semana; "
                          f"{d.get('console')} no console. Reescrever o desenho (perspectivas, cota, pesquisa), não insistir.", nm.get("cobrado_em"), [], 0, link="/loop#evolucao"))
+    for chave, e in (store.get("perguntas_esgotadas") or {}).items():       # pergunta que virou N entregas sem mover a dor
+        out.append(_item("pergunta_esgotada", f"Conselho parou de repetir “{chave}”: {e.get('entregas')} entregas sem a dor cair",
+                         "A resposta não está em mais um item igual: mude o desenho (a pergunta, a persona ou a métrica) ou aceite a dor.",
+                         e.get("em"), [], 2, ref=chave, link="/loop#evolucao"))
     par = store.get("entrega_parada") or {}
     if par:
         out.append(_item("entrega_parada", f"Entrega parada há {par.get('horas', '?')} h com {par.get('prontos', '?')} item(ns) prontos",
