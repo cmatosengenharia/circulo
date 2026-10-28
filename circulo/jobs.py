@@ -180,7 +180,7 @@ def sem_proposta(store, agora: float | None = None, pedidos=None) -> dict[str, i
 def propor_item(store, pergunta_id: int | None, agora: float | None = None, pedidos=None) -> int | None:
     """O job recorrente mais pedido sem item 'antecipar:<job>' aberto ou criado nos últimos 7 dias vira um único item
     'proposto' do roteiro, preso à pergunta do conselho que o originou (lição #15); None se todos já têm."""
-    from .planejador import exigir_pergunta, gravar_item
+    from .roadmap import exigir_pergunta, gravar_item
     pid = exigir_pergunta(store, pergunta_id)
     agora = time.time() if agora is None else agora
     pedidos = pedidos_7d(store, agora) if pedidos is None else pedidos

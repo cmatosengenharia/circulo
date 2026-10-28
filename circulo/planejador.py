@@ -33,6 +33,7 @@ from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
 from .licoes import titulo_curto
 from .merge_gate import CONSTITUICAO
+from .roadmap import SemPerguntaOrigem, exigir_pergunta, gravar_item
 
 MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
 FREIO_POR_DIA = 6           # teto quando a qualidade cai (maioria dos últimos PRs fechada sem merge)
@@ -409,30 +410,6 @@ SYSTEM_DIVIDIR = """Você é o Planejador do círculo autoevolutivo (repositóri
 Use o erro da última tentativa para isolar a parte difícil num sub-item próprio.
 Responda só com JSON numa linha, sem markdown:
 {"sub_itens": [{"titulo": "até 100 caracteres", "detalhe": "até 2 frases: o que mudar e onde", "teste": "o teste que prova"}]}"""
-
-
-class SemPerguntaOrigem(ValueError):
-    """Item do loop sem a pergunta do conselho que o originou (lição #15): o rastro:cadeia barraria a entrega."""
-
-
-def exigir_pergunta(store, pergunta_id: int | None) -> int:
-    """O id da pergunta de origem, se ela existe na tabela do conselho; senão SemPerguntaOrigem."""
-    if not pergunta_id or not store.one("SELECT 1 FROM perguntas WHERE id=?", (pergunta_id,)):
-        raise SemPerguntaOrigem(f"pergunta de origem #{pergunta_id} não está na tabela do conselho")
-    return pergunta_id
-
-
-def gravar_item(store, pergunta_id: int | None, titulo: str, detalhe: str, evidencia: str, modulo: str | None = None,
-                status: str = "pendente") -> int:
-    """A única forma de o planejador gravar um item do loop no roteiro: sempre preso à pergunta que o originou."""
-    pid = exigir_pergunta(store, pergunta_id)
-    ordem = (store.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
-    agora = time.time()
-    rid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo,"
-                  "pergunta_id,origem_status) VALUES(?,?,'loop',?,?,?,?,?,?,?,'ok')",
-                  (titulo, detalhe[:2000], status, evidencia, ordem, agora, agora, modulo, pid))
-    store.x("UPDATE perguntas SET item_id=?, updated_at=? WHERE id=?", (rid, agora, pid))
-    return rid
 
 
 def _parse_sub_itens(texto: str) -> list[dict]:

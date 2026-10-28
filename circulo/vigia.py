@@ -24,6 +24,7 @@ import threading
 import time
 from typing import Any, Callable
 
+from . import roadmap
 from .decision import SN, Decision, Question, norm
 from .licoes import Licoes
 from .metrics import seguro
@@ -491,10 +492,9 @@ class Vigia:
         causa = _causa_porteiro(u)
         titulo = f"Vigia: revisar o limiar worth_spending.idle_evolution: pergunta #{u['pergunta_id']} recusada {u['seguidas']}x ({u['motivo']})"
         if not self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE 'Vigia: revisar o limiar%'"):
-            ordem = (self.s.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
             detalhe = f"A pergunta saiu da fila como 'recusada pelo porteiro'.\nEvidência (medida): {json.dumps(u, ensure_ascii=False, default=str)}\nCausa: {causa}"
-            self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                     (titulo[:200], detalhe[:2000], "loop", "pendente", f"Vigia (medido): porteiro_recusa_pergunta:{u['pergunta_id']}", ordem, now, now))
+            roadmap.gravar_medido(self.s, "vigia", "porteiro_recusa_pergunta", titulo[:200], detalhe,
+                                  f"Vigia (medido): porteiro_recusa_pergunta:{u['pergunta_id']}")
         self.ctx.reply(f"Vigia: pergunta #{u['pergunta_id']} recusada pelo porteiro. {causa[:160]}", "saude")
 
     def _registrar(self, c: dict, antes: dict | None, now: float) -> None:
@@ -513,11 +513,9 @@ class Vigia:
             titulo = f"Vigia: {c['titulo'][:150]}"
             ja = self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE ?", (f"Vigia: {c['chave'].split(':')[0]}%",))
             if not ja:
-                ordem = (self.s.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
                 detalhe = (f"Trava da autoevolução detectada pelo Vigia (Jev: trava com {c['conf']:.0%} de confiança).\n"
                            f"Evidência (medida): {json.dumps(c['evidencia'], ensure_ascii=False, default=str)}\nSugestão: {c['sugestao']}")
-                rid = self.s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                               (titulo[:200], detalhe[:2000], "loop", "pendente", f"Vigia (medido): {c['chave']}", ordem, now, now))
+                rid = roadmap.gravar_medido(self.s, "vigia", c["chave"], titulo[:200], detalhe, f"Vigia (medido): {c['chave']}")
                 self.s.x("UPDATE vigia SET item_id=? WHERE chave=? AND status='aberta'", (rid, c["chave"]))
                 self.ctx.reply(f"Vigia: {c['titulo']} → item #{rid} no roteiro. {c['sugestao'][:140]}", "saude")
                 return

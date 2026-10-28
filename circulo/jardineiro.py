@@ -16,6 +16,8 @@ import re
 import time
 from pathlib import Path
 
+from .roadmap import gravar_medido
+
 INTERVALO = 6 * 3600
 FUNCAO_LONGA = 80
 MODULO_GRANDE = 900
@@ -86,12 +88,9 @@ def _item(store, achado: str, reply=None) -> None:
     titulo = f"Jardineiro: podar {achado.split(':')[0]}"[:200]
     if store.one("SELECT 1 FROM roadmap WHERE titulo=? AND status IN ('pendente','em_andamento')", (titulo,)):
         return
-    agora = time.time()
-    ordem = (store.one("SELECT COALESCE(MAX(ordem),0) m FROM roadmap")["m"] or 0) + 1
     detalhe = (f"O padrão está se espalhando no código (medido pelo jardineiro): {achado}. Primeiro impedir que cresça "
                "(um teste em tests/test_arquitetura.py que trave o número atual), depois reduzir nos arquivos citados, "
                "sem mudar comportamento.\nSucesso: o indicador para de crescer na próxima medição e cai em relação a hoje.")
-    iid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
-                  "VALUES(?,?,'loop','pendente',?,?,?,?)", (titulo, detalhe, "medido pelo jardineiro", ordem, agora, agora))
+    iid = gravar_medido(store, "jardineiro", achado.split(":")[0], titulo, detalhe, "medido pelo jardineiro")
     if reply:
         reply(f"Jardineiro: {achado}. Virou o item #{iid} do roteiro.", "roteiro")
