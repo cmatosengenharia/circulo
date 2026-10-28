@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 from . import roadmap
 from .decision import SN, Decision, Question, norm
+from .estagnacao import ESTAGNADO
 from .licoes import Licoes
 from .metrics import seguro
 from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
@@ -205,10 +206,11 @@ def s_jev_duvida(s, now):
 def s_estagnacao(s, now):
     p = _kv(s, "progresso", {}) or {}
     sem = int(p.get("sem", 0))
-    if sem < 10:
+    if sem < ESTAGNADO:
         return None
     return {"chave": "estagnacao", "titulo": f"{sem} giros seguidos com trabalho pendente e nada avançando",
-            "evidencia": {"giros_sem_avanco": sem, "recusas": p.get("recusas") or {}}, "gravidade": min(1.0, sem / 20), "sugestao": "ver recusas do porteiro e a fila"}
+            "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}}, "gravidade": min(1.0, sem / 20),
+            "sugestao": "ver recusas do porteiro e a fila"}
 
 
 def s_missao_sem_ciclo(s, now):
@@ -509,6 +511,8 @@ class Vigia:
                      (c["chave"], c["titulo"][:300], ev, c["sugestao"][:300], c["gravidade"], c["veredito"], c["acao"], c["conf"], cls, now, now))
 
     def _agir(self, c: dict, now: float) -> None:
+        ev = c["evidencia"] if isinstance(c["evidencia"], str) else json.dumps(c["evidencia"], ensure_ascii=False, default=str)
+        self.s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em) VALUES(?,?,?,?)", (c["chave"], c["acao"], ev, now))
         if c["acao"] == "abrir_item":
             titulo = f"Vigia: {c['titulo'][:150]}"
             ja = self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE ?", (f"Vigia: {c['chave'].split(':')[0]}%",))
@@ -543,6 +547,11 @@ class Vigia:
             self._thread.join(timeout=2)
 
 
+def disparos_30d(store, chave: str, now: float | None = None) -> int:
+    """Quantas vezes o Vigia executou a ação (abrir item ou alertar) para a trava `chave` nos últimos 30 dias."""
+    return int(_um(store, "SELECT COUNT(*) FROM vigia_disparos WHERE chave=? AND em>=?", (chave, (now or time.time()) - 30 * 86400)))
+
+
 def resumo(store, limite: int = 20) -> dict[str, Any]:
     abertas = [dict(r) for r in store.q("SELECT * FROM vigia WHERE status='aberta' ORDER BY gravidade DESC, primeira_em")]
     hist = [dict(r) for r in store.q("SELECT id, chave, titulo, veredito, acao, conf, item_id, primeira_em, resolvida_em FROM vigia "
@@ -556,4 +565,5 @@ def resumo(store, limite: int = 20) -> dict[str, Any]:
     ult = store.get("vigia_ultima") or {}
     travas = [a for a in abertas if a["veredito"] == "trava"]
     return {"estado": "travado" if travas else ("observando" if abertas else "livre"), "travas": len(travas), "abertas": abertas,
-            "resolvidas": hist, "ultima_em": ult.get("em"), "sondas": [f.__name__[2:] for f in SONDAS], "intervalo_s": INTERVALO}
+            "resolvidas": hist, "ultima_em": ult.get("em"), "sondas": [f.__name__[2:] for f in SONDAS], "intervalo_s": INTERVALO,
+            "disparos_30d": {"estagnacao": disparos_30d(store, "estagnacao")}}
