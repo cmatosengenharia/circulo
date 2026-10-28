@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument("texto", nargs="+")
     pd = sub.add_parser("pedir", help="pede uma feature em uma frase (vai pela caixa de entrada; o loop lê no próximo giro)")
     pd.add_argument("texto", nargs="+")
+    lc = sub.add_parser("lancar", help="um lançamento em uma linha: 'mercado 45,90 ontem' (ambígua vira pergunta)")
+    lc.add_argument("texto", nargs="+")
     cm = sub.add_parser("caminho", help="o caminho de um pedido até o merge, com o tempo de cada etapa e o que espera agora")
     cm.add_argument("ref", nargs="?", default=None, help="arquivo do pedido ou ev<N> (padrão: o último pedido do console)")
     cm.add_argument("--json", action="store_true")
@@ -150,6 +152,16 @@ def main(argv: list[str] | None = None) -> None:
         from . import resumo_semanal
         from .state import Store
         print(resumo_semanal.semana(Store(os.path.join(args.data, "circulo.db"))))
+        return
+    if args.cmd == "lancar":
+        from datetime import datetime
+
+        from .budget import TZ
+        from .lancamento_manual import registrar_linha_manual
+        from .state import Store
+        novos, pergunta = registrar_linha_manual(Store(os.path.join(args.data, "circulo.db")), " ".join(args.texto),
+                                                 datetime.now(TZ).date())
+        print(pergunta or f"{novos} lançamento gravado.")
         return
     if args.cmd == "redrive":
         from .portao_previo import redrive
