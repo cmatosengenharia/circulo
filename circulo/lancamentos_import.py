@@ -26,6 +26,8 @@ class Linha(NamedTuple):
     centavos: int    # negativo = saída, positivo = entrada
     descricao: str   # minúscula, sem acento, espaços colapsados
     chave: str       # FITID ou sha256(data|centavos|descricao|ocorrência)
+    categoria: str | None = None   # None: despesa entra em aberto (outros) e receita como renda
+    tag: str | None = None
 
 
 _TRN = re.compile(r"<STMTTRN>(.*?)</STMTTRN>", re.S | re.I)
@@ -111,8 +113,9 @@ def importar(store: Store, texto: str, formato: str) -> int:
 
 
 def gravar(store: Store, novas: list[Linha]) -> int:
-    """Grava as linhas novas no ledger e devolve quantas entraram. Despesa entra em aberto e com confiança 0:
-    o loop a reclassifica (`reclassificar_pendentes`); receita entra como renda, igual ao lançamento por mensagem."""
+    """Grava as linhas novas no ledger e devolve quantas entraram. Despesa sem categoria (ou 'outros') entra em
+    aberto e com confiança 0: o loop a reclassifica (`reclassificar_pendentes`); receita entra como renda, igual ao
+    lançamento por mensagem; categoria dada pela linha (entrada manual) entra aceita."""
     version, _ = PolicyStore(store).active()
     n = 0
     with store.tx():
@@ -120,13 +123,15 @@ def gravar(store: Store, novas: list[Linha]) -> int:
             if lin.centavos == 0:
                 continue
             receita = lin.centavos > 0
+            certa = receita or lin.categoria not in (None, "outros")
             em = datetime.fromisoformat(lin.data).replace(hour=12, tzinfo=TZ).timestamp()
             n += store.run(
                 "INSERT OR IGNORE INTO ledger(kind,amount_cents,description,category,tag,confidence,auto_accepted,"
                 "policy_version,created_at,import_key) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 ("receita" if receita else "despesa", abs(lin.centavos), lin.descricao,
-                 "renda" if receita else "outros", "necessario" if receita else "escolha",
-                 1.0 if receita else 0.0, int(receita), version, em, lin.chave))
+                 lin.categoria or ("renda" if receita else "outros"),
+                 lin.tag or ("necessario" if receita else "escolha"),
+                 1.0 if certa else 0.0, int(certa), version, em, lin.chave))
         violations = finance.check_invariants(store)
         if violations:
             raise ValueError("invariante violado; importação desfeita: " + "; ".join(violations))
