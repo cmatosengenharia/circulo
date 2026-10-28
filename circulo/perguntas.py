@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import jobs, jtbd, pedido_claro
+from . import jobs, jtbd, pedido_claro, pedidos_repetidos
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
 from .json_llm import objeto
@@ -420,7 +420,8 @@ def _m_pedidos_humano(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM roadmap WHERE origem='pedido_cassio' AND created_at>=?", (agora - 7 * 86400,))
     d, diag = jobs.medir_propostas(s, agora), jtbd.diagnostico(s, agora)
     motivo = "" if d.total else diag["motivo_sem_proposta"]
-    return (min(1.0, n / 4), {"pedidos_7d": n, "antecipacao": {"propostas": d.total, "taxa": d.taxa, **d.contagem,
+    return (min(1.0, n / 4), {"pedidos_7d": n, "repeticoes_7d": pedidos_repetidos.repeticoes_7d(s, agora),
+                              "antecipacao": {"propostas": d.total, "taxa": d.taxa, **d.contagem,
                                                                "pedidos_depois": d.pedidos_depois,
                                                                "job_maior_grupo": diag["job_maior_grupo"],
                                                                "motivo_sem_proposta": motivo}})
