@@ -46,7 +46,7 @@ def cobrar_no_roteiro(store, pergunta_id: int, agora: float | None = None) -> li
     `item_id` gravado no pedido é a marca de já cobrada: a chave é o PR (não o evento esperado), então o item resolvido
     não volta e duas entregas com o mesmo evento têm um item cada. O pedido é reservado (item_id=0) antes de gravar o
     item, para que duas execuções em paralelo não cobrem o mesmo PR duas vezes. Devolve os itens criados."""
-    from .planejador import exigir_pergunta, gravar_item
+    from .roadmap import exigir_pergunta, gravar_item
     pid = exigir_pergunta(store, pergunta_id)
     abrir_pedidos_revisao_uso(store.db, agora)
     novos = []

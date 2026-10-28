@@ -1,0 +1,546 @@
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_base_vermelha_registro.py", line 34, in test_base_confirmada_no_mesmo_sha_nao_roda_os_testes_de_novo
+    assert execucoes.read_text().count("x") == 2                     # a 2ª execução confirma; as outras 48 pulam
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/pathlib.py", line 1027, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/k0/3jgwzn3j4b5fzskh8lfxq2mm0000gn/T/tmpq_lrevxz/execucoes.txt'
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_canario_portoes_aprendidos.py", line 82, in test_canario_nao_conta_bloqueio_no_portao_real
+    assert portoes_que_deixam_passar([p]) == []
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+PASS test_aluno test_features_e_rotulos_sao_estaveis
+PASS test_aluno test_aluno_aprende_a_regra_escondida_do_jev_e_mede_no_holdout
+PASS test_aluno test_poucos_exemplos_nao_viram_modelo_e_retreino_so_quando_precisa
+PASS test_aluno test_em_sombra_o_aluno_palpita_sem_decidir_e_pronto_exige_prova
+SKIP test_aluno test_meta_learner_treina_o_aluno_e_painel_expoe
+PASS test_aluno test_estado_compacto_sempre_fecha_e_registro_cortado_nao_derruba_o_treino
+PASS test_aluno test_licao_43_estado_com_uma_chave_aninhada_grande_ainda_vira_json_valido
+PASS test_aluno test_licao_44_valor_da_decisao_cortado_nao_derruba_o_treino_da_meta
+PASS test_aluno_jev test_aluno_decide_so_onde_provou_e_a_regra_responde_o_resto
+PASS test_aluno_jev test_aluno_nao_pronto_delega_tudo_e_nunca_derruba_a_decisao
+SKIP test_aluno_jev test_build_jev_respeita_o_decisor_escolhido
+PASS test_aluno_jev test_planejador_declara_o_modulo_e_o_texto_serve_de_reserva
+PASS test_aluno_jev test_developer_escalado_nao_pega_dois_itens_do_mesmo_modulo_nem_de_pr_aberto
+SKIP test_aluno_jev test_memoria_externa_entra_no_indice_e_banco_indisponivel_nao_quebra
+SKIP test_aluno_jev test_item_e_estudo_de_outro_loop_nao_quebram_o_planejador
+PASS test_alvo_inexistente test_licao_27_alvo_inexistente_fica_obsoleta_e_a_contagem_em_1
+PASS test_alvo_inexistente test_licao_27_alvo_na_main_ou_em_item_pendente_conta_normalmente
+PASS test_antecipacao test_agrupar_pelo_texto_do_pedido_aponta_o_job_que_se_repete
+PASS test_antecipacao test_32_pedidos_do_roteiro_com_padrao_repetido_viram_uma_proposta_medida
+PASS test_antecipacao test_sem_pergunta_do_conselho_o_padrao_do_roteiro_nao_vira_proposta
+PASS test_antecipacao test_32_pedidos_sem_grupo_de_3_dizem_que_o_limiar_barrou_a_proposta
+PASS test_antecipacao test_32_pedidos_sem_job_classificado_dizem_que_a_classificacao_barrou
+PASS test_antecipacao test_padrao_sem_pergunta_do_conselho_diz_por_que_nao_virou_proposta
+PASS test_antecipacao test_com_proposta_o_motivo_fica_vazio_e_o_maior_grupo_continua
+PASS test_aprovacoes_duvidas test_precisa_de_voce_reune_tudo_com_a_acao_do_lado
+SKIP test_aprovacoes_duvidas test_pagina_e_api_precisa_de_voce_e_selo_no_menu
+PASS test_aprovacoes_duvidas test_duvida_do_jev_vai_para_o_arquiteto_e_volta_ao_jev_na_hora
+PASS test_aprovacoes_duvidas test_duvida_sem_llm_fica_marcada_e_nao_trava_nada
+SKIP test_aprovacoes_duvidas test_pin_automatico_da_versao_do_jev
+PASS test_arquitetura test_painel_nunca_importa_quem_age
+PASS test_arquitetura test_constituicao_nao_ganha_dependencia_nova
+PASS test_arquitetura test_so_a_linha_de_comando_sobe_o_loop
+PASS test_arquitetura test_nenhum_modulo_gigante
+PASS test_arquitetura test_except_exception_conta_so_o_erro_engolido
+PASS test_arquitetura test_json_da_llm_so_e_lido_por_json_llm
+PASS test_arquitetura test_json_da_llm_e_aceito_pelo_criterio_do_papel_e_nao_por_uma_chave
+PASS test_arquitetura test_padroes_ruins_nao_crescem
+PASS test_arquitetura test_licao_2_nenhum_teste_exige_o_erro_antigo_e_depois_o_conserto
+PASS test_arquitetura test_testes_importam_vizinhos_sem_o_prefixo_tests
+PASS test_arquitetura test_testes_nao_usam_a_data_local_da_maquina
+SKIP test_assuntos test_frase_vai_para_o_assunto_certo_com_o_tipo_certo
+SKIP test_assuntos test_o_que_decidimos_volta_com_data_e_nota_de_origem
+SKIP test_assuntos test_graft_indexa_e_acha_por_significado
+PASS test_assuntos test_console_anota_e_pergunta
+SKIP test_assuntos test_codigo_e_credencial_nao_entram
+PASS test_atividade test_painel_mostra_giros_linha_do_tempo_e_ritmo
+PASS test_atividade test_linha_do_tempo_junta_evolucoes
+PASS test_auditoria test_transacao_que_nao_abre_nao_vaza_o_lock
+PASS test_auditoria test_medico_reabre_diagnostico_fechado_sem_estourar_a_chave_unica
+PASS test_auditoria test_erro_de_ambiente_nao_reprova_o_codigo_novo
+PASS test_auditoria test_item_que_precisa_dividir_sem_planejador_sai_da_fila_com_o_motivo
+SKIP test_auditoria test_aluno_responde_noul_comum_pela_probabilidade_prevista
+PASS test_auditoria test_evolucao_nao_divide_por_zero_com_token_so_em_receitas
+PASS test_auditoria test_rendeu_conta_o_papel_real_da_acao
+PASS test_auditoria test_titulo_sem_espaco_e_encurtado_uma_vez_so
+SKIP test_auditoria test_painel_recusa_host_que_nao_e_local
+PASS test_auditoria test_esquema_do_aluno_e_por_banco_e_sem_executescript
+PASS test_auditoria test_evento_processando_de_outro_processo_nao_e_recuperado
+SKIP test_autonomia test_missoes_evoluem_em_paralelo
+SKIP test_autonomia test_paralelo_respeita_orcamento
+SKIP test_autonomia test_missoes_se_conhecem_ao_nascer
+SKIP test_autonomia test_integracao_vira_criterio_e_contexto_compartilhado
+SKIP test_autonomia test_memoria_compartilhada_entre_missoes_ligadas
+SKIP test_autonomia test_licao_confirmada_viaja_para_missao_ligada
+SKIP test_autonomia test_evidencia_registrada_em_cada_avanco
+SKIP test_autonomia test_jev_que_se_contradiz_nao_avanca
+PASS test_autonomia test_missao_cumprida_quando_bate_a_meta_duas_vezes
+SKIP test_autonomia test_nenhuma_mensagem_do_loop_pede_acao_sua
+SKIP test_autonomia test_missao_ligada_que_muda_reabre_a_outra
+SKIP test_base_vermelha test_base_sempre_vermelha_roda_no_maximo_2_vezes_e_volta_quando_a_main_muda
+SKIP test_base_vermelha test_assinatura_diferente_nao_bloqueia
+PASS test_base_vermelha_registro test_50_execucoes_com_a_mesma_chave_sao_1_registro_e_um_sha_novo_e_outro
+FAIL test_base_vermelha_registro test_base_confirmada_no_mesmo_sha_nao_roda_os_testes_de_novo
+PASS test_caixa test_arquivos_da_caixa_viram_eventos_e_sao_arquivados
+PASS test_caixa test_sem_pasta_caixa_nada_acontece
+PASS test_camadas test_cada_etapa_do_giro_e_a_metrica_carregam_o_mesmo_run_id
+PASS test_camadas test_giro_pausado_nao_vira_execucao
+PASS test_camadas test_todas_as_etapas_do_ciclo_aparecem_com_status_e_duracao
+SKIP test_camadas test_falha_de_uma_etapa_e_localizada_pelo_run_id
+PASS test_camadas test_merge_vira_marco_no_grafico
+SKIP test_camadas test_api_do_dash_em_camadas
+PASS test_camadas test_saude_traz_entregas_e_fila_das_ultimas_24h
+PASS test_caminho test_pedido_do_console_e_acompanhado_ate_o_merge_com_tempo_por_etapa
+SKIP test_caminho test_cli_pedir_e_caminho
+PASS test_caminho test_pedido_curto_demais_e_recusado_no_console
+PASS test_canario test_painel_velho_falha_e_painel_fresco_passa_em_estado_temporario
+PASS test_canario test_canario_do_frescor_detecta_painel_velho
+SKIP test_canario test_canario_acusa_checagem_sempre_verde
+SKIP test_canario test_canario_acusa_checagem_removida
+PASS test_canario test_ciclo_de_saude_registra_canario_e_o_auditor_deixa_de_contar_o_ponto
+SKIP test_canario test_ciclo_de_saude_prova_cada_portao_aprendido_e_o_auditor_deixa_de_contar
+SKIP test_canario test_portao_que_deixa_passar_a_propria_assinatura_continua_contado_e_avisa
+PASS test_canario_abrir_pr test_diff_com_marcadores_de_conflito_e_barrado_com_a_causa_certa
+PASS test_canario_abrir_pr test_diff_sem_teste_novo_e_barrado_com_a_causa_certa
+SKIP test_canario_abrir_pr test_canario_barra_a_falha_injetada_e_deixa_passar_o_controle
+SKIP test_canario_abrir_pr test_canario_acusa_portoes_sempre_verdes
+SKIP test_canario_abrir_pr test_canario_acusa_falha_com_a_causa_errada
+PASS test_canario_abrir_pr test_auditor_deixa_de_contar_os_dois_pontos_depois_do_canario
+SKIP test_canario_gate_merge test_portao_recusa_merge_com_a_razao_certa
+PASS test_canario_gate_merge test_portao_mergeia_quando_todos_os_gates_passam
+PASS test_canario_gate_merge test_canario_do_gate_merge_barra_a_falha_injetada_e_deixa_passar_o_controle
+SKIP test_canario_gate_merge test_canario_acusa_portao_neutralizado
+SKIP test_canario_gate_merge test_canario_acusa_portao_que_barra_tudo
+PASS test_canario_gate_merge test_auditor_deixa_de_contar_gate_merge_depois_do_canario
+PASS test_canario_portoes_aprendidos test_toda_licao_com_assinatura_mecanica_vira_portao
+SKIP test_canario_portoes_aprendidos test_portao_aprendido_tem_canario_e_barra_a_assinatura_da_licao
+SKIP test_canario_portoes_aprendidos test_canario_acusa_portao_neutralizado_que_barra_tudo_ou_sem_entrada
+FAIL test_canario_portoes_aprendidos test_canario_nao_conta_bloqueio_no_portao_real
+PASS test_cao_de_guarda test_giro_preso_sem_sinal_encerra_o_processo
+PASS test_cao_de_guarda test_giro_longo_com_passos_recentes_nao_e_presoTraceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_conta.py", line 135, in test_sem_assinatura_o_guardiao_nao_faz_nada
+    assert conta.vigiar(circle.store, lambda *a: None, consultar=lambda: 1 / 0) is None
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/circulo/conta.py", line 138, in vigiar
+    r = consultar()
+        ^^^^^^^^^^^
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_conta.py", line 135, in <lambda>
+    assert conta.vigiar(circle.store, lambda *a: None, consultar=lambda: 1 / 0) is None
+                                                                         ~~^~~
+ZeroDivisionError: division by zero
+
+PASS test_cao_de_guarda test_validacao_com_neto_segurando_a_saida_respeita_o_prazo
+SKIP test_cao_de_guarda test_git_com_prazo_nao_pendura
+PASS test_capacidade test_mede_ocupacao_fila_e_acha_o_gargalo
+PASS test_capacidade test_jev_decide_subir_um_trabalhador_so_para_quem_escala_e_desce_com_fila_vazia
+SKIP test_capacidade test_arquiteto_estuda_varios_itens_ao_mesmo_tempo
+PASS test_capacidade test_desenvolvedor_pega_itens_distintos_em_paralelo
+SKIP test_capacidade test_painel_e_equipe_mostram_gargalo_e_paralelo
+PASS test_cascata test_route_e_pick_model
+PASS test_cascata test_pick_model_segue_a_complexidade_da_tarefa
+SKIP test_cascata test_engine_passa_a_tarefa_para_a_escolha_do_modelo
+PASS test_cascata test_verify_output_barra_injecao_dados_e_formato
+PASS test_cascata test_meets_bar_composite_com_regra_e_jev
+PASS test_cascata test_relevant_reranqueia
+SKIP test_cascata test_guard_protege_o_harness
+PASS test_causa_do_agente test_licao_18_e_42_caudas_cortadas_caem_na_mesma_causa_nomeada
+PASS test_causa_do_agente test_terminal_reason_vem_antes_do_subtype
+PASS test_causa_do_agente test_subtype_de_limite_sem_result_e_is_error_com_result
+PASS test_causa_do_agente test_nenhuma_causa_carrega_metadado_do_sdk
+PASS test_changelog test_changelog_agrupa_produto_e_infra_com_o_pedido_de_origem_e_a_fracao_contra_a_meta
+PASS test_changelog test_todo_pr_de_produto_aparece_mesmo_sem_pedido
+PASS test_changelog test_semana_monta_da_base_com_o_pedido_de_origem
+PASS test_changelog test_semana_vazia_nao_divide_por_zero
+SKIP test_ci_causa test_falha_total_por_codigo_dos_prs_80_a_84_nao_vira_infra
+PASS test_ci_causa test_pr_86_com_anotacao_de_cobranca_e_infra
+PASS test_ci_causa test_startup_failure_job_nao_iniciado_e_runner_sao_infra
+PASS test_ci_causa test_falha_parcial_e_codigo_e_mistura_com_falha_real_nunca_e_infra
+PASS test_ci_causa test_reexecute_local_main_vs_branch_decide_o_indeterminado
+PASS test_ci_causa test_run_do_github_vira_sinal_nao_iniciado_e_sem_passos
+PASS test_ci_causa test_revisor_nao_gasta_conserto_nem_reabre_item_com_assinatura_de_infra
+PASS test_ci_causa test_revisor_mantem_o_conserto_e_rotula_a_causa_quando_e_codigo
+PASS test_ci_indisponivel test_checks_que_nem_comecaram_nao_sao_falha_do_pr
+PASS test_ci_indisponivel test_gate_pausa_o_developer_e_nao_pede_conserto
+PASS test_ci_indisponivel test_gate_nao_atropela_espera_mais_importante
+SKIP test_ci_indisponivel test_cliente_marca_jobs_sem_passos_pela_anotacao
+PASS test_ci_indisponivel test_erro_que_ja_existia_antes_da_troca_nao_reprova_o_codigo_novo
+PASS test_ci_indisponivel test_worktree_orfao_e_movido_e_o_caminho_fica_livre
+SKIP test_ci_indisponivel test_job_sem_nenhum_passo_conta_como_ci_nao_iniciado_mesmo_sem_a_anotacao
+PASS test_ci_indisponivel test_disjuntor_pausa_o_developer_depois_de_tres_abandonos_iguais
+PASS test_ci_indisponivel test_espera_de_ci_nao_iniciado_cai_assim_que_os_jobs_rodam
+PASS test_ci_indisponivel test_espera_mais_importante_nao_e_tirada_quando_o_ci_volta
+PASS test_ci_indisponivel test_tres_tentativas_sem_mudanca_tiram_o_item_da_fila
+PASS test_ci_indisponivel test_developer_pode_rodar_python_com_versao
+PASS test_ci_indisponivel test_item_cortado_de_novo_pelo_teto_sai_da_fila
+PASS test_ci_inteiro_falhou test_licao_53_constituicao_caindo_com_o_ci_inteiro_nao_abre_item
+PASS test_ci_inteiro_falhou test_licao_53_falha_so_nos_testes_segue_como_trabalho
+SKIP test_cofre test_valor_vai_pelo_stdin_e_nunca_volta_na_listagem
+SKIP test_cofre test_migrar_so_apaga_do_arquivo_depois_de_ler_igual_no_cofre
+SKIP test_cofre test_carrega_do_cofre_sem_sobrescrever_o_ambiente
+PASS test_cofre test_sem_cofre_do_sistema_usa_arquivo_600
+SKIP test_cofre test_nome_invalido_e_rejeitado
+SKIP test_cofre test_api_de_chaves_protegida_e_sem_valores
+PASS test_conexoes test_pulsos_viram_estado_ok_instavel_fora_e_ocioso
+PASS test_conexoes test_llm_e_claude_code_vem_de_llm_calls_e_a_espera_do_desenvolvedor_aparece
+PASS test_conexoes test_batimento_do_loop_e_o_quinto_servico
+PASS test_conexoes test_jev_fora_do_ar_deixa_pulso_de_falha_e_o_local_nao_conta
+SKIP test_conexoes test_cliente_do_github_avisa_o_ouvinte_sem_conhecer_o_registro
+SKIP test_conexoes test_painel_expoe_a_faixa_de_conexoes
+SKIP test_conexoes test_403_esperado_do_check_runs_nao_e_falha_de_conexao
+PASS test_confianca test_loop_desligado_nao_e_confiavel
+PASS test_confianca test_loop_vivo_e_tudo_seguro_e_confiavel_com_tres_niveis
+PASS test_confianca test_reincidencia_e_main_vermelha_derrubam_a_confianca
+PASS test_confianca test_pausa_e_verificavel
+PASS test_confianca test_projecao_mostra_o_que_vem
+PASS test_confianca test_frescor_do_painel_e_um_neuronio_monitorado
+SKIP test_confianca test_frescor_julga_so_o_codigo_atual_do_painel
+PASS test_confianca test_amostra_da_pagina_antiga_nao_conta_no_p99_nem_na_primeira_versao
+SKIP test_confianca test_frescor_sem_versao_da_pagina_nao_entra_na_janela
+PASS test_confianca test_painel_manda_a_propria_versao_com_o_frescor
+PASS test_confianca test_frescor_com_poucas_amostras_nao_julga
+SKIP test_confianca test_sse_empurra_confianca_e_sinapses
+SKIP test_confianca test_sse_reempurra_confianca_parada_dentro_do_slo_de_frescor
+PASS test_confianca test_frescor_so_mede_a_idade_enquanto_a_aba_esta_visivel
+SKIP test_confianca test_api_confianca_e_frescor
+PASS test_confianca test_semente_nunca_desfaz_o_que_o_loop_entregou
+SKIP test_configuracao test_configurar_cria_arquivo_privado_e_preserva_chaves
+SKIP test_configuracao test_carregar_env_nao_sobrescreve_ambiente
+SKIP test_configuracao test_diagnostico_sem_nada_nao_gasta_e_explica
+SKIP test_configuracao test_instalar_escreve_servico_com_caminhos_reais
+PASS test_configuracao test_registrar_fecha_itens_de_configuracao_do_roteiro
+SKIP test_configuracao test_loop_reinicia_sozinho_quando_a_configuracao_muda
+PASS test_configuracao test_servico_roda_na_pasta_de_dados_e_nao_e_escondido_pelo_clone
+SKIP test_configuracao test_gate_testa_o_token_de_verdade_quando_pedido
+PASS test_conflito_arquivos test_arquivos_em_conflito_le_so_a_secao_conflicted_file_info
+PASS test_conflito_arquivos test_dois_prs_que_conflitam_no_mesmo_arquivo_contam_dois_para_ele
+SKIP test_conta test_conta_max_troca_o_provedor_e_tira_a_chave_do_ambiente
+SKIP test_conta test_llm_pela_assinatura_usa_o_claude_sem_a_chave
+SKIP test_conta test_llm_pela_assinatura_acusa_sessao_caida
+SKIP test_conta test_developer_na_assinatura_nao_recebe_a_chave
+SKIP test_conta test_guardiao_reabre_o_login_e_libera_quando_volta
+SKIP test_conta test_guardiao_confere_na_hora_quando_o_developer_acusa
+SKIP test_conta test_token_de_um_ano_avisa_antes_de_vencer_sem_guardar_o_valor
+FAIL test_conta test_sem_assinatura_o_guardiao_nao_faz_nada
+SKIP test_contexto_cursor test_agents_md_so_tem_comandos_convencoes_e_armadilhas
+SKIP test_contexto_cursor test_regra_com_caminho_vira_mdc_escopado_e_sai_do_agents_md
+SKIP test_contexto_cursor test_agents_md_tem_no_maximo_60_linhas_e_cada_regra_tem_teto
+SKIP test_contexto_cursor test_o_que_o_readme_ja_diz_nao_entra
+PASS test_contexto_cursor test_repositorio_usa_so_licoes_evidenciadas
+PASS test_contexto_cursor test_assunto_desconhecido_e_recusado
+SKIP test_contexto_cursor test_escrever_na_branch_principal_e_recusado
+SKIP test_contexto_cursor test_escrever_numa_branch_de_trabalho_grava_para_virar_pr
+PASS test_contexto_cursor test_escrever_recusa_arquivo_acima_do_teto
+PASS test_controle test_processo_do_controle_sobe_o_painel_e_o_sre_sobre_o_mesmo_banco
+SKIP test_controle test_supervisor_reinicia_o_filho_e_desiste_depois_de_cair_demais
+PASS test_controle test_loop_so_sobe_o_sre_dentro_dele_quando_nao_ha_controle
+SKIP test_corpo test_codigo_novo_validado_vira_o_corpo_e_reinicia
+SKIP test_corpo test_codigo_que_nao_passa_na_validacao_nao_vira_corpo
+SKIP test_corpo test_erros_nos_primeiros_giros_voltam_para_o_codigo_anterior
+SKIP test_corpo test_licao_1_arquivo_nao_rastreado_que_a_main_traz_nao_trava_a_troca
+SKIP test_corpo test_licao_1_sem_colisao_o_erro_continua_visivel
+SKIP test_corpo test_licao_2_troca_direta_nao_esbarra_e_main_consertada_vira_corpo
+PASS test_corpo test_em_testes_nunca_ha_corpo_de_verdade
+SKIP test_corpo test_arquivo_nao_rastreado_no_caminho_nao_trava_a_troca
+PASS test_corpo test_troca_de_versao_tira_snapshot_e_rollback_restaura_so_se_o_esquema_mudouTraceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_engine.py", line 64, in test_sem_llm_o_motor_nao_inventa
+    assert r.fase == "bloqueado" and circle.store.one("SELECT COUNT(*) n FROM deliverables")["n"] == 0
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_evolution.py", line 30, in test_evolucao_de_dominio_aprende_regra
+    assert circle.store.one("SELECT category FROM ledger WHERE id=?", (tx,))["category"] == "outros"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_evolution.py", line 46, in test_duas_correcoes_ainda_nao_bastam
+    assert circle.store.one("SELECT status FROM proposals")["status"] == "deferred"
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_evolution.py", line 68, in test_evolucao_do_circulo_vai_para_shadow
+    assert sh is not None and sh[1]["thresholds"]["auto_accept_category"] == 0.8
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_evolution.py", line 92, in test_rollback_automatico_quando_saude_cai
+    assert circle.ctx.policies.active()[0] == 2
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_evolution.py", line 131, in test_codigo_passa_no_lint_do_ci
+    pytest.importorskip("ruff")
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'pytest' has no attribute 'importorskip'
+
+PASS test_corpo test_codeowners_cobre_a_constituicao
+PASS test_corpo_pr test_modulos_agrupam_os_arquivos_do_diff_por_pasta
+PASS test_corpo_pr test_corpo_tem_as_4_secoes_preenchidas_e_a_lista_de_arquivos_recolhida_no_fim
+PASS test_corpo_pr test_gate_reprovado_aparece_como_reprovado
+PASS test_corpo_pr test_saida_invalida_da_llm_vira_nao_informado
+PASS test_corpo_pr test_llm_que_falha_nao_impede_o_corpo
+PASS test_custo test_tokens_do_developer_somados_por_desfecho_do_item
+PASS test_custo test_sem_chamadas_nao_divide_por_zero
+PASS test_custo test_evidencia_do_economista_traz_tokens_sem_pr_do_developer
+PASS test_dado_na_evidencia test_estado_tem_features_medidas_com_casamento_por_token_numerico
+PASS test_dado_na_evidencia test_estados_distintos_dao_confiancas_distintas_e_dado_ausente_e_nao_com_confianca_alta
+PASS test_daily test_pauta_por_assunto_com_ontem_hoje_e_bloqueio
+PASS test_daily test_no_maximo_dez_linhas
+PASS test_daily test_sai_uma_vez_por_dia_a_partir_das_8h_no_console_e_no_mac
+PASS test_daily test_sem_pasta_de_notas_nao_fala
+PASS test_decision test_worth_spending_bloqueia_acima_do_orcamento
+PASS test_decision test_llm_so_entra_quando_jev_inseguro
+PASS test_decision test_resposta_invalida_do_jev_cai_no_local
+SKIP test_decision test_jev_http_monta_request_da_api
+PASS test_decision test_jev_fora_do_ar_nao_para_o_circulo
+PASS test_decision test_jev_em_duvida_passa_para_a_regra_e_fica_registrado
+PASS test_decision test_jev_aprende_worth_spending_imitando_a_regra_quando_em_duvida
+PASS test_decision test_worth_spending_com_rotulos_divergentes_continua_na_regra
+PASS test_desfecho test_tarefa_do_giro_fecha_o_desfecho_da_decisao_de_gastar
+PASS test_desfecho test_estudo_e_evolucao_registram_o_veredito
+PASS test_desfecho test_developer_proposto_vira_entregue_quando_o_pr_entra
+PASS test_desfecho test_aluno_aprende_com_o_desfecho_quando_ele_existe
+SKIP test_desfecho test_painel_mostra_tokens_por_pr
+PASS test_developer test_licao_26_id_inventado_nao_existe
+PASS test_developer test_id_valido_existe
+PASS test_developer test_id_de_classe_e_de_classe_aninhada
+PASS test_developer test_id_parametrizado
+PASS test_developer test_licao_26_reparo_recusa_alvo_inexistente_sem_rodar_o_pytest
+PASS test_developer test_licao_59_estimar_passos_com_entradas_conhecidas
+PASS test_developer test_licao_59_risco_de_passos_acima_do_limiar_vai_ao_fatiador_antes
+PASS test_developer test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador
+PASS test_developer test_licao_59_limiar_recalibrado_pelas_tarefas_que_estouraram
+PASS test_diff_size test_parse_numstat
+PASS test_diff_size test_numstat_vazio_nao_tem_dominante
+PASS test_diff_size test_renomeacao_com_prefixo_e_sufixo
+PASS test_diff_size test_categoria
+PASS test_diff_size test_limite
+PASS test_diff_size test_numstat_contra_base
+PASS test_digest_semanal test_pr_de_produto_sem_pedido_fica_marcado_e_nao_e_omitido
+SKIP test_digest_semanal test_leitura_pelo_comando_monta_da_base_e_registra_o_uso
+PASS test_digest_semanal test_semana_vazia_publica_fracao_sem_valor_e_prioriza_produto
+PASS test_digest_semanal test_semana_sem_pedido_de_origem_marca_os_prs_e_fica_abaixo_da_meta
+PASS test_digest_semanal test_idle_publica_o_digest_uma_vez_por_semana
+PASS test_digest_semanal test_fracao_abaixo_da_meta_poe_a_pergunta_de_produto_na_frente_do_roteiro
+PASS test_disjuntor test_so_credito_baixo_e_externa
+PASS test_disjuntor test_cinco_falhas_externas_um_aviso_zero_chamadas_na_pausa_e_um_sucesso_fecha
+PASS test_disjuntor test_meio_aberto_libera_um_teste_e_a_falha_reabre_com_backoff_maior
+PASS test_disjuntor test_backoff_tem_teto
+PASS test_disjuntor test_llm_protegida_nao_chama_durante_a_pausa_e_persiste
+PASS test_disjuntor test_developer_sem_credito_nao_chama_o_agente_na_pausa
+PASS test_disjuntor test_o_loop_consulta_o_disjuntor_antes_de_cada_chamada
+PASS test_disjuntor_abrir_pr test_tres_barras_iguais_geram_duas_tentativas_e_um_bloqueio_e_a_main_mudar_reabre
+PASS test_disjuntor_abrir_pr test_assinatura_diferente_zera_a_contagem_e_so_a_mesma_2x_seguidas_bloqueia
+PASS test_disjuntor_abrir_pr test_barra_que_cita_arquivo_so_reabre_quando_esse_arquivo_muda
+PASS test_documentador test_gera_documentacao_profissional_do_codigo_do_banco_e_do_changelog
+SKIP test_documentador test_roda_quando_ha_entrega_nova_e_publica_no_local_sem_github
+PASS test_documentador test_gate_aceita_pr_de_docs_so_com_docs_e_recusa_se_tocar_codigo
+PASS test_documentador test_pr_de_docs_fechado_libera_o_proximo
+PASS test_documentador test_doc_mergeada_nao_dispara_outra_doc
+FAIL test_engine test_sem_llm_o_motor_nao_inventa
+SKIP test_engine test_ciclo_completo_pesquisa_regua_construcao_melhoria
+SKIP test_engine test_catraca_descarta_versao_pior
+SKIP test_engine test_saida_com_injecao_e_reprovada_antes_de_avaliar
+SKIP test_engine test_plateau_coloca_em_manutencao_e_feedback_reabre
+SKIP test_engine test_portfolio_prioriza_projeto_sem_regua
+SKIP test_engine test_orcamento_por_projeto
+SKIP test_engine test_loop_evolui_projeto_sozinho_no_idle
+SKIP test_engine test_painel_mostra_motor_e_serve_entrega_isolada
+PASS test_engine test_roteiro_versionado_atualiza_estado_sem_duplicar
+SKIP test_engine test_reprovacoes_seguidas_param_o_projeto
+SKIP test_engine test_cada_chamada_de_llm_fica_registrada_com_o_modelo_escolhido_pelo_jev
+PASS test_equipe test_mensagens_nascem_dos_registros_e_citam_o_dado
+PASS test_equipe test_retrato_mostra_quem_faz_o_que_e_o_quadro
+SKIP test_equipe test_pagina_equipe_api_e_menu_em_todas_as_telas
+PASS test_erro_legivel test_licao_18_assinatura_nao_carrega_metadados_do_json_do_agente
+PASS test_erro_legivel test_erro_legivel_le_so_o_evento_result_com_erro
+PASS test_erro_legivel test_higiene_funde_as_licoes_18_e_42
+SKIP test_estagnacao_barrada test_licao_47_tarefa_que_o_idle_barra_nao_e_trabalho_pendente
+PASS test_estagnacao_barrada test_licao_47_uma_so_regra_de_trabalho_pronto
+PASS test_estagnacao_barrada test_licao_47_tarefa_pausada_nao_vira_estagnacao_sem_causa
+PASS test_estudo test_adaptar_com_evidencia_reescreve_o_item_e_avisa
+PASS test_estudo test_contestar_com_evidencia_nao_executa_ate_voce_reafirmar
+PASS test_estudo test_sem_fontes_o_loop_nao_desobedece
+PASS test_estudo test_adotar_anexa_o_estudo_para_o_developer
+PASS test_estudo test_resposta_invalida_vira_licao_e_nao_estuda
+PASS test_estudo test_resposta_cortada_no_item_aproveita_o_veredito_e_os_achados
+PASS test_estudo test_cortada_depois_da_justificativa_inteira_estuda_e_sem_ela_grava_o_motivo_tipado
+PASS test_estudo test_adaptar_cortado_sem_o_item_novo_e_adotado_como_pedido
+PASS test_estudo test_narracao_com_chave_antes_do_json_nao_descarta_o_estudo
+PASS test_estudo test_rascunho_ou_eco_do_formato_antes_da_resposta_nao_descarta_o_estudo
+PASS test_estudo test_erro_do_loop_nao_passa_pelo_estudo
+PASS test_estudo test_loop_estuda_antes_do_developer
+PASS test_evidencia_sustenta_estado test_estado_traz_o_teste_citado_em_faixas
+PASS test_evidencia_sustenta_estado test_estados_distintos_dao_confiancas_distintas_e_a_decisao_da_regra
+PASS test_evidencia_sustenta_estado test_estudo_manda_ao_jev_o_resultado_medido_do_teste_citado
+SKIP test_evolution test_guard_impede_remover_protecoes
+FAIL test_evolution test_evolucao_de_dominio_aprende_regra
+FAIL test_evolution test_duas_correcoes_ainda_nao_bastam
+PASS test_evolution test_reviewer_finance_rejeita_regra_que_quebra_historico
+FAIL test_evolution test_evolucao_do_circulo_vai_para_shadow
+PASS test_evolution test_shadow_promovido_quando_melhor
+FAIL test_evolution test_rollback_automatico_quando_saude_cai
+PASS test_evolution test_reviewer_code_nunca_auto_aprova_codigo_de_dinheiro
+PASS test_evolution test_valor_portfolio_um_valor_por_par_de_ciclos_por_projeto
+PASS test_evolution test_valor_portfolio_para_no_plateau_e_mantem_tamanho_entre_politicas
+FAIL test_evolution test_codigo_passa_no_lint_do_ci
+SKIP test_fabrica test_o_circulo_completo_entrega_um_pedido
+SKIP test_fabrica test_sem_teste_novo_o_qa_devolve_e_na_terceira_o_cartao_bloqueia
+SKIP test_fabrica test_arquiteto_bloqueia_o_que_exige_mexer_no_protegido
+SKIP test_fabrica test_ci_vermelho_devolve_ao_dev_e_achado_vira_cartao_quando_a_fila_esvazia
+SKIP test_fabrica test_painel_mostra_o_chao_de_fabrica_e_aceita_pedidoTraceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_fabrica.py", line 179, in test_cli_demo_tem_projeto_de_exemplo_que_fecha_o_circulo
+    assert finais == [(1, "concluido"), (2, "concluido")]                                        # o segundo precisou de uma devolução do QA
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_intencoes.py", line 87, in test_central_em_tres_niveis_com_sinais_de_ouro
+    assert all(x["dado_em"] for x in r["checks"]) and r["veredito"] == "confiavel"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+FAIL test_fabrica test_cli_demo_tem_projeto_de_exemplo_que_fecha_o_circulo
+PASS test_fatiador test_tres_falhas_dividem_o_item_e_ele_nao_e_reexecutado_inteiro
+PASS test_fatiador test_falha_de_sub_item_repete_so_ele_com_o_erro_anterior
+PASS test_fatiador test_divisao_tem_profundidade_maxima_1_e_sub_item_com_3_falhas_e_descartado
+PASS test_fatiador test_ultimo_sub_item_feito_conclui_o_pai
+PASS test_fatiador test_sub_item_com_pr_aberto_nao_trava_o_conserto_nem_a_fila
+PASS test_fatiador test_estimar_tamanho_conta_modulos_e_simbolos_citados
+PASS test_fatiador test_texto_do_60_gera_fatias_por_modulo_sem_chamar_a_llm
+PASS test_fatiador test_sub_item_pre_dividido_que_estoura_o_teto_e_redividido_sozinho
+PASS test_fazendo test_registro_por_agente_com_passos_e_termino
+PASS test_fazendo test_eventos_do_claude_code_viram_passos_legiveis
+SKIP test_fazendo test_claude_code_em_streaming_avisa_cada_passo_e_devolve_o_resultado
+PASS test_fazendo test_toda_tarefa_do_giro_marca_comeco_e_fim_e_a_equipe_mostra
+SKIP test_fazendo test_tela_da_equipe_tem_os_passos
+SKIP test_fazendo test_segunda_tentativa_do_mesmo_item_retoma_a_sessao_do_claude_code
+PASS test_fazendo test_prompt_traz_testes_existentes_e_ultimo_pr_dos_modulos_alvo
+PASS test_fluxo test_giro_vira_eventos_em_ordem_de_agente_para_agente
+PASS test_fluxo test_agente_novo_da_autoevolucao_entra_sozinho
+SKIP test_fluxo test_painel_do_fluxo
+SKIP test_fluxo test_fluxo_so_mostra_o_que_nao_esta_em_outra_tela
+PASS test_fluxo test_laboratorio_manda_variante_na_mesma_chamada_e_adota_com_evidencia
+PASS test_fluxo test_sem_jev_real_o_laboratorio_nao_interfere
+PASS test_fluxo test_versao_nova_do_jev_vira_alerta
+PASS test_fluxo test_jardineiro_transforma_crescimento_em_item
+SKIP test_fluxo test_raias_do_giro_mostram_quem_fez_o_que_e_quando
+SKIP test_fluxo test_obras_dizem_o_que_cada_agente_construiu
+PASS test_fuso_da_maquina test_licao_50_nenhum_agora_pelo_fuso_da_maquina_no_pacote_nem_nos_testes
+SKIP test_gargalos_20_10 test_desenvolvedor_pode_rodar_testes_lint_e_git_de_leitura_sozinho
+PASS test_gargalos_20_10 test_espera_vencida_do_desenvolvedor_some_do_banco
+PASS test_gargalos_20_10 test_portao_com_teste_inexistente_vira_obsoleto_e_nao_bloqueia
+PASS test_gargalos_20_10 test_estudo_sem_texto_tenta_de_novo_sem_busca_com_teto_maior
+PASS test_gargalos_20_10 test_aviso_de_saude_igual_nao_repete_na_mesma_hora
+PASS test_gasto_cursor test_lancamento_rapido_em_centavos_de_dolar_com_assunto_e_tipo
+PASS test_gasto_cursor test_csv_do_cursor_vira_linhas_e_nao_duplica_ao_reimportar
+PASS test_gasto_cursor test_projecao_pela_media_movel_de_7_dias_e_alerta_antes_do_fim_do_mes
+PASS test_gasto_cursor test_sem_alerta_quando_o_ritmo_cabe_no_mes_e_mes_novo_zera
+SKIP test_gasto_cursor test_comando_lanca_importa_e_mostra_a_projecao
+PASS test_gate_causa test_os_7_checks_juntos_sao_falha_uniforme_em_qualquer_ordem
+PASS test_gate_causa test_falha_parcial_e_especifica_e_motivo_sem_checks_fica_de_fora
+PASS test_gate_causa test_baseline_da_a_fracao_uniforme_e_os_tokens_do_developer_nesses_prs
+SKIP test_graft test_sem_graft_tudo_degrada_para_o_fts
+SKIP test_graft test_escrita_espelha_no_graft_e_conteudo_novo_supersede_o_antigo
+SKIP test_graft test_busca_funde_lexical_e_semantica_por_rrf
+SKIP test_graft test_item_repetido_dito_com_outras_palavras_e_pego_pelo_cache_verificado
+SKIP test_graft test_manutencao_resolve_duplicata_do_mesmo_registro_e_deixa_o_resto_para_o_medico
+SKIP test_graft test_espelha_linhas_antigas_aos_poucos_e_entorno_vem_do_grafo
+SKIP test_graft test_graft_caido_pausa_e_nunca_derruba_a_memoria
+SKIP test_graft test_evidencia_de_uso_vai_para_o_painel
+SKIP test_graft test_sem_graft_o_painel_mostra_como_instalar
+SKIP test_graft test_acha_o_graft_fora_do_path_do_servico
+PASS test_graft test_testes_e_validacao_nunca_falam_com_o_graft_real
+SKIP test_graft test_perfil_trocado_reespelha_do_zero
+PASS test_guardrails test_snapshot_e_restauracao
+PASS test_guardrails test_snapshot_automatico_antes_de_mudar_politica
+PASS test_guardrails test_snapshots_antigos_vao_para_arquivo_nao_sao_apagados
+PASS test_guardrails test_rollback_conta_e_oscilacao_bloqueia
+SKIP test_guardrails test_orcamento_de_mudancas_nivel2
+SKIP test_guardrails test_estagnacao_vira_alerta
+PASS test_guardrails test_destilacao_sobe_na_cascata
+PASS test_guardrails test_harness_lab_rejeita_variante_sem_regra_anti_injecao
+PASS test_guardrails test_harness_lab_ab_promove_variante_melhor
+PASS test_higiene test_log_json_do_agente_vira_causa_classificada_e_nao_trecho_cru
+PASS test_higiene test_titulo_curto_cabe_numa_linha_sem_json
+PASS test_higiene test_higiene_expira_dependentes_encurta_titulos_e_une_licoes
+PASS test_impressao_pr test_terceira_abertura_igual_a_48_e_49_fechados_e_bloqueada
+PASS test_impressao_pr test_titulo_normalizado_e_checks_sem_ordem_dao_a_mesma_impressao
+PASS test_impressao_pr test_uma_abertura_fechada_ainda_deixa_abrir
+PASS test_impressao_pr test_mudar_os_checks_falhos_ou_o_titulo_libera_a_abertura
+PASS test_impressao_pr test_so_aberturas_fechadas_contam
+PASS test_incidents test_decisoes_fora_de_pedido_sao_do_proprio_circulo
+PASS test_incidents test_erro_vira_incidente_agrupado
+PASS test_incidents test_erro_recorrente_vira_item_do_roteiro
+PASS test_incidents test_autocorrecao_isola_etapa_com_backoff
+PASS test_incidents test_saude_nunca_entra_em_quarentena
+PASS test_incidents test_incidente_que_parou_de_acontecer_e_resolvido
+PASS test_incidents test_card_do_circulo_mostra_roteiro_e_erros
+PASS test_incidents test_pedido_que_falha_registra_incidente_no_projeto
+PASS test_incidents test_tarefa_ociosa_respeita_quarentena_do_componente
+PASS test_indagador test_perguntas_da_missao_passam_pelo_jev_e_so_a_pertinente_vale
+PASS test_indagador test_pergunta_generica_e_descartada_pelo_jev
+PASS test_indagador test_jev_em_duvida_vira_inconclusa_e_nao_passa
+PASS test_indagador test_planejador_e_missao_partem_da_pergunta_validada
+PASS test_indagador test_pedido_do_cassio_entra_na_fila_e_o_jev_so_anota
+PASS test_indagador test_indagador_roda_como_tarefa_do_giro_e_respeita_o_intervalo
+SKIP test_indagador test_painel_mostra_o_indagador
+PASS test_indagador test_planejador_mantem_fila_com_folga
+PASS test_indagador test_pergunta_validada_destrava_o_planejador_no_porteiro_do_gasto
+PASS test_indagador test_estoque_de_validas_e_teto_e_nao_intervalo
+PASS test_indagador test_uma_passagem_nao_passa_do_estoque_de_validas
+PASS test_ingestao test_pasta_vazia_gera_1_pedido_repetir_nao_gera_outro_e_a_fixture_fecha
+PASS test_ingestao test_causa_que_muda_fecha_o_pedido_antigo_e_conta_de_novo
+PASS test_ingestao test_cada_giro_grava_a_causa_da_rodada_e_a_dominante_das_ultimas_explica_lancamentos_0
+PASS test_ingestao test_pedido_so_abre_com_lancamentos_0_e_fecha_quando_o_ledger_ganha_lancamento
+PASS test_ingestao test_toda_rodada_grava_registro_com_carimbo_e_sem_registro_recente_e_nunca_rodou
+PASS test_ingestao test_contadores_por_fonte_fecham_vistos_igual_rejeitados_mais_duplicados_mais_novos
+PASS test_ingestao test_giro_ocioso_ingere_pendentes_lancamentos_0_a_n_e_o_segundo_giro_so_duplica
+PASS test_ingestao test_todo_giro_com_lancamentos_0_grava_1_causa_e_a_pasta_e_o_ofx_vira_ok_no_giro_seguinte
+SKIP test_ingestao test_giro_que_quebra_grava_erro_e_nao_a_causa_da_rodada_anterior
+PASS test_intencoes test_toda_acao_do_loop_tem_intencao_gravada_antes
+SKIP test_intencoes test_acao_so_roda_depois_do_registro
+PASS test_intencoes test_trilha_e_so_de_acrescimo_e_encadeada
+FAIL test_intencoes test_central_em_tres_niveis_com_sinais_de_ouro
+PASS test_intencoes test_frescor_e_slo_em_p99_de_24h
+PASS test_intencoes test_teste_semanal_da_parada_exercita_o_botao
+PASS test_intencoes test_parada_que_vaza_derruba_a_confianca
+SKIP test_intencoes test_botao_parar_verificado_de_ponta_a_ponta
+PASS test_jev_cobertura test_toda_pergunta_ao_jev_tem_criterios_descritos
+SKIP test_jev_cobertura test_cliente_envia_criterios_do_noul_e_guarda_legenda_do_score
+PASS test_jev_cobertura test_decisao_guarda_a_distribuicao
+PASS test_jev_passe test_estado_identico_nas_perguntas_de_rotina_vem_do_cache
+PASS test_jev_passe test_worth_spending_recebe_features_medidas_e_criterio_com_numero
+PASS test_jev_passe test_dado_na_evidencia_e_conferido_mecanicamente_antes_do_jevTraceback (most recent call last):
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/.shim259/run.py", line 50, in <module>
+    f(**kw)
+  File "/Users/cassiomatos/Projects/.circulo-wt-270/tests/test_jobs.py", line 46, in test_pedido_ambiguo_vira_desconhecido_e_so_entao_a_llm_escolhe_um_rotulo
+    assert jobs.registrar(circle.ctx, eid) == "desconhecido"  # sem LLM: o rótulo explícito fica
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

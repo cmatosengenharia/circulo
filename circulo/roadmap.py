@@ -24,13 +24,47 @@ VERMELHA = "roadmap_licao_vermelha"      # {item: quando o node id da lição fe
 FECHADAS = ("validada", "evidenciada")
 
 
+class SemPerguntaOrigem(ValueError):
+    """Item do loop sem a pergunta do conselho que o originou (lição #15): o rastro:cadeia barraria a entrega."""
+
+
 @dataclass(frozen=True)
 class Origem:
     pergunta_id: int
 
     def __post_init__(self) -> None:
         if type(self.pergunta_id) is not int or self.pergunta_id <= 0:
-            raise ValueError(f"item do roadmap sem pergunta de origem: pergunta_id={self.pergunta_id!r}")
+            raise SemPerguntaOrigem(f"item do roadmap sem pergunta de origem: pergunta_id={self.pergunta_id!r}")
+
+
+def exigir_pergunta(store, pergunta_id: int | None) -> int:
+    """O id da pergunta de origem, se ela existe na tabela do conselho; senão SemPerguntaOrigem."""
+    pid = Origem(pergunta_id).pergunta_id
+    if not store.one("SELECT 1 FROM perguntas WHERE id=?", (pid,)):
+        raise SemPerguntaOrigem(f"pergunta de origem #{pid} não está na tabela do conselho")
+    return pid
+
+
+def gravar_item(store, pergunta_id: int | None, titulo: str, detalhe: str, evidencia: str, modulo: str | None = None,
+                status: str = "pendente") -> int:
+    """O ponto único de gravação de item do loop no roteiro (lição #15): sempre preso à pergunta que o originou."""
+    pid = exigir_pergunta(store, pergunta_id)
+    ordem = (store.one("SELECT MAX(ordem) m FROM roadmap")["m"] or 0) + 1
+    agora = time.time()
+    rid = store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,modulo,"
+                  "pergunta_id,origem_status) VALUES(?,?,'loop',?,?,?,?,?,?,?,'ok')",
+                  (titulo, detalhe[:2000], status, evidencia, ordem, agora, agora, modulo, pid))
+    store.x("UPDATE perguntas SET item_id=?, updated_at=? WHERE id=?", (rid, agora, pid))
+    return rid
+
+
+def gravar_medido(store, persona: str, chave: str, titulo: str, detalhe: str, evidencia: str) -> int:
+    """Item que um papel do loop abre a partir do que mediu (Vigia, Jardineiro): a medição vira a pergunta de origem,
+    já respondida pelo item, e o item é gravado preso a ela. O cérebro é o próprio papel: fora do placar do conselho."""
+    agora = time.time()
+    pid = store.x("INSERT INTO perguntas(chave,persona,texto,evidencia,status,cerebro,created_at,updated_at) "
+                  "VALUES(?,?,?,?,'virou_item',?,?,?)", (chave, persona, titulo, evidencia, persona, agora, agora))
+    return gravar_item(store, pid, titulo, detalhe, evidencia)
 
 
 def migrar(db: sqlite3.Connection) -> None:
