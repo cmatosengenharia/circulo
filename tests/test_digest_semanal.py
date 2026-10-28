@@ -1,8 +1,9 @@
 """Digest semanal: os PRs de produto mergeados em 7 dias, cada um com o pedido ou a pergunta de origem e o antes/depois
 da métrica; PR de produto sem origem aparece marcado 'sem pedido', nunca omitido."""
 import json
+import time
 
-from circulo import digest_semanal
+from circulo import digest_semanal, indagador
 from circulo.cli import main
 from conftest import NOON
 
@@ -58,3 +59,54 @@ def test_leitura_pelo_comando_monta_da_base_e_registra_o_uso(circle, capsys):
     out = capsys.readouterr().out
     assert "#501" in out and "#502" in out and "#503" not in out
     assert digest_semanal.leituras(s, AGORA + 1) == 1
+
+
+def _pergunta(s, chave, eixo, score):
+    return s.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,eixo,created_at,updated_at) "
+               "VALUES(?,'pm','q?','valida','loop',?,?,?,?)", (chave, score, eixo, AGORA, AGORA))
+
+
+def test_semana_vazia_publica_fracao_sem_valor_e_prioriza_produto(circle):
+    t = digest_semanal.texto([])
+    assert "0 de 0 PRs" in t and "fração —" in t and "meta 0.5" in t and "Nenhum PR de produto na semana." in t
+    avisos = []
+    assert digest_semanal.publicar(circle.store, lambda m, k="resposta": avisos.append(m), AGORA) == digest_semanal.texto([])
+    assert avisos == [t]
+    assert digest_semanal.prioriza_produto(circle.store)
+
+
+def test_semana_sem_pedido_de_origem_marca_os_prs_e_fica_abaixo_da_meta(circle):
+    s = circle.store
+    _pr(s, 601, None)
+    _pr(s, 602, _item(s, "Ajuste interno", "erro"))
+    prs = digest_semanal.prs_da_semana(s, AGORA)
+    assert all(p["pedido"] is None and not p["produto"] for p in prs)
+    t = digest_semanal.publicar(s, lambda m, k="resposta": None, AGORA)
+    assert "0 de 2 PRs" in t and "fração 0.00, meta 0.5" in t and "abaixo da meta" in t
+    assert digest_semanal.prioriza_produto(s)
+
+
+def test_idle_publica_o_digest_uma_vez_por_semana(circle):
+    s = circle.store
+    circle._run_idle_task("resumo")
+    circle._run_idle_task("resumo")
+    assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'Digest semanal:%'")["n"] == 1
+    assert digest_semanal.publicar(s, lambda m, k="resposta": None, time.time() + 6 * 86400) is None
+    assert digest_semanal.publicar(s, lambda m, k="resposta": None, time.time() + 7 * 86400 + 1) is not None
+
+
+def test_fracao_abaixo_da_meta_poe_a_pergunta_de_produto_na_frente_do_roteiro(circle):
+    s = circle.store
+    infra = _pergunta(s, "arq:a", "infra", 0.9)
+    produto = _pergunta(s, "pm:b", "produto", 0.4)
+    for n in range(4):                                       # semana na meta: 2 de 4 PRs de produto
+        _pr(s, 700 + n, _item(s, f"Pedido {n}", "pedido_cassio" if n < 2 else "erro"))
+    digest_semanal.publicar(s, lambda m, k="resposta": None, AGORA)
+    assert not digest_semanal.prioriza_produto(s)
+    assert indagador.espiar(s, "loop")["id"] == infra
+    s.set(digest_semanal.PUBLICADO, None)
+    _pr(s, 710, _item(s, "Conserto", "erro"))                 # 2 de 5: abaixo da meta
+    digest_semanal.publicar(s, lambda m, k="resposta": None, AGORA)
+    assert digest_semanal.prioriza_produto(s)
+    assert indagador.espiar(s, "loop")["id"] == produto
+    assert indagador.proxima(s, "loop")["id"] == produto

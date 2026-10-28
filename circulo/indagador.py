@@ -457,18 +457,26 @@ def rodar(ctx, engine=None) -> dict | None:
 
 
 # ------------------------------------------------------------------ consumo: quem parte da pergunta válida
+def _ordem(store, cerebro: str) -> str:
+    """A ordem de consumo, a mesma para espiar e proxima: com o último digest semanal abaixo da meta de produto, a
+    pergunta do loop com eixo produto/missão vai na frente das de manutenção."""
+    from . import digest_semanal
+    frente = cerebro == "loop" and digest_semanal.prioriza_produto(store)
+    return ("CASE WHEN eixo IN ('produto','missao') THEN 0 ELSE 1 END, " if frente else "") + "score DESC, id"
+
+
 def espiar(store, cerebro: str, pergunta_id: int | None = None) -> dict | None:
     """A melhor pergunta válida esperando (ou a pergunta_id, se ainda válida), sem consumir (o porteiro do gasto vê o
     que o gasto vai responder)."""
     r = store.one("SELECT id, texto, eixo, pertinencia, acionavel, created_at FROM perguntas WHERE cerebro=? AND status='valida' "
-                  "AND (? IS NULL OR id=?) ORDER BY score DESC, id LIMIT 1", (cerebro, pergunta_id, pergunta_id))
+                  "AND (? IS NULL OR id=?) ORDER BY " + _ordem(store, cerebro) + " LIMIT 1", (cerebro, pergunta_id, pergunta_id))
     return dict(r) if r else None
 
 
 def proxima(store, cerebro: str, pergunta_id: int | None = None) -> dict | None:
     """A melhor pergunta validada pelo Jev para este cérebro (ou a pergunta_id, se ainda válida), marcada como 'feita'
     (quem consome liga ao item)."""
-    r = store.one("SELECT * FROM perguntas WHERE cerebro=? AND status='valida' AND (? IS NULL OR id=?) ORDER BY score DESC, id LIMIT 1",
+    r = store.one("SELECT * FROM perguntas WHERE cerebro=? AND status='valida' AND (? IS NULL OR id=?) ORDER BY " + _ordem(store, cerebro) + " LIMIT 1",
                   (cerebro, pergunta_id, pergunta_id))
     if r is None:
         return None

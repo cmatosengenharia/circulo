@@ -13,15 +13,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import finance, ingestao, intencoes, jobs, jtbd, parada, revisao_uso, revisor, telemetria
+from . import digest_semanal, finance, ingestao, intencoes, jobs, jtbd, parada, revisao_uso, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
-from . import caixa, cao_de_guarda
+from . import caixa, cao_de_guarda, guardrails
 from .disjuntor import protegida
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
-from . import guardrails
 from .engine import Engine
 from .estagnacao import anotar_giro, causa_provavel, pode_rodar
 from .graph import MissionGraph
@@ -683,6 +682,7 @@ class Circle:
             self.regression()
         elif pick == "resumo":
             self.write_summary()
+            digest_semanal.publicar(self.store, self.ctx.reply)   # uma vez por semana; abaixo da meta, o roteiro prioriza produto
         elif pick == "propor_feature":
             self.developer.idle()
         elif pick == "revisar_prs":
