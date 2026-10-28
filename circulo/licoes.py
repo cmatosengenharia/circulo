@@ -750,13 +750,16 @@ class Licoes:
         return self.s.one("SELECT COUNT(*) n FROM licoes WHERE classe='estrutural' "
                           "AND status IN ('aberta','em_correcao','reincidente')")["n"] > 0
 
-    def contexto(self, limite: int = 15) -> str:
-        rows = self.s.q("SELECT id, status, assinatura, prevencao, reincidencias FROM licoes WHERE classe!='ambiente' AND status!='unida' "
-                        "ORDER BY reincidencias DESC, ocorrencias DESC, id DESC LIMIT ?", (limite,))
+    def contexto(self, limite: int = 15, resolvidas_so_titulo: bool = False) -> str:
+        """resolvidas_so_titulo: obsoleta/evidenciada já foram corrigidas, vão depois das ativas e só com o título."""
+        resolvida = "status IN ('obsoleta','evidenciada')" if resolvidas_so_titulo else "0"
+        rows = self.s.q(f"SELECT id, status, assinatura, prevencao, reincidencias, {resolvida} resolvida FROM licoes "
+                        "WHERE classe!='ambiente' AND status!='unida' "
+                        "ORDER BY resolvida, reincidencias DESC, ocorrencias DESC, id DESC LIMIT ?", (limite,))
         if not rows:
             return ""
         linhas = [f"- #{r['id']} [{r['status']}{', reincidiu ' + str(r['reincidencias']) + 'x' if r['reincidencias'] else ''}] "
-                  f"{r['assinatura']}: {r['prevencao']}" for r in rows]
+                  f"{r['assinatura']}" + ("" if r["resolvida"] else f": {r['prevencao']}") for r in rows]
         return "Erros que o círculo já cometeu (lições). Não repita nenhum deles:\n" + "\n".join(linhas)
 
     def resumo(self) -> dict:

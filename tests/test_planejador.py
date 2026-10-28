@@ -108,3 +108,28 @@ def test_item_medido_leva_o_dado_no_detalhe(circle, repo):  # noqa: F811
     _, plan = preparar(circle, repo, Medido())
     item = plan.run()
     assert "Evidência (medido): 44%" in circle.store.one("SELECT detalhe FROM roadmap WHERE id=?", (item["id"],))["detalhe"]
+
+
+def test_prompt_do_planejador_poda_roteiro_antigo_e_licoes_resolvidas(circle):
+    """Pergunta #404: com 300 itens no roteiro e 30 lições o prompt fica abaixo do teto, com os pendentes e as
+    lições sem_prevencao inteiras; lição obsoleta/evidenciada vai só com o título."""
+    from circulo.perguntas import Pergunta
+    s = circle.store
+    for i in range(300):
+        s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+            "VALUES(?,'d','loop',?,'x',?,?,?)", (f"item antigo de roteiro numero {i:03d}", "pendente" if i % 30 == 7 else "feito",
+                                                1000 + i, i, i))
+    for i in range(30):
+        s.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,created_at,updated_at) "
+            "VALUES(?,?,'trabalho','d',?,?,1,?,0,0)", (f"ponto{i}:erro", f"ponto{i}", f"prevencao longa da licao {i} " * 8,
+                                                     ("sem_prevencao", "obsoleta", "evidenciada")[i % 3], 30 - i))
+    prompt = Planejador(circle.ctx).montar_prompt(Pergunta("k", "economista", "Qual é o jeito mais barato?", 0.5))
+    assert len(prompt) < 9000
+    pendentes = [r["titulo"] for r in s.q("SELECT titulo FROM roadmap WHERE status='pendente' AND titulo LIKE 'item antigo%'")]
+    assert len(pendentes) == 10 and all(t in prompt for t in pendentes)
+    assert "item antigo de roteiro numero 000" not in prompt
+    for r in s.q("SELECT id, status, prevencao FROM licoes WHERE assinatura LIKE 'ponto%'"):
+        if r["status"] == "sem_prevencao":
+            assert f"#{r['id']} [" in prompt and r["prevencao"] in prompt
+        else:
+            assert r["prevencao"] not in prompt
