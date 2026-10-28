@@ -1,6 +1,8 @@
 """Digest semanal do que o time ganhou: os PRs de produto mergeados em 7 dias, cada um com o pedido ou a pergunta de
 origem e o antes/depois da métrica que a motivou. PR de produto sem origem sai marcado 'sem pedido', nunca omitido:
-o buraco no rastro é o que o time precisa ver. Cada leitura (`circulo digest`) fica em `digest_leituras`."""
+o buraco no rastro é o que o time precisa ver. Cada leitura (`circulo digest`) fica em `digest_leituras`. O idle publica
+o digest uma vez por semana (`publicar`); com a fração de produto abaixo da meta, o próximo roteiro parte de uma
+pergunta de produto (`prioriza_produto`, lido pelo Indagador)."""
 from __future__ import annotations
 
 import json
@@ -20,6 +22,12 @@ CREATE TABLE IF NOT EXISTS digest_leituras (
 """
 SEM_PEDIDO = "sem pedido"
 META = next(meta for chave, _, meta, _ in norte.RESULTADOS if chave == "fracao_produto")
+PUBLICADO = "digest_semanal_publicado"   # kv: a última publicação do idle (em, fracao, prioriza_produto)
+
+
+def abaixo_da_meta(prs: list[dict]) -> bool:
+    """Semana vazia também conta: sem PR mergeado, nenhum foi produto. Pura."""
+    return not prs or sum(1 for p in prs if p["produto"]) / len(prs) < META
 
 
 def texto(prs: list[dict]) -> str:
@@ -27,7 +35,7 @@ def texto(prs: list[dict]) -> str:
     produto = [p for p in prs if p["produto"]]
     fracao = f"{len(produto) / len(prs):.2f}" if prs else "—"
     linhas = [f"Digest semanal: {len(produto)} de {len(prs)} PRs mergeados em 7 dias foram produto "
-              f"(fração {fracao}, meta {META})."]
+              f"(fração {fracao}, meta {META}{', abaixo da meta' if abaixo_da_meta(prs) else ''})."]
     for p in sorted(produto, key=lambda p: p["number"]):
         partes = [f"#{p['number']} {p['titulo']}", p["pedido"] or SEM_PEDIDO]
         if p["metrica"]:
@@ -75,12 +83,34 @@ def prs_da_semana(store: Store, agora: float | None = None) -> list[dict]:
 def ler(store: Store, agora: float | None = None) -> str:
     """Monta o digest da semana e registra a leitura."""
     agora = time.time() if agora is None else agora
-    prs = prs_da_semana(store, agora)
+    return _ler(store, prs_da_semana(store, agora), agora)
+
+
+def _ler(store: Store, prs: list[dict], agora: float) -> str:
     produto = [p for p in prs if p["produto"]]
     store.x(ESQUEMA)
     store.x("INSERT INTO digest_leituras(prs, produto, sem_pedido, created_at) VALUES(?,?,?,?)",
             (len(prs), len(produto), sum(1 for p in produto if not p["pedido"]), agora))
     return texto(prs)
+
+
+def publicar(store: Store, reply, agora: float | None = None) -> str | None:
+    """No idle: o digest da semana vai para a linha do tempo no máximo uma vez a cada 7 dias, e a fração fica gravada
+    em kv PUBLICADO. Devolve o texto publicado, ou None se a semana já teve o seu."""
+    agora = time.time() if agora is None else agora
+    if agora - float((store.get(PUBLICADO) or {}).get("em") or 0) < norte.SEMANA:
+        return None
+    prs = prs_da_semana(store, agora)
+    t = _ler(store, prs, agora)
+    store.set(PUBLICADO, {"em": agora, "fracao": round(sum(1 for p in prs if p["produto"]) / len(prs), 2) if prs else None,
+                          "prioriza_produto": abaixo_da_meta(prs)})
+    reply(t, "saude")
+    return t
+
+
+def prioriza_produto(store: Store) -> bool:
+    """O último digest publicado ficou abaixo da meta de produto: o roteiro seguinte parte de uma pergunta de produto."""
+    return bool((store.get(PUBLICADO) or {}).get("prioriza_produto"))
 
 
 def leituras(store: Store, agora: float | None = None) -> int:
