@@ -250,3 +250,32 @@ def test_fila_cheia_e_contrapressao_e_nao_trava_de_pergunta_validada(circle):
     assert vigia.Vigia(circle.ctx).rodar(agora)["achados"] == 0
     circle.store.set(pl.GATE, {"em": agora, "motivo": "teto diário: 24 itens em 24 h (teto 24)"})   # fila livre e parada: trava
     assert "pergunta_valida_parada" in {a["chave"] for a in vigia.sondar(circle.store, agora)}
+
+
+def test_disparo_da_estagnacao_grava_um_evento_e_conta_nos_30_dias(circle):
+    """Pergunta #434: a ação da estagnação fica gravada, e disparos_30d é lido do banco, sem duplicar nos giros seguintes."""
+    from circulo.estagnacao import ESTAGNADO
+    from circulo.perguntas import METRICAS
+
+    class JevSeguro:
+        source, ultimo_modelo = "jev", "jev-1.13.0"
+
+        def ask_many(self, state, qs):
+            return {qid: Decision(qid, "noul", 0.9, 0.9, "jev") if q.kind == "noul" else Decision(qid, "choice", "alertar", 0.9, "jev")
+                    for qid, q in qs.items()}, 10
+    s, agora = circle.store, time.time()
+    circle.ctx.dl.jev = JevSeguro()
+    v = vigia.Vigia(circle.ctx)
+    s.set("progresso", {"sem": 3, "recusas": {}})                             # a pendência sintética parada, abaixo do limiar
+    v.rodar(agora)
+    assert vigia.disparos_30d(s, "estagnacao", agora) == 0 and vigia.resumo(s)["disparos_30d"]["estagnacao"] == 0
+    for i, sem in enumerate((ESTAGNADO, ESTAGNADO + 1, ESTAGNADO + 2)):      # passa do limiar e segue parada
+        s.set("progresso", {"sem": sem, "recusas": {}})
+        v.rodar(agora + 60 * (i + 1))
+    ev = [dict(r) for r in s.q("SELECT * FROM vigia_disparos WHERE chave='estagnacao'")]
+    assert len(ev) == 1 and ev[0]["acao"] == "alertar"
+    assert json.loads(ev[0]["evidencia"])["giros_sem_avanco"] == ESTAGNADO and json.loads(ev[0]["evidencia"])["limiar"] == ESTAGNADO
+    s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em) VALUES('estagnacao','alertar','{}',?)", (agora - 31 * 86400,))
+    assert vigia.disparos_30d(s, "estagnacao", agora + 300) == 1               # o de 31 dias atrás fica fora da janela
+    assert vigia.resumo(s)["disparos_30d"]["estagnacao"] == 1
+    assert METRICAS["estagnacao"][1](s, agora + 300)[1]["disparos_30d"] == 1   # o auditor lê o número, não "desconhecido"

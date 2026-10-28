@@ -22,7 +22,7 @@ from .disjuntor import protegida
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from .engine import Engine
-from .estagnacao import anotar_giro, causa_provavel, pode_rodar
+from .estagnacao import ESTAGNADO, anotar_giro, causa_provavel, pode_rodar
 from .graph import MissionGraph
 from .harness_lab import HarnessLab
 from .reparo import build_developer
@@ -40,7 +40,6 @@ TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_co
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
-ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura)
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
 VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop em docs/", "analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",

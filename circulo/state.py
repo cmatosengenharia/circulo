@@ -480,6 +480,16 @@ CREATE TABLE IF NOT EXISTS vigia (
   vezes INTEGER NOT NULL DEFAULT 1
 );
 
+-- cada ação executada pelo Vigia (abrir item ou alertar): contador que só cresce; a janela é calculada na leitura
+CREATE TABLE IF NOT EXISTS vigia_disparos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL,
+  acao TEXT NOT NULL,
+  evidencia TEXT,
+  em REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vigia_disparos_chave ON vigia_disparos(chave, em);
+
 CREATE TABLE IF NOT EXISTS run_errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT,                    -- execução (giro) em que o erro aconteceu: o painel abre o erro por ele

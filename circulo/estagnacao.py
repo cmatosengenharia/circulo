@@ -5,6 +5,7 @@ que rodou (tarefa, pedido, erro por etapa); a causa junta essas contagens às re
 Tarefa que o idle não deixa rodar não é trabalho pendente: `pode_rodar` é a mesma regra para os dois.
 """
 
+ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura); o Vigia age a partir dele
 SEGURAS = ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")   # modo seguro: só baixo risco
 COMPONENTE = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}     # (corrigir_codigo tem quarentena própria)
 
