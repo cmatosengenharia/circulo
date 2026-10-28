@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import __version__, finance
 from . import atividade as atv
-from . import registro, repo_stats
+from . import planos, registro, repo_stats
 from .budget import TZ
 from .falhas_painel import (_falhas_antes, agrupar_por_causa, causas_vs_antes, falhas_por_causa, falhas_por_componente,
                             variacao)
@@ -292,6 +292,7 @@ def saude(conn) -> dict:
                (agora - 2 * 86400,)), agora),
            "entregas_sem_uso": (uso := classificar(conn, agora))["sem_uso"], "entregas_sem_uso_7d": resumo_7d(uso),
            "contestados": (cont := contestados(conn)), "contestados_sem_fonte": sum(not c["fontes"] for c in cont),
+           "planos": planos.ler(conn, agora),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -347,6 +348,13 @@ def pagina_saude(h: dict) -> bytes:
                        " ".join(f'<a href="{escape(u)}" rel="noreferrer">{escape(u)}</a>' for u in c["fontes"])
                        or '<em class="delta ruim">⚠ contestação sem fonte</em>') + "</li>"
                    for c in h["contestados"]) + "</ol></section>")
+    pl = h["planos"]
+    reg, hum = ("—", "—") if pl["total"] == 0 else (f'{pl["registrado_pct"]}%', f'{pl["humano_pct"]}%')
+    plano = ('<section class="card falhas" aria-label="Planos aprovados antes do commit"><span>Planos aprovados antes do '
+             f'commit (7 d)</span><b>{reg}</b><small>com plano antes do commit, de {pl["total"]} PR(s) · aprovado ou '
+             f'corrigido por humano: <b>{hum}</b></small><ol>' + "".join(
+                 f'<li>PR #{p["pr"]} item #{p["item_id"]} <em class="delta ruim">⚠ {p["motivo"]}</em></li>'
+                 for p in pl["sem_plano"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -357,7 +365,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{componentes}{falhas}{sem_uso}{contest}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{falhas}{sem_uso}{contest}{plano}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
