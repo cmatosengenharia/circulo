@@ -441,6 +441,35 @@ def test_item_feito_sem_checagem_deixa_a_licao_sem_prevencao_e_a_volta_do_erro_r
     assert (r["status"], r["reincidencias"]) == ("reincidente", 1)
 
 
+def _sem_prevencao(s, lid, reincidencias, item_id=None):
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,created_at,updated_at,camada,item_id) VALUES(?,?,'developer:agente','estrutural',"
+        "'developer:agente: circulo/self_dev.py maximo de passos','Não repetir: maximo de passos',"
+        "'sem_prevencao',?,?,0,0,0,0,'regra',?)",
+        (lid, f"developer:agente:maximo_de_passos:{lid}", reincidencias + 1, reincidencias, item_id))
+
+
+def test_licao_59_sem_prevencao_que_reincidiu_3x_vira_item_de_teste_de_regressao_uma_vez(circle):
+    """Pergunta #461 (lições #59 e #15): sem_prevencao com reincidência ≥3 ganha um item de roteiro que cobra o teste
+    de regressão da assinatura (neurônio + arquivo + código), com chave única pelo id da lição: um item só."""
+    s, L = circle.store, lic(circle)
+    s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+        "VALUES('antigo','x','erro','feito','PR #9 mergeado',1,0,0)")
+    _sem_prevencao(s, 59, 12, item_id=s.one("SELECT MAX(id) m FROM roadmap")["m"])
+    _sem_prevencao(s, 50, 2)
+    L.revisar()
+    L.revisar()
+    itens = s.q("SELECT r.*, p.chave FROM roadmap r JOIN perguntas p ON p.id=r.pergunta_id WHERE r.status='pendente'")
+    assert [r["chave"] for r in itens] == ["licao:59:teste_regressao"]
+    assert itens[0]["titulo"].startswith("Lição #59: teste de regressão")
+    d = itens[0]["detalhe"]
+    assert all(x in d for x in ("lição #59", "developer:agente:maximo_de_passos:59", "circulo/self_dev.py", "reincidiu 12x"))
+    assert s.one("SELECT item_id FROM licoes WHERE id=59")["item_id"] == itens[0]["id"]
+    s.x("UPDATE roadmap SET status='descartado' WHERE id=?", (itens[0]["id"],))   # saiu da fila: volta a ela, sem duplicar
+    L.revisar()
+    assert [r["status"] for r in s.q("SELECT status FROM roadmap WHERE origem='loop'")] == ["pendente"]
+
+
 # ------------------------------------------------------------ lição #70: validada reabre quando o mesmo erro volta
 def _validada_70(s):
     agora = time.time()
