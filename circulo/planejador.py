@@ -44,6 +44,7 @@ EST_TOKENS = 3000
 MAX_TOKENS = 1500   # lição: com 700 a resposta (em português, detalhada) era cortada e o JSON ficava inválido
 PORTEIRO = "porteiro_planejador"   # kv: decisão do porteiro worth_spending.idle_evolution sobre a pergunta, a cada ciclo
 HISTORICO = 20
+ROTEIRO_CHEIO = 12          # mais pendentes que isso no roteiro: sem_item por regra, sem chamar a LLM (pergunta #419)
 ROTEIRO_RECENTES = 40       # o prompt leva os itens mais recentes e os ainda abertos, não o roteiro inteiro (pergunta #404)
 TENTATIVAS = "planejador_tentativas"   # kv: o resultado de cada tentativa real (envelope por pergunta e último progresso)
 ESPERA = "intervalo"        # prefixo do motivo de espera entre tentativas: não é causa de trava, a última tentativa é
@@ -252,8 +253,10 @@ class Planejador:
         from .perguntas import Conselho, gerar, personas
         conselho = Conselho(self.ctx)
         conselho.acompanhar()
+        pendentes = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0")["n"]
         try:
-            gerar(self.ctx)          # o Questionador (LLM especializada): 1x por dia, ou antes se as perguntas se esgotarem
+            if pendentes <= ROTEIRO_CHEIO:
+                gerar(self.ctx)      # o Questionador (LLM especializada): 1x por dia, ou antes se as perguntas se esgotarem
         except Exception:  # noqa: BLE001 — gerar perguntas nunca impede de responder as que já existem
             pass
         PERSONAS = personas(self.s)
@@ -282,6 +285,9 @@ class Planejador:
         if ja:                 # idempotente pelo id da pergunta: uma nova tentativa não grava um segundo item
             conselho.marcar(pid, "virou_item")
             return pid, "repetida", f"a pergunta já virou o item #{ja['item_id']}", None
+        if pendentes > ROTEIRO_CHEIO:    # por regra, sem tokens: com o roteiro cheio, um item novo só espera (pergunta #419)
+            conselho.marcar(pid, "descartada")
+            return pid, "descartada", f"sem item novo: roteiro cheio: {pendentes} itens pendentes (limite {ROTEIRO_CHEIO})", None
         ev = self.evidencia()
         if not autorizado:     # chamado pelo loop, o gasto já foi decidido lá: um porteiro só
             gate = self.ctx.dl.worth_spending("planejar_roteiro", {"est_tokens": EST_TOKENS, "value_signal": 0.8,

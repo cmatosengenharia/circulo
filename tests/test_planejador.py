@@ -133,3 +133,26 @@ def test_prompt_do_planejador_poda_roteiro_antigo_e_licoes_resolvidas(circle):
             assert f"#{r['id']} [" in prompt and r["prevencao"] in prompt
         else:
             assert r["prevencao"] not in prompt
+
+
+def test_roteiro_cheio_de_pendentes_nao_chama_a_llm(circle, repo):  # noqa: F811
+    """Pergunta #419: o planejador gastou 852012 tokens sem PR com ~17 itens pendentes no roteiro. Acima de
+    12 pendentes a resposta é sem_item por regra, com o motivo registrado e zero tokens."""
+    from circulo.planejador import TENTATIVAS
+
+    def com_pendentes(n):
+        llm = PlanLLM(titulo=f"Item novo com {n} pendentes")
+        _, plan = preparar(circle, repo, llm)
+        circle.store.x("DELETE FROM roadmap WHERE titulo LIKE 'pendente %'")
+        for i in range(n):
+            circle.store.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                           "VALUES(?,'d','loop','pendente','x',?,strftime('%s','now'),strftime('%s','now'))",
+                           (f"pendente {i}", 900 + i))
+        return llm, plan
+
+    llm, plan = com_pendentes(13)
+    assert plan.run() is None and llm.prompts == []
+    ultima = circle.store.get(TENTATIVAS)["ultima"]
+    assert ultima["desfecho"] == "descartada" and "roteiro cheio: 13 itens pendentes" in ultima["motivo"]
+    llm, plan = com_pendentes(5)
+    assert plan.run() is not None and any(p.startswith("Pergunta do conselho") for p in llm.prompts)
