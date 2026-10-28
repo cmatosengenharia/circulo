@@ -200,3 +200,47 @@ def test_giro_ocioso_ingere_pendentes_lancamentos_0_a_n_e_o_segundo_giro_so_dupl
     assert estado()["lancamentos"] == lancamentos(s) == len(fixture)
     assert ingerir_pendentes(circle.data_dir, s) == 0                          # sem pendente: nada novo
     assert estado()["lancamentos"] == len(fixture) and estado()["lancamentos_duplicados"] == 0
+
+
+def test_todo_giro_com_lancamentos_0_grava_1_causa_e_a_pasta_e_o_ofx_vira_ok_no_giro_seguinte(circle, tmp_path):
+    s = circle.store
+    pasta = tmp_path / "extratos"
+
+    def zero() -> tuple[str, str]:
+        c = s.get("ingestao_causas")
+        return c["estado"], c["pasta"]
+
+    girar(pasta, s)
+    assert zero() == ("sem_fonte", str(pasta))                 # pasta inexistente
+    pasta.mkdir()
+    for _ in range(GIROS * 2):
+        girar(pasta, s)
+        assert zero() == ("sem_fonte", str(pasta)) and lancamentos(s) == 0
+    pedido, = abertos(s)                                      # sem fonte há giros: 1 pedido, sem duplicar
+    assert str(pasta) in pedido["mensagem"]
+    (pasta / "quebrado.csv").write_text("foo;bar\n1;2\n", encoding="utf-8")
+    girar(pasta, s)
+    assert zero() == ("rejeitados", str(pasta)) and lancamentos(s) == 0
+
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")
+    assert girar(pasta, s) > 0                                 # 1 giro depois do depósito
+    assert zero() == ("ok", str(pasta)) and lancamentos(s) > 0 and abertos(s) == []
+
+
+def test_giro_que_quebra_grava_erro_e_nao_a_causa_da_rodada_anterior(circle, tmp_path, monkeypatch):
+    import pytest
+
+    s = circle.store
+    pasta = tmp_path / "extratos"
+    pasta.mkdir()
+    shutil.copy(FIX / "extrato_anonimo.ofx", pasta / "extrato_anonimo.ofx")
+
+    def quebra(pasta, store):
+        raise RuntimeError("disco cheio")
+
+    monkeypatch.setattr("circulo.ingestao.ingerir_pasta", quebra)
+    with pytest.raises(RuntimeError):
+        girar(pasta, s)
+    c = s.get("ingestao_causas")
+    assert (c["ultima"]["causa"], c["estado"], c["pasta"]) == ("erro", "erro", str(pasta))
+    assert lancamentos(s) == 0

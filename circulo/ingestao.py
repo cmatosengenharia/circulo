@@ -4,10 +4,11 @@ A cada giro, `girar` passa a pasta (`lancamentos_pasta.ingerir_pasta`) e lê o d
 lançamentos e a pasta inexistente ou vazia por GIROS giros seguidos, abre um pedido com a causa, o caminho da pasta e o formato aceito. Um índice único
 parcial deixa no máximo 1 pedido aberto por causa (como o Alertmanager agrupa por rótulo); quando a causa some
 (extrato solto, pasta criada), o pedido fecha sozinho. Os abertos aparecem em "Precisa de você" (`aprovacoes`).
-Todo giro grava a causa da rodada em kv `ingestao_causas` (as últimas RODADAS e a dominante entre elas) e, mesmo com
-zeros, o registro da rodada em `ultima` (carimbo, arquivos vistos, rejeitados com motivo, lançamentos novos e, por fonte
-pasta/e-mail, `lancamentos_pasta.contadores` com o último descarte) e as linhas: `lancamentos` (total do ledger),
-`lancamentos_novos` e `lancamentos_duplicados` (linhas que já tinham chave no ledger): sem
+Todo giro grava a causa da rodada em kv `ingestao_causas` (as últimas RODADAS e a dominante entre elas), o `estado`
+('ok' com o ledger cheio; com lancamentos=0, 'sem_fonte', 'rejeitados' ou 'erro' se o giro quebrou), a `pasta`
+e, mesmo com zeros, o registro da rodada em `ultima` (carimbo, arquivos vistos, rejeitados com motivo, lançamentos
+novos e, por fonte pasta/e-mail, `lancamentos_pasta.contadores` com o último descarte) e as linhas: `lancamentos`
+(total do ledger), `lancamentos_novos` e `lancamentos_duplicados` (linhas que já tinham chave no ledger): sem
 registro nas últimas RECENTE horas, `estado` diz 'nunca_rodou', como o heartbeat que não chegou.
 `ingerir_pendentes` é o que o giro chama: a pasta <dados>/PASTA, onde extrato (.ofx/.csv) e e-mail exportado (.eml)
 entram sem LLM, com a dedupe de `lancamentos_import.linhas` (FITID ou data+valor+descrição+ocorrência)."""
@@ -24,6 +25,7 @@ PASTA = "extratos"     # dentro do diretório de dados do loop
 RODADAS = 10           # giros guardados em kv `ingestao_causas`; a mais frequente explica lancamentos=0
 RECENTE = 24 * 3600    # registro mais velho que isto: a ingestão parou de girar
 CAUSAS = {"pasta_inexistente": "a pasta de extratos não existe", "vazia": "a pasta de extratos está vazia"}
+ZERO = {"erro": "erro", "so_rejeitados": "rejeitados"}   # por que lancamentos=0; qualquer outra causa é falta de fonte
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS pedidos_ingestao (
   id INTEGER PRIMARY KEY,
@@ -57,10 +59,12 @@ def causa_da_rodada(motivo: str, pendentes: int, novos: int) -> str:
     return motivo.split("(")[0]
 
 
-def _registrar(store: Store, causa: str, ultima: dict) -> None:
+def _registrar(store: Store, causa: str, pasta: Path, ultima: dict) -> None:
     rodadas = ((store.get("ingestao_causas") or {}).get("rodadas", []) + [causa])[-RODADAS:]
     dominante = max(reversed(rodadas), key=rodadas.count)          # empate: a mais recente
-    store.set("ingestao_causas", {"rodadas": rodadas, "dominante": dominante, "ultima": {"causa": causa, **ultima}})
+    zero = ZERO.get(causa, "sem_fonte") if causa == "erro" or not ultima["lancamentos"] else "ok"
+    store.set("ingestao_causas", {"rodadas": rodadas, "dominante": dominante, "estado": zero, "pasta": str(pasta),
+                                  "ultima": {"causa": causa, **ultima}})
 
 
 def estado(store: Store, agora: float | None = None) -> str:
@@ -76,14 +80,15 @@ def girar(pasta: str | Path, store: Store, agora: float | None = None) -> int:
     pasta = Path(pasta)
     agora = time.time() if agora is None else agora
     pendentes = len(_extratos(pasta))
-    novos, resumo = 0, {}
+    novos, resumo, erro = 0, {}, True
     try:
         novos = ingerir_pasta(pasta, store)
         resumo = (store.get("lancamentos_pasta") or {}) if pendentes else {}   # sem extrato, o kv é de outra rodada
+        erro = False
     finally:
         rejeitados = [{"nome": i["arquivo"], "motivo": i["motivo"]} for i in resumo.get("ignorados", [])
                       if i["motivo"].startswith("rejeitado")]
-        _registrar(store, causa_da_rodada(store.get("lancamentos_motivo"), pendentes, novos),
+        _registrar(store, "erro" if erro else causa_da_rodada(store.get("lancamentos_motivo"), pendentes, novos), pasta,
                    {"timestamp": agora, "arquivos_vistos": pendentes, "arquivos_rejeitados": rejeitados,
                     "lancamentos_novos": novos, "lancamentos_duplicados": resumo.get("duplicados", 0),
                     "lancamentos": store.one("SELECT COUNT(*) AS n FROM ledger")["n"],
