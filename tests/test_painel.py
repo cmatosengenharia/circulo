@@ -474,3 +474,43 @@ def test_cada_pedido_contestado_aparece_com_motivo_e_fontes_e_sem_fonte_vira_avi
     assert "Pedidos contestados" in pagina and "O banco atual já aguenta a carga medida." in pagina
     assert '<a href="https://sqlite.org/whentouse.html"' in pagina
     assert pagina.count("contestação sem fonte") == 1 and "Reescrever em Rust" in pagina
+
+
+def test_planos_antes_do_commit_fracoes_puras_com_plano_posterior_ausente_e_lista_vazia():
+    """Item #276: só conta o plano gravado até o primeiro commit do PR; plano depois do commit e plano ausente entram
+    na lista de pedidos sem plano; a fração humana conta aprovado ou corrigido por humano, não o prazo vencido."""
+    from circulo.planos import fracoes
+    prs = [{"item_id": i, "pr": 9 + i, "commit_em": 100.0} for i in range(1, 6)]
+    planos = {1: {"estado": "aprovado_humano", "em": 50.0}, 2: {"estado": "corrigido_humano", "em": 100.0},
+              3: {"estado": "auto_prosseguiu", "em": 90.0}, 4: {"estado": "aprovado_humano", "em": 101.0}}
+    r = fracoes(prs, planos)
+    assert r["total"] == 5 and r["registrado_pct"] == 60.0 and r["humano_pct"] == 40.0
+    assert r["estados"] == {"aprovado_humano": 1, "corrigido_humano": 1, "auto_prosseguiu": 1, "ausente": 2}
+    assert r["sem_plano"] == [{"item_id": 4, "pr": 13, "motivo": "plano depois do commit"},
+                              {"item_id": 5, "pr": 14, "motivo": "sem plano"}]
+    vazio = fracoes([], planos)
+    assert vazio["total"] == 0 and vazio["registrado_pct"] is None and vazio["humano_pct"] is None
+    assert vazio["sem_plano"] == []
+
+
+def test_planos_aprovados_antes_do_commit_aparecem_no_painel(tmp_path):
+    """Item #276: o plano gravado por item e o PR do Developer viram a seção 'Planos aprovados antes do commit'."""
+    import sqlite3
+    import time
+
+    from circulo.painel import pagina_saude, saude
+    from circulo.planos import gravar
+    from circulo.state import Store
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+    gravar(st.db, 7, ["ler painel.py", "criar seção"], ["circulo/painel.py"], ["prs.created_at é o commit"],
+           "aprovado_humano", em=agora - 60)
+    with pytest.raises(sqlite3.IntegrityError):
+        gravar(st.db, 8, [], [], [], "talvez", em=agora)
+    for n, item in ((40, 7), (41, 9)):
+        st.x("INSERT INTO prs(number,titulo,branch,status,item_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+             (n, f"item {item}", f"circulo/fix-{item}-1", "aberto", item, agora, agora))
+    h = saude(st.db)
+    assert h["planos"]["registrado_pct"] == 50.0 and h["planos"]["humano_pct"] == 50.0
+    pagina = pagina_saude(h).decode()
+    assert "Planos aprovados antes do commit" in pagina and "PR #41" in pagina and "sem plano" in pagina
