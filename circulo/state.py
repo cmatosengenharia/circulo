@@ -656,8 +656,9 @@ class Store:
 
     # ---------- eventos (fila de pedidos) ----------
     def enqueue(self, kind: str, payload: dict) -> int:
+        from .pedidos import canal
         return self.x("INSERT INTO events(kind,payload,created_at) VALUES(?,?,?)",
-                      (kind, json.dumps(payload, ensure_ascii=False), time.time()))
+                      (kind, json.dumps({**payload, "canal": canal(payload)}, ensure_ascii=False), time.time()))
 
     def claim_next_event(self) -> sqlite3.Row | None:
         from .pausa import evento_em_espera, pausadas
