@@ -257,6 +257,17 @@ def _pct(r) -> float:
     return round(100 * (r[1] or 0) / r[0], 1) if r[0] else 0.0
 
 
+def contestados(conn) -> list[dict]:
+    """Todo pedido contestado pelo estudo, com o motivo e as fontes (links http) registradas; lista vazia = sem fonte."""
+    out = []
+    for iid, titulo, evidencia, est in conn.execute(
+            "SELECT id, titulo, evidencia, estudo FROM roadmap WHERE status='contestado' ORDER BY updated_at DESC"):
+        e = json.loads(est or "{}")
+        out.append({"id": iid, "titulo": titulo, "motivo": e.get("justificativa") or evidencia,
+                    "fontes": [u for u in e.get("fontes") or [] if str(u).startswith(("http://", "https://"))]})
+    return out
+
+
 def saude(conn) -> dict:
     """Semáforo + 5 números do loop, lidos só do SQLite (sqlite3.Connection), e a causa quando não está verde."""
     agora = time.time()
@@ -280,6 +291,7 @@ def saude(conn) -> dict:
                "SELECT ponto, created_at FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
                (agora - 2 * 86400,)), agora),
            "entregas_sem_uso": (uso := classificar(conn, agora))["sem_uso"], "entregas_sem_uso_7d": resumo_7d(uso),
+           "contestados": (cont := contestados(conn)), "contestados_sem_fonte": sum(not c["fontes"] for c in cont),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -329,6 +341,12 @@ def pagina_saude(h: dict) -> bytes:
                f'{h["entregas_sem_uso_7d"]["maduras"]}</small><ol>' + "".join(
                    f'<li>PR #{e["number"]} <small>esperava {escape(e["evento_esperado"])}</small></li>'
                    for e in h["entregas_sem_uso"]) + "</ol></section>")
+    contest = ('<section class="card falhas" aria-label="Pedidos contestados"><span>Pedidos contestados</span>'
+               f'<b>{len(h["contestados"])}</b><small>Sem fonte: <b>{h["contestados_sem_fonte"]}</b></small><ol>' + "".join(
+                   f'<li>#{c["id"]} {escape(c["titulo"])} <small>{escape(c["motivo"] or "")}</small> ' + (
+                       " ".join(f'<a href="{escape(u)}" rel="noreferrer">{escape(u)}</a>' for u in c["fontes"])
+                       or '<em class="delta ruim">⚠ contestação sem fonte</em>') + "</li>"
+                   for c in h["contestados"]) + "</ol></section>")
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -339,7 +357,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{componentes}{falhas}{sem_uso}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{falhas}{sem_uso}{contest}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()

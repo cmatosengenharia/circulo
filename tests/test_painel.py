@@ -445,3 +445,32 @@ def test_painel_expoe_entregas_sem_uso_7d_com_toda_entrega_madura_classificada(t
     r = saude(st.db)["entregas_sem_uso_7d"]
     assert (time.perf_counter() - inicio) * 1000 < 3000
     assert sorted(r["com_uso"] + r["sem_uso"]) == [31, 32, *range(1000, 3000)]    # 0 maduras sem classificação
+
+
+def test_cada_pedido_contestado_aparece_com_motivo_e_fontes_e_sem_fonte_vira_aviso(tmp_path):
+    """Pergunta #429: o painel lista todo pedido contestado com o motivo e os links das fontes; a contestação sem fonte
+    registrada aparece com o aviso 'contestação sem fonte' em vez de sumir."""
+    import time
+
+    from circulo.painel import pagina_saude, saude
+    from circulo.state import Store
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+    estudo = json.dumps({"veredito": "contestar", "justificativa": "O banco atual já aguenta a carga medida.",
+                         "fontes": ["https://sqlite.org/whentouse.html", "https://www.sqlite.org/wal.html"]})
+    for titulo, est in (("Trocar o banco", estudo), ("Reescrever em Rust", None)):
+        st.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at,estudo) "
+             "VALUES(?,'d','pedido_cassio','contestado','contestado pelo estudo',1,?,?,?)", (titulo, agora, agora, est))
+    st.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+         "VALUES('Item comum','d','loop','pendente','e',2,?,?)", (agora, agora))
+    h = saude(st.db)
+    por_titulo = {c["titulo"]: c for c in h["contestados"]}
+    assert set(por_titulo) == {"Trocar o banco", "Reescrever em Rust"}
+    assert por_titulo["Trocar o banco"]["motivo"] == "O banco atual já aguenta a carga medida."
+    assert por_titulo["Trocar o banco"]["fontes"] == ["https://sqlite.org/whentouse.html", "https://www.sqlite.org/wal.html"]
+    assert por_titulo["Reescrever em Rust"]["fontes"] == [] and por_titulo["Reescrever em Rust"]["motivo"]
+    assert h["contestados_sem_fonte"] == 1
+    pagina = pagina_saude(h).decode()
+    assert "Pedidos contestados" in pagina and "O banco atual já aguenta a carga medida." in pagina
+    assert '<a href="https://sqlite.org/whentouse.html"' in pagina
+    assert pagina.count("contestação sem fonte") == 1 and "Reescrever em Rust" in pagina
