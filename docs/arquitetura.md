@@ -22,7 +22,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `caixa.py` | 74 | Caixa de entrada por arquivo: um `.md` em `<dados>/caixa/` vira pedido, lido pelo próprio loop. |
 | `camadas.py` | 191 | Dash do loop em camadas: saúde no topo, todas as etapas do ciclo ao vivo, detalhe de uma execução pelo run_id. |
 | `caminho.py` | 142 | O caminho de um pedido feito pelo console: pedido → item → estudo → PR → CI → merge, com o tempo de cada etapa e o que está esperando agora. |
-| `canario.py` | 176 | Canário de falha: ponto de verificação que nunca falhou pode estar quebrado sem ninguém saber. |
+| `canario.py` | 179 | Canário de falha: ponto de verificação que nunca falhou pode estar quebrado sem ninguém saber. |
 | `cao_de_guarda.py` | 52 | Cão de guarda do giro: um giro preso sem nenhum sinal de vida encerra o processo, e o launchd (KeepAlive) sobe um limpo em 10 s. |
 | `capacidade.py` | 172 | Escalador: quem está sobrecarregado na equipe, e quem pode ganhar mais um trabalhador em paralelo. |
 | `causas.py` | 25 | Alias causa raiz → node id: lição sem teste próprio herda a checagem determinística de outra lição da mesma causa. |
@@ -44,7 +44,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `decision.py` | 1000 | DecisionLayer — Jev First: todo ponto do círculo que vai gastar recurso pergunta primeiro aqui. JevHttpClient (API da TypeSafe, POST /v1/systemone) e LocalJev (regra determinística) têm o MESMO contrato. |
 | `demo.py` | 119 | Demonstração: loop acelerado com pedidos simulados, para ver o painel vivo. Usa uma pasta de dados separada. |
 | `desfecho.py` | 157 | Desfecho por decisão: o que cada "sim" do Jev rendeu — fecha o ciclo de aprendizado. |
-| `developer.py` | 117 | O id pytest conferido por `ast` antes de rodar (lição #26): o reparo copiava ou inventava um id, e o pytest só avisava depois de iniciar ('ERROR: file or directory not found', saída 4). |
+| `developer.py` | 134 | O id pytest conferido por `ast` antes de rodar (lição #26): o reparo copiava ou inventava um id, e o pytest só avisava depois de iniciar ('ERROR: file or directory not found', saída 4). |
 | `diff_size.py` | 97 | Tamanho de um diff a partir do texto de `git diff --numstat`: total de linhas e a causa dominante (categoria e arquivo que mais pesam). Só `numstat_contra_base` chama git; o resto é puro. |
 | `digest_semanal.py` | 120 | Digest semanal do que o time ganhou: os PRs de produto mergeados em 7 dias, cada um com o pedido ou a pergunta de origem e o antes/depois da métrica que a motivou. PR de produto sem origem sai marcado 'sem pedido', nunca omitido: o buraco no rastro é o que o time precisa ver. Cada leitura (`circulo digest`) fica em `digest_leituras`. O idle publica o digest uma vez por semana (`publicar`); com a fração de produto abaixo da meta, o próximo roteiro parte de uma pergunta de produto (`prioriza_produto`, lido pelo Indagador). |
 | `disjuntor.py` | 126 | Disjuntor de LLM: a conta sem crédito ("credit balance is too low") não volta sozinha, e cada chamada repetida só gasta tentativa e enche o log de falhas do Developer. |
@@ -85,7 +85,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `lancamentos_email.py` | 41 | E-mail de notificação do banco → lançamentos, sem rede e sem LLM (o texto chega pronto, nunca do Gmail aqui). |
 | `lancamentos_import.py` | 138 | Importa extrato bancário (OFX/CSV) para o ledger, sem rede e sem LLM. |
 | `lancamentos_pasta.py` | 131 | Pasta monitorada de extratos: cada .ofx/.csv/.eml novo vai para o ledger e sai da pasta. |
-| `licoes.py` | 895 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
+| `licoes.py` | 900 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
 | `limite_uso.py` | 100 | Limite de uso do Claude Code: até quando não chamar a LLM, lido da própria mensagem de erro. |
 | `links.py` | 130 | Catálogo de links da empresa por assunto: colo o link com um rótulo curto e acho em segundos. |
 | `llm.py` | 258 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
@@ -99,7 +99,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `missao.py` | 30 | Causa normalizada de cada barra em missao:verificacao_saida (pergunta #363): a falha é classificada, não só contada. |
 | `money.py` | 45 | Dinheiro sempre em centavos (int). Nunca float. |
 | `motivo.py` | 114 | Motivo tipado de recusa/parada (pergunta #269): por que um PR foi recusado ou um item parou, em três campos. |
-| `neuronios.py` | 236 | Cérebros e neurônios: cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros. |
+| `neuronios.py` | 242 | Cérebros e neurônios: cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros. |
 | `nomes.py` | 70 | Os nomes dos agentes, num lugar só, para todas as telas falarem a mesma língua. |
 | `norte.py` | 164 | Norte: para onde o loop evolui, em resultados mensuráveis — não em erros. |
 | `observabilidade.py` | 385 | Observabilidade do loop: sinais de ouro, SLOs com orçamento de erro, métricas no padrão Prometheus e exportação OTLP. |
