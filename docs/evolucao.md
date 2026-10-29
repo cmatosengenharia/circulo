@@ -48,12 +48,14 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.40.2 | 2026-10-20 | Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste: | 2 |
 | 1.40.1 | 2026-10-20 | Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17): | 2 |
 
-## Entregas do loop (198 PRs mergeados)
+## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 104 · **observabilidade** 40 · **correcao** 25 · **seguranca** 14 · **documentacao** 13 · **velocidade** 2.
+Por tipo: **funcionalidade** 93 · **observabilidade** 45 · **correcao** 31 · **documentacao** 15 · **seguranca** 14 · **velocidade** 2.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #241 | 29/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #240 | 29/10/2026 | documentacao (100%) | — | Developer: registrar hash e seções do AGENTS.md por tarefa e comparar falha e custo com/sem | pergunta do mercado: “Como líder de equipe, posso registrar convenções e conhecimento do repositório (” |
 | #239 | 29/10/2026 | seguranca (66%) | sim | Canário para o único portão aprendido que nunca barrou: caso sintético que ele deve barrar | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
 | #238 | 29/10/2026 | seguranca (42%) | sim | Reparo: alvo de teste inexistente vira causa própria 'alvo_inexistente' e cai para o arquivo… | pergunta do operador: “As lições #31 e #35 registram 'ERROR: file or directory not found' ao rodar test” |
 | #237 | 29/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -126,28 +128,28 @@ Por tipo: **funcionalidade** 104 · **observabilidade** 40 · **correcao** 25 ·
 | #170 | 26/10/2026 | correcao (77%) | — | Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA em toda a esteira de… | pergunta do cassio: “Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA e” |
 | #169 | 26/10/2026 | correcao (76%) | — | Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, notas, prompts)… | pergunta do cassio: “Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, no” |
 | #168 | 26/10/2026 | funcionalidade (60%) | sim | Exportar contexto enxuto para o Cursor (AGENTS.md e .cursor/rules) a partir da memória do assunto | pergunta do cassio: “Para cada assunto ou repositório, o loop gera e mantém os arquivos de contexto q” |
-| #167 | 26/10/2026 | funcionalidade (0%) | — | Gasto diário do Cursor por assunto/tarefa, com projeção de esgotamento dos US$ 250 | pergunta do cassio: “Tenho US$ 250 por mês de IA no Cursor e sempre acabo antes do fim do mês. Quero ” |
-| #166 | 26/10/2026 | funcionalidade (0%) | — | Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsserviço de… | pergunta do cassio: “Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsse” |
-| #165 | 26/10/2026 | funcionalidade (0%) | — | Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e depois acho em segundos, por pa | pergunta do cassio: “Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e d” |
-| #164 | 26/10/2026 | funcionalidade (0%) | — | Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das notas), o que farei hoje (pend | pergunta do cassio: “Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das ” |
-| #163 | 26/10/2026 | funcionalidade (0%) | — | Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela até o merge: pedido →… | pergunta do cassio: “Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela at” |
-| #162 | 26/10/2026 | funcionalidade (0%) | — | Motivo tipado de recusa/parada (gate, check, próxima ação) ao lado do item na Equipe ao vivo | pergunta do cassio: “Na Equipe ao vivo quero entender em 10 segundos por que um PR foi recusado ou um” |
-| #161 | 26/10/2026 | funcionalidade (0%) | — | Corpo do PR do Developer: template fixo de impacto e risco, com módulos e testes vindos do diff e do gate | pergunta do cassio: “Todo PR do Developer deve vir com um resumo de impacto e risco no corpo: o que m” |
-| #160 | 25/10/2026 | funcionalidade (0%) | — | Parser puro de e-mail de notificação com dedup por hash+ocorrência, cruzando com o extrato | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #159 | 25/10/2026 | funcionalidade (0%) | — | Teste de ponta a ponta: pasta monitorada → lançamentos > 0 medido no estado do loop | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #158 | 25/10/2026 | funcionalidade (0%) | — | Impressão digital de PR (título + checks falhos) que bloqueia a 3ª abertura idêntica | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #157 | 25/10/2026 | funcionalidade (0%) | — | Ingestão de pasta monitorada: importar extratos OFX/CSV novos para os lançamentos, de forma… | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #156 | 25/10/2026 | funcionalidade (0%) | — | Parser OFX/CSV determinístico com dedupe idempotente (FITID ou hash+ocorrência) | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #155 | 25/10/2026 | funcionalidade (0%) | — | Validar por ast o id pytest (arquivo, classe, função) antes do reparo, sem rodar pytest | pergunta do operador: “As lições #31 e #35 registram 'ERROR: file or directory not found' ao rodar test” |
-| #154 | 25/10/2026 | funcionalidade (0%) | — | Reabrir lição 'validada' quando nova lição chega com a mesma assinatura (neurônio+arquivo+código) | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
-| #153 | 25/10/2026 | funcionalidade (0%) | — | Lição só vira 'validada' se a Prevenção citar um teste/checagem; senão fica 'sem_prevencao' | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
-| #152 | 25/10/2026 | funcionalidade (0%) | — | Lição #78: developer:abrir_pr: --> tests/test_vigia_drena.py:93:89 | item #191 (erro) |
-| #151 | 25/10/2026 | funcionalidade (0%) | — | Vigia: 2 pergunta(s) validada(s) pelo Jev esperando há 31 min sem virar item (último progresso há 235 min) | item #178 (loop) |
-| #150 | 24/10/2026 | funcionalidade (0%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #149 | 24/10/2026 | funcionalidade (0%) | — | Expor por que a antecipação gerou 0 propostas com 32 pedidos: maior grupo de job e o limiar 3+ | item #176 (loop) |
-| #148 | 24/10/2026 | funcionalidade (0%) | — | Evidência do conselho: contar falhas locais por execução distinta, não por linha repetida | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #147 | 24/10/2026 | funcionalidade (0%) | — | Gerar proposta antecipada quando um job de pedido do humano se repete 3+ vezes em 7 dias | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #146 | 24/10/2026 | funcionalidade (0%) | — | Auditar e corrigir o corte de developer:teto: chave por item raiz, estado persistente, bloqueio | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
+| #167 | 26/10/2026 | observabilidade (99%) | — | Gasto diário do Cursor por assunto/tarefa, com projeção de esgotamento dos US$ 250 | pergunta do cassio: “Tenho US$ 250 por mês de IA no Cursor e sempre acabo antes do fim do mês. Quero ” |
+| #166 | 26/10/2026 | observabilidade (56%) | sim | Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsserviço de… | pergunta do cassio: “Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsse” |
+| #165 | 26/10/2026 | funcionalidade (89%) | sim | Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e depois acho em segundos, por pa | pergunta do cassio: “Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e d” |
+| #164 | 26/10/2026 | funcionalidade (84%) | sim | Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das notas), o que farei hoje (pend | pergunta do cassio: “Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das ” |
+| #163 | 26/10/2026 | funcionalidade (88%) | sim | Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela até o merge: pedido →… | pergunta do cassio: “Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela at” |
+| #162 | 26/10/2026 | funcionalidade (63%) | sim | Motivo tipado de recusa/parada (gate, check, próxima ação) ao lado do item na Equipe ao vivo | pergunta do cassio: “Na Equipe ao vivo quero entender em 10 segundos por que um PR foi recusado ou um” |
+| #161 | 26/10/2026 | funcionalidade (76%) | sim | Corpo do PR do Developer: template fixo de impacto e risco, com módulos e testes vindos do diff e do gate | pergunta do cassio: “Todo PR do Developer deve vir com um resumo de impacto e risco no corpo: o que m” |
+| #160 | 25/10/2026 | funcionalidade (86%) | sim | Parser puro de e-mail de notificação com dedup por hash+ocorrência, cruzando com o extrato | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #159 | 25/10/2026 | funcionalidade (54%) | — | Teste de ponta a ponta: pasta monitorada → lançamentos > 0 medido no estado do loop | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #158 | 25/10/2026 | funcionalidade (50%) | sim | Impressão digital de PR (título + checks falhos) que bloqueia a 3ª abertura idêntica | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
+| #157 | 25/10/2026 | funcionalidade (45%) | sim | Ingestão de pasta monitorada: importar extratos OFX/CSV novos para os lançamentos, de forma… | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #156 | 25/10/2026 | funcionalidade (93%) | — | Parser OFX/CSV determinístico com dedupe idempotente (FITID ou hash+ocorrência) | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #155 | 25/10/2026 | correcao (41%) | sim | Validar por ast o id pytest (arquivo, classe, função) antes do reparo, sem rodar pytest | pergunta do operador: “As lições #31 e #35 registram 'ERROR: file or directory not found' ao rodar test” |
+| #154 | 25/10/2026 | correcao (70%) | sim | Reabrir lição 'validada' quando nova lição chega com a mesma assinatura (neurônio+arquivo+código) | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
+| #153 | 25/10/2026 | correcao (54%) | sim | Lição só vira 'validada' se a Prevenção citar um teste/checagem; senão fica 'sem_prevencao' | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
+| #152 | 25/10/2026 | correcao (86%) | sim | Lição #78: developer:abrir_pr: --> tests/test_vigia_drena.py:93:89 | item #191 (erro) |
+| #151 | 25/10/2026 | correcao (86%) | sim | Vigia: 2 pergunta(s) validada(s) pelo Jev esperando há 31 min sem virar item (último progresso há 235 min) | item #178 (loop) |
+| #150 | 24/10/2026 | observabilidade (45%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
+| #149 | 24/10/2026 | correcao (28%) | sim | Expor por que a antecipação gerou 0 propostas com 32 pedidos: maior grupo de job e o limiar 3+ | item #176 (loop) |
+| #148 | 24/10/2026 | observabilidade (56%) | sim | Evidência do conselho: contar falhas locais por execução distinta, não por linha repetida | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #147 | 24/10/2026 | observabilidade (35%) | sim | Gerar proposta antecipada quando um job de pedido do humano se repete 3+ vezes em 7 dias | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #146 | 24/10/2026 | funcionalidade (52%) | sim | Auditar e corrigir o corte de developer:teto: chave por item raiz, estado persistente, bloqueio | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
 | #145 | 24/10/2026 | funcionalidade (0%) | — | Medir se a proposta antecipada de job recorrente foi aceita ou o humano pediu o mesmo job depois | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
 | #144 | 24/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 79 h bloqueando a evolução | item #171 (loop) |
 | #143 | 24/10/2026 | funcionalidade (0%) | — | Vigia: 2 lição(ões) de estrutura aberta(s) há 76 h bloqueando a evolução | item #170 (loop) |
