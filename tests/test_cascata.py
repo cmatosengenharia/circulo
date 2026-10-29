@@ -73,3 +73,29 @@ def test_relevant_reranqueia(circle):
 def test_guard_protege_o_harness(patch):
     with pytest.raises(PolicyViolation):
         guard(PolicyStore.patched(DEFAULT_POLICY, patch))
+
+
+def test_verify_output_de_saida_longa_mostra_ao_jev_o_comeco_e_o_fim_e_nao_o_meio_cortado(circle):
+    """Missões 3/4/5 (28/10): toda entrega acima de 8.000 caracteres ia ao Jev como `output[:8000]`, cortada no meio de
+    uma frase; ele respondia que estava cortada e verify_formato reprovou 9 de 9 ciclos de construção. Agora vai o
+    começo e o FIM, com o meio marcado como omitido, e o estado diz o tamanho real."""
+    from circulo.decision import amostra_da_saida
+    corpo = "\n".join(f"## Seção {i}\n\nTexto da seção {i} com conteúdo suficiente para encher a linha." for i in range(300))
+    saida = "# Plano\n\n" + corpo + "\n\nFim do plano: todos os passos acima têm dono e prazo."
+    assert len(saida) > 8000
+    amostra, cortada = amostra_da_saida(saida)
+    assert cortada and amostra.startswith("# Plano") and amostra.endswith("todos os passos acima têm dono e prazo.")
+    assert "omitidos nesta amostra" in amostra and len(amostra) < 8000
+    assert amostra_da_saida("curta") == ("curta", False)
+    visto = {}
+    dl = circle.ctx.dl
+    original = dl.ask_many
+
+    def espiao(state, qs):
+        visto.update(state)
+        return original(state, qs)
+    dl.ask_many = espiao
+    ok, checks = dl.verify_output(saida, "plano da semana", "md")
+    assert ok and checks["verify_formato"] >= 0.5
+    assert visto["tamanho"] == len(saida) and visto["amostra_cortada_no_meio"] is True
+    assert visto["output"].endswith("dono e prazo.")           # o Jev vê o fim de verdade, não um corte arbitrário
