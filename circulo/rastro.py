@@ -154,7 +154,8 @@ def cadeia_item(store: Store, item_id: int, now: float | None = None) -> dict | 
         else:
             passos.append(_passo("origem", "Erro do loop", "ok", it["created_at"], it["evidencia"]))
     else:
-        perg = store.one("SELECT id, persona, texto, created_at FROM perguntas WHERE item_id=? ORDER BY id LIMIT 1", (item_id,))
+        perg = store.one("SELECT id, persona, texto, created_at FROM perguntas WHERE id=? OR item_id=? "
+                         "ORDER BY id=? DESC, id LIMIT 1", (it.get("pergunta_id"), item_id, it.get("pergunta_id")))
         if perg:
             passos.append(_passo("origem", f"Conselho ({perg['persona']}) perguntou", "ok", perg["created_at"], perg["texto"],
                                  no=f"pergunta:{perg['id']}"))
