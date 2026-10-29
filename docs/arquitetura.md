@@ -25,7 +25,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `canario.py` | 176 | Canário de falha: ponto de verificação que nunca falhou pode estar quebrado sem ninguém saber. |
 | `cao_de_guarda.py` | 52 | Cão de guarda do giro: um giro preso sem nenhum sinal de vida encerra o processo, e o launchd (KeepAlive) sobe um limpo em 10 s. |
 | `capacidade.py` | 172 | Escalador: quem está sobrecarregado na equipe, e quem pode ganhar mais um trabalhador em paralelo. |
-| `causas.py` | 22 | Alias causa raiz → node id: lição sem teste próprio herda a checagem determinística de outra lição da mesma causa. |
+| `causas.py` | 25 | Alias causa raiz → node id: lição sem teste próprio herda a checagem determinística de outra lição da mesma causa. |
 | `changelog.py` | 25 | Changelog semanal: os PRs mergeados em 7 dias agrupados em produto e infra, cada um com o pedido de origem, e a fração de produto contra a meta do Norte. Usa os PRs de `digest_semanal.prs_da_semana`; PR sem origem sai marcado 'sem pedido', nunca omitido. |
 | `ci_causa.py` | 45 | Causa da falha de CI pelos sinais diretos da API de checks, não pela contagem de checks que caíram. |
 | `cli.py` | 252 | circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | status | resumo | respostas |
@@ -104,11 +104,12 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `norte.py` | 164 | Norte: para onde o loop evolui, em resultados mensuráveis — não em erros. |
 | `observabilidade.py` | 385 | Observabilidade do loop: sinais de ouro, SLOs com orçamento de erro, métricas no padrão Prometheus e exportação OTLP. |
 | `orcamento_dia.py` | 62 | Orçamento diário de tokens vindo da configuração, com aviso antes do corte. |
-| `painel.py` | 893 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
+| `painel.py` | 895 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
 | `parada.py` | 91 | Parada verificável (kill switch): o botão do painel, a confirmação do loop e o teste semanal. |
 | `pastas.py` | 53 | Pastas padrão por assunto no Mac, espelhando os assuntos do console (`circulo assunto novo`). |
 | `pausa.py` | 131 | Pausar e retomar missão por missão, sem parar o loop inteiro. |
 | `pedido_claro.py` | 133 | Portão de pedido (pergunta do conselho #323): antes da LLM, o pedido do Developer (título + detalhe do item) cita critério de aceite, arquivo alvo (.py) e resultado esperado? Se falta algum, sai UMA pergunta de esclarecimento, a do primeiro campo ausente. O veredito de cada item fica em `pedidos_claros`. |
+| `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 29 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
 | `perguntas.py` | 618 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
