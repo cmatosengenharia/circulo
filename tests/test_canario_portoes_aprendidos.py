@@ -36,6 +36,12 @@ LICOES = [
     (62, "developer:testes:teste:tests/test_capacidade.py::test_arquiteto_estuda_varios_itens_ao_mesmo_tempo", None),
     (63, "developer:testes:teste:tests/test_capacidade.py::test_desenvolvedor_pega_itens_distintos_em_paralelo", None),
     (64, "developer:testes:teste:tests/test_memoria.py::test_estudo_parecido_e_item_parecido", None),
+    # pergunta do conselho #483: os lints com código que o CI ignora (E501) ou sem trecho violador (F541)
+    (70, "developer:lint:lint:B905,E501,F541", None),
+    (76, "developer:lint:lint:B905,E501,F401", None),
+    (79, "developer:lint:lint:B905,F811", None),
+    (81, "developer:testes:teste:tests/test_autonomia.py::test_missoes_evoluem_em_paralelo", None),
+    (84, "developer:lint:lint:B007,B905,E501", None),
 ]
 
 

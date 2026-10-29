@@ -827,6 +827,7 @@ VIOLA_LINT = {
     "E722": "def f_e722():\n    try:\n        pass\n    except:\n        pass\n",
     "B006": "def f_b006(a=[]):\n    return a\n",
     "B007": "def f_b007():\n    for i in range(3):\n        pass\n",
+    "F541": "F_F541 = f\"sem campo\"\n",
 }
 
 
@@ -838,11 +839,12 @@ def entrada_sintetica(tipo: str, spec: dict, licao_id: int | None, falha: bool) 
         arquivo, _, teste = argv[-1].partition("::")
         return {arquivo: f"def {teste}():\n    assert {not falha}\n"}
     if tipo == "comando" and argv[1:2] == ["ruff"] and "--select" in argv[:-1]:
-        codigos = argv[argv.index("--select") + 1].split(",")
-        if not all(c in VIOLA_LINT for c in codigos):
+        from .self_dev import LINT_CMD     # lição #78: o código que o CI ignora o portão também ignora, não é assinatura
+        codigos = set(argv[argv.index("--select") + 1].split(",")) - set(LINT_CMD[LINT_CMD.index("--ignore") + 1].split(","))
+        if not codigos or not codigos <= VIOLA_LINT.keys():
             return None
         return {"pyproject.toml": '[tool.ruff]\ntarget-version = "py311"\n',
-                "circulo/canario.py": "".join(VIOLA_LINT[c] for c in codigos) if falha else "X = 1\n"}
+                "circulo/canario.py": "".join(VIOLA_LINT[c] for c in sorted(codigos)) if falha else "X = 1\n"}
     if tipo == "obrigatorio" and spec.get("em") == "teste" and licao_id is not None:
         return {"tests/test_canario.py": "def test_canario():" + ("" if falha else f"  # lição #{licao_id}") + "\n    pass\n"}
     return None
