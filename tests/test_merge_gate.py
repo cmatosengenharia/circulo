@@ -194,3 +194,18 @@ def test_main_vermelha_vira_licao_de_estrutura(circle):
     gate(circle, gh).run()                                     # o mesmo sha não registra duas vezes
     lic = circle.store.one("SELECT classe, ocorrencias, item_id FROM licoes WHERE assinatura='gate:main_vermelha'")
     assert lic["classe"] == "estrutural" and lic["ocorrencias"] == 1 and lic["item_id"]
+
+
+def test_pr_de_docs_fechado_fora_do_gate_sai_de_aberto_na_tabela(circle):
+    """PR #44 (Redator técnico, sem item): fechado no GitHub em 28/10, ficou 'aberto' na tabela `prs` porque a
+    sincronização só olhava PR com item; o Redator ficou parado ("um PR de docs por vez") e o Vigia alertou por 8 dias."""
+    import time
+    s = circle.store
+    agora = time.time()
+    s.x("INSERT INTO prs(number,titulo,branch,status,created_at,updated_at,item_id) VALUES(44,'docs','circulo/docs-1',"
+        "'aberto',?,?,NULL)", (agora, agora))
+    gh = FakeGH([])                                   # não está mais entre os abertos do GitHub
+    gh.pr_state = lambda n: {"state": "closed", "merged": False, "mergeable": None}
+    gate(circle, gh).run()
+    assert s.one("SELECT status FROM prs WHERE number=44")["status"] == "fechado"
+    assert s.one("SELECT 1 FROM alerts WHERE kind='merge' AND message LIKE 'PR #44 (sem item)%'")
