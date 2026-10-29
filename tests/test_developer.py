@@ -5,8 +5,11 @@ import time
 from pathlib import Path
 
 from circulo import fatiador
-from circulo.developer import alvo_pytest_existe, estimar_passos, limiar_calibrado, limiar_de_passos, listar_testes
+from circulo.developer import (ALVO_INEXISTENTE, alvo_coletado, alvo_pytest_existe, estimar_passos, limiar_calibrado,
+                               limiar_de_passos, listar_testes)
+from circulo.licoes import assinatura_de
 from circulo.neuronios import ABRIR_PR, avaliar_aprendidos, criar_portao
+from circulo.reparo import REPARO
 
 from test_fatiador import preparar, subs
 from test_self_dev import repo  # noqa: F401 — fixture do repositório
@@ -87,6 +90,54 @@ def test_licao_26_reparo_recusa_alvo_inexistente_sem_rodar_o_pytest(circle, tmp_
     assert r.ok and "alvo_inexistente" in r.motivo and "não existe mais" in r.motivo
     assert "test_solto" in r.motivo and "TestFora::test_metodo" in r.motivo
     assert s.one("SELECT status FROM licoes WHERE id=?", (lid,))["status"] == "obsoleta"
+
+
+COM_INIT = '''
+class TestComInit:
+    def __init__(self):
+        pass
+
+    def test_a(self):
+        pass
+
+
+def test_existe():
+    pass
+'''
+
+
+def test_licao_26_id_que_o_ast_ve_mas_o_pytest_nao_coleta(tmp_path):
+    """lição #26 (pergunta #482): classe com `__init__` passa no `ast`, mas o pytest não a coleta."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_c.py").write_text(COM_INIT)
+    assert alvo_pytest_existe(tmp_path, "tests/test_c.py::TestComInit::test_a")
+    assert not alvo_coletado(tmp_path, "tests/test_c.py::TestComInit::test_a")
+    assert alvo_coletado(tmp_path, "tests/test_c.py::test_existe")
+
+
+def test_licao_26_reparo_nao_roda_o_pytest_no_id_nao_coletado_e_registra_uma_causa(circle, tmp_path):
+    """lição #26: o id que a coleta não acha não roda; vira uma única lição developer:reparo:alvo_inexistente, seja
+    qual for o nome do teste, e a recusa leva os testes reais do arquivo."""
+    s = circle.store
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_c.py").write_text(COM_INIT)
+    (tmp_path / "tests" / "test_vigia_trava_estado.py").write_text("def test_trava():\n    pass\n")
+    for alvo in ("tests/test_c.py::TestComInit::test_a", "tests/test_vigia_trava_estado.py::test_200_decisoes_x"):
+        criar_portao(s, ABRIR_PR, "comando", {"argv": ["-m", "pytest", "-q", alvo]}, f"teste {alvo}", None)
+    r1, r2 = avaliar_aprendidos(s, ABRIR_PR, tmp_path, {}, {})
+    assert r1.ok and "recusa alvo_inexistente" in r1.motivo and "pytest não rodou" in r1.motivo
+    assert "test_existe" in r1.motivo and r2.ok and "test_trava" in r2.motivo
+    lics = s.q("SELECT assinatura, ocorrencias FROM licoes")
+    assert [(x["assinatura"], x["ocorrencias"]) for x in lics] == [(ALVO_INEXISTENTE, 2)]
+    assert {v["causa"] for v in s.q("SELECT causa FROM verificacoes WHERE ponto=?", (REPARO,))} == {"alvo_inexistente"}
+
+
+def test_licao_26_file_or_directory_not_found_tem_assinatura_unica():
+    """lição #26: lições #31 e #35 eram a mesma causa com nomes de teste diferentes."""
+    sigs = {assinatura_de(REPARO, f"- aprendido#{n}: teste {alvo}: ERROR: {erro}: {alvo}\n\nno tests ran in 0.01s")
+            for n, alvo in ((3, "tests/test_vigia_trava_estado.py::test_200_decisoes_x"), (9, "tests/test_b.py::test_y"))
+            for erro in ("file or directory not found", "not found")}
+    assert sigs == {ALVO_INEXISTENTE}
 
 
 MAX_TURNS = json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 41,

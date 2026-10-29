@@ -56,12 +56,12 @@ import time
 from pathlib import Path
 
 from . import disjuntor, pedido_claro
+from .developer import REPARO
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
 from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
                        garantir_ruff)
 
-REPARO = "developer:reparo"
 REVERTIDA = "developer:constituicao_revertida"
 BASE = "developer:base"
 TETO, REPETIDA = CORTES
