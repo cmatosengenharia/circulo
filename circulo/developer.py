@@ -8,11 +8,22 @@ Passos (lição #59): o agente parava no máximo de passos (38 em 709 execuçõe
 fração do limite que a tarefa usa; acima do limiar o fatiador divide antes de rodar. A fração prevista de cada tarefa
 fica em PASSOS e o limiar sai do p20 das previsões das que ainda pararam no máximo (trajetórias que falham são mais
 longas que as bem-sucedidas): 80% delas teriam sido divididas.
+
+Convenções: o AGENTS.md da raiz entra no prompt e cada tarefa grava o hash, os títulos das seções injetadas e
+`com_convencoes`, listados no corpo do PR. O efeito medido de arquivos de contexto é pequeno (~+4% com arquivo humano)
+e o custo sobe mais de 20% (Gloaguen et al., arXiv 2602.11988): ~20% das tarefas, sorteadas pelo título, ficam sem o
+arquivo como controle, e `relatorio_convencoes` (`python -m circulo.developer --dias 7`) compara falha e tokens por
+tarefa nos dois grupos.
 """
 from __future__ import annotations
 
+import argparse
 import ast
+import hashlib
+import json
 import math
+import os
+import re
 import subprocess
 import sys
 import time
@@ -29,6 +40,12 @@ PASSOS_BASE, PASSOS_POR_ARQUIVO, PASSOS_POR_FUNCAO = 8, 6, 3   # ler/testar/lint
 LIMIAR_INICIAL, PERCENTIL, MIN_AMOSTRAS = 0.8, 0.2, 5
 PASSOS = "developer_passos"                 # kv: título da tarefa -> {"fracao", "limite", "em"}
 MAX_REGISTROS = 300
+
+ARQUIVO_CONVENCOES = "AGENTS.md"
+CONVENCOES = "developer_convencoes"         # kv: título da tarefa -> {"hash", "secoes", "com_convencoes", "linhas", "bytes", "em"}
+FRACAO_CONTROLE = 0.2                       # tarefas sem o arquivo, para comparar
+CUSTO_ACEITO = 1.2                          # o grupo com convenções pode custar até 20% a mais por tarefa
+TITULO_MD = re.compile(r"#{1,6}\s+(.+?)[\s#]*$")
 
 
 def estimar_passos(arquivos, funcoes, limite: int = LIMITE_PASSOS) -> float:
@@ -132,3 +149,108 @@ def listar_testes(raiz: Path | str, arquivo: str) -> list[str]:
                 out += varrer(n.body, f"{prefixo}{n.name}::")
         return out
     return varrer(arvore.body, "") if arvore else []
+
+
+def no_controle(titulo: str, fracao: float = FRACAO_CONTROLE) -> bool:
+    """O sorteio determinístico do grupo de controle: o mesmo título cai sempre no mesmo grupo."""
+    return int(hashlib.sha256(titulo.encode("utf-8")).hexdigest()[:8], 16) < fracao * 0x100000000
+
+
+def secoes_md(texto: str) -> list[str]:
+    """Os títulos `#` do markdown, fora dos blocos de código."""
+    out, codigo = [], False
+    for linha in texto.splitlines():
+        if linha.lstrip().startswith("```"):
+            codigo = not codigo
+        elif not codigo and (m := TITULO_MD.match(linha)):
+            out.append(m.group(1))
+    return out
+
+
+def convencoes(raiz: Path | str, titulo: str, fracao_controle: float = FRACAO_CONTROLE) -> dict:
+    """O que do AGENTS.md entra no prompt desta tarefa (`texto`) e o evento dela: hash, seções, grupo e tamanho."""
+    try:
+        bruto = (Path(raiz) / ARQUIVO_CONVENCOES).read_bytes()
+        conteudo = bruto.decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {"hash": None, "secoes": [], "com_convencoes": False, "linhas": 0, "bytes": 0, "texto": ""}
+    com = not no_controle(titulo, fracao_controle)
+    return {"hash": hashlib.sha256(bruto).hexdigest()[:12], "secoes": secoes_md(conteudo) if com else [],
+            "com_convencoes": com, "linhas": len(conteudo.splitlines()), "bytes": len(bruto),
+            "texto": f"\nConvenções do repositório ({ARQUIVO_CONVENCOES}):\n{conteudo.strip()}\n" if com else ""}
+
+
+def registrar_convencoes(s, titulo: str, conv: dict) -> None:
+    reg = s.get(CONVENCOES) or {}
+    ev = {k: v for k, v in conv.items() if k != "texto"}
+    if {k: v for k, v in reg.get(titulo, {}).items() if k != "em"} == ev:
+        return
+    reg[titulo] = {**ev, "em": time.time()}
+    s.set(CONVENCOES, dict(sorted(reg.items(), key=lambda kv: kv[1]["em"])[-MAX_REGISTROS:]))
+
+
+def linha_pr(ev: dict | None) -> str:
+    """O evento da tarefa no corpo do PR."""
+    if not ev:
+        return f"Convenções ({ARQUIVO_CONVENCOES}): sem registro nesta tarefa."
+    if not ev.get("hash"):
+        return f"Convenções ({ARQUIVO_CONVENCOES}): arquivo ausente, nada injetado (com_convencoes=0)."
+    grupo = ("seções injetadas: " + (", ".join(ev["secoes"]) or "nenhuma")) if ev["com_convencoes"] else \
+        "grupo de controle, nada injetado"
+    return (f"Convenções ({ARQUIVO_CONVENCOES} `{ev['hash']}`, {ev['linhas']} linhas, {ev['bytes']} bytes): {grupo} "
+            f"(com_convencoes={int(ev['com_convencoes'])}).")
+
+
+class GitHubComConvencoes:
+    """O GitHub do Developer: cada PR aberto leva no corpo o evento de convenções da tarefa."""
+
+    def __init__(self, gh, store):
+        self._gh, self._s = gh, store
+
+    def __getattr__(self, nome):
+        return getattr(self._gh, nome)
+
+    def create_pr(self, head: str, base: str, title: str, body: str) -> int:
+        ev = (self._s.get(CONVENCOES) or {}).get(title)
+        return self._gh.create_pr(head, base, title, f"{body}\n\n{linha_pr(ev)}")
+
+
+def relatorio_convencoes(s, desde: float = 0.0) -> dict:
+    """Taxa de falha e tokens por tarefa com e sem convenções (só tarefas em que o arquivo existia e já com desfecho).
+    `aceito`: o grupo com convenções não falha mais que o controle nem custa mais de CUSTO_ACEITO vezes."""
+    from .neuronios import ABRIR_PR
+    from .reparo import tokens_do_item
+    grupos: dict[str, list[tuple[bool, int, int]]] = {"com": [], "controle": []}
+    for titulo, ev in (s.get(CONVENCOES) or {}).items():
+        if not ev.get("hash") or ev.get("em", 0) < desde:
+            continue
+        r = s.one("SELECT ok FROM verificacoes WHERE ponto IN ('developer:agente', ?) AND sujeito IN (?, ?) "
+                  "ORDER BY id DESC LIMIT 1", (ABRIR_PR, titulo, titulo[:120]))
+        if r is not None:
+            grupos["com" if ev["com_convencoes"] else "controle"].append(
+                (not r["ok"], tokens_do_item(s, titulo)[0], ev["bytes"] if ev["com_convencoes"] else 0))
+    out: dict = {g: {"tarefas": len(v), "taxa_falha": round(sum(f for f, _, _ in v) / len(v), 4) if v else None,
+                     "tokens_por_tarefa": round(sum(t for _, t, _ in v) / len(v)) if v else None,
+                     "bytes_injetados": round(sum(b for _, _, b in v) / len(v)) if v else None}
+                 for g, v in grupos.items()}
+    com, ctrl = out["com"], out["controle"]
+    medido = com["tarefas"] and ctrl["tarefas"] and ctrl["tokens_por_tarefa"]
+    out["custo_relativo"] = round(com["tokens_por_tarefa"] / ctrl["tokens_por_tarefa"], 4) if medido else None
+    out["aceito"] = (com["taxa_falha"] <= ctrl["taxa_falha"] and out["custo_relativo"] <= CUSTO_ACEITO) if medido else None
+    return out
+
+
+def main(argv: list[str] | None = None) -> None:
+    """python -m circulo.developer [--dias 7]: falha e tokens por tarefa com e sem convenções, em JSON."""
+    ap = argparse.ArgumentParser(prog="python -m circulo.developer",
+                                 description="compara falha e custo das tarefas com e sem o AGENTS.md no prompt")
+    ap.add_argument("--data", default=os.environ.get("CIRCULO_DATA", "data"))
+    ap.add_argument("--dias", type=float, default=7.0)
+    args = ap.parse_args(argv)
+    from .state import Store
+    store = Store(os.path.join(args.data, "circulo.db"))
+    print(json.dumps(relatorio_convencoes(store, desde=time.time() - args.dias * 86400), ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
