@@ -56,7 +56,7 @@ import time
 from pathlib import Path
 
 from . import disjuntor, pedido_claro
-from .developer import REPARO
+from .developer import REPARO, GitHubComConvencoes, convencoes, registrar_convencoes
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
 from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
@@ -243,6 +243,18 @@ class DeveloperComReparo(SelfDeveloper):
         self._base_status = "pendente"
         self._disjuntor = self._escalada = ""
         self._teto_bloqueado: tuple[int, str] | None = None
+        if self.gh is not None:
+            self.gh = GitHubComConvencoes(self.gh, self.s)
+
+    def _licoes_txt(self, item_id: int | None = None) -> str:
+        """O contexto do prompt mais o AGENTS.md da tarefa (fora do grupo de controle); o evento dela fica gravado."""
+        txt = super()._licoes_txt(item_id)
+        item = self.s.one("SELECT titulo FROM roadmap WHERE id=?", (item_id,)) if item_id else None
+        if item is None:
+            return txt
+        conv = convencoes(self.repo, item["titulo"])
+        registrar_convencoes(self.s, item["titulo"], conv)
+        return txt + conv["texto"]
 
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()

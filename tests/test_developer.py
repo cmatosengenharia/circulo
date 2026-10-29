@@ -1,18 +1,22 @@
 """Lição #26: o reparo rodava o pytest num id inventado ('ERROR: file or directory not found'). O id é conferido por
 `ast` antes (arquivo, classes, função, sem o sufixo `[...]`), e a recusa devolve os `test_*` reais do arquivo."""
+import io
 import json
 import time
+from contextlib import redirect_stdout
 from pathlib import Path
 
-from circulo import fatiador
-from circulo.developer import (ALVO_INEXISTENTE, alvo_coletado, alvo_pytest_existe, estimar_passos, limiar_calibrado,
-                               limiar_de_passos, listar_testes)
+from circulo import developer, fatiador
+from circulo.developer import (ALVO_INEXISTENTE, CONVENCOES, alvo_coletado, alvo_pytest_existe, convencoes,
+                               estimar_passos, limiar_calibrado, limiar_de_passos, listar_testes, no_controle,
+                               relatorio_convencoes)
 from circulo.licoes import assinatura_de
 from circulo.neuronios import ABRIR_PR, avaliar_aprendidos, criar_portao
-from circulo.reparo import REPARO
+from circulo.registro import registrar as registrar_llm
+from circulo.reparo import REPARO, DeveloperComReparo
 
 from test_fatiador import preparar, subs
-from test_self_dev import repo  # noqa: F401 — fixture do repositório
+from test_self_dev import TEST_CMD, FakeGH, FixAgent, erro_recorrente, repo  # noqa: F401 — fixture do repositório
 
 RAIZ = Path(__file__).resolve().parent.parent
 REAL = "test_200_decisoes_do_worth_spending_saem_da_duvida_concordando_com_a_regra"
@@ -182,3 +186,85 @@ def test_licao_59_limiar_recalibrado_pelas_tarefas_que_estouraram(circle):
         circle.licoes.verificar("developer:agente", False, sujeito=f"t{i}", motivo=MAX_TURNS, licao=False)
     circle.licoes.verificar("developer:agente", False, sujeito="t5", motivo="AssertionError", licao=False)   # outra causa
     assert limiar_calibrado(s) == 0.5
+
+
+AGENTS = "# Convenções\n\n## Testes\nrode `python -m pytest -q`\n\n```sh\n# não é seção\n```\n\n### Armadilhas\nnada\n"
+
+
+def test_convencoes_hash_secoes_e_grupo_de_controle(tmp_path):
+    """Sem AGENTS.md nada entra; com ele, hash e títulos das seções; o controle (~20%, por título) fica sem o texto."""
+    assert convencoes(tmp_path, "t") == {"hash": None, "secoes": [], "com_convencoes": False, "linhas": 0, "bytes": 0,
+                                         "texto": ""}
+    (tmp_path / "AGENTS.md").write_text(AGENTS)
+    com, ctrl = convencoes(tmp_path, "t", fracao_controle=0), convencoes(tmp_path, "t", fracao_controle=1)
+    assert com["secoes"] == ["Convenções", "Testes", "Armadilhas"] and com["com_convencoes"]
+    assert "rode `python -m pytest -q`" in com["texto"] and com["linhas"] == 11 and com["bytes"] == len(AGENTS.encode())
+    assert ctrl["hash"] == com["hash"] and ctrl["secoes"] == [] and not ctrl["com_convencoes"] and ctrl["texto"] == ""
+    sorteio = [no_controle(f"tarefa {i}") for i in range(2000)]
+    assert sorteio == [no_controle(f"tarefa {i}") for i in range(2000)]          # determinístico
+    assert 0.17 < sum(sorteio) / len(sorteio) < 0.23
+
+
+class GHComCorpo(FakeGH):
+    def create_pr(self, head, base, title, body):
+        self.corpos = [*getattr(self, "corpos", []), body]
+        return super().create_pr(head, base, title, body)
+
+
+def _pr_com_agents_md(circle, repo, titulo):  # noqa: F811
+    (repo / "AGENTS.md").write_text(AGENTS)
+    item = erro_recorrente(circle)
+    circle.store.x("UPDATE roadmap SET titulo=? WHERE id=?", (titulo, item["id"]))
+    agent, gh = FixAgent(), GHComCorpo()
+    dev = DeveloperComReparo(circle.ctx, repo, agent, gh, test_cmd=TEST_CMD, lint_cmd=[], fix_cmds=[])
+    r = dev.run_once()
+    assert r.status == "proposto", r.detalhe
+    ev = circle.store.get(CONVENCOES)[titulo]
+    assert ev["hash"] == convencoes(repo, titulo)["hash"] and f"`{ev['hash']}`" in gh.corpos[0]
+    return ev, agent.tasks[0], gh.corpos[0]
+
+
+def test_pr_do_developer_lista_hash_e_secoes_do_agents_md(circle, repo):  # noqa: F811
+    """Todo PR do Developer leva o evento da tarefa: hash do AGENTS.md, seções injetadas e com_convencoes."""
+    assert not no_controle("Corrigir soma")
+    ev, prompt, corpo = _pr_com_agents_md(circle, repo, "Corrigir soma")
+    assert ev["com_convencoes"] and ev["secoes"] == ["Convenções", "Testes", "Armadilhas"]
+    assert "rode `python -m pytest -q`" in prompt
+    assert "seções injetadas: Convenções, Testes, Armadilhas (com_convencoes=1)" in corpo
+
+
+def test_pr_do_grupo_de_controle_registra_o_hash_sem_injetar(circle, repo):  # noqa: F811
+    assert no_controle("Corrigir soma com convenções")
+    ev, prompt, corpo = _pr_com_agents_md(circle, repo, "Corrigir soma com convenções")
+    assert not ev["com_convencoes"] and ev["secoes"] == [] and "rode `python -m pytest -q`" not in prompt
+    assert "grupo de controle, nada injetado (com_convencoes=0)" in corpo
+
+
+def test_relatorio_compara_falha_e_tokens_com_e_sem_convencoes(circle):
+    s = circle.store
+    ev = {"hash": "abc", "linhas": 10, "bytes": 400, "em": time.time()}
+    s.set(CONVENCOES, {"a": {**ev, "secoes": ["X"], "com_convencoes": True},
+                       "b": {**ev, "secoes": ["X"], "com_convencoes": True},
+                       "c": {**ev, "secoes": [], "com_convencoes": False},
+                       "d": {**ev, "hash": None, "bytes": 0, "secoes": [], "com_convencoes": False}})   # sem arquivo: fora
+    for titulo, ok, tokens in (("a", True, 1100), ("b", False, 1300), ("c", True, 1000), ("d", False, 5)):
+        circle.licoes.verificar("developer:agente", ok, sujeito=titulo, motivo="" if ok else "x", licao=False)
+        registrar_llm(s, tick=0, project_id=None, papel="developer", modelo="m", tokens=tokens, ok=ok, entrada=titulo)
+    r = relatorio_convencoes(s)
+    assert r["com"] == {"tarefas": 2, "taxa_falha": 0.5, "tokens_por_tarefa": 1200, "bytes_injetados": 400}
+    assert r["controle"] == {"tarefas": 1, "taxa_falha": 0.0, "tokens_por_tarefa": 1000, "bytes_injetados": 0}
+    assert r["custo_relativo"] == 1.2 and r["aceito"] is False                   # falha pior que o controle
+
+
+def test_relatorio_de_convencoes_pela_linha_de_comando_so_da_janela(circle):
+    """`python -m circulo.developer --dias 7` imprime o relatório só com as tarefas da janela."""
+    s, agora = circle.store, time.time()
+    ev = {"hash": "abc", "linhas": 10, "bytes": 400, "secoes": [], "com_convencoes": False}
+    s.set(CONVENCOES, {"nova": {**ev, "em": agora}, "velha": {**ev, "em": agora - 8 * 86400}})
+    for titulo in ("nova", "velha"):
+        circle.licoes.verificar("developer:agente", True, sujeito=titulo, motivo="", licao=False)
+    saida = io.StringIO()
+    with redirect_stdout(saida):
+        developer.main(["--data", str(Path(s.path).parent), "--dias", "7"])
+    r = json.loads(saida.getvalue())
+    assert r["controle"]["tarefas"] == 1 and r["com"]["tarefas"] == 0 and r["aceito"] is None
