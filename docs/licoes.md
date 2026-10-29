@@ -5,7 +5,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
-| 59 | developer:agente:maximo_de_passos | trabalho | validada | 22 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
+| 59 | developer:agente:maximo_de_passos | trabalho | validada | 23 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
 | 15 | rastro:lacuna | trabalho | sem_prevencao | 18 | 8 | Sem prevenção verificável: falta um teste de regressão (lição #15) ou checagem determinística; não repetir: rastro:cadei |
 | 47 | loop:estagnado | estrutural | evidenciada | 12 | 5 | Já corrigido (PR #150 mergeado); não repetir: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa  |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |

@@ -48,12 +48,15 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.40.2 | 2026-10-20 | Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste: | 2 |
 | 1.40.1 | 2026-10-20 | Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17): | 2 |
 
-## Entregas do loop (195 PRs mergeados)
+## Entregas do loop (198 PRs mergeados)
 
-Por tipo: **funcionalidade** 119 · **observabilidade** 35 · **correcao** 18 · **documentacao** 11 · **seguranca** 10 · **velocidade** 2.
+Por tipo: **funcionalidade** 104 · **observabilidade** 40 · **correcao** 25 · **seguranca** 14 · **documentacao** 13 · **velocidade** 2.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #239 | 29/10/2026 | seguranca (66%) | sim | Canário para o único portão aprendido que nunca barrou: caso sintético que ele deve barrar | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
+| #238 | 29/10/2026 | seguranca (42%) | sim | Reparo: alvo de teste inexistente vira causa própria 'alvo_inexistente' e cai para o arquivo… | pergunta do operador: “As lições #31 e #35 registram 'ERROR: file or directory not found' ao rodar test” |
+| #237 | 29/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #236 | 28/10/2026 | observabilidade (82%) | sim | Painel: estado único derivado de cada pedido do humano (recebido/andamento/bloqueado/entregue) e há… | pergunta do usuario: “Para cada pedido do humano, o painel mostra hoje um estado único e atual (recebi” |
 | #235 | 28/10/2026 | observabilidade (75%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #234 | 28/10/2026 | documentacao (98%) | — | Lição #59: teste de regressão para developer:agente: maximo de passos | pergunta do licoes: “Lição #59: teste de regressão para developer:agente: maximo de passos” |
@@ -102,27 +105,27 @@ Por tipo: **funcionalidade** 119 · **observabilidade** 35 · **correcao** 18 ·
 | #191 | 26/10/2026 | observabilidade (94%) | sim | Portão de pedido: checar critério de aceite, arquivo alvo e resultado esperado antes da LLM | pergunta do entrevistador_jtbd: “Entre os PRs das últimas 24 h com mais tokens, quantos partiram de um pedido sem” |
 | #190 | 26/10/2026 | observabilidade (36%) | sim | Resumo semanal: listar pedidos de usuário abertos sem PR de produto, ordenados por idade | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
 | #189 | 26/10/2026 | observabilidade (74%) | sim | Medir o uso do resumo semanal: registrar cada leitura e mostrar PRs de produto sem uso | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
-| #188 | 26/10/2026 | funcionalidade (0%) | — | Painel: delta de falhas 24h vs 24h anteriores nos cards, com cor invertida e caso sem base | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
-| #187 | 26/10/2026 | funcionalidade (0%) | — | Resumo semanal para a equipe: PRs de produto mergeados, quem pediu e uso medido | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
-| #186 | 26/10/2026 | funcionalidade (0%) | — | Limitar reentradas de developer:abrir_pr:adiar e escalar a tarefa após N adiamentos seguidos | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #185 | 26/10/2026 | funcionalidade (0%) | — | Painel: card de falhas por componente nas últimas 24h, ordenado pelo mais afetado | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
-| #184 | 26/10/2026 | funcionalidade (0%) | — | Changelog semanal: PRs mergeados agrupados em produto/infra, com o pedido de origem | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
-| #183 | 26/10/2026 | funcionalidade (0%) | — | Diagnóstico de ingestão: registrar por que lancamentos=0 (pasta ausente, vazia ou arquivos… | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #182 | 26/10/2026 | funcionalidade (0%) | — | Painel: agrupar as falhas das últimas 24h por causa em um card único no topo | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
-| #181 | 26/10/2026 | funcionalidade (0%) | — | Disjuntor por causa em developer:abrir_pr:adiar: após 3 falhas seguidas iguais, pôr o item em… | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #180 | 26/10/2026 | funcionalidade (0%) | — | Digest semanal do que o time ganhou: PRs de produto ligados ao pedido de origem | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
-| #179 | 26/10/2026 | funcionalidade (0%) | — | Parser determinístico de e-mail de notificação bancária → lançamentos, com dedupe por hash | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #178 | 26/10/2026 | funcionalidade (0%) | — | Registrar causa e limitar retentativas de developer:abrir_pr:adiar, que falhou 13 de 13 | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #177 | 26/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 4 h bloqueando a evolução | item #219 (loop) |
-| #176 | 26/10/2026 | funcionalidade (0%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #175 | 26/10/2026 | funcionalidade (0%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #174 | 26/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 2 h bloqueando a evolução | item #213 (loop) |
-| #173 | 26/10/2026 | funcionalidade (0%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #172 | 26/10/2026 | funcionalidade (0%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #171 | 26/10/2026 | funcionalidade (0%) | — | Isolar o teste de paralelismo do Arquiteto: trocar timing por threading.Barrier com timeout | item #214 (sub_item) |
-| #170 | 26/10/2026 | funcionalidade (0%) | — | Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA em toda a esteira de… | pergunta do cassio: “Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA e” |
-| #169 | 26/10/2026 | funcionalidade (0%) | — | Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, notas, prompts)… | pergunta do cassio: “Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, no” |
-| #168 | 26/10/2026 | funcionalidade (0%) | — | Exportar contexto enxuto para o Cursor (AGENTS.md e .cursor/rules) a partir da memória do assunto | pergunta do cassio: “Para cada assunto ou repositório, o loop gera e mantém os arquivos de contexto q” |
+| #188 | 26/10/2026 | documentacao (100%) | — | Painel: delta de falhas 24h vs 24h anteriores nos cards, com cor invertida e caso sem base | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
+| #187 | 26/10/2026 | funcionalidade (65%) | sim | Resumo semanal para a equipe: PRs de produto mergeados, quem pediu e uso medido | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
+| #186 | 26/10/2026 | funcionalidade (51%) | sim | Limitar reentradas de developer:abrir_pr:adiar e escalar a tarefa após N adiamentos seguidos | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
+| #185 | 26/10/2026 | seguranca (87%) | sim | Painel: card de falhas por componente nas últimas 24h, ordenado pelo mais afetado | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
+| #184 | 26/10/2026 | observabilidade (42%) | sim | Changelog semanal: PRs mergeados agrupados em produto/infra, com o pedido de origem | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
+| #183 | 26/10/2026 | observabilidade (72%) | sim | Diagnóstico de ingestão: registrar por que lancamentos=0 (pasta ausente, vazia ou arquivos… | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #182 | 26/10/2026 | observabilidade (78%) | sim | Painel: agrupar as falhas das últimas 24h por causa em um card único no topo | pergunta do usuario: “Como usuário, qual componente do painel devo melhorar para facilitar a visualiza” |
+| #181 | 26/10/2026 | funcionalidade (40%) | sim | Disjuntor por causa em developer:abrir_pr:adiar: após 3 falhas seguidas iguais, pôr o item em… | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
+| #180 | 26/10/2026 | seguranca (30%) | sim | Digest semanal do que o time ganhou: PRs de produto ligados ao pedido de origem | pergunta do pm: “Como PM, qual funcionalidade uma equipe de engenharia usaria já na próxima seman” |
+| #179 | 26/10/2026 | funcionalidade (98%) | sim | Parser determinístico de e-mail de notificação bancária → lançamentos, com dedupe por hash | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
+| #178 | 26/10/2026 | funcionalidade (40%) | sim | Registrar causa e limitar retentativas de developer:abrir_pr:adiar, que falhou 13 de 13 | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
+| #177 | 26/10/2026 | observabilidade (45%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 4 h bloqueando a evolução | item #219 (loop) |
+| #176 | 26/10/2026 | observabilidade (28%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #175 | 26/10/2026 | correcao (40%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #174 | 26/10/2026 | correcao (74%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 2 h bloqueando a evolução | item #213 (loop) |
+| #173 | 26/10/2026 | correcao (50%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #172 | 26/10/2026 | correcao (66%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #171 | 26/10/2026 | correcao (65%) | sim | Isolar o teste de paralelismo do Arquiteto: trocar timing por threading.Barrier com timeout | item #214 (sub_item) |
+| #170 | 26/10/2026 | correcao (77%) | — | Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA em toda a esteira de… | pergunta do cassio: “Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA e” |
+| #169 | 26/10/2026 | correcao (76%) | — | Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, notas, prompts)… | pergunta do cassio: “Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, no” |
+| #168 | 26/10/2026 | funcionalidade (60%) | sim | Exportar contexto enxuto para o Cursor (AGENTS.md e .cursor/rules) a partir da memória do assunto | pergunta do cassio: “Para cada assunto ou repositório, o loop gera e mantém os arquivos de contexto q” |
 | #167 | 26/10/2026 | funcionalidade (0%) | — | Gasto diário do Cursor por assunto/tarefa, com projeção de esgotamento dos US$ 250 | pergunta do cassio: “Tenho US$ 250 por mês de IA no Cursor e sempre acabo antes do fim do mês. Quero ” |
 | #166 | 26/10/2026 | funcionalidade (0%) | — | Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsserviço de… | pergunta do cassio: “Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsse” |
 | #165 | 26/10/2026 | funcionalidade (0%) | — | Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e depois acho em segundos, por pa | pergunta do cassio: “Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e d” |
