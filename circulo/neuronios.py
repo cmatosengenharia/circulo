@@ -110,10 +110,12 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                 argv[3:3] = alvos               # -m ruff check <alvos> --select ...
                 argv += LINT_CMD[LINT_CMD.index("--ignore"):][:2]   # lição #78: nunca mais estrito que o CI
             # lições #26 e #27: o id (arquivo, classe, função) é conferido por ast antes de chamar o pytest (o exit 4 é
-            # qualquer erro de uso, não só este); a recusa leva os test_* reais para o reparo não repetir o id inventado
-            from .developer import alvo_pytest_existe, listar_testes
-            sumido = next((a for a in argv if "pytest" in argv and a.startswith("tests/")
-                           and not alvo_pytest_existe(wt, a)), None)
+            # qualquer erro de uso, não só este); a recusa leva os test_* reais para o reparo não repetir o id inventado.
+            # Lição #26: o que passa no ast ainda passa pela coleta do pytest antes de rodar
+            from .developer import (ALVO_INEXISTENTE, CAUSA_ALVO, REPARO, alvo_coletado, alvo_pytest_existe,
+                                    listar_testes)
+            sumido = next((a for a in argv if "pytest" in argv and a.startswith("tests/") and not (
+                alvo_pytest_existe(wt, a) and ("::" not in a or alvo_coletado(wt, a, env)))), None)
             cp = None if sumido else subprocess.run([sys.executable, *argv], cwd=wt, capture_output=True, text=True,
                                                     timeout=900, env=env)
             ok, motivo = (True, "") if cp is None else (cp.returncode == 0, (cp.stdout + cp.stderr)[-800:])
@@ -125,6 +127,10 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                 recusa = "" if not sumido else (
                     f"recusa alvo_inexistente: {sumido}, pytest não rodou; test_* reais do arquivo: "
                     f"{', '.join(listar_testes(wt, sumido.split('::')[0])) or 'nenhum (arquivo ausente)'}; ")
+                if sumido:
+                    from .licoes import Licoes
+                    Licoes(store, repo=wt).verificar(REPARO, False, sujeito=p["descricao"], motivo=recusa,
+                                                     assinatura=ALVO_INEXISTENTE, causa=CAUSA_ALVO)
                 res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", True, f"{recusa}alvo do pytest não existe mais: portão desativado (lição obsoleta)", p["id"]))
                 continue
         else:

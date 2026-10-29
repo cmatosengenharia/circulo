@@ -13,10 +13,16 @@ from __future__ import annotations
 
 import ast
 import math
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 DEF = (ast.FunctionDef, ast.AsyncFunctionDef)
+REPARO = "developer:reparo"
+CAUSA_ALVO = "alvo_inexistente"
+ALVO_INEXISTENTE = f"{REPARO}:{CAUSA_ALVO}"   # uma lição, seja qual for o teste citado (lições #31 e #35)
+NAO_COLETADO = (4, 5)                       # pytest: id não achado (erro de uso) e nenhum teste coletado
 
 LIMITE_PASSOS = 40                          # o --max-turns padrão do ClaudeCodeAgent
 PASSOS_BASE, PASSOS_POR_ARQUIVO, PASSOS_POR_FUNCAO = 8, 6, 3   # ler/testar/lint/commit; ler e editar; editar e testar
@@ -100,6 +106,17 @@ def alvo_pytest_existe(raiz: Path | str, node_id: str) -> bool:
             return False
         corpo = no.body
     return True
+
+
+def alvo_coletado(raiz: Path | str, node_id: str, env: dict | None = None) -> bool:
+    """O pytest coleta o id (`--collect-only`): o `ast` não vê o que o pytest descarta (classe com `__init__`, conftest).
+    Só a saída 4 ou 5 recusa; sem pytest ou com erro de coleta, quem relata é a execução."""
+    try:
+        p = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider", node_id],
+                           cwd=raiz, capture_output=True, text=True, timeout=300, env=env)
+    except subprocess.TimeoutExpired:
+        return True
+    return p.returncode not in NAO_COLETADO
 
 
 def listar_testes(raiz: Path | str, arquivo: str) -> list[str]:
