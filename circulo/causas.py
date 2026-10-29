@@ -13,6 +13,9 @@ CAUSAS = {
     # lições #10/#11 (o agente edita a constituição) → teste da lição #12
     "constituicao_intacta":
         "tests/test_reparo.py::test_constituicao_editada_pelo_agente_e_revertida_em_cada_rodada_e_o_pr_sai",
+    # lição #59 (o agente para no máximo de passos): o estouro não se reproduz sem LLM; o portão que reage a ele, sim
+    "maximo_de_passos":
+        "tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador",
 }
 
 
