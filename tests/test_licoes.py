@@ -444,9 +444,9 @@ def test_item_feito_sem_checagem_deixa_a_licao_sem_prevencao_e_a_volta_do_erro_r
 def _sem_prevencao(s, lid, reincidencias, item_id=None):
     s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
         "ultima_tick,created_at,updated_at,camada,item_id) VALUES(?,?,'developer:agente','estrutural',"
-        "'developer:agente: circulo/self_dev.py maximo de passos','Não repetir: maximo de passos',"
+        "'developer:agente: circulo/self_dev.py sem saida','Não repetir: sem saida',"
         "'sem_prevencao',?,?,0,0,0,0,'regra',?)",
-        (lid, f"developer:agente:maximo_de_passos:{lid}", reincidencias + 1, reincidencias, item_id))
+        (lid, f"developer:agente:sem_saida:{lid}", reincidencias + 1, reincidencias, item_id))
 
 
 def test_licao_59_sem_prevencao_que_reincidiu_3x_vira_item_de_teste_de_regressao_uma_vez(circle):
@@ -463,7 +463,7 @@ def test_licao_59_sem_prevencao_que_reincidiu_3x_vira_item_de_teste_de_regressao
     assert [r["chave"] for r in itens] == ["licao:59:teste_regressao"]
     assert itens[0]["titulo"].startswith("Lição #59: teste de regressão")
     d = itens[0]["detalhe"]
-    assert all(x in d for x in ("lição #59", "developer:agente:maximo_de_passos:59", "circulo/self_dev.py", "reincidiu 12x"))
+    assert all(x in d for x in ("lição #59", "developer:agente:sem_saida:59", "circulo/self_dev.py", "reincidiu 12x"))
     assert s.one("SELECT item_id FROM licoes WHERE id=59")["item_id"] == itens[0]["id"]
     s.x("UPDATE roadmap SET status='descartado' WHERE id=?", (itens[0]["id"],))   # saiu da fila: volta a ela, sem duplicar
     L.revisar()
