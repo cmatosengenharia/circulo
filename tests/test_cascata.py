@@ -79,7 +79,7 @@ def test_verify_output_de_saida_longa_mostra_ao_jev_o_comeco_e_o_fim_e_nao_o_mei
     """Missões 3/4/5 (28/10): toda entrega acima de 8.000 caracteres ia ao Jev como `output[:8000]`, cortada no meio de
     uma frase; ele respondia que estava cortada e verify_formato reprovou 9 de 9 ciclos de construção. Agora vai o
     começo e o FIM, com o meio marcado como omitido, e o estado diz o tamanho real."""
-    from circulo.decision import amostra_da_saida
+    from circulo.missao import amostra_da_saida
     corpo = "\n".join(f"## Seção {i}\n\nTexto da seção {i} com conteúdo suficiente para encher a linha." for i in range(300))
     saida = "# Plano\n\n" + corpo + "\n\nFim do plano: todos os passos acima têm dono e prazo."
     assert len(saida) > 8000
