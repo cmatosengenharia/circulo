@@ -62,3 +62,4 @@ Cada giro escolhe uma tarefa (as de trabalho primeiro, depois as de manutenção
 | `revisar_prs` (QA e release) | Revisando PRs abertos no gate |
 | `planejar_roteiro` (Gerente de produto) | Planejando o próximo item do roteiro a partir da evidência |
 | `indagar` (Product owner) | Indagador: levantando as perguntas da missão e passando cada uma pelo Jev |
+| `pesquisar_mercado` (Pesquisar mercado) | Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal) |
