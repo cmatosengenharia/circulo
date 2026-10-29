@@ -24,6 +24,7 @@ from .falhas_painel import (_falhas_antes, agrupar_por_causa, causas_vs_antes, f
                             variacao)
 from .money import fmt_brl
 from .orcamento_dia import limite_hoje, tokens_dia
+from .pedido_estado import pedidos, secao
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
 from .state import Store
@@ -355,6 +356,7 @@ def pagina_saude(h: dict) -> bytes:
              f'corrigido por humano: <b>{hum}</b></small><ol>' + "".join(
                  f'<li>PR #{p["pr"]} item #{p["item_id"]} <em class="delta ruim">⚠ {p["motivo"]}</em></li>'
                  for p in pl["sem_plano"]) + "</ol></section>")
+    pedido = secao(h.get("pedidos", []))
     return (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Saúde do loop</title>'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><style>{TOKENS}\n'
             "body{margin:0;padding:18px;background:var(--bg);color:var(--ink)}"
@@ -365,7 +367,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{componentes}{falhas}{sem_uso}{contest}{plano}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{pedido}{falhas}{sem_uso}{contest}{plano}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
@@ -421,7 +423,7 @@ def make_handler(db_path: str):
                 self.end_headers()
                 self.wfile.write(body)
             elif u.path == "/painel":
-                body = pagina_saude(saude(self._store().db))
+                body = pagina_saude({**saude((st := self._store()).db), "pedidos": pedidos(st)})
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")

@@ -514,3 +514,84 @@ def test_planos_aprovados_antes_do_commit_aparecem_no_painel(tmp_path):
     assert h["planos"]["registrado_pct"] == 50.0 and h["planos"]["humano_pct"] == 50.0
     pagina = pagina_saude(h).decode()
     assert "Planos aprovados antes do commit" in pagina and "PR #41" in pagina and "sem plano" in pagina
+
+
+def test_estado_do_pedido_e_puro_e_segue_a_ordem_das_regras():
+    """Pergunta #472: entregue > bloqueado > andamento (com o PR) > recebido; idade desde a última transição."""
+    from circulo.pedido_estado import estado_pedido
+
+    def c(feitas, motivo="", o_que="o estudo do item"):
+        etapas = [{"etapa": e, "titulo": t, "em": em, "feita": True} for e, t, em in feitas]
+        return {"etapas": etapas, "esperando": {"o_que": o_que, "motivo": motivo}}
+    ev = {"status": "done", "error": None, "created_at": 100.0, "processed_at": 110.0}
+    item = [("pedido", "Pedido", 100.0), ("item", "virou item #5", 120.0)]
+    pr = item + [("pr", "PR #9 aberto", 200.0)]
+    assert estado_pedido(ev, c(item), {"status": "pendente"}, 300.0) == {
+        "estado": "recebido", "detalhe": "esperando o estudo do item", "pr": None, "desde": 120.0, "idade_s": 180}
+    r = estado_pedido(ev, c(pr, "checks em andamento: test"), {"status": "em_andamento"}, 300.0)
+    assert (r["estado"], r["pr"], r["idade_s"]) == ("andamento", 9, 100)
+    r = estado_pedido(ev, c(pr + [("ci", "CI: vermelho", 250.0)], "CI vermelho: test_x"), {"status": "em_andamento"}, 300.0)
+    assert (r["estado"], r["detalhe"], r["pr"], r["desde"]) == ("bloqueado", "CI vermelho: test_x", 9, 250.0)
+    r = estado_pedido(ev, c(pr + [("merge", "PR #9 mergeado", 280.0)]), {"status": "feito"}, 300.0)
+    assert (r["estado"], r["detalhe"], r["idade_s"]) == ("entregue", "PR #9 mergeado", 20)
+    r = estado_pedido(ev, c([("pedido", "Pedido", 100.0)]), None, 300.0)
+    assert (r["estado"], r["desde"]) == ("entregue", 110.0)                      # respondido sem virar item
+    falhou = {**ev, "status": "failed", "error": "boom", "processed_at": None}
+    r = estado_pedido(falhou, c([("pedido", "Pedido", 100.0)], "o pedido falhou ao virar item: boom"), None, 300.0)
+    assert (r["estado"], r["idade_s"]) == ("bloqueado", 200) and "boom" in r["detalhe"]
+    r = estado_pedido({**ev, "status": "pending", "processed_at": None}, c([("pedido", "Pedido", 100.0)]), None, 300.0)
+    assert r["estado"] == "recebido"
+
+
+def test_cada_pedido_dos_7_dias_tem_exatamente_um_estado_com_idade_no_painel(tmp_path):
+    """Pergunta #472: os 10 pedidos do humano em 7 dias, um em cada caminho já gravado (evento, item, PR, CI, gate),
+    saem com exatamente 1 estado e a idade nele; nenhum fica sem estado, nem na lista nem na página."""
+    import time
+
+    from circulo.painel import pagina_saude, pedidos, saude
+    from circulo.pedido_estado import ESTADOS_PEDIDO
+    from circulo.rastro import elo
+    from circulo.state import Store
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+
+    def ev(kind, status, horas, error=None, origem="painel"):
+        em = agora - horas * 3600
+        return st.x("INSERT INTO events(kind,payload,status,error,created_at,processed_at) VALUES(?,?,?,?,?,?)",
+                    (kind, json.dumps({"text": f"pedido de {horas} h", "origem": origem}), status, error, em,
+                     em + 1 if status == "done" else None))
+
+    def item(e, status="pendente", pr=None, merges=()):
+        i = st.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                 "VALUES(?,?,'pedido_cassio',?,'pedido pelo painel',1,?,?)", (f"item do ev {e}", "d", status, agora, agora))
+        elo(st, f"pedido:{e}", f"item:{i}", "virou_item")
+        if pr:
+            st.x("INSERT INTO prs(number,titulo,branch,status,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                 (pr, "t", f"circulo/fix-{i}-1", "aberto", agora - 600, agora - 600))
+        for merged, motivo in merges:
+            st.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(?,'a',?,?,'{}',?)",
+                 (pr, merged, motivo, agora - 300))
+
+    ev("mensagem", "pending", 1)
+    ev("novo_projeto", "processing", 2)
+    ev("mensagem", "failed", 3, error="boom")
+    ev("novo_projeto", "done", 4)
+    item(ev("mensagem", "done", 5))
+    item(ev("mensagem", "done", 6), "em_andamento", 101)
+    item(ev("mensagem", "done", 7), "em_andamento", 102, [(0, "checks em andamento: test")])
+    item(ev("mensagem", "done", 8), "em_andamento", 103, [(0, "CI vermelho: test_x")])
+    item(ev("mensagem", "done", 9), "feito", 104, [(1, "checks verdes")])
+    item(ev("mensagem", "done", 10), "contestado")
+    ev("mensagem", "done", 11, origem="demo")                                    # não é pedido do humano
+    ev("mensagem", "done", 8 * 24)                                               # fora da janela de 7 dias
+
+    ps = pedidos(st, agora)
+    assert len(ps) == 10
+    assert all(p["estado"] in ESTADOS_PEDIDO and p["idade_s"] >= 0 for p in ps)
+    assert [p["estado"] for p in ps] == ["recebido", "recebido", "bloqueado", "entregue", "recebido",
+                                         "andamento", "andamento", "bloqueado", "entregue", "bloqueado"]
+    assert [p["pr"] for p in ps][5:9] == [101, 102, 103, 104] and "CI vermelho" in ps[7]["detalhe"]
+
+    pagina = pagina_saude({**saude(st.db), "pedidos": ps}).decode()
+    linhas = pagina.split('aria-label="Estado de cada pedido seu"', 1)[1].split("</ol>", 1)[0].count("<li")
+    assert linhas == 10 and "PR #104 mergeado" in pagina and "boom" in pagina
