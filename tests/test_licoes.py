@@ -470,6 +470,50 @@ def test_licao_59_sem_prevencao_que_reincidiu_3x_vira_item_de_teste_de_regressao
     assert [r["status"] for r in s.q("SELECT status FROM roadmap WHERE origem='loop'")] == ["pendente"]
 
 
+def _sem_prevencao_sem_arquivo(s, lid, reincidencias):
+    """Lição #15 real: 'rastro:cadeia' não cita caminho .py nenhum — o item nascia sem arquivo alvo."""
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,created_at,updated_at,camada) VALUES(?,'rastro:lacuna','rastro:cadeia','trabalho',"
+        "'rastro:cadeia: item planejado pelo loop sem a pergunta do conselho que o originou','Não repetir',"
+        "'sem_prevencao',?,?,0,0,0,0,'regra')", (lid, reincidencias + 1, reincidencias))
+
+
+def test_item_do_teste_de_regressao_nasce_com_arquivo_alvo_e_passa_no_portao_de_pedido(circle):
+    """Itens #282/#283 (28/10): a lição sem .py no texto gerava um pedido sem arquivo alvo; o portão de pedido devolvia
+    a pergunta, descartava na 2ª rodada e `cobrar_teste` repunha o item na fila — a cada hora, sem gastar. Agora o
+    detalhe cita o teste novo (tests/test_licao_<id>_regressao.py) e o módulo do neurônio, e o portão o aceita."""
+    from circulo.pedido_claro import avaliar
+    from circulo.prevencao import arquivos_do_teste
+    s, L = circle.store, lic(circle)
+    _sem_prevencao_sem_arquivo(s, 15, 8)
+    L.revisar()
+    [item] = s.q("SELECT * FROM roadmap WHERE origem='loop'")
+    assert arquivos_do_teste({"id": 15, "ponto": "rastro:cadeia"}) == ("tests/test_licao_15_regressao.py", "circulo/rastro.py")
+    assert "tests/test_licao_15_regressao.py" in item["detalhe"] and "circulo/rastro.py" in item["detalhe"]
+    assert avaliar(item["titulo"], item["detalhe"]).completo
+
+
+def test_item_do_teste_de_regressao_descartado_pelo_portao_volta_reescrito_com_arquivo_e_nao_fica_em_ciclo(circle):
+    """O item já criado sem arquivo (antes desta correção) e descartado pelo portão volta à fila UMA vez, já reescrito
+    e completo; o esclarecimento antigo não o derruba de novo porque o pedido agora passa no portão."""
+    from circulo.pedido_claro import esclarecer, registrar
+    s, L = circle.store, lic(circle)
+    _sem_prevencao_sem_arquivo(s, 15, 8)
+    L.revisar()
+    [item] = map(dict, s.q("SELECT * FROM roadmap WHERE origem='loop'"))
+    antigo = "A lição #15 reincidiu 8x. Escrever em tests/ um teste de regressão.\nSucesso: a lição sai de sem_prevencao"
+    s.x("UPDATE roadmap SET detalhe=? WHERE id=?", (antigo, item["id"]))          # o pedido como nascia antes
+    item = dict(s.one("SELECT * FROM roadmap WHERE id=?", (item["id"],)))
+    assert esclarecer(s, item, registrar(s, item))[0] == "esclarecer"            # 1ª rodada: pergunta do arquivo
+    item = dict(s.one("SELECT * FROM roadmap WHERE id=?", (item["id"],)))
+    assert esclarecer(s, item, registrar(s, item))[0] == "descartado"            # 2ª rodada: descartado
+    L.revisar()                                                                  # cobrar_teste: reescreve e repõe
+    item = dict(s.one("SELECT * FROM roadmap WHERE id=?", (item["id"],)))
+    assert item["status"] == "pendente" and item["estudo"] is None and "tests/test_licao_15_regressao.py" in item["detalhe"]
+    assert esclarecer(s, item, registrar(s, item)) is None                       # completo: segue para o Developer
+    assert s.one("SELECT COUNT(*) n FROM roadmap WHERE origem='loop'")["n"] == 1
+
+
 # ------------------------------------------------------------ lição #70: validada reabre quando o mesmo erro volta
 def _validada_70(s):
     agora = time.time()

@@ -313,10 +313,11 @@ class MergeGate:
 
     def _pr_do_developer_sumiu(self, abertos: set[int]) -> None:
         """PR do Developer fechado ou mergeado fora do gate (por você, no GitHub): o Developer não fica esperando
-        para sempre um PR que não existe mais."""
+        para sempre um PR que não existe mais. Vale também para o PR de docs do Redator técnico (sem item): o #44,
+        fechado no GitHub, ficou 'aberto' na tabela por 8 dias, com o Redator parado e o Vigia alertando a cada hora."""
         s = self.ctx.store
         estado = getattr(self.gh, "pr_state", None)
-        for dev in [dict(r) for r in s.q("SELECT number, item_id FROM prs WHERE status='aberto' AND item_id IS NOT NULL")]:
+        for dev in [dict(r) for r in s.q("SELECT number, item_id FROM prs WHERE status='aberto'")]:
             if dev["number"] in abertos:
                 continue
             info = {}
@@ -327,10 +328,14 @@ class MergeGate:
                     continue
             merged = bool(info.get("merged"))
             self._fechar(dev["number"], merged)
-            if not merged:
-                s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE id=? AND status='em_andamento'",
-                    (f"PR #{dev['number']} fechado sem merge fora do gate", time.time(), dev["item_id"]))
-                self.ctx.reply(f"PR #{dev['number']} foi fechado sem merge fora do gate; o item volta para a fila e o Developer segue.", "merge")
+            if merged:
+                continue
+            if dev["item_id"] is None:
+                self.ctx.reply(f"PR #{dev['number']} (sem item) foi fechado sem merge fora do gate.", "merge")
+                continue
+            s.x("UPDATE roadmap SET status='pendente', evidencia=?, updated_at=? WHERE id=? AND status='em_andamento'",
+                (f"PR #{dev['number']} fechado sem merge fora do gate", time.time(), dev["item_id"]))
+            self.ctx.reply(f"PR #{dev['number']} foi fechado sem merge fora do gate; o item volta para a fila e o Developer segue.", "merge")
 
     def _fechar(self, pr: int, merged: bool) -> None:
         """PR saiu (mergeado ou fechado): tabela prs, item do roteiro e retrato do Developer."""
