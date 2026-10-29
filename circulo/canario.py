@@ -133,7 +133,7 @@ def _injetar_portao(portao: dict) -> dict:
     from .licoes import portoes_que_deixam_passar
     causa = next((r["causa"] for r in portoes_que_deixam_passar([portao])), "")
     return {"ponto": f"portao:{portao['id']}", "velho_falhou": causa in ("", "barrou também o controle"),
-            "fresco_passou": causa != "barrou também o controle", "ok": not causa}
+            "fresco_passou": causa != "barrou também o controle", "ok": not causa, "causa": causa}
 
 
 def _portoes_que_nunca_barraram(s: Store, now: float) -> list[dict]:
@@ -172,5 +172,8 @@ def rodar(s: Store, reply=None, now: float | None = None) -> list[dict]:
         if not r["ok"] and reply:
             reply(f"Canário de {p} falhou: a falha injetada {'não foi acusada' if not r['velho_falhou'] else 'acusou também o controle'}.",
                   "saude")
+        if not r["ok"] and r.get("causa"):     # pergunta do conselho #483: portão aprendido mudo é erro de estrutura
+            from .licoes import Licoes
+            Licoes(s, reply).verificar("canario:portao_mudo_quebrado", False, sujeito=p, motivo=f"{p}: {r['causa']}")
         out.append(r)
     return out

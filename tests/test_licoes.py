@@ -617,3 +617,37 @@ def test_licao_83_higiene_tira_das_abertas_a_licao_de_telemetria(circle):
     assert higiene.rodar(s, forcar=True)["licoes_telemetria"] == 2
     assert [r["status"] for r in s.q("SELECT status FROM licoes ORDER BY id")] == ["obsoleta", "obsoleta", "aberta"]
     assert _m_licoes_abertas(s, 0)[1]["licoes_abertas"] == 1
+
+
+# Pergunta do conselho #483 (auditor): o único portão aprendido que nunca barrou era um lint com código que o CI
+# ignora (lição #70: B905,E501,F541): sem trecho que viola o F541 e com o E501 mudo (lição #78), ficava sem canário.
+LINT_70 = {"argv": ["-m", "ruff", "check", "circulo", "tests", "--select", "B905,E501,F541"]}
+
+
+def test_portao_de_lint_da_licao_70_tem_canario_dos_codigos_que_o_ci_cobra():
+    from circulo.licoes import VIOLA_LINT, entrada_sintetica
+    falha = entrada_sintetica("comando", LINT_70, 70, falha=True)["circulo/canario.py"]
+    assert VIOLA_LINT["B905"] in falha and VIOLA_LINT["F541"] in falha
+    assert "X = 1" in entrada_sintetica("comando", LINT_70, 70, falha=False)["circulo/canario.py"]
+
+
+def test_portao_de_lint_so_de_codigo_ignorado_pelo_ci_e_mudo_e_fica_sem_canario():
+    from circulo.licoes import portoes_que_deixam_passar
+    mudo = {"id": 1, "neuronio": "abrir_pr", "tipo": "comando", "descricao": "lint E501", "licao_id": 1,
+            "spec": json.dumps({"argv": ["-m", "ruff", "check", "circulo", "tests", "--select", "E501"]})}
+    assert portoes_que_deixam_passar([mudo]) == [{"id": 1, "descricao": "lint E501", "causa": "sem canário"}]
+
+
+def test_canario_de_portao_neutralizado_falha_e_abre_licao_portao_mudo_quebrado(circle, monkeypatch):
+    from circulo import canario, neuronios
+    s, agora = circle.store, time.time()
+    [pid] = neuronios.neurogenese(s, {"id": 15, "assinatura": "rastro:lacuna", "item_id": 96})
+    s.x("UPDATE portoes SET created_at=?", (agora - 2 * 86400,))
+    assert [r["ok"] for r in canario.rodar(s, now=agora)] == [True]
+    assert not s.q("SELECT 1 FROM licoes WHERE ponto='canario:portao_mudo_quebrado'")
+
+    monkeypatch.setattr(neuronios, "avaliar_aprendidos", lambda *a: [neuronios.Resultado("neutralizado", True, "", pid)])
+    [r] = canario.rodar(s, now=agora + 2 * canario.INTERVALO)
+    assert not r["ok"]
+    [lic] = s.q("SELECT classe, status FROM licoes WHERE ponto='canario:portao_mudo_quebrado'")
+    assert (lic["classe"], lic["status"]) == ("estrutural", "aberta")
