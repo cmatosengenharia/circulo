@@ -233,7 +233,7 @@ def causa_do_ci(store, gh, vereditos) -> None:
     """Cada PR devolvido por 'checks falhando' ganha a causa (`ci_causa.classificar`) na trilha, uma vez por versão.
     infra_suspeita tira o conserto da fila: o Developer não gasta tentativa e o item não reabre por um CI que nem rodou;
     codigo_ou_indeterminado segue para o conserto, que reexecuta lint e testes no worktree com a main."""
-    from .ci_causa import INFRA, classificar, do_run
+    from .ci_causa import INFRA, PASSOU, classificar, do_run, raiz
     vistos = dict(store.get("ci_causa_vistos") or {})
     for v in vereditos:
         if gh is None or not v.reason.startswith("checks falhando") or vistos.get(str(v.number)) == v.sha:
@@ -247,6 +247,11 @@ def causa_do_ci(store, gh, vereditos) -> None:
         row = store.one("SELECT item_id FROM prs WHERE number=?", (v.number,))
         if causa == INFRA:
             store.x("UPDATE prs SET conserto=NULL, updated_at=? WHERE number=? AND conserto_sha=?", (time.time(), v.number, v.sha))
+        r = raiz([c["name"] for c in checks if c["conclusion"] not in PASSOU])
+        if r:
+            store.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at) VALUES(?,?,?,?,?,?)",
+                    (store.tick, "ci_causa", r["check"], 1.0, "local", time.time()))
+            registrar(store, v.number, row["item_id"] if row else None, "ci_raiz", r["decisao"], r["comando"], r, {})
         registrar(store, v.number, row["item_id"] if row else None, "ci_causa", causa, v.reason,
                   {"sha": v.sha, "checks": checks}, {})
     store.set("ci_causa_vistos", dict(list(vistos.items())[-50:]))

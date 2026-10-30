@@ -10,7 +10,8 @@ import time
 import pytest
 
 from circulo import revisor
-from circulo.ci_causa import CODIGO, CODIGO_OU_INDETERMINADO, INFRA, apos_reexecucao, classificar, do_run
+from circulo.ci_causa import (CODIGO, CODIGO_OU_INDETERMINADO, INFRA, PELA_REGRA, apos_reexecucao, classificar, do_run,
+                              raiz)
 from circulo.merge_gate import Verdict
 
 SETE = ("Container", "Constituição", "Reprodução primeiro", "Evidência reforçada",
@@ -110,3 +111,35 @@ def test_revisor_mantem_o_conserto_e_rotula_a_causa_quando_e_codigo(circle):
     revisor.revisar(s, gate)
     assert s.one("SELECT conserto FROM prs WHERE number=82")["conserto"] is not None
     assert s.one("SELECT veredito FROM revisoes WHERE pr=82 AND momento='ci_causa'")["veredito"] == CODIGO_OU_INDETERMINADO
+
+
+# lição #53: os 7 checks vermelhos juntos têm uma raiz pela ordem fixa; os demais são derivados e não viram ação.
+def test_licao_53_sete_checks_vermelhos_viram_uma_acao_sobre_a_constituicao():
+    r = raiz(list(SETE))
+    assert (r["check"], r["acao"], r["decisao"]) == ("Constituição", "rodar_local", PELA_REGRA)
+    assert "circulo/merge_gate.py" in r["comando"]
+    assert sorted(r["derivados"]) == sorted(set(SETE) - {"Constituição"})
+
+
+def test_raiz_segue_a_ordem_fixa_e_so_decide_com_tres_ou_mais_checks_conhecidos():
+    assert raiz(list(SETE[2:]))["check"] == "Reprodução primeiro"
+    assert raiz(["Container", "Testes (Python 3.13)", "Testes (Python 3.11)"])["check"] == "Testes (Python 3.11)"
+    assert raiz(["Container", "Testes (Python 3.13)", "Evidência reforçada"])["check"] == "Testes (Python 3.13)"
+    assert raiz(["Container", "Evidência reforçada"]) is None
+    assert raiz(["Container", "Evidência reforçada", "Lint externo"]) is None    # check fora da ordem fica para o Jev
+
+
+def test_licao_53_revisor_grava_uma_decisao_pela_regra_por_versao_do_pr(circle):
+    s = circle.store
+    _pr_em_conserto(s, 82)
+    gate = Gate([{"id": i, "name": n, "status": "completed", "conclusion": "failure"} for i, n in enumerate(SETE)], pr=82)
+    revisor.revisar(s, gate)
+    revisor.revisar(s, gate)
+    # source='local' é o que a métrica regra_decide conta como pela_regra; a trilha leva o rótulo explícito
+    ds = s.q("SELECT value, source FROM decisions WHERE question='ci_causa'")
+    assert [(d["value"], d["source"]) for d in ds] == [("Constituição", "local")]
+    revs = s.q("SELECT veredito, evidencia FROM revisoes WHERE pr=82 AND momento='ci_raiz'")
+    assert [r["veredito"] for r in revs] == [PELA_REGRA]
+    ev = json.loads(revs[0]["evidencia"])
+    assert (ev["check"], ev["acao"]) == ("Constituição", "rodar_local")
+    assert len(ev["derivados"]) == 6
