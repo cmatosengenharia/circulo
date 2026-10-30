@@ -7,6 +7,7 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 | Versão | Data | Destaque | Itens |
 |---|---|---|---|
+| 1.70.0 | 2026-10-30 | Regra: o loop nunca para de evoluir. Agentes de validação entre o Developer e o PR. Sem limite de tokens. | 6 |
 | 1.69.2 | 2026-10-28 | Cobrança do prazo de 48 h do Norte: a cadeia girava em falso — o conselho para de insistir. | 4 |
 | 1.69.1 | 2026-10-26 | - `CIRCULO_EXEMPLO=1` no arquivo de configuração: o SRE semeia o exemplo da tela Meu trabalho uma vez, na primeira | 2 |
 | 1.69.0 | 2026-10-26 | Meu trabalho: a tela que junta o dia a dia do engenheiro, com dados de exemplo para o esqueleto nascer pronto. | 5 |
@@ -46,14 +47,18 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.41.1 | 2026-10-20 | - Painel: aba fechada pelo navegador no meio de um `/api/...` gerava `BrokenPipeError` com traceback no `loop.err`; agora é ignorado (outros erros do servidor continuam no log). | 1 |
 | 1.41.0 | 2026-10-20 | `circulo/medico.py` | 9 |
 | 1.40.2 | 2026-10-20 | Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste: | 2 |
-| 1.40.1 | 2026-10-20 | Diagnóstico do "travado na 1.32.1" (medido no Mac às 14:17): | 2 |
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 93 · **observabilidade** 45 · **correcao** 31 · **documentacao** 15 · **seguranca** 14 · **velocidade** 2.
+Por tipo: **funcionalidade** 75 · **observabilidade** 51 · **correcao** 37 · **seguranca** 18 · **documentacao** 17 · **velocidade** 2.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #246 | 30/10/2026 | correcao (86%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
+| #245 | 30/10/2026 | observabilidade (83%) | sim | Classificar por regra a causa das falhas do neurônio (transitória x determinística) e expô-la na… | pergunta do operador: “Entre as falhas do neurônio que mais falha nas últimas 24 h (ex.: loop:progresso” |
+| #244 | 30/10/2026 | correcao (90%) | — | Lição #47: teste de regressão para loop:progresso: havia trabalho pendente e nada avançou em 10… | pergunta do licoes: “Lição #47: teste de regressão para loop:progresso: havia trabalho pendente e nad” |
+| #243 | 29/10/2026 | correcao (83%) | — | PR #243 | — |
+| #242 | 29/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #241 | 29/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #240 | 29/10/2026 | documentacao (100%) | — | Developer: registrar hash e seções do AGENTS.md por tarefa e comparar falha e custo com/sem | pergunta do mercado: “Como líder de equipe, posso registrar convenções e conhecimento do repositório (” |
 | #239 | 29/10/2026 | seguranca (66%) | sim | Canário para o único portão aprendido que nunca barrou: caso sintético que ele deve barrar | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
@@ -150,25 +155,25 @@ Por tipo: **funcionalidade** 93 · **observabilidade** 45 · **correcao** 31 · 
 | #148 | 24/10/2026 | observabilidade (56%) | sim | Evidência do conselho: contar falhas locais por execução distinta, não por linha repetida | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
 | #147 | 24/10/2026 | observabilidade (35%) | sim | Gerar proposta antecipada quando um job de pedido do humano se repete 3+ vezes em 7 dias | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
 | #146 | 24/10/2026 | funcionalidade (52%) | sim | Auditar e corrigir o corte de developer:teto: chave por item raiz, estado persistente, bloqueio | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #145 | 24/10/2026 | funcionalidade (0%) | — | Medir se a proposta antecipada de job recorrente foi aceita ou o humano pediu o mesmo job depois | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #144 | 24/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 79 h bloqueando a evolução | item #171 (loop) |
-| #143 | 24/10/2026 | funcionalidade (0%) | — | Vigia: 2 lição(ões) de estrutura aberta(s) há 76 h bloqueando a evolução | item #170 (loop) |
-| #142 | 24/10/2026 | funcionalidade (0%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #141 | 23/10/2026 | funcionalidade (0%) | — | Lição #19: developer:testes: __… | item #168 (erro) |
-| #140 | 23/10/2026 | funcionalidade (0%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #139 | 23/10/2026 | funcionalidade (0%) | — | Teste do Developer em paralelo: Barrier(2) com timeout e causa raiz de test_capacidade.py:112 | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #138 | 23/10/2026 | funcionalidade (0%) | — | Canário parametrizado: cada portão aprendido recusa a assinatura da lição que o criou | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #137 | 23/10/2026 | funcionalidade (0%) | — | Base vermelha: upsert da falha local por (item, assinatura, sha da main) com contador | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #136 | 23/10/2026 | funcionalidade (0%) | — | Canário para portões aprendidos: reexecutar a assinatura de cada lição e exigir que o portão barre | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #135 | 23/10/2026 | funcionalidade (0%) | — | Quarentena de item por teto de falhas locais com a mesma assinatura (limite 5, à la DLQ) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #134 | 23/10/2026 | funcionalidade (0%) | — | Ligar o agrupador de jobs (#146) ao loop: registrar o job recorrente como proposta antecipada | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #133 | 23/10/2026 | funcionalidade (0%) | — | Canário de falha para gate:merge: provar com teste que o portão recusa merge com check vermelho | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #132 | 23/10/2026 | funcionalidade (0%) | — | Antecipar o job recorrente: abrir item proposto com origem na pergunta quando ele passa de 3… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #131 | 23/10/2026 | funcionalidade (0%) | — | Medir tokens do developer por desfecho do item (PR entregue vs sem PR) para achar o desperdício | pergunta do economista: “Qual é o jeito mais barato de obter o mesmo resultado na etapa que mais gasta (d” |
-| #130 | 23/10/2026 | funcionalidade (0%) | — | Canário de falha para developer:abrir_pr:sem_marcador_de_conflito e teste_novo | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #129 | 23/10/2026 | funcionalidade (0%) | — | Developer: base vermelha com a mesma assinatura de teste para o item em vez de repetir a execução | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #128 | 23/10/2026 | funcionalidade (0%) | — | Medir cobertura de antecipação: fração dos pedidos humanos cujo job já tinha item proativo aberto… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #127 | 23/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 127 h bloqueando a evolução | item #153 (loop) |
+| #145 | 24/10/2026 | documentacao (99%) | — | Medir se a proposta antecipada de job recorrente foi aceita ou o humano pediu o mesmo job depois | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #144 | 24/10/2026 | observabilidade (99%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 79 h bloqueando a evolução | item #171 (loop) |
+| #143 | 24/10/2026 | observabilidade (54%) | sim | Vigia: 2 lição(ões) de estrutura aberta(s) há 76 h bloqueando a evolução | item #170 (loop) |
+| #142 | 24/10/2026 | correcao (89%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
+| #141 | 23/10/2026 | correcao (92%) | — | Lição #19: developer:testes: __… | item #168 (erro) |
+| #140 | 23/10/2026 | correcao (82%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
+| #139 | 23/10/2026 | correcao (68%) | sim | Teste do Developer em paralelo: Barrier(2) com timeout e causa raiz de test_capacidade.py:112 | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #138 | 23/10/2026 | correcao (26%) | — | Canário parametrizado: cada portão aprendido recusa a assinatura da lição que o criou | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
+| #137 | 23/10/2026 | seguranca (33%) | sim | Base vermelha: upsert da falha local por (item, assinatura, sha da main) com contador | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #136 | 23/10/2026 | funcionalidade (27%) | — | Canário para portões aprendidos: reexecutar a assinatura de cada lição e exigir que o portão barre | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
+| #135 | 23/10/2026 | seguranca (28%) | — | Quarentena de item por teto de falhas locais com a mesma assinatura (limite 5, à la DLQ) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #134 | 23/10/2026 | seguranca (72%) | sim | Ligar o agrupador de jobs (#146) ao loop: registrar o job recorrente como proposta antecipada | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #133 | 23/10/2026 | funcionalidade (54%) | sim | Canário de falha para gate:merge: provar com teste que o portão recusa merge com check vermelho | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
+| #132 | 23/10/2026 | seguranca (52%) | sim | Antecipar o job recorrente: abrir item proposto com origem na pergunta quando ele passa de 3… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #131 | 23/10/2026 | observabilidade (74%) | — | Medir tokens do developer por desfecho do item (PR entregue vs sem PR) para achar o desperdício | pergunta do economista: “Qual é o jeito mais barato de obter o mesmo resultado na etapa que mais gasta (d” |
+| #130 | 23/10/2026 | observabilidade (98%) | — | Canário de falha para developer:abrir_pr:sem_marcador_de_conflito e teste_novo | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
+| #129 | 23/10/2026 | documentacao (0%) | — | Developer: base vermelha com a mesma assinatura de teste para o item em vez de repetir a execução | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #128 | 23/10/2026 | correcao (27%) | — | Medir cobertura de antecipação: fração dos pedidos humanos cujo job já tinha item proativo aberto… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #127 | 23/10/2026 | observabilidade (50%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 127 h bloqueando a evolução | item #153 (loop) |
 | #126 | 23/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 125 h bloqueando a evolução | item #148 (loop) |
 | #125 | 23/10/2026 | funcionalidade (0%) | — | Disjuntor por assinatura no seletor do roadmap, com reteste e fechamento por reexecução verde | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
 | #124 | 23/10/2026 | funcionalidade (0%) | — | Isolar test_arquiteto_estuda_varios_itens: tornar o teste determinístico (barreira em vez de tempo) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
@@ -249,8 +254,3 @@ Por tipo: **funcionalidade** 93 · **observabilidade** 45 · **correcao** 31 · 
 | #8 | 18/10/2026 | observabilidade (76%) | sim | Trilha de eventos tipados do loop + painel de timeline e grafo de agentes/workflow | — |
 | #7 | 18/10/2026 | observabilidade (98%) | sim | Dash do loop em camadas: saúde no topo, todas as etapas em tempo real, drill-down por run_id | — |
 | #6 | 18/10/2026 | observabilidade (99%) | sim | Central de confiança: 3 níveis Endsley, sinais de ouro, trilha write-ahead e parada testada | — |
-| #5 | 18/10/2026 | correcao (80%) | sim | Lição #2: corpo:atualizar: >       with pytest.raises(RuntimeError):                                  # o erro | — |
-| #4 | 18/10/2026 | correcao (89%) | — | Lição #1: Corrigir erro: RuntimeError em idle:atualizar_corpo | — |
-| #3 | 18/10/2026 | correcao (56%) | — | Jev aprende worth_spending imitando a regra quando está em dúvida | — |
-| #2 | 18/10/2026 | funcionalidade (45%) | sim | a escolha do modelo deve ser decidida pelo jev, dependendo da complexidade da tarefa | — |
-| #1 | 18/10/2026 | documentacao (48%) | sim | Perguntas do Jev e portfólio evoluindo sozinhos | — |
