@@ -569,6 +569,33 @@ def test_licao_70_outro_neuronio_ou_outro_codigo_nao_reabre(circle):
     assert s.one("SELECT status, reincidencias FROM licoes WHERE id=70")["status"] == "validada"
 
 
+# ------------------------------------------------------------ pergunta #528: teste citado renomeado rebaixa a validada
+TESTE_59 = "tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador"
+
+
+def test_validada_cujo_teste_citado_foi_renomeado_cai_com_o_motivo_e_nao_volta_pelo_alias(circle, tmp_path):
+    """Pergunta #528 (lições #59/#15): a #59 cita o teste do alias 'maximo_de_passos'; renomeado, ela vira sem_prevencao
+    com o motivo 'teste citado não existe' e não volta a 'validada' pelo próprio alias quebrado no giro seguinte."""
+    s = circle.store
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "tests").mkdir()
+    arquivo = repo / "tests" / "test_developer.py"
+    arquivo.write_text("def test_licao_59_renomeado():\n    pass\n")
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,corrigida_tick,created_at,updated_at,camada) VALUES(59,'developer:agente:maximo_de_passos',"
+        "'developer:agente','estrutural','developer:agente: maximo de passos',?,'validada',13,12,0,?,?,0,0,'regra')",
+        (f"Checagem: teste {TESTE_59}; não repetir: developer:agente: maximo de passos", s.tick, s.tick))
+    L = Licoes(s, repo=repo)
+    for _ in range(2):
+        L.revisar()
+        r = s.one("SELECT status, prevencao FROM licoes WHERE id=59")
+        assert r["status"] == "sem_prevencao" and f"teste citado não existe ({TESTE_59})" in r["prevencao"]
+    arquivo.write_text(f"def {TESTE_59.split('::')[1]}():\n    pass\n")              # o teste voltou: a lição também
+    L.revisar()
+    assert s.one("SELECT status FROM licoes WHERE id=59")["status"] == "validada"
+
+
 # ------------------------------------------------------------ lição #83: JSON de estatística sem erro não é lição
 STATS_83 = json.dumps({"type": "system", "subagent_stats": {"spawned": 0, "completed": 0, "failed": 0, "killed": 0}})
 
