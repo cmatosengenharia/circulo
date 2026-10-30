@@ -41,3 +41,24 @@ def test_higiene_expira_dependentes_encurta_titulos_e_une_licoes(circle):
     assert s.one("SELECT status FROM licoes WHERE id=?", (b,))["status"] == "unida" and s.one("SELECT ocorrencias FROM licoes WHERE id=?", (a,))["ocorrencias"] == 21
     assert higiene.rodar(s) is None                                                  # uma vez por hora
     assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'Higiene:%'")["n"] == 1
+
+
+def test_licao_88_varredura_fecha_licao_validada_de_dump_zerado_cortado_e_mantem_a_com_failed(circle):
+    """lição #88 (lição #83 retroativa): a #88 ficou 'validada' com um dump de subagent_stats cortado, tudo em 0. A
+    varredura também olha as validadas e o JSON cortado; o dump com failed>0 é erro e fica. A evidência conta as que sobram."""
+    from circulo.perguntas import _m_licoes_abertas
+    s = circle.store
+    zerado = 'nd":0,"max_depth":0,"completed":0,"failed":0,"killed":0}}'
+    com_erro = 'nd":1,"max_depth":0,"completed":0,"failed":1,"killed":0}}'
+    for lid, status, texto in ((88, "validada", zerado), (89, "aberta", "nd: 0, max_depth: 0, completed: 0, failed: 0, killed: 0"),
+                               (90, "aberta", com_erro), (91, "aberta", "FAILED tests/test_a.py::test_x - assert 0 == 1")):
+        s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,primeira_tick,"
+            "ultima_tick,created_at,updated_at) VALUES(?,?,'developer:agente','ambiente',?,?,1,0,0,0,0,0)",
+            (lid, f"developer:agente:x{lid}", f"developer:agente: {texto}", status))
+    antes = _m_licoes_abertas(s, 0)[1]
+    assert antes["licoes_abertas"] == 3 and antes["licoes_telemetria"] == 2
+    assert higiene.rodar(s, forcar=True)["licoes_telemetria"] == 2
+    assert [r["status"] for r in s.q("SELECT status FROM licoes ORDER BY id")] == ["obsoleta", "obsoleta", "aberta", "aberta"]
+    assert "telemetria sem erro" in s.one("SELECT prevencao FROM licoes WHERE id=88")["prevencao"]
+    depois = _m_licoes_abertas(s, 0)[1]
+    assert depois["licoes_abertas"] == 2 and depois["licoes_telemetria"] == 0
