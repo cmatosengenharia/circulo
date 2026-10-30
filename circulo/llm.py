@@ -62,6 +62,20 @@ PROVEDORES: dict[str, tuple[str, str, str, str]] = {
 PORTE_ANTHROPIC = {"claude-haiku-5-5": "pequena", "claude-sonnet-5-5": "grande"}   # o harness pede nestes nomes
 
 
+MAX_RETRY = 1                # retries por chamada de neurônio, só em llm_cache.gerar (pergunta #563)
+
+
+def causa_da_falha(exc: BaseException) -> str:
+    """A causa da falha pela regra do item #299 (vigia.classificar_causa): timeout e saída inválida são transitórias."""
+    from .vigia import classificar_causa
+    return classificar_causa(f"{type(exc).__name__}: {exc}")
+
+
+def pode_repetir(exc: BaseException, retry: int) -> bool:
+    """Repetir só a causa transitória, e no máximo MAX_RETRY vezes: o resto falha igual e gasta os tokens de novo."""
+    return retry < MAX_RETRY and causa_da_falha(exc) == "transitoria"
+
+
 def provedor() -> str:
     from .conta import assinatura
     if assinatura():          # CIRCULO_CONTA=max vence o provedor configurado: nada passa pela API
