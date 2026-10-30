@@ -7,7 +7,8 @@ aninhadas. Classe com base (herança) pode ter testes que o `ast` não vê: o qu
 Passos (lição #59): o agente parava no máximo de passos (38 em 709 execuções). `estimar_passos` prevê por regra a
 fração do limite que a tarefa usa; acima do limiar o fatiador divide antes de rodar. A fração prevista de cada tarefa
 fica em PASSOS e o limiar sai do p20 das previsões das que ainda pararam no máximo (trajetórias que falham são mais
-longas que as bem-sucedidas): 80% delas teriam sido divididas.
+longas que as bem-sucedidas): 80% delas teriam sido divididas. Cada execução grava também os passos usados (o
+`num_turns` do Claude Code), e `relatorio_passos` dá a fração das tarefas acima de 80% do limite (alvo: menos de 5%).
 
 Convenções: o AGENTS.md da raiz entra no prompt e cada tarefa grava o hash, os títulos das seções injetadas e
 `com_convencoes`, listados no corpo do PR. O efeito medido de arquivos de contexto é pequeno (~+4% com arquivo humano)
@@ -38,8 +39,10 @@ NAO_COLETADO = (4, 5)                       # pytest: id não achado (erro de us
 LIMITE_PASSOS = 80                          # o --max-turns padrão do ClaudeCodeAgent (1.70: 40 → 80)
 PASSOS_BASE, PASSOS_POR_ARQUIVO, PASSOS_POR_FUNCAO = 8, 6, 3   # ler/testar/lint/commit; ler e editar; editar e testar
 LIMIAR_INICIAL, PERCENTIL, MIN_AMOSTRAS = 0.8, 0.2, 5
-PASSOS = "developer_passos"                 # kv: título da tarefa -> {"fracao", "limite", "em"}
+PASSOS = "developer_passos"                 # kv: título da tarefa -> {"fracao", "usados", "limite", "em"}
 MAX_REGISTROS = 300
+ALVO_ACIMA = 0.05                           # menos de 5% das tarefas acima de 80% do limite
+NUM_TURNS = re.compile(r'"num_turns":\s*(\d+)')
 
 ARQUIVO_CONVENCOES = "AGENTS.md"
 CONVENCOES = "developer_convencoes"         # kv: título da tarefa -> {"hash", "secoes", "com_convencoes", "linhas", "bytes", "em"}
@@ -61,12 +64,41 @@ def limiar_de_passos(fracoes_que_estouraram: list[float]) -> float:
     return ordem[max(0, math.ceil(PERCENTIL * len(ordem)) - 1)]
 
 
-def registrar_passos(s, titulo: str, fracao: float, limite: int) -> None:
+def _gravar_passos(s, titulo: str, **campos) -> None:
     reg, chave = s.get(PASSOS) or {}, titulo[:120]
-    if reg.get(chave, {}).get("fracao") == round(fracao, 4) and reg[chave].get("limite") == limite:
+    if all(reg.get(chave, {}).get(k) == v for k, v in campos.items()):
         return
-    reg[chave] = {"fracao": round(fracao, 4), "limite": limite, "em": time.time()}
+    reg[chave] = {**reg.get(chave, {}), **campos, "em": time.time()}
     s.set(PASSOS, dict(sorted(reg.items(), key=lambda kv: kv[1]["em"])[-MAX_REGISTROS:]))
+
+
+def registrar_passos(s, titulo: str, fracao: float, limite: int) -> None:
+    _gravar_passos(s, titulo, fracao=round(fracao, 4), limite=limite)
+
+
+def passos_usados(out: dict) -> int | None:
+    """Os passos de uma execução do agente: o `num_turns` do evento `result`, senão os passos vistos no streaming."""
+    achados = NUM_TURNS.findall(str(out.get("log") or ""))
+    if achados:
+        return int(achados[-1])
+    return len(out["passos"]) if out.get("passos") else None
+
+
+def registrar_passos_usados(s, titulo: str, usados: int, limite: int) -> None:
+    """O maior uso entre as execuções da tarefa, com o limite do agente em uso."""
+    anterior = (s.get(PASSOS) or {}).get(titulo[:120], {})
+    if anterior.get("usados") is not None and anterior.get("limite") == limite and anterior["usados"] >= usados:
+        return
+    _gravar_passos(s, titulo, usados=usados, limite=limite)
+
+
+def relatorio_passos(s, desde: float = 0.0) -> dict:
+    """A fração das tarefas com uso registrado que passaram de LIMIAR_INICIAL do limite de passos (alvo: ALVO_ACIMA)."""
+    usos = [ev for ev in (s.get(PASSOS) or {}).values() if ev.get("usados") is not None and ev.get("em", 0) >= desde]
+    acima = sum(ev["usados"] > LIMIAR_INICIAL * ev["limite"] for ev in usos)
+    fracao = round(acima / len(usos), 4) if usos else None
+    return {"tarefas": len(usos), "acima_de_80": acima, "fracao_acima_de_80": fracao, "alvo": ALVO_ACIMA,
+            "dentro_do_alvo": fracao < ALVO_ACIMA if usos else None}
 
 
 def parou_no_maximo(motivo: str | None) -> bool:
@@ -81,7 +113,7 @@ def limiar_calibrado(s) -> float:
         return LIMIAR_INICIAL
     rows = s.q("SELECT DISTINCT sujeito, motivo FROM verificacoes WHERE ponto='developer:agente' AND ok=0 "
                f"AND sujeito IN ({','.join('?' * len(reg))})", tuple(reg))
-    estouradas = {r["sujeito"] for r in rows if parou_no_maximo(r["motivo"])}
+    estouradas = {r["sujeito"] for r in rows if parou_no_maximo(r["motivo"]) and "fracao" in reg[r["sujeito"]]}
     return limiar_de_passos([reg[t]["fracao"] for t in estouradas])
 
 
@@ -241,7 +273,8 @@ def relatorio_convencoes(s, desde: float = 0.0) -> dict:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """python -m circulo.developer [--dias 7]: falha e tokens por tarefa com e sem convenções, em JSON."""
+    """python -m circulo.developer [--dias 7]: falha e tokens por tarefa com e sem convenções e, em `passos`, a fração
+    das tarefas acima de 80% do limite de passos, em JSON."""
     ap = argparse.ArgumentParser(prog="python -m circulo.developer",
                                  description="compara falha e custo das tarefas com e sem o AGENTS.md no prompt")
     ap.add_argument("--data", default=os.environ.get("CIRCULO_DATA", "data"))
@@ -249,7 +282,9 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
     from .state import Store
     store = Store(os.path.join(args.data, "circulo.db"))
-    print(json.dumps(relatorio_convencoes(store, desde=time.time() - args.dias * 86400), ensure_ascii=False, indent=2))
+    desde = time.time() - args.dias * 86400
+    print(json.dumps({**relatorio_convencoes(store, desde=desde), "passos": relatorio_passos(store, desde=desde)},
+                     ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
