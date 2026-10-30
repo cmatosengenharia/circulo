@@ -218,3 +218,25 @@ def test_semente_nunca_desfaz_o_que_o_loop_entregou(circle):
     r = circle.store.one("SELECT status, evidencia FROM roadmap WHERE titulo=?", (t,))
     assert (r["status"], r["evidencia"]) == ("feito", "PR #1 mergeado")
     assert circle.store.one("SELECT 1 FROM roadmap WHERE titulo LIKE 'Painel de confiança%'")
+
+
+def test_card_ao_vivo_nao_recalcula_dias_de_historico(circle, monkeypatch):
+    """lição #60 (painel:frescor_atrasado, p99 3562 ms): o card é recalculado a cada 1,5 s e a idade conta do início do
+    cálculo; rastro e SLOs leem de 24 h a 30 dias de histórico e ficavam mais lentos a cada giro dentro do card ao vivo.
+    Eles saem da thread do card: o card mostra o último retrato com a hora dele e o recálculo roda em segundo plano."""
+    from circulo import observabilidade
+    from circulo.confianca import LENTO_S
+    circle.tick()
+    vivo(circle)
+    t0 = time.time()
+    assert ids(confianca(circle.store, t0))["slos"]["dado_em"] == t0
+    quem, original = [], observabilidade.slos
+    monkeypatch.setattr(observabilidade, "slos", lambda *a, **k: quem.append(threading.current_thread()) or original(*a, **k))
+    assert ids(confianca(circle.store, t0 + 1))["slos"]["dado_em"] == t0 and not quem
+    t1 = t0 + LENTO_S + 1
+    assert ids(confianca(circle.store, t1))["slos"]["dado_em"] == t0      # o card não espera o histórico
+    fim = time.time() + 5
+    while ids(confianca(circle.store, t1 + 1))["slos"]["dado_em"] != t1 and time.time() < fim:
+        time.sleep(0.02)
+    assert ids(confianca(circle.store, t1 + 1))["slos"]["dado_em"] == t1
+    assert quem and threading.current_thread() not in quem, "histórico recalculado na thread que empurra o card"
