@@ -41,14 +41,14 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `indagador.py:140` | noul | português | A pergunta `candidatas.{…}.texto` é pertinente agora para a missão `missao`? |
 | `indagador.py:146` | choice | português | O que a pergunta `candidatas.{…}.texto` faz evoluir, se respondida? |
 | `indagador.py:147` | score | português | Quão acionável é a pergunta `candidatas.{…}.texto`? |
-| `jev_lab.py:37` | noul | inglês | The autonomous loop wants to run `action` now, costing about `est_tokens` tokens (`custo_pct_dia` percent of what it spe |
-| `jev_lab.py:47` | choice | inglês | Which maintenance task gives the loop the most value right now? Prefer the task neglected for the most turns in `stalene |
-| `jev_lab.py:54` | noul | inglês | Does the evidence justify applying this `evolution_type` change now? |
-| `jev_lab.py:62` | choice | português | Can this pull request be merged automatically? |
-| `jev_lab.py:70` | noul | inglês | Does the evidence show the new version is better and safe to advance? |
-| `jev_lab.py:77` | noul | inglês | Did the new version make something important worse than the previous one? |
-| `jev_lab.py:84` | choice | inglês | Which model tier is enough for this task? |
-| `jev_lab.py:91` | noul | inglês | Is this lesson worth keeping in the loop's memory? |
+| `jev_lab.py:39` | noul | inglês | The autonomous loop wants to run `action` now, costing about `est_tokens` tokens (`custo_pct_dia` percent of what it spe |
+| `jev_lab.py:49` | choice | inglês | Which maintenance task gives the loop the most value right now? Prefer the task neglected for the most turns in `stalene |
+| `jev_lab.py:56` | noul | inglês | Does the evidence justify applying this `evolution_type` change now? |
+| `jev_lab.py:64` | choice | português | Can this pull request be merged automatically? |
+| `jev_lab.py:72` | noul | inglês | Does the evidence show the new version is better and safe to advance? |
+| `jev_lab.py:79` | noul | inglês | Did the new version make something important worse than the previous one? |
+| `jev_lab.py:86` | choice | inglês | Which model tier is enough for this task? |
+| `jev_lab.py:93` | noul | inglês | Is this lesson worth keeping in the loop's memory? |
 | `loop.py:459` | choice | português | Qual tarefa de manutenção tem mais valor agora? |
 | `loop.py:511` | noul | português | vale gastar agora? |
 | `medico.py:165` | noul | inglês | Finding `achados.{…}.titulo` (evidence `achados.{…}.evidencia`) is blocking the loop's progress right now. |

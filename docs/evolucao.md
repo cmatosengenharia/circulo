@@ -50,10 +50,16 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 61 · **correcao** 55 · **funcionalidade** 37 · **seguranca** 25 · **documentacao** 18 · **velocidade** 4.
+Por tipo: **observabilidade** 58 · **correcao** 56 · **funcionalidade** 40 · **seguranca** 22 · **documentacao** 20 · **velocidade** 4.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #258 | 30/10/2026 | funcionalidade (47%) | sim | Auditar regras mortas: reprocessar decisões de 7d com entrada normalizada e listar regras com 0… | pergunta do analista_reincidencia: “Das regras determinísticas que já existem, quantas não decidiram nada nos último” |
+| #257 | 30/10/2026 | funcionalidade (51%) | sim | Regra promovida roda em sombra e só assume com limite inferior de concordância ≥90% | pergunta do analista_reincidencia: “Quando uma regra for promovida (por exemplo, as dos pares repetidos de entrada e” |
+| #256 | 30/10/2026 | funcionalidade (77%) | sim | Regra de causa-raiz de CI: com ≥3 checks falhando juntos, agir só sobre o primeiro da ordem de… | pergunta do analista_reincidencia: “A lição #53 mostra 7 checks de CI falhando juntos (Constituição, Container, Test” |
+| #255 | 30/10/2026 | funcionalidade (90%) | sim | Promover a regra determinística que cobre o par mais repetido do Jev (≥90% de consistência) antes… | pergunta do economista: “Só 1% das decisões é tomado por regra. Entre as decisões do Jev dos últimos 7 di” |
+| #254 | 30/10/2026 | documentacao (84%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #253 | 30/10/2026 | documentacao (100%) | sim | Fechar lição 'evidenciada' sem reincidência: 30 giros viram obsoleta, reincidente escala | pergunta do curador_licoes: “Qual é a regra que leva uma lição de 'evidenciada' (como as #83, #85 e #86) para” |
 | #252 | 30/10/2026 | correcao (99%) | sim | Rebaixar lição 'validada' cuja Checagem cita teste inexistente (arquivo ou função não resolve) | pergunta do cetico: “Quantas lições com status 'validada' citam na Prevenção um teste ou checagem (co” |
 | #251 | 30/10/2026 | correcao (99%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #250 | 30/10/2026 | correcao (86%) | — | Verificar que o teste citado na Prevenção de lição validada existe no repositório (arquivo e função) | pergunta do auditor: “Entre as lições com status 'validada' (como a #59, que cita tests/test_developer” |
@@ -222,8 +228,8 @@ Por tipo: **observabilidade** 61 · **correcao** 55 · **funcionalidade** 37 · 
 | #87 | 21/10/2026 | correcao (78%) | sim | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
 | #86 | 21/10/2026 | correcao (81%) | — | Lição #44: corpo:evidencia: erros nos primeiros giros do código novo: … | item #98 (erro) |
 | #47 | 20/10/2026 | correcao (74%) | — | Obter o numstat real via merge-base com a base | item #93 (sub_item) |
-| #46 | 20/10/2026 | funcionalidade (0%) | — | Lição #2: corpo:atualizar: > with pytest.raises(RuntimeError): # o erro do incidente, sem o caminho… | item #30 (erro) |
-| #45 | 20/10/2026 | funcionalidade (0%) | — | Comparar o total com o limite de tamanho e devolver veredito | item #92 (sub_item) |
+| #46 | 20/10/2026 | funcionalidade (69%) | sim | Lição #2: corpo:atualizar: > with pytest.raises(RuntimeError): # o erro do incidente, sem o caminho… | item #30 (erro) |
+| #45 | 20/10/2026 | correcao (90%) | — | Comparar o total com o limite de tamanho e devolver veredito | item #92 (sub_item) |
 | #43 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #42 | 20/10/2026 | correcao (42%) | sim | Lição #43: Corrigir erro: JSONDecodeError em meta | item #97 (erro) |
 | #41 | 20/10/2026 | correcao (46%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
@@ -248,9 +254,3 @@ Por tipo: **observabilidade** 61 · **correcao** 55 · **funcionalidade** 37 · 
 | #21 | 19/10/2026 | documentacao (0%) | sim | Registrar o job de cada pedido humano (regra do Jev, limiar calibrado) e antecipar jobs recorrentes | — |
 | #20 | 19/10/2026 | observabilidade (38%) | — | Gravar o id do item na falha local ao registrá-la; nunca agregar por caminho .circulo-wt-* | — |
 | #19 | 19/10/2026 | observabilidade (51%) | — | Vigia: registrar o resultado real de cada tentativa do planejador e diagnosticar a trava por ele | — |
-| #18 | 19/10/2026 | observabilidade (76%) | sim | Curador: fechar #10/#11 por alias causa→node id da #12 e proteger o mapa como constituição | — |
-| #17 | 19/10/2026 | seguranca (50%) | — | Developer: teto de tokens checado antes da chamada + corte na 2ª falha igual, rumo ao fatiamento | — |
-| #16 | 19/10/2026 | observabilidade (39%) | sim | Vigia: citar o motivo da última recusa do porteiro (worth_spending) no alerta de trava, não adivinhar | — |
-| #15 | 19/10/2026 | observabilidade (68%) | sim | Developer: ao chegar a 3 falhas, dividir o item e repetir só o sub-item que falhou, com o erro anterior | — |
-| #14 | 18/10/2026 | seguranca (82%) | sim | Developer: proteger a constituição em camadas (somente leitura + reversão pós-edição + lista no prompt) | — |
-| #13 | 18/10/2026 | seguranca (78%) | sim | Curador de lições: unir por node id e fechar por reexecução verde isolada do main, reabrindo na falha | — |
