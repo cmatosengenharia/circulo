@@ -167,3 +167,34 @@ def test_sombra_grava_o_pr_do_estado_e_o_desfecho_quando_o_pr_fecha(circle):
     s.x("UPDATE prs SET status='mergeado' WHERE number=7")
     regras.desfechos(s)
     assert s.one("SELECT desfecho FROM regra_sombra")["desfecho"] == "mergeado"
+
+
+def _regra(s, pergunta, estado):
+    regras._esquema(s)
+    s.x("INSERT INTO regras_jev(question,entrada,rotulo,valor,n,taxa,created_at) VALUES(?,?,'sim','0.9',20,1,?)",
+        (pergunta, regras.entrada(estado), time.time()))
+
+
+def test_auditoria_reprocessa_7d_cru_e_normalizado_e_classifica_regra_morta(circle):
+    """Pergunta #540: a regra só casa depois de normalizar ids/caminhos → 'falta normalização'; sem casar → 'específica
+    demais'; a que decide não leva rótulo. Só leitura: nenhum contador muda."""
+    s = circle.store
+    _regra(s, "vigia_trava_0", {"achados": [{"titulo": "Item #1 parado em circulo/loop.py", "gravidade": 0.7}]})
+    _regra(s, "vigia_acao_0", {"achados": [{"titulo": "Nada parecido", "gravidade": 0.1}]})
+    _regra(s, "indaga_pert_0", _estado(5))
+    for i in (2, 3, 4):
+        _decisoes(s, "vigia_trava_0", {"achados": [{"titulo": f"ITEM #{i} parado em tests/test_{i}.py",
+                                                     "gravidade": 0.7}]}, [0.9])
+    _decisoes(s, "vigia_trava_0", {"achados": [{"titulo": "Item #9 parado em x.py", "gravidade": 0.7}]}, [0.9],
+              idade=8 * 86400)
+    _decisoes(s, "vigia_acao_0", _estado(7), [0.9] * 2)
+    _decisoes(s, "indaga_pert_0", _estado(5), [0.9] * 4)
+    antes = [dict(r) for r in s.q("SELECT * FROM regras_jev ORDER BY id")]
+    aud = {a["question"]: a for a in regras.auditar(s)}
+    assert set(aud) == {"vigia_trava_0", "vigia_acao_0", "indaga_pert_0"}
+    assert (aud["vigia_trava_0"]["acionou"], aud["vigia_trava_0"]["quase_acionou"]) == (0, 3)
+    assert aud["vigia_trava_0"]["rotulo"] == "falta normalização"
+    assert (aud["vigia_acao_0"]["acionou"], aud["vigia_acao_0"]["quase_acionou"]) == (0, 0)
+    assert aud["vigia_acao_0"]["rotulo"] == "específica demais"
+    assert (aud["indaga_pert_0"]["acionou"], aud["indaga_pert_0"]["rotulo"]) == (4, None)
+    assert [dict(r) for r in s.q("SELECT * FROM regras_jev ORDER BY id")] == antes
