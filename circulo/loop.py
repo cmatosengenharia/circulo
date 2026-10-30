@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import digest_semanal, finance, ingestao, intencoes, jobs, jtbd, parada, revisao_uso, revisor, telemetria
+from . import digest_semanal, finance, ingestao, intencoes, jobs, jtbd, parada, pedidos, revisao_uso, revisor, telemetria
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
@@ -225,10 +225,8 @@ class Circle:
                                           {"evento": ev["id"], "texto": str(payload.get("text") or payload.get("pedido") or "")[:200]},
                                           regra="regra: a fila de pedidos tem prioridade")
                 with s.tx():
-                    if ev["kind"] == "novo_projeto":
-                        self.new_project(payload)
-                    else:
-                        self.handle(payload, ev["id"])
+                    if not pedidos.lancamento(ctx, ev["kind"], {**payload, "projeto": pid}):   # cara de lançamento: grava e responde, não vira missão
+                        self.new_project(payload) if ev["kind"] == "novo_projeto" else self.handle(payload, ev["id"])
                 s.finish_event(ev["id"], True)
                 intencoes.concluir(s, seq, True)
             except Exception as exc:  # o círculo não pode morrer
