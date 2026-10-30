@@ -45,7 +45,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `decision.py` | 1000 | DecisionLayer — Jev First: todo ponto do círculo que vai gastar recurso pergunta primeiro aqui. JevHttpClient (API da TypeSafe, POST /v1/systemone) e LocalJev (regra determinística) têm o MESMO contrato. |
 | `demo.py` | 119 | Demonstração: loop acelerado com pedidos simulados, para ver o painel vivo. Usa uma pasta de dados separada. |
 | `desfecho.py` | 157 | Desfecho por decisão: o que cada "sim" do Jev rendeu — fecha o ciclo de aprendizado. |
-| `developer.py` | 256 | O id pytest conferido por `ast` antes de rodar (lição #26): o reparo copiava ou inventava um id, e o pytest só avisava depois de iniciar ('ERROR: file or directory not found', saída 4). |
+| `developer.py` | 291 | O id pytest conferido por `ast` antes de rodar (lição #26): o reparo copiava ou inventava um id, e o pytest só avisava depois de iniciar ('ERROR: file or directory not found', saída 4). |
 | `diff_size.py` | 97 | Tamanho de um diff a partir do texto de `git diff --numstat`: total de linhas e a causa dominante (categoria e arquivo que mais pesam). Só `numstat_contra_base` chama git; o resto é puro. |
 | `digest_semanal.py` | 120 | Digest semanal do que o time ganhou: os PRs de produto mergeados em 7 dias, cada um com o pedido ou a pergunta de origem e o antes/depois da métrica que a motivou. PR de produto sem origem sai marcado 'sem pedido', nunca omitido: o buraco no rastro é o que o time precisa ver. Cada leitura (`circulo digest`) fica em `digest_leituras`. O idle publica o digest uma vez por semana (`publicar`); com a fração de produto abaixo da meta, o próximo roteiro parte de uma pergunta de produto (`prioriza_produto`, lido pelo Indagador). |
 | `disjuntor.py` | 126 | Disjuntor de LLM: a conta sem crédito ("credit balance is too low") não volta sozinha, e cada chamada repetida só gasta tentativa e enche o log de falhas do Developer. |
@@ -89,8 +89,8 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `licoes.py` | 900 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
 | `limite_uso.py` | 100 | Limite de uso do Claude Code: até quando não chamar a LLM, lido da própria mensagem de erro. |
 | `links.py` | 130 | Catálogo de links da empresa por assunto: colo o link com um rótulo curto e acho em segundos. |
-| `llm.py` | 258 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
-| `llm_cache.py` | 77 | Cache exato das respostas da LLM, por (neurônio + modelo + prompt normalizado), com TTL curto. |
+| `llm.py` | 272 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
+| `llm_cache.py` | 83 | Cache exato das respostas da LLM, por (neurônio + modelo + prompt normalizado), com TTL curto. |
 | `loop.py` | 898 | O círculo: loop infinito, Jev First, retoma de onde parou, pausa só por orçamento. |
 | `medico.py` | 319 | O Médico do loop: plano de controle que diagnostica gargalos por PADRÃO medido e responde pela escada mais barata. |
 | `memoria.py` | 494 | Memória de trabalho do time: o que o círculo já viu, recuperado por relevância na hora em que um agente precisa. |
@@ -115,7 +115,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 73 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 630 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `perguntas.py` | 631 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
 | `planejador.py` | 593 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planejador_cache.py` | 70 | A mesma pergunta do conselho com evidência quase igual em 24 h não volta à LLM do Planejador. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
@@ -126,9 +126,9 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `projects.py` | 301 | Projetos vivos: cada pedido vira um projeto que o círculo evolui com o propósito dele. |
 | `prova.py` | 72 | Prova de melhora por item mergeado (pergunta do conselho #57): a métrica do critério de sucesso do item, lida no planejamento (antes) e 7 dias depois do merge (depois), gravada na trilha (`elos`: item:N → medicao:N:antes|depois). |
 | `rastro.py` | 448 | Rastreabilidade de ponta a ponta: de onde veio cada mudança do loop até a prova de que ela funciona rodando. |
-| `registro.py` | 97 | Registro estruturado das chamadas de LLM. |
+| `registro.py` | 104 | Registro estruturado das chamadas de LLM. |
 | `regras.py` | 256 | Regras promovidas do Jev (pergunta #533): o par (entrada normalizada → decisão) que o Jev repete vira regra determinística consultada ANTES dele. |
-| `reparo.py` | 723 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
+| `reparo.py` | 727 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
 | `repo_stats.py` | 65 | Números do repositório do loop (commits), lidos do clone local. Cache curto: o painel atualiza a cada poucos segundos. |
 | `reproducao.py` | 282 | Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo. |
 | `resumo_semanal.py` | 77 | Resumo semanal para a equipe: o changelog (produto/infra, cada PR com o pedido de origem, e a fração de produto contra a meta), os PRs sem pedido listados à parte, o uso medido (leituras do digest em 7 dias) e as consultas 7d de cada PR de produto, com os que ninguém consultou sinalizados, e os pedidos abertos ainda sem PR de produto mergeado, do mais velho ao mais novo, para a equipe ver o que vem a seguir. Cada consulta fica em `uso_resumo` (recurso, created_at): 'resumo' e 'pr:<número>' de cada PR de produto mostrado. Compõe `changelog` e `digest_semanal`; não refaz a coleta nem a classificação. |
