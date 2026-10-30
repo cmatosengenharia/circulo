@@ -7,7 +7,8 @@ giro derrubava o SRE junto, e cada reinício do corpo apagava tudo. Agora:
   dois processos): o painel em primeiro plano e o SRE na thread dele. Não roda giros.
 - O loop (`circulo run --painel`) sobe este processo como filho e o **supervisiona**: se cair, sobe de novo (até 3 vezes
   em 2 min; depois volta a rodar painel e SRE dentro do próprio loop, como antes, e avisa). Ao reiniciar o giro (corpo),
-  o filho é encerrado e o loop novo sobe outro — ~2 s sem painel, em vez de tudo parado.
+  o filho é encerrado e o loop novo sobe outro — ~2 s sem painel, em vez de tudo parado. O filho também sai sozinho
+  quando o loop morre sem encerrá-lo (`os._exit` do cão de guarda): órfão, ele seguraria a porta com o código velho.
 - `CIRCULO_CONTROLE_SEPARADO=0` desliga: painel e SRE voltam para dentro do loop.
 """
 from __future__ import annotations
@@ -16,8 +17,10 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 QUEDAS_MAX = 3
 JANELA_QUEDAS = 120
@@ -37,7 +40,8 @@ class Supervisor:
         self.desistiu = False
 
     def comando(self) -> list[str]:
-        return [sys.executable, "-m", "circulo.controle", "--data", str(self.data_dir), "--porta", str(self.porta)]
+        return [sys.executable, "-m", "circulo.controle", "--data", str(self.data_dir), "--porta", str(self.porta),
+                "--pai", str(os.getpid())]
 
     def iniciar(self) -> bool:
         if self.desistiu:
@@ -84,12 +88,27 @@ class Supervisor:
             self.store.set("controle_processo", None)
 
 
+def vigiar_pai(pai: int, sair: Callable[[], None], intervalo: float = 0.5) -> threading.Thread:
+    """O plano de controle nunca sobrevive ao loop que o subiu (lição #60): o loop pode sair sem `finally` (os._exit do
+    cão de guarda) e o filho órfão seguia servindo o painel com o código velho, segurando a porta do loop novo."""
+    def rodar():
+        while os.getppid() == pai:
+            time.sleep(intervalo)
+        sair()
+    t = threading.Thread(target=rodar, daemon=True, name="controle-vigia-pai")
+    t.start()
+    return t
+
+
 def main(argv: list[str] | None = None) -> None:
     import argparse
     ap = argparse.ArgumentParser(prog="circulo.controle")
     ap.add_argument("--data", default="data")
     ap.add_argument("--porta", type=int, default=8765)
+    ap.add_argument("--pai", type=int, default=None, help="pid do loop que subiu este processo: ele sai junto")
     args = ap.parse_args(argv)
+    if args.pai:
+        vigiar_pai(args.pai, lambda: os.kill(os.getpid(), signal.SIGTERM))
     from . import configuracao as cfg
     cfg.carregar_env()
     from .loop import Circle

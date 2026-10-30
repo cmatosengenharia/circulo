@@ -91,3 +91,31 @@ def test_loop_so_sobe_o_sre_dentro_dele_quando_nao_ha_controle(circle):
     circle.run_forever(max_ticks=1, sleep=lambda s: None)
     assert "cuidar" in SupervisorFalso.chamadas and SupervisorFalso.chamadas[-1] == "parar"
     assert circle.vigia._thread is None or not circle.vigia._thread.is_alive()   # SRE ficou com o processo do controle
+
+
+def test_controle_nao_sobrevive_ao_loop_que_sai_sem_finally(tmp_path):
+    """lição #60 (painel:frescor_atrasado, p99 3583 ms igual antes e depois do #264 e do #268): o cão de guarda reinicia
+    o loop com os._exit, que pula o `finally` que para o plano de controle. O filho ficava órfão segurando a porta com o
+    código velho, o novo não subia e nenhum conserto do painel chegava à tela. O filho sai sozinho quando o pai morre."""
+    env = {**os.environ, "CIRCULO_ENV": os.devnull, "CIRCULO_SEM_DEVELOPER": "1", "PYTHONPATH": str(Path(__file__).resolve().parent.parent)}
+    for k in ("ANTHROPIC_API_KEY", "TYPESAFE_API_KEY", "GITHUB_TOKEN"):
+        env.pop(k, None)
+    pai = ("import os, sys, time; from circulo import controle; "
+           "s = controle.Supervisor(sys.argv[1], int(sys.argv[2])); s.iniciar(); print(s.proc.pid, flush=True); "
+           "time.sleep(1); os._exit(0)")
+    r = subprocess.run([sys.executable, "-c", pai, str(tmp_path / "dados"), str(_porta_livre())], env=env,
+                       capture_output=True, text=True, timeout=30)
+    filho = int(r.stdout.split()[0])
+    try:
+        for _ in range(100):
+            try:
+                os.kill(filho, 0)
+            except ProcessLookupError:
+                return
+            time.sleep(0.2)
+        raise AssertionError("o plano de controle seguiu vivo depois que o loop saiu (órfão com o código velho)")
+    finally:
+        try:
+            os.kill(filho, 9)
+        except ProcessLookupError:
+            pass
