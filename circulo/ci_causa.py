@@ -39,6 +39,35 @@ def apos_reexecucao(main_ok: bool, branch_ok: bool) -> str:
     return INFRA if main_ok else CODIGO_OU_INDETERMINADO
 
 
+# Ordem de causa-raiz (lição #53): o primeiro vermelho dela é a raiz e os demais são derivados. Cada check com o
+# comando que o reproduz localmente; Testes 3.12/3.13 dividem o mesmo posto (o 3.12 vem antes no desempate).
+CONSTITUICAO = ("circulo/merge_gate.py circulo/policy.py circulo/budget.py circulo/guardrails.py circulo/self_dev.py "
+                "circulo/corpo.py .github/")
+ORDEM_RAIZ = (
+    ("Constituição", f"git diff --name-only origin/main HEAD -- {CONSTITUICAO}"),
+    ("Reprodução primeiro", "python -m circulo.reproducao --base origin/main --head HEAD"),
+    ("Testes (Python 3.11)", "python3.11 -m pytest -q"),
+    ("Testes (Python 3.12)", "python3.12 -m pytest -q"),
+    ("Testes (Python 3.13)", "python3.13 -m pytest -q"),
+    ("Container", "docker build -q -t circulo:ci ."),
+    ("Evidência reforçada", "python -m pytest -q tests/test_propriedades_financeiras.py"),
+)
+MIN_JUNTOS = 3
+PELA_REGRA = "pela_regra"
+
+
+def raiz(falhando: list[str]) -> dict | None:
+    """Nomes dos checks vermelhos → {check, acao: rodar_local, comando, derivados, decisao: pela_regra}: com ≥3 juntos,
+    só o primeiro da ORDEM_RAIZ vira ação e os outros são consequência. None com menos de 3 ou com check fora da ordem
+    (fica para o Jev)."""
+    nomes = dict(ORDEM_RAIZ)
+    if len(set(falhando)) < MIN_JUNTOS or any(n not in nomes for n in falhando):
+        return None
+    check = next(n for n, _ in ORDEM_RAIZ if n in falhando)
+    return {"check": check, "acao": "rodar_local", "comando": nomes[check],
+            "derivados": [n for n, _ in ORDEM_RAIZ if n in falhando and n != check], "decisao": PELA_REGRA}
+
+
 def do_run(r: dict) -> dict:
     """Check do GitHubREST (merge_gate) → o que `classificar` lê, com a anotação de não iniciado e o job sem passos."""
     return {"name": r.get("name"), "status": r.get("status"), "conclusion": r.get("conclusion"),
