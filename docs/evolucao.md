@@ -50,10 +50,14 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 75 · **observabilidade** 51 · **correcao** 37 · **seguranca** 18 · **documentacao** 17 · **velocidade** 2.
+Por tipo: **observabilidade** 56 · **funcionalidade** 56 · **correcao** 42 · **seguranca** 24 · **documentacao** 18 · **velocidade** 4.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #250 | 30/10/2026 | correcao (86%) | — | Verificar que o teste citado na Prevenção de lição validada existe no repositório (arquivo e função) | pergunta do auditor: “Entre as lições com status 'validada' (como a #59, que cita tests/test_developer” |
+| #249 | 30/10/2026 | correcao (68%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #248 | 30/10/2026 | velocidade (47%) | sim | Medir repetição de prompts (modo sombra) e só então ligar cache LLM com TTL curto | pergunta do economista: “Nas chamadas de LLM das últimas 24 h, quantos prompts têm entrada normalizada id” |
+| #247 | 30/10/2026 | velocidade (53%) | sim | Curador fecha lições cujo node id de pytest citado não existe, e as reabre se reaparecer | pergunta do curador_licoes: “Entre as lições ainda abertas, quais compartilham a mesma causa raiz, e qual del” |
 | #246 | 30/10/2026 | correcao (86%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
 | #245 | 30/10/2026 | observabilidade (83%) | sim | Classificar por regra a causa das falhas do neurônio (transitória x determinística) e expô-la na… | pergunta do operador: “Entre as falhas do neurônio que mais falha nas últimas 24 h (ex.: loop:progresso” |
 | #244 | 30/10/2026 | correcao (90%) | — | Lição #47: teste de regressão para loop:progresso: havia trabalho pendente e nada avançou em 10… | pergunta do licoes: “Lição #47: teste de regressão para loop:progresso: havia trabalho pendente e nad” |
@@ -174,26 +178,26 @@ Por tipo: **funcionalidade** 75 · **observabilidade** 51 · **correcao** 37 · 
 | #129 | 23/10/2026 | documentacao (0%) | — | Developer: base vermelha com a mesma assinatura de teste para o item em vez de repetir a execução | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
 | #128 | 23/10/2026 | correcao (27%) | — | Medir cobertura de antecipação: fração dos pedidos humanos cujo job já tinha item proativo aberto… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
 | #127 | 23/10/2026 | observabilidade (50%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 127 h bloqueando a evolução | item #153 (loop) |
-| #126 | 23/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 125 h bloqueando a evolução | item #148 (loop) |
-| #125 | 23/10/2026 | funcionalidade (0%) | — | Disjuntor por assinatura no seletor do roadmap, com reteste e fechamento por reexecução verde | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #124 | 23/10/2026 | funcionalidade (0%) | — | Isolar test_arquiteto_estuda_varios_itens: tornar o teste determinístico (barreira em vez de tempo) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #123 | 23/10/2026 | funcionalidade (0%) | — | Função pura que agrupa os pedidos de 7d por job e aponta o job recorrente a antecipar | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #122 | 23/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 85 h bloqueando a evolução | item #139 (loop) |
-| #121 | 23/10/2026 | funcionalidade (0%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 17 h bloqueando a evolução | item #137 (loop) |
-| #120 | 23/10/2026 | funcionalidade (0%) | — | Fatiador: pré-divisão determinística por módulos/símbolos citados, limite calibrado e teto como… | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
-| #119 | 23/10/2026 | funcionalidade (0%) | — | Lição #63: developer:testes: tests/test_capacidade.py:112: AssertionError | item #145 (erro) |
-| #118 | 21/10/2026 | funcionalidade (0%) | — | Classificar falha de CI por conclusion/anotação (infra vs código) e reexecutar local antes de… | pergunta do arquiteto: “O PR #82 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #117 | 22/10/2026 | funcionalidade (0%) | — | Portão pré-PR: descartar item com 2 PRs fechados sem merge (fundir com #128) | pergunta do arquiteto: “O PR #83 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #116 | 21/10/2026 | funcionalidade (0%) | — | Portão de reincidência: não abrir PR de item que já fechou 2x sem merge com os mesmos checks… | pergunta do arquiteto: “O PR #84 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #115 | 21/10/2026 | funcionalidade (0%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #114 | 21/10/2026 | funcionalidade (0%) | — | Medir falha uniforme de checks por PR fechado e o gasto do developer nele | pergunta do arquiteto: “O PR #48 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #113 | 21/10/2026 | funcionalidade (0%) | — | Portão pré-PR: não abrir PR se a main está vermelha ou se todos os checks falham de modo uniforme | pergunta do arquiteto: “O PR #49 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #112 | 21/10/2026 | funcionalidade (0%) | — | Portão pré-PR: não abrir PR enquanto o CI da main estiver vermelho ou sem iniciar | pergunta do arquiteto: “O PR #50 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #111 | 21/10/2026 | funcionalidade (0%) | — | Painel local: faixa de saúde no topo (semáforo + 5 números) em HTML estático, sem Grafana | pergunta do usuario: “Dado que /metrics e o Grafana opcional já existem, qual visão do painel do loop ” |
-| #110 | 21/10/2026 | funcionalidade (0%) | — | Registrar medição antes/depois por item mergeado e listar os sem linha de base | pergunta do cientista: “Dos 15 PRs mergeados em 7 dias, quantos dos 11 itens com critério de sucesso têm” |
-| #109 | 21/10/2026 | funcionalidade (0%) | — | Classificar a falha do developer:agente pela causa real (subtype/is_error), não pelo trecho cru do… | pergunta do operador: “O neurônio developer:agente foi barrado 17 de 181 vezes em 24 h: qual é a causa ” |
-| #108 | 21/10/2026 | funcionalidade (0%) | — | Disjuntor por assinatura de causa no abrir_pr: após 2 barras iguais no mesmo item, não gasta até a… | pergunta do operador: “O neurônio developer:abrir_pr:aprendido foi barrado 495 de 1910 vezes em 24 h: q” |
-| #107 | 21/10/2026 | funcionalidade (0%) | — | Gravar os arquivos realmente em conflito (git merge-tree) de cada PR devolvido e contar por arquivo… | pergunta do operador: “Nos PRs devolvidos por conflito com a main nos últimos 7 dias (hoje 2), quais ar” |
+| #126 | 23/10/2026 | observabilidade (41%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 125 h bloqueando a evolução | item #148 (loop) |
+| #125 | 23/10/2026 | observabilidade (80%) | sim | Disjuntor por assinatura no seletor do roadmap, com reteste e fechamento por reexecução verde | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #124 | 23/10/2026 | seguranca (56%) | sim | Isolar test_arquiteto_estuda_varios_itens: tornar o teste determinístico (barreira em vez de tempo) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
+| #123 | 23/10/2026 | correcao (75%) | — | Função pura que agrupa os pedidos de 7d por job e aponta o job recorrente a antecipar | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
+| #122 | 23/10/2026 | observabilidade (36%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 85 h bloqueando a evolução | item #139 (loop) |
+| #121 | 23/10/2026 | observabilidade (80%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 17 h bloqueando a evolução | item #137 (loop) |
+| #120 | 23/10/2026 | observabilidade (28%) | sim | Fatiador: pré-divisão determinística por módulos/símbolos citados, limite calibrado e teto como… | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
+| #119 | 23/10/2026 | funcionalidade (66%) | sim | Lição #63: developer:testes: tests/test_capacidade.py:112: AssertionError | item #145 (erro) |
+| #118 | 21/10/2026 | correcao (94%) | sim | Classificar falha de CI por conclusion/anotação (infra vs código) e reexecutar local antes de… | pergunta do arquiteto: “O PR #82 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
+| #117 | 22/10/2026 | documentacao (0%) | sim | Portão pré-PR: descartar item com 2 PRs fechados sem merge (fundir com #128) | pergunta do arquiteto: “O PR #83 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
+| #116 | 21/10/2026 | seguranca (90%) | sim | Portão de reincidência: não abrir PR de item que já fechou 2x sem merge com os mesmos checks… | pergunta do arquiteto: “O PR #84 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
+| #115 | 21/10/2026 | seguranca (76%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #114 | 21/10/2026 | observabilidade (72%) | sim | Medir falha uniforme de checks por PR fechado e o gasto do developer nele | pergunta do arquiteto: “O PR #48 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
+| #113 | 21/10/2026 | observabilidade (63%) | sim | Portão pré-PR: não abrir PR se a main está vermelha ou se todos os checks falham de modo uniforme | pergunta do arquiteto: “O PR #49 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
+| #112 | 21/10/2026 | seguranca (68%) | sim | Portão pré-PR: não abrir PR enquanto o CI da main estiver vermelho ou sem iniciar | pergunta do arquiteto: “O PR #50 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
+| #111 | 21/10/2026 | seguranca (50%) | sim | Painel local: faixa de saúde no topo (semáforo + 5 números) em HTML estático, sem Grafana | pergunta do usuario: “Dado que /metrics e o Grafana opcional já existem, qual visão do painel do loop ” |
+| #110 | 21/10/2026 | observabilidade (78%) | sim | Registrar medição antes/depois por item mergeado e listar os sem linha de base | pergunta do cientista: “Dos 15 PRs mergeados em 7 dias, quantos dos 11 itens com critério de sucesso têm” |
+| #109 | 21/10/2026 | observabilidade (95%) | sim | Classificar a falha do developer:agente pela causa real (subtype/is_error), não pelo trecho cru do… | pergunta do operador: “O neurônio developer:agente foi barrado 17 de 181 vezes em 24 h: qual é a causa ” |
+| #108 | 21/10/2026 | correcao (50%) | sim | Disjuntor por assinatura de causa no abrir_pr: após 2 barras iguais no mesmo item, não gasta até a… | pergunta do operador: “O neurônio developer:abrir_pr:aprendido foi barrado 495 de 1910 vezes em 24 h: q” |
+| #107 | 21/10/2026 | seguranca (26%) | sim | Gravar os arquivos realmente em conflito (git merge-tree) de cada PR devolvido e contar por arquivo… | pergunta do operador: “Nos PRs devolvidos por conflito com a main nos últimos 7 dias (hoje 2), quais ar” |
 | #106 | 21/10/2026 | funcionalidade (0%) | — | Estado de dado_na_evidencia com features numéricas: o número do campo 'dado' aparece literal na… | pergunta do economista: “O Jev decide “dado_na_evidencia” com dúvida (a regra decidiu 27% de 26 vezes em ” |
 | #105 | 21/10/2026 | funcionalidade (0%) | — | TTL de lição de estrutura: marcar obsoleta se a assinatura não reincide em 6 h | pergunta do operador: “O Vigia mede a trava “3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a e” |
 | #104 | 21/10/2026 | funcionalidade (0%) | — | Estado do revisor_seguro com linhas alteradas, nº de arquivos, categoria dominante e se há teste no… | pergunta do economista: “O Jev decide “revisor_seguro” com dúvida (a regra decidiu 41% de 22 vezes em 24 ” |
@@ -250,7 +254,3 @@ Por tipo: **funcionalidade** 75 · **observabilidade** 51 · **correcao** 37 · 
 | #13 | 18/10/2026 | seguranca (78%) | sim | Curador de lições: unir por node id e fechar por reexecução verde isolada do main, reabrindo na falha | — |
 | #11 | 18/10/2026 | documentacao (0%) | sim | Developer: ruff --fix determinístico + 1 rodada de reparo com saída focada antes do PR | — |
 | #10 | 18/10/2026 | correcao (64%) | — | Expor métricas do loop via prometheus_client (/metrics) e dashboard Grafana opcional | — |
-| #9 | 18/10/2026 | observabilidade (94%) | sim | Replay em lote priorizado e calibrado para worth_spending, validado em dados retidos | — |
-| #8 | 18/10/2026 | observabilidade (76%) | sim | Trilha de eventos tipados do loop + painel de timeline e grafo de agentes/workflow | — |
-| #7 | 18/10/2026 | observabilidade (98%) | sim | Dash do loop em camadas: saúde no topo, todas as etapas em tempo real, drill-down por run_id | — |
-| #6 | 18/10/2026 | observabilidade (99%) | sim | Central de confiança: 3 níveis Endsley, sinais de ouro, trilha write-ahead e parada testada | — |

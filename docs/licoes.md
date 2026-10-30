@@ -7,17 +7,17 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 |---|---|---|---|---|---|---|
 | 59 | developer:agente:maximo_de_passos | trabalho | validada | 24 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
 | 15 | rastro:lacuna | trabalho | validada | 18 | 8 | Checagem: teste tests/test_licao_15_regressao.py; não repetir: rastro:cadeia: item planejado pelo loop sem a pergunta do |
-| 47 | loop:estagnado | estrutural | validada | 15 | 7 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
+| 47 | loop:estagnado | estrutural | reincidente | 16 | 8 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |
 | 60 | painel:frescor_atrasado | ambiente | evidenciada | 211 | 3 | Já corrigido (PR #176 mergeado); checagem: portão #36 teste de regressão marcado com a lição #60; não repetir: painel:fr |
 | 50 | gate:main_vermelha | estrutural | sem_prevencao | 15 | 2 | Sem prevenção verificável: falta um teste de regressão (lição #50) ou checagem determinística; não repetir: gate:main: C |
 | 22 | estudo:saida_invalida | estrutural | evidenciada | 14 | 2 | Já corrigido (PR #41 mergeado); não repetir: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/a |
+| 73 | developer:testes:.................................................. | trabalho | evidenciada | 4 | 2 | Fechada: pytest --collect-only verde no main (sha 374a415dd938, exit 0); não repetir: developer:testes: ================ |
 | 26 | developer:reparo:- aprendido#n: teste tests/test_vigia_trava_estado | trabalho | evidenciada | 3 | 2 | arquitetura (erro impossível): developer:reparo: ERROR: file or directory not found: tests/test_vigia_trava_estado.py::t |
 | 36 | developer:abrir_pr:lint:F811 | trabalho | evidenciada | 28 | 1 | CI (teste ou lint): developer:abrir_pr: - lint e testes (iguais ao CI): tests/test_revisor.py:156:16: F811 Redefinition  |
 | 29 | developer:sub_item_falhou | trabalho | evidenciada | 9 | 1 | arquitetura (erro impossível): developer:fatiador: sub-item #60 “Extrair features das tentativas do planejador (minutos, |
 | 17 | gate:ci:teste:tests/test_arquitetura.py::test_padroes_ruins_nao_cresce | trabalho | evidenciada | 4 | 1 | Fechada: tests/test_arquitetura.py::test_padroes_ruins_nao_crescem passou no main (sha b91013bd13c1, exit 0 em 2 execuçõ |
 | 4 | gate:ci:conflito com a main: o developer precisa trazer a  | trabalho | evidenciada | 3 | 1 | CI (teste ou lint): gate:ci: conflito com a main: o Developer precisa trazer a main para a branch |
-| 73 | developer:testes:.................................................. | trabalho | evidenciada | 3 | 1 | Fechada: pytest --collect-only verde no main (sha e9657e0c2baf, exit 0); não repetir: developer:testes: ================ |
 | 9 | developer:testes:ImportError | trabalho | evidenciada | 2 | 1 | CI (teste ou lint): developer:testes: ==================================== ERRORS ==================================== |
 | 19 | developer:testes:timeout | ambiente | evidenciada | 2 | 1 | Já corrigido (PR #141 mergeado); não repetir: developer:testes: __ test_5xx_e_timeout_sao_repetidos_uma_vez_com_espera_c |
 | 35 | developer:reparo:lint:F811 | trabalho | evidenciada | 2 | 1 | CI (teste ou lint): developer:reparo: ERROR: file or directory not found: tests/test_vigia_trava_estado.py::test_200_dec |
