@@ -5,13 +5,14 @@ checagem, ou a lição que já reincidiu e só tem texto, fica 'sem_prevencao' (
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import subprocess
 import time
 from pathlib import Path
 
-from .developer import alvo_pytest_existe
+from .developer import DEF, _arvore, alvo_pytest_existe
 from .licoes import (AMBIENTE, BANNER_ERROS, FORA_DA_FILA, LICAO_DE_COLETA, OBSOLETA_POR_PRAZO, alvo_de, teste_que_falhou,
                      titulo_curto)
 
@@ -19,6 +20,7 @@ REINCIDENCIAS_PARA_TESTE = 3
 PRAZO_GIROS, PRAZO_DIAS = 30, 7   # evidenciada parada tanto tempo sem a assinatura voltar fecha como obsoleta
 TESTE_CITADO = re.compile(r"\btests/[\w/.-]+?\.py(?:::\w+)*(?![\w/.:-])")
 RAIZ = Path(__file__).resolve().parent.parent
+NAO_RODA = ("skip", "xfail", "expectedFailure")   # skipif fica de fora: a condição costuma valer só fora do CI
 RESILIENCIA = re.compile(r"fora_do_ar|nao_para|fallback|timeout")   # o nome do teste diz que ele tolera falha externa
 
 
@@ -70,6 +72,36 @@ def testes_inexistentes(repo, texto: str | None) -> list[str]:
     return [t for t in dict.fromkeys(TESTE_CITADO.findall(texto or "")) if not alvo_pytest_existe(raiz, t)]
 
 
+def _marca(m: ast.expr) -> str | None:
+    m = m.func if isinstance(m, ast.Call) else m
+    return m.attr if isinstance(m, ast.Attribute) else getattr(m, "id", None)
+
+
+def nao_roda(raiz: Path, node: str) -> bool:
+    """O id existe, mas a função, uma classe dela ou o módulo (`pytestmark`) está marcado skip/xfail, lido por ast."""
+    arquivo, *nomes = node.split("[", 1)[0].split("::")
+    arvore = _arvore(raiz, arquivo)
+    if arvore is None:
+        return False
+    marcas = [e for a in arvore.body if isinstance(a, ast.Assign) and any(getattr(t, "id", None) == "pytestmark" for t in a.targets)
+              for e in (a.value.elts if isinstance(a.value, (ast.List, ast.Tuple)) else [a.value])]
+    corpo = arvore.body
+    for nome in nomes:
+        no = next((n for n in corpo if isinstance(n, (ast.ClassDef, *DEF)) and n.name == nome), None)
+        if no is None:
+            break
+        marcas += no.decorator_list
+        corpo = no.body
+    return any(_marca(m) in NAO_RODA for m in marcas)
+
+
+def irresolviveis(repo, texto: str | None) -> tuple[list[str], list[str]]:
+    """Pergunta #543: os ids citados que não seguram nada: os que não existem e os que existem marcados skip/xfail."""
+    raiz = Path(repo) if repo else RAIZ
+    faltam = testes_inexistentes(raiz, texto)
+    return faltam, [t for t in dict.fromkeys(TESTE_CITADO.findall(texto or "")) if t not in faltam and nao_roda(raiz, t)]
+
+
 def teste_de_regressao(repo, lic: dict) -> str | None:
     """O teste que `cobrar_teste` pede, já na main do repositório e citando a lição (lição #47: o arquivo existia e a
     lição seguia sem_prevencao, porque só o portão do item contava e cada reincidência reabre o item)."""
@@ -90,7 +122,7 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
     a lição a cada giro com o teste renomeado)."""
     stub = pede_stub(lic)
     node = teste_de_regressao(repo, lic) if stub else alvo_de(lic) or teste_de_regressao(repo, lic)
-    if node and not testes_inexistentes(repo, node):
+    if node and not any(irresolviveis(repo, node)):
         return f"teste {node}"
     if stub:
         return None
@@ -101,8 +133,9 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
     return None
 
 
-def sem_prevencao(lic: dict, faltam: list[str] | None = None) -> str:
-    causa = f"teste citado não existe ({', '.join(faltam)})" if faltam else \
+def sem_prevencao(lic: dict, faltam: list[str] | None = None, pulados: list[str] | None = None) -> str:
+    citados = [f"teste citado {o} ({', '.join(ids)})" for o, ids in (("não existe", faltam), ("marcado skip/xfail", pulados)) if ids]
+    causa = "; ".join(citados) if citados else \
         f"causa desconhecida, o timeout não prova erro de ambiente; falta {_stub(lic)}" if pede_stub(lic) else \
         f"falta um teste de regressão (lição #{lic['id']}) ou checagem determinística"
     return f"Sem prevenção verificável: {causa}; não repetir: {lic['descricao']}"[:500]
@@ -110,17 +143,18 @@ def sem_prevencao(lic: dict, faltam: list[str] | None = None) -> str:
 
 def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
     """A que já reincidiu provou que texto não segura: validada só com checagem; ganhou uma, volta a validada.
-    Toda validada cuja Prevenção cita um teste que não existe no repositório cai também (pergunta #522), e a de teste
-    de resiliência sem o teste de regressão com o stub (lição #89)."""
+    Toda validada ou evidenciada cuja Prevenção cita um teste que não existe no repositório (pergunta #522) ou que
+    está marcado skip/xfail (pergunta #543) reabre também, a cada giro, por ast e sem executar nada; e a validada de
+    teste de resiliência sem o teste de regressão com o stub (lição #89)."""
     log = desrotular_ambiente(store, agora)
-    for lic in map(dict, store.q("SELECT * FROM licoes WHERE status IN ('sem_prevencao','validada')")):
-        if lic["status"] == "validada":
-            faltam = testes_inexistentes(repo, lic["prevencao"])
-            sem_exigencia = lic["reincidencias"] == 0 and not pede_stub(lic)
-            if not faltam and (sem_exigencia or checagem_de(store, lic, repo)):
+    for lic in map(dict, store.q("SELECT * FROM licoes WHERE status IN ('sem_prevencao','validada','evidenciada')")):
+        if lic["status"] != "sem_prevencao":
+            faltam, pulados = irresolviveis(repo, lic["prevencao"])
+            sem_exigencia = lic["status"] == "evidenciada" or (lic["reincidencias"] == 0 and not pede_stub(lic))
+            if not (faltam or pulados) and (sem_exigencia or checagem_de(store, lic, repo)):
                 continue
             store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
-                    (sem_prevencao(lic, faltam), agora, lic["id"]))
+                    (sem_prevencao(lic, faltam, pulados), agora, lic["id"]))
             log.append(f"lição #{lic['id']} sem prevenção")
         elif checagem := checagem_de(store, lic, repo):
             store.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=?, updated_at=? WHERE id=?",
