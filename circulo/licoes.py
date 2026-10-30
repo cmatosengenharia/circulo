@@ -543,7 +543,7 @@ class Licoes:
                 self.s.x("UPDATE licoes SET status='em_correcao', updated_at=? WHERE id=?", (agora, lic["id"]))
             elif lic["item_status"] == "feito" and not gemea_aberta(self.s, lic):
                 pr = re.search(r"PR #(\d+)", lic["item_evidencia"] or "")
-                checagem = checagem_de(self.s, dict(lic))
+                checagem = checagem_de(self.s, dict(lic), self.repo)
                 self.s.x("UPDATE licoes SET status=?, corrigida_tick=?, pr=?, prevencao=?, updated_at=? WHERE id=?",
                          ("validada" if checagem else "sem_prevencao", tick, int(pr.group(1)) if pr else None,
                           f"Já corrigido ({lic['item_evidencia']}); checagem: {checagem}; não repetir: {lic['descricao']}"
@@ -563,7 +563,7 @@ class Licoes:
             if node_por_causa(lic["assinatura"]) or gemea_aberta(self.s, lic):
                 continue                  # o alias dá um teste à lição (só fecha pela reexecução); a gêmea, o erro vivo
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
-        log += exigir(self.s, tick, agora) + cobrar_teste(self.s)
+        log += exigir(self.s, tick, agora, self.repo) + cobrar_teste(self.s)
         log += reabrir_todas(self.s, self.reply)
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
