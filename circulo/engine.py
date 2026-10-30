@@ -17,13 +17,13 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import llm_cache
 from .agents import Ctx
 from .decision import Question, SN
 from .memory import Memory
 from .missao import PONTO as PONTO_SAIDA
 from .missao import causa_da_barra
 from .registro import marcar_resultado
-from .registro import registrar as registrar_llm
 
 FORMATO = {"landing_page": "html"}
 EXT = {"html": "html", "md": "md"}
@@ -119,16 +119,8 @@ class Engine:
         escolha = self.ctx.dl.pick_model_detalhe(role, {"tipo": project["tipo"], "pedido": project["pedido"][:300],
                                                          "tarefa": prompt})
         model = escolha["modelo"]
-        t0 = time.time()
-        try:
-            out = self.llm.generate(system=system, prompt=prompt, model=model,
-                                    max_tokens=int(cfg["max_tokens"]), web_search=int(cfg.get("web_search", 0)))
-        except Exception as exc:
-            registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
-                          duracao_ms=int((time.time() - t0) * 1000), ok=False, erro=f"{type(exc).__name__}: {exc}", entrada=prompt)
-            raise
-        registrar_llm(self.s, tick=self.s.tick, project_id=project["id"], papel=role, modelo=model, escolha=escolha,
-                      uso=out, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
+        out = llm_cache.gerar(self.s, self.llm, papel=role, project_id=project["id"], system=system, prompt=prompt, model=model,
+                              max_tokens=int(cfg["max_tokens"]), web_search=int(cfg.get("web_search", 0)), escolha=escolha)
         self.ctx.budget.charge(out.tokens, "llm")
         with self._tokens_lock:
             res.tokens += out.tokens

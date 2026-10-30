@@ -393,6 +393,22 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 CREATE INDEX IF NOT EXISTS llm_calls_papel ON llm_calls(papel, nivel);
 
+CREATE TABLE IF NOT EXISTS llm_cache (
+  -- uma linha por chamada de LLM (circulo/llm_cache.py): o acerto potencial medido em modo sombra e, por TTL_S,
+  -- a resposta completa de chamada que deu certo (servida só se o ciclo foi aceito e a taxa de 24 h passa do limiar)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL,            -- sha256(neurônio + modelo + system + prompt normalizados)
+  papel TEXT NOT NULL,
+  chamada INTEGER,                -- llm_calls.id
+  acerto_potencial INTEGER NOT NULL,
+  servido INTEGER NOT NULL DEFAULT 0,
+  texto TEXT,
+  citacoes TEXT,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS llm_cache_chave ON llm_cache(chave, created_at);
+CREATE INDEX IF NOT EXISTS llm_cache_em ON llm_cache(created_at);
+
 CREATE TABLE IF NOT EXISTS gasto_cursor (
   -- gasto do Cursor em centavos de US$ por dia, assunto e tipo de tarefa (circulo/gasto_cursor.py)
   id INTEGER PRIMARY KEY AUTOINCREMENT,
