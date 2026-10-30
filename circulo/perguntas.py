@@ -369,9 +369,17 @@ class Conselho:
 # repetido ou sem item é desativada sozinha.
 
 def _m_falha_neuronio(s, agora):
+    from .vigia import causas_por_classe
     r = s.one("SELECT ponto, COUNT(*) n, SUM(ok=0) f FROM verificacoes WHERE created_at>=? GROUP BY ponto HAVING f>0 "
               "ORDER BY f*1.0/n DESC LIMIT 1", (agora - 86400,))
-    return (min(1.0, (r["f"] or 0) / max(r["n"], 1) + 0.1), {"ponto": r["ponto"], "falhas": r["f"], "total": r["n"]}) if r else (0.0, {})
+    if not r:
+        return (0.0, {})
+    causas = causas_por_classe(f"{v['motivo'] or ''} {v['causa'] or ''}" for v in s.q(
+        "SELECT motivo, causa FROM verificacoes WHERE ponto=? AND ok=0 AND created_at>=?", (r["ponto"], agora - 86400)))
+    return (min(1.0, (r["f"] or 0) / max(r["n"], 1) + 0.1),
+            {"ponto": r["ponto"], "falhas": r["f"], "total": r["n"], "causas": causas,
+             "fracao_transitoria": round(causas["transitoria"] / r["f"], 2),
+             "fracao_deterministica": round(causas["deterministica"] / r["f"], 2)})
 
 
 def _m_tokens_por_pr(s, agora):

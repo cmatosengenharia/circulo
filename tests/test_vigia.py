@@ -279,3 +279,71 @@ def test_disparo_da_estagnacao_grava_um_evento_e_conta_nos_30_dias(circle):
     assert vigia.disparos_30d(s, "estagnacao", agora + 300) == 1               # o de 31 dias atrás fica fora da janela
     assert vigia.resumo(s)["disparos_30d"]["estagnacao"] == 1
     assert METRICAS["estagnacao"][1](s, agora + 300)[1]["disparos_30d"] == 1   # o auditor lê o número, não "desconhecido"
+
+
+CAUSAS_REAIS = [                       # mensagens de erro como chegam em verificacoes.motivo
+    ("TimeoutError: timed out", "transitoria"),
+    ("The read operation timed out", "transitoria"),
+    ("subprocess.TimeoutExpired: Command '['claude', '-p']' timed out after 900 seconds", "transitoria"),
+    ("HTTP Error 429: Too Many Requests", "transitoria"),
+    ("Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error'}}", "transitoria"),
+    ("HTTP Error 502: Bad Gateway", "transitoria"),
+    ("Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}}", "transitoria"),
+    ("json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)", "transitoria"),
+    ("saída da LLM sem_json", "transitoria"),
+    ("schema inválido: falta_chave titulo", "deterministica"),
+    ("jsonschema.exceptions.ValidationError: 'titulo' is a required property", "deterministica"),
+    ("entrada vazia: nenhum lançamento para classificar", "deterministica"),
+    ("CircuitoAberto: a LLM está em pausa pelo disjuntor (conta sem crédito)", "deterministica"),
+    ("Your credit balance is too low to access the Anthropic API", "deterministica"),
+    ("bloqueado em 2026-10-28 14:02: 3 falhas locais iguais (developer:testes:AssertionError); reteste em 6 h", "deterministica"),
+    ("havia trabalho pendente e nada avançou em 10 giros; causa provável: sem recusa registrada", "deterministica"),
+    ("FAILED tests/test_vigia.py::test_x - AssertionError: assert 1 == 2", "deterministica"),
+    ("", "desconhecida"),
+    ("algo estranho aconteceu", "desconhecida"),
+    ("roteiro #503 tem 500 linhas", "desconhecida"),            # número solto não é status HTTP
+]
+
+
+def test_causa_da_falha_do_neuronio_e_classificada_por_regra_e_so_a_transitoria_repete():
+    """Pergunta #511: tabela de mensagens reais de cada classe; só a transitória pode acionar retry com backoff."""
+    for texto, classe in CAUSAS_REAIS:
+        assert vigia.classificar_causa(texto) == classe, texto
+        assert vigia.pode_repetir(texto) is (classe == "transitoria"), texto
+    assert vigia.classificar_causa(None) == "desconhecida"
+
+
+def test_so_a_causa_transitoria_aciona_o_retry_com_backoff_do_planejador(circle, monkeypatch):
+    """Pergunta #511: o timeout repete uma vez com espera; o mesmo timeout vindo do disjuntor aberto (determinística) não."""
+    from circulo import planejador as pl
+    from test_planejador_mesmo_giro import LLMSeq, _pergunta, _plan
+    esperas = []
+    monkeypatch.setattr(pl, "dormir", esperas.append)
+    _pergunta(circle)
+    llm = LLMSeq(TimeoutError("The read operation timed out"))
+    assert _plan(circle, llm).run() and llm.chamadas == 2 and len(esperas) == 1
+    circle.store.x("UPDATE perguntas SET status='descartada'")
+    _pergunta(circle)
+    llm = LLMSeq(TimeoutError("disjuntor aberto: a LLM está em pausa"))
+    try:
+        _plan(circle, llm).run()
+    except TimeoutError:
+        pass
+    assert llm.chamadas == 1 and len(esperas) == 1                       # nenhuma nova tentativa nem espera
+
+
+def test_leitura_de_falha_neuronio_expoe_a_fracao_por_classe_do_lider(circle):
+    """Pergunta #511: a métrica falha_neuronio conta por classe as falhas do neurônio que mais falha em 24 h."""
+    from circulo.perguntas import METRICAS
+    s, agora = circle.store, time.time()
+    linhas = [("loop:progresso", 0, "TimeoutError: timed out"), ("loop:progresso", 0, "HTTP Error 429: Too Many Requests"),
+              ("loop:progresso", 0, "schema inválido: falta_chave titulo"), ("loop:progresso", 0, "algo estranho"),
+              ("loop:progresso", 1, ""), ("developer", 0, "HTTP Error 502: Bad Gateway"), ("developer", 1, ""),
+              ("developer", 1, ""), ("loop:progresso", 0, "TimeoutError: timed out")]
+    for i, (ponto, ok, motivo) in enumerate(linhas):
+        ts = agora - 2 * 86400 if i == len(linhas) - 1 else agora - 60           # a última fica fora das 24 h
+        s.x("INSERT INTO verificacoes(tick,ponto,ok,motivo,created_at) VALUES(0,?,?,?,?)", (ponto, ok, motivo, ts))
+    _, ctx = METRICAS["falha_neuronio"][1](s, agora)
+    assert ctx["ponto"] == "loop:progresso" and ctx["falhas"] == 4 and ctx["total"] == 5
+    assert ctx["causas"] == {"transitoria": 2, "deterministica": 1, "desconhecida": 1}
+    assert ctx["fracao_transitoria"] == 0.5 and ctx["fracao_deterministica"] == 0.25

@@ -58,6 +58,39 @@ def _kv(s, k, default=None):
     return s.get(k) or default
 
 
+# ------------------------------------------------------------------ causa da falha de um neurônio (pergunta #511)
+# A pausa é decisão já tomada (disjuntor, conta sem crédito): vence o timeout que a causou. Depois, o que repetir resolve;
+# por fim, o que repetir dá o mesmo. Um número solto ("500 linhas") não é status HTTP.
+PAUSA = re.compile(r"disjuntor|circuito ?aberto|credit balance", re.I)
+TRANSITORIA = re.compile(r"timed? ?out|rate.?limit|too many requests|overloaded|bad gateway|service unavailable"
+                         r"|connection (?:reset|refused|aborted)|(?:HTTP(?: Error)?|status|code)\W{0,3}(?:429|5\d\d)\b"
+                         r"|JSONDecodeError|Expecting value|Unterminated string|sem_json", re.I)
+DETERMINISTICA = re.compile(r"schema|falta_chave|ValidationError|vazi[ao]s?\b|\b(?:Key|Type|Attribute|Value|Name|Import"
+                            r"|Index|Assertion|Syntax)Error|FAILED|falhas locais iguais|nada avançou|m[aá]ximo de passos", re.I)
+
+
+def classificar_causa(texto_erro: str | None) -> str:
+    """'transitoria' (repetir pode dar certo), 'deterministica' (repetir dá o mesmo) ou 'desconhecida'. Pura."""
+    t = texto_erro or ""
+    if PAUSA.search(t):
+        return "deterministica"
+    if TRANSITORIA.search(t):
+        return "transitoria"
+    return "deterministica" if DETERMINISTICA.search(t) else "desconhecida"
+
+
+def pode_repetir(texto_erro: str | None) -> bool:
+    """Só a causa transitória pode acionar retry com backoff."""
+    return classificar_causa(texto_erro) == "transitoria"
+
+
+def causas_por_classe(textos) -> dict[str, int]:
+    out = {"transitoria": 0, "deterministica": 0, "desconhecida": 0}
+    for t in textos:
+        out[classificar_causa(t)] += 1
+    return out
+
+
 # ------------------------------------------------------------------ sondas (cada uma devolve um achado ou None)
 def _causa_porteiro(u: dict) -> str:
     """A causa medida no registro do porteiro (planejador.registrar_porteiro); sem registro, nenhuma causa é sugerida."""

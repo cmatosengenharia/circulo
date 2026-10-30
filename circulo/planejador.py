@@ -242,14 +242,16 @@ class Planejador:
             raise limite_uso.LimiteDeUso(ate, str(exc)) from exc
 
     def _gerar(self, prompt: str, modelo: str, pid: int | None) -> tuple[str, int]:
-        """A chamada ao LLM com a única nova tentativa da cadeia: só 5xx ou timeout, depois de espera curta com jitter."""
+        """A chamada ao LLM com a única nova tentativa da cadeia: só 5xx ou timeout de causa transitória
+        (vigia.pode_repetir), depois de espera curta com jitter."""
+        from .vigia import pode_repetir
         tentativa, motivo = 1, None
         while True:
             marcar_etapa(self.s, pid, "planejador_chamado", {"tentativa": tentativa, "motivo": motivo})
             try:
                 return self._llm(SYSTEM, prompt, modelo)
             except Exception as exc:
-                motivo = _repetivel(exc)
+                motivo = _repetivel(exc) if pode_repetir(f"{type(exc).__name__}: {exc}") else None
                 if tentativa == 1 and motivo:
                     dormir(ESPERA_RETRY + random.uniform(0, JITTER))
                     tentativa += 1
