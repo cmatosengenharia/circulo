@@ -4,14 +4,63 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta
 
+from . import motivo
 from .budget import TZ
+from .caminho import CI_EM_CURSO
 from .state import Store
 
 STALE_AFTER = 20.0  # sem batimento por mais que isso → o processo do loop não está rodando
+TAREFA_PARADA = 45 * 60  # item em andamento sem atualização por mais que isso → tarefa parada
+
+PROXIMO_PASSO = {"check": "aguardar o check", "tarefa": "reabrir a tarefa", "portao": "escalar ao Developer"}
 
 
 def _ped(n: int) -> str:
     return f"{n} pedido esperando" if n == 1 else f"{n} pedidos esperando"
+
+
+def _trava_de_pr(store: Store, pr: int) -> tuple[str, str, float] | None:
+    """Tipo, causa e início da trava do PR aberto: a sequência mais recente de vereditos do mesmo tipo no gate."""
+    vereditos = store.q("SELECT merged, reason, created_at FROM merges WHERE pr=? ORDER BY id DESC", (pr,))
+    if not vereditos or vereditos[0]["merged"]:
+        return None
+
+    def tipo(r) -> str | None:
+        if r["merged"]:
+            return None
+        if (r["reason"] or "").startswith(CI_EM_CURSO):
+            return "check"
+        return "portao" if motivo.do_gate(r["reason"]) is not None else None
+
+    t = tipo(vereditos[0])
+    if t is None:
+        return None
+    desde = vereditos[0]["created_at"]
+    for r in vereditos[1:]:
+        if tipo(r) != t:
+            break
+        desde = r["created_at"]
+    return t, (vereditos[0]["reason"] or "").split("\n", 1)[0][:200], desde
+
+
+def trava(store: Store, now: float | None = None) -> dict | None:
+    """A primeira causa de trava, por regra e sem LLM: entre PR esperando check, PR recusado por portão e tarefa
+    parada, a que dura há mais tempo, com a idade em horas e o próximo passo automático."""
+    now = now or time.time()
+    candidatas = []
+    for p in store.q("SELECT number FROM prs WHERE status='aberto'"):
+        if t := _trava_de_pr(store, p["number"]):
+            candidatas.append((t[0], f"PR #{p['number']}", t[1], t[2]))
+    for r in store.q("SELECT id, titulo, updated_at FROM roadmap WHERE status='em_andamento' AND updated_at < ?",
+                     (now - TAREFA_PARADA,)):
+        candidatas.append(("tarefa", f"item #{r['id']}", f"em andamento sem avanço: {r['titulo'][:120]}", r["updated_at"]))
+    if not candidatas:
+        return None
+    tipo, alvo, causa, desde = min(candidatas, key=lambda c: c[3])
+    idade_h = round((now - desde) / 3600, 1)
+    passo = PROXIMO_PASSO[tipo]
+    return {"tipo": tipo, "alvo": alvo, "causa": causa, "desde": desde, "idade_h": idade_h, "proximo_passo": passo,
+            "texto": f"{alvo} travado há {idade_h:g} h — {causa}. Próximo passo: {passo}."}
 
 
 def loop_status(store: Store, now: float | None = None) -> dict:
@@ -22,7 +71,7 @@ def loop_status(store: Store, now: float | None = None) -> dict:
     etapa = store.get("etapa") or {}
     pend = store.pending_count()
     base = {"tick": store.tick, "pendentes": pend, "modo_seguro": bool(ctl.get("modo_seguro")),
-            "batimento_ha": round(now - b["em"], 1) if b else None, "agora": now}
+            "batimento_ha": round(now - b["em"], 1) if b else None, "agora": now, "trava": trava(store, now)}
 
     if not b or now - b["em"] > STALE_AFTER:
         visto = (etapa.get("em") if etapa else None) or (b["em"] if b else None)
