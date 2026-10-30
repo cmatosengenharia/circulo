@@ -533,8 +533,9 @@ class Licoes:
     def revisar(self) -> list[str]:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
         from .gemeas import gemea_aberta, reabrir_todas
+        from .curador_licoes import curar_no_main
         from .prevencao import checagem_de, cobrar_teste, exigir, sem_prevencao
-        log = self.unir_duplicatas()
+        log = self.unir_duplicatas() + curar_no_main(self.s, self.repo)
         tick, agora = self.s.tick, time.time()
         for lic in self.s.q("""SELECT l.*, r.status item_status, r.evidencia item_evidencia FROM licoes l
                                LEFT JOIN roadmap r ON r.id=l.item_id WHERE l.status IN ('aberta','em_correcao','reincidente')
