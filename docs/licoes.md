@@ -5,9 +5,9 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
-| 59 | developer:agente:maximo_de_passos | trabalho | validada | 23 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
-| 15 | rastro:lacuna | trabalho | sem_prevencao | 18 | 8 | Sem prevenção verificável: falta um teste de regressão (lição #15) ou checagem determinística; não repetir: rastro:cadei |
-| 47 | loop:estagnado | estrutural | evidenciada | 12 | 5 | Já corrigido (PR #150 mergeado); não repetir: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa  |
+| 59 | developer:agente:maximo_de_passos | trabalho | validada | 24 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
+| 15 | rastro:lacuna | trabalho | validada | 18 | 8 | Checagem: teste tests/test_licao_15_regressao.py; não repetir: rastro:cadeia: item planejado pelo loop sem a pergunta do |
+| 47 | loop:estagnado | estrutural | validada | 15 | 7 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |
 | 60 | painel:frescor_atrasado | ambiente | evidenciada | 211 | 3 | Já corrigido (PR #176 mergeado); checagem: portão #36 teste de regressão marcado com a lição #60; não repetir: painel:fr |
 | 50 | gate:main_vermelha | estrutural | sem_prevencao | 15 | 2 | Sem prevenção verificável: falta um teste de regressão (lição #50) ou checagem determinística; não repetir: gate:main: C |
@@ -88,3 +88,5 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 84 | developer:testes:lint:B007,B905,E501 | trabalho | evidenciada | 1 | 0 | Não repetir: developer:testes: E       AssertionError: B007 Loop control variable `i` not used within loop body |
 | 85 | developer:agente:n_started_in_background:_n_max_depth:_n_ | trabalho | evidenciada | 1 | 0 | Não repetir: developer:agente: n started in background: n max depth: n  — 0}, "started_in_background": 0, "max_depth": 0 |
 | 86 | developer:agente:unset:_n_started_in_background:_n_max_de | trabalho | evidenciada | 1 | 0 | Não repetir: developer:agente: unset: n started in background: n max de — "unset": 0}, "started_in_background": 0, "max_ |
+| 87 | incidente:37e8abc2882fd909 | estrutural | validada | 1 | 0 | Já corrigido (lição #87 · erro não ocorre há 200 giros); checagem: portão #53 teste de regressão marcado com a lição #87 |
+| 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | aberta | 1 | 0 | Não repetir: developer:agente: nd: n max depth: n spawned by subagents: — nd": 0, "max_depth": 0, "spawned_by_subagents" |
