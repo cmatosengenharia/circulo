@@ -628,6 +628,7 @@ class Store:
                   ("llm_calls", "tokens_entrada", "INTEGER"), ("llm_calls", "tokens_saida", "INTEGER"),
                   ("llm_calls", "cache_lido", "INTEGER"), ("llm_calls", "cache_escrito", "INTEGER"),
                   ("llm_calls", "job", "TEXT"), ("llm_calls", "retry", "INTEGER NOT NULL DEFAULT 0"),
+                  ("llm_calls", "variante", "TEXT"),
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
                   ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"),

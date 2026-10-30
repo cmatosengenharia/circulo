@@ -33,6 +33,7 @@ from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
 from .licoes import titulo_curto
+from .llm import modelo_da_variante, reverter_se_preciso, variante
 from .merge_gate import CONSTITUICAO
 from .roadmap import SemPerguntaOrigem, exigir_pergunta, gravar_item
 
@@ -101,6 +102,7 @@ class Planejador:
         self.ctx = ctx
         self.s = ctx.store
         self.dev = self_dev
+        self._chamada: int | None = None     # id em llm_calls da última chamada: o desfecho dela mede o A/B
 
     # ------------------------------------------------------------ quando planejar
     def _hoje(self) -> int:
@@ -312,12 +314,15 @@ class Planejador:
         guardada = planejador_cache.reservar(self.s, pergunta.texto, pergunta.evidencia, pid)
         if guardada is not None:   # a mesma pergunta com evidência quase igual em 24 h: a resposta já existe, sem LLM
             return _reaproveitar(conselho, pid, guardada)
-        res = None
+        res, self._chamada = None, None
         try:
             res = self._responder(autorizado, conselho, pid, pergunta, PERSONAS)
         finally:   # só a resposta válida da LLM fica guardada; falha, porteiro ou JSON inválido liberam a entrada
             respondida = res is not None and res[1] in PROGRESSO and res[2] != SEM_JSON
             planejador_cache.concluir(self.s, pergunta.texto, pid, res[1] if respondida else None, res[2] if respondida else "")
+            if self._chamada:  # o desfecho da chamada (virou item?) mede o A/B de modelo menor e pode revertê-lo
+                self.s.x("UPDATE llm_calls SET aceita=? WHERE id=?", (int(res is not None and res[1] == "virou_item"), self._chamada))
+                reverter_se_preciso(self.s, "planejador")
         return res
 
     def _responder(self, autorizado: bool, conselho, pid: int, pergunta, PERSONAS: dict) -> tuple[int, str, str, dict | None]:
@@ -335,8 +340,10 @@ class Planejador:
         if mem and (bloco := mem.para("planejar_roteiro", pergunta.texto)):
             prompt += "\n\n" + bloco + "\nSe um item parecido já foi feito ou contestado, proponha o próximo passo, não o mesmo."
         escolha = self.ctx.dl.pick_model_detalhe("planejador", {"tarefa": prompt})
+        var = variante(self.s, "planejador", pid)
+        modelo = modelo_da_variante(escolha["modelo"], var)
         t0 = time.time()
-        texto, tokens = self._gerar(prompt, escolha["modelo"], pid)
+        texto, tokens = self._gerar(prompt, modelo, pid)
         self.ctx.budget.charge(tokens, "llm")
         item = _parse(texto)
         sem_item = _sem_item(texto)             # "não há item novo" também é resposta válida
@@ -346,9 +353,10 @@ class Planejador:
                   + texto[-200:], assinatura=None if item or sem_item else "planejador:saida_invalida")
         try:
             from .registro import registrar
-            registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="planejador",
-                      modelo=escolha["modelo"], escolha=escolha, tokens=tokens, duracao_ms=int((time.time() - t0) * 1000),
-                      ok=item is not None or bool(sem_item), erro=None if item or sem_item else "resposta sem JSON válido", entrada="evidência do loop", saida=texto)
+            self._chamada = registrar(
+                self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="planejador", modelo=modelo, escolha=escolha,
+                tokens=tokens, duracao_ms=int((time.time() - t0) * 1000), ok=item is not None or bool(sem_item),
+                erro=None if item or sem_item else "resposta sem JSON válido", entrada="evidência do loop", saida=texto, variante=var)
         except Exception:  # noqa: BLE001 — registro nunca derruba o planejador
             pass
         if sem_item:
