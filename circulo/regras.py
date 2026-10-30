@@ -4,9 +4,12 @@ determinística consultada ANTES dele.
 - minerar: decisões do Jev dos últimos JANELA s, agrupadas por (pergunta, entrada normalizada); um par entra se tem
   n ≥ N_MIN e a mesma decisão em mais de CONSISTENCIA_MIN dos casos;
 - promover: grava os primeiros (por n) em `regras_jev` com n e taxa, até MAX_REGRAS ligadas; regra desligada não volta;
-- antes_do_jev: a regra ligada decide no lugar do Jev (source 'local', como a regra determinística); a cada
-  AUDITAR_A_CADA vezes o Jev decide de novo e `conferir` compara: errou em mais de ERRO_MAX das conferências, a regra
-  é desligada e o Jev volta a decidir.
+- sombra (item #306): a regra promovida não age; o Jev decide e `conferir` grava em `regra_sombra` a decisão da regra,
+  a do Jev e o PR do estado (`desfechos` completa com o desfecho quando o PR fecha). `avaliar` faz a regra assumir só com ≥ SOMBRA_MIN de idade, n ≥ N_SOMBRA comparações e limite inferior
+  de Wilson (95%) da concordância ≥ CONCORDANCIA_INF (19 de 20 dá 95% pontual, mas ~76% no limite inferior);
+- antes_do_jev: a regra que assumiu decide no lugar do Jev (source 'local', como a regra determinística); a cada
+  AUDITAR_A_CADA vezes (10%) segue em sombra: o Jev decide de novo e `conferir` compara. Limite inferior abaixo de
+  CONCORDANCIA_INF, a regra volta à sombra; errou em mais de ERRO_MAX das conferências, é desligada.
 """
 from __future__ import annotations
 
@@ -26,9 +29,13 @@ MAX_REGRAS = 3
 AUDITAR_A_CADA = 10
 ERRO_MAX = 0.10
 PROMOVER_A_CADA = 3600
+SOMBRA_MIN = 7 * 86400
+N_SOMBRA = 40
+CONCORDANCIA_INF = 0.9
+Z = 1.96
 KV = "regras_jev.promovido_em"
 
-ESQUEMA = """
+ESQUEMA = ("""
 CREATE TABLE IF NOT EXISTS regras_jev (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   question TEXT NOT NULL,
@@ -43,15 +50,40 @@ CREATE TABLE IF NOT EXISTS regras_jev (
   ativa INTEGER NOT NULL DEFAULT 1,
   created_at REAL NOT NULL,
   desligada_em REAL,
+  assumiu_em REAL,
+  concordancia_inf REAL,
   UNIQUE(question, entrada)
-)
-"""
+)""", """
+CREATE TABLE IF NOT EXISTS regra_sombra (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  regra_id INTEGER NOT NULL,
+  regra TEXT NOT NULL,
+  jev TEXT NOT NULL,
+  concorda INTEGER NOT NULL,
+  assumida INTEGER NOT NULL,
+  pr INTEGER,
+  desfecho TEXT,
+  em REAL NOT NULL
+)""", "CREATE INDEX IF NOT EXISTS regra_sombra_regra ON regra_sombra(regra_id)")
 
 
 def _esquema(store) -> None:
     if not getattr(store, "_regras_esquema", False):
-        store.x(ESQUEMA)
+        for sql in ESQUEMA:
+            store.x(sql)
+        cols = {r["name"] for r in store.q("PRAGMA table_info(regras_jev)")}
+        for col in ("assumiu_em", "concordancia_inf"):
+            if col not in cols:
+                store.x(f"ALTER TABLE regras_jev ADD COLUMN {col} REAL")
         store._regras_esquema = True
+
+
+def wilson_inf(acertos: int, n: int, z: float = Z) -> float:
+    """Limite inferior do intervalo de Wilson para a proporção acertos/n (0 sem amostra)."""
+    if n == 0:
+        return 0.0
+    p, z2 = acertos / n, z * z
+    return (p + z2 / (2 * n) - z * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))) / (1 + z2 / n)
 
 
 def _normal(v: Any) -> Any:
@@ -108,6 +140,7 @@ def promover(store, agora: float | None = None) -> list[dict]:
     _esquema(store)
     agora = agora or time.time()
     store.set(KV, agora)
+    desfechos(store)
     vagas = MAX_REGRAS - store.one("SELECT COUNT(*) c FROM regras_jev WHERE ativa=1")["c"]
     feitas = {(r["question"], r["entrada"]) for r in store.q("SELECT question, entrada FROM regras_jev")}
     novos = [p for p in minerar(store, agora) if (p["question"], p["entrada"]) not in feitas][:max(0, vagas)]
@@ -118,31 +151,61 @@ def promover(store, agora: float | None = None) -> list[dict]:
 
 
 def antes_do_jev(store, state: Mapping[str, Any], questions: Mapping[str, Any]) -> tuple[dict, dict]:
-    """({pergunta: Decision da regra}, {pergunta: id da regra a conferir com o Jev}) para as perguntas com regra ligada."""
+    """({pergunta: Decision da regra}, {pergunta: (id da regra a conferir com o Jev, PR do estado)}) para as perguntas
+    com regra ligada."""
     from .decision import Decision
     _esquema(store)
     if time.time() - float(store.get(KV) or 0) >= PROMOVER_A_CADA:
         promover(store)
     decididas, auditar = {}, {}
     e = entrada(state)
+    pr = state.get("pr") if type(state.get("pr")) is int else None
     for qid, q in questions.items():
         r = store.one("SELECT * FROM regras_jev WHERE ativa=1 AND question=? AND entrada=?", (qid, e))
         if r is None:
             continue
-        if (r["usos"] + r["conferidas"] + 1) % AUDITAR_A_CADA == 0:
-            auditar[qid] = r["id"]
+        if r["assumiu_em"] is None or (r["usos"] + r["conferidas"] + 1) % AUDITAR_A_CADA == 0:
+            auditar[qid] = (r["id"], pr)
             continue
         store.x("UPDATE regras_jev SET usos=usos+1 WHERE id=?", (r["id"],))
         decididas[qid] = Decision(qid, q.kind, json.loads(r["valor"]), float(r["taxa"]), "local")
     return decididas, auditar
 
 
-def conferir(store, regra_id: int, decisao) -> bool:
-    """Compara a regra com a decisão real do Jev; desliga a regra se errou em mais de ERRO_MAX das conferências."""
-    r = store.one("SELECT rotulo, conferidas, erros FROM regras_jev WHERE id=?", (regra_id,))
-    erro = rotulo(decisao.value) != r["rotulo"]
+def conferir(store, regra_id: int, decisao, pr: int | None = None) -> bool:
+    """Grava a sombra (regra × Jev, e o PR em jogo), desliga a regra se errou em mais de ERRO_MAX das conferências e reavalia se ela
+    assume ou volta à sombra."""
+    r = store.one("SELECT rotulo, conferidas, erros, assumiu_em FROM regras_jev WHERE id=?", (regra_id,))
+    jev = rotulo(decisao.value)
+    erro = jev != r["rotulo"]
+    store.x("INSERT INTO regra_sombra(regra_id,regra,jev,concorda,assumida,pr,em) VALUES(?,?,?,?,?,?,?)",
+            (regra_id, r["rotulo"], jev, int(not erro), int(r["assumiu_em"] is not None), pr, time.time()))
     conferidas, erros = r["conferidas"] + 1, r["erros"] + erro
     desligar = erros / conferidas > ERRO_MAX
     store.x("UPDATE regras_jev SET conferidas=?, erros=?, ativa=?, desligada_em=? WHERE id=?",
             (conferidas, erros, 0 if desligar else 1, time.time() if desligar else None, regra_id))
+    avaliar(store, regra_id)
     return not erro
+
+
+def avaliar(store, regra_id: int, agora: float | None = None) -> bool:
+    """A regra assume (ou segue assumida) só com ≥ SOMBRA_MIN desde a promoção, n ≥ N_SOMBRA comparações em sombra e
+    limite inferior de Wilson da concordância ≥ CONCORDANCIA_INF; senão fica (ou volta) em sombra."""
+    _esquema(store)
+    agora = agora or time.time()
+    r = store.one("SELECT created_at, assumiu_em FROM regras_jev WHERE id=?", (regra_id,))
+    c = store.one("SELECT COUNT(*) n, COALESCE(SUM(concorda), 0) k FROM regra_sombra WHERE regra_id=?", (regra_id,))
+    inf = wilson_inf(c["k"], c["n"])
+    assume = agora - r["created_at"] >= SOMBRA_MIN and c["n"] >= N_SOMBRA and inf >= CONCORDANCIA_INF
+    store.x("UPDATE regras_jev SET assumiu_em=?, concordancia_inf=? WHERE id=?",
+            ((r["assumiu_em"] or agora) if assume else None, round(inf, 4), regra_id))
+    return assume
+
+
+def desfechos(store) -> int:
+    """Completa a sombra com o desfecho (mergeado/fechado) dos PRs que já fecharam; devolve quantas linhas mudaram."""
+    _esquema(store)
+    antes = store.one("SELECT COUNT(*) c FROM regra_sombra WHERE desfecho IS NOT NULL")["c"]
+    store.x("UPDATE regra_sombra SET desfecho=(SELECT status FROM prs WHERE number=regra_sombra.pr) "
+            "WHERE desfecho IS NULL AND pr IN (SELECT number FROM prs WHERE status IN ('mergeado','fechado'))")
+    return store.one("SELECT COUNT(*) c FROM regra_sombra WHERE desfecho IS NOT NULL")["c"] - antes

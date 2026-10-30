@@ -208,9 +208,9 @@ def colher(store, out: dict, mapa: dict, modelo: str | None = None) -> dict:
     """Separa as respostas do laboratório, registra o par (atual × variante) e devolve só as perguntas pedidas."""
     from .decision import Decision
     decididas, auditar = mapa.pop(REGRAS_CHAVE, ({}, {}))
-    for qid, regra_id in auditar.items():
+    for qid, (regra_id, pr) in auditar.items():
         if qid in out:
-            regras.conferir(store, regra_id, out[qid])
+            regras.conferir(store, regra_id, out[qid], pr)
     out.update(decididas)
     lembradas, estado, perguntas, jev = mapa.get(CACHE_CHAVE, ({}, {}, {}, None))
     for qid, d in lembradas.items():
