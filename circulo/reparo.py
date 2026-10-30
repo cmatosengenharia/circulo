@@ -56,7 +56,8 @@ import time
 from pathlib import Path
 
 from . import disjuntor, pedido_claro
-from .developer import REPARO, GitHubComConvencoes, convencoes, registrar_convencoes
+from .developer import (LIMITE_PASSOS, REPARO, GitHubComConvencoes, convencoes, passos_usados, registrar_convencoes,
+                        registrar_passos_usados)
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
 from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
@@ -547,7 +548,10 @@ class DeveloperComReparo(SelfDeveloper):
         self._rodada += 1
         modos = self._travar(wt)
         try:
-            return super()._agente(task, wt, titulo, papel, item_id=item_id)
+            out = super()._agente(task, wt, titulo, papel, item_id=item_id)
+            if (usados := passos_usados(out)) is not None:
+                registrar_passos_usados(self.s, titulo, usados, getattr(self.agent, "max_turns", LIMITE_PASSOS))
+            return out
         finally:
             self._destravar(modos)
             self._reverter(wt, titulo)

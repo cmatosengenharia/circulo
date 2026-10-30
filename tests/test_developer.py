@@ -190,7 +190,44 @@ def test_licao_59_limiar_recalibrado_pelas_tarefas_que_estouraram(circle):
     assert limiar_calibrado(s) == 0.5
 
 
-AGENTS = "# Convenções\n\n## Testes\nrode `python -m pytest -q`\n\n```sh\n# não é seção\n```\n\n### Armadilhas\nnada\n"
+def test_licao_59_passos_usados_por_tarefa_e_fracao_acima_de_80_do_limite(circle):
+    """lição #59: os passos usados de fato ficam por tarefa (o maior das execuções) e o relatório mostra a fração das
+    tarefas acima de 80% do limite (alvo: menos de 5%). Tarefa só com uso registrado não quebra o limiar calibrado."""
+    s = circle.store
+    assert developer.passos_usados({"log": "texto\n" + MAX_TURNS}) == 41                # o num_turns do evento `result`
+    assert developer.passos_usados({"log": "ok", "passos": ["Read a.py", "Edit a.py"]}) == 2   # sem result: os passos vistos
+    assert developer.passos_usados({"log": "ok"}) is None
+    developer.registrar_passos(s, "grande", 0.875, 80)
+    for titulo, usados in [("grande", 41), ("grande", 70), ("grande", 30), ("a", 10), ("b", 64), ("c", 12)]:
+        developer.registrar_passos_usados(s, titulo, usados, 80)
+    reg = s.get("developer_passos")
+    assert reg["grande"]["usados"] == 70 and reg["grande"]["fracao"] == 0.875 and reg["c"] == {**reg["c"], "usados": 12}
+    developer.registrar_passos(s, "grande", 0.5, 80)                                    # nova estimativa não apaga o uso
+    assert s.get("developer_passos")["grande"] == {**s.get("developer_passos")["grande"], "fracao": 0.5, "usados": 70}
+    assert limiar_calibrado(s) == 0.8
+    r = developer.relatorio_passos(s)
+    assert r == {"tarefas": 4, "acima_de_80": 1, "fracao_acima_de_80": 0.25, "alvo": 0.05, "dentro_do_alvo": False}
+    assert developer.relatorio_passos(s, desde=time.time() + 60)["fracao_acima_de_80"] is None
+
+
+class AgenteComTurnos(FixAgent):
+    max_turns = 40
+
+    def run(self, task, workdir):
+        out = super().run(task, workdir)
+        return {**out, "log": json.dumps({"type": "result", "subtype": "success", "num_turns": 33})}
+
+
+def test_licao_59_developer_grava_os_passos_usados_de_cada_execucao(circle, repo):  # noqa: F811
+    """lição #59: cada execução do agente grava os passos usados e o limite do agente em uso, antes do portão do PR."""
+    item = erro_recorrente(circle)
+    dev = DeveloperComReparo(circle.ctx, repo, AgenteComTurnos(), FakeGH(), test_cmd=TEST_CMD, lint_cmd=[], fix_cmds=[])
+    dev.run_once()
+    ev = circle.store.get("developer_passos")[item["titulo"][:120]]
+    assert ev["usados"] == 33 and ev["limite"] == 40
+
+
+AGENTS ="# Convenções\n\n## Testes\nrode `python -m pytest -q`\n\n```sh\n# não é seção\n```\n\n### Armadilhas\nnada\n"
 
 
 def test_convencoes_hash_secoes_e_grupo_de_controle(tmp_path):
@@ -270,3 +307,4 @@ def test_relatorio_de_convencoes_pela_linha_de_comando_so_da_janela(circle):
         developer.main(["--data", str(Path(s.path).parent), "--dias", "7"])
     r = json.loads(saida.getvalue())
     assert r["controle"]["tarefas"] == 1 and r["com"]["tarefas"] == 0 and r["aceito"] is None
+    assert r["passos"]["tarefas"] == 0 and r["passos"]["fracao_acima_de_80"] is None
