@@ -678,3 +678,59 @@ def test_canario_de_portao_neutralizado_falha_e_abre_licao_portao_mudo_quebrado(
     assert not r["ok"]
     [lic] = s.q("SELECT classe, status FROM licoes WHERE ponto='canario:portao_mudo_quebrado'")
     assert (lic["classe"], lic["status"]) == ("estrutural", "aberta")
+
+
+def _licao(s, lid, reincidencias, tick, desde=None, classe="trabalho", ponto="gate:ci", status="evidenciada",
+           prevencao="Não repetir"):
+    agora, sig = time.time(), f"{ponto}:erro_{lid}"
+    s.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,prevencao,status,ocorrencias,reincidencias,primeira_tick,"
+        "ultima_tick,corrigida_tick,evidenciada_tick,created_at,updated_at,camada,origens) "
+        "VALUES(?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,'regra',?)",
+        (lid, sig, ponto, classe, f"erro {lid}", prevencao, status, reincidencias + 1, reincidencias, tick, tick, tick,
+         agora - 30 * 86400, desde or agora, json.dumps([sig])))
+    return sig
+
+
+# as seis lições medidas no pedido #529 (id, reincidências, classe, ponto do neurônio)
+PARADAS_529 = ((22, 1, "trabalho", "gate:ci"), (73, 2, "estrutural", "execucao:meta"), (26, 1, "trabalho", "developer:testes"),
+               (36, 2, "estrutural", "planejador:saida"), (29, 1, "trabalho", "developer:abrir_pr"),
+               (17, 2, "estrutural", "jardineiro:teto"))
+
+
+def test_licoes_22_73_26_36_29_17_evidenciadas_paradas_fecham_por_prazo_ou_escalam(circle):
+    """Pergunta #529: lição #22, lição #73, lição #26, lição #36, lição #29 e lição #17 ficavam 'evidenciada' para
+    sempre (20835 giros; reincidiram 1 a 2x). Parada 30 giros ou 7 dias sem a assinatura voltar: obsoleta com a regra e
+    o prazo na Prevenção; se a mesma assinatura voltar, reincide. Reincidiu 3x sem checagem: sem_prevencao, com o item."""
+    L, s = lic(circle), circle.store
+    sigs = {lid: _licao(s, lid, n, s.tick, classe=classe, ponto=ponto) for lid, n, classe, ponto in PARADAS_529}
+    _licao(s, 80, 1, s.tick + 29)                                   # ainda dentro do prazo em giros
+    _licao(s, 81, 2, s.tick + 29, desde=time.time() - 8 * 86400)   # parada há 8 dias
+    _licao(s, 90, 3, s.tick)                                        # reincidiu 3x, sem teste nem portão
+    avancar(circle, 30)
+    L.revisar()
+    st = {r["id"]: r for r in s.q("SELECT id, status, prevencao, item_id FROM licoes")}
+    for lid in (*sigs, 81):
+        assert st[lid]["status"] == "obsoleta", lid
+        assert "(regra: 30 giros ou 7 dias)" in st[lid]["prevencao"], st[lid]["prevencao"]
+    assert "evidenciada há 30 giros" in st[22]["prevencao"] and "evidenciada há 8 dias" in st[81]["prevencao"]
+    assert st[80]["status"] == "evidenciada"
+    assert st[90]["status"] == "sem_prevencao" and st[90]["item_id"]
+    assert not s.q("SELECT 1 FROM licoes WHERE status='evidenciada' AND evidenciada_tick <= ?", (s.tick - 30,))
+
+    for lid, n, _, ponto in PARADAS_529:                                     # a mesma assinatura voltou
+        L.verificar(ponto, False, motivo=f"erro {lid}", assinatura=sigs[lid])
+        r = s.one("SELECT status, reincidencias FROM licoes WHERE id=?", (lid,))
+        assert (r["status"], r["reincidencias"]) == ("reincidente", n + 1), lid
+
+
+def test_obsoleta_so_reincide_se_estrutural_ou_fechada_por_prazo(circle):
+    """Pergunta #529: a regra de reincidência da obsoleta ganhou o caso 'por prazo' sem perder o de estrutura (TTL);
+    a obsoleta de trabalho por outro motivo (alvo do pytest sumido) continua sem reincidir."""
+    L, s = lic(circle), circle.store
+    ttl = _licao(s, 91, 0, s.tick, classe="estrutural", ponto="execucao:meta", status="obsoleta",
+                 prevencao="Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado")
+    alvo = _licao(s, 92, 0, s.tick, status="obsoleta", prevencao="Obsoleta: o alvo tests/x.py não existe na main")
+    L.verificar("execucao:meta", False, motivo="erro 91", assinatura=ttl)
+    L.verificar("gate:ci", False, motivo="erro 92", assinatura=alvo)
+    st = {r["id"]: (r["status"], r["reincidencias"]) for r in s.q("SELECT id, status, reincidencias FROM licoes")}
+    assert st[91] == ("reincidente", 1) and st[92] == ("obsoleta", 0)

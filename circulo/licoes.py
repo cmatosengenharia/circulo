@@ -54,6 +54,7 @@ TTL_ESTRUTURA = 6 * 3600   # lição de estrutura sem reincidir por tanto tempo,
 TRAVA_ESTRUTURAL_S = 1800  # quanto uma lição de estrutura aberta segura o Planejador; depois a evolução segue em paralelo (nunca parar)
 PASSAGENS_PARA_EXPIRAR = 3  # passagens pelo caminho na janela: silêncio sem exposição não prova a correção
 ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta", "sem_prevencao")
+OBSOLETA_POR_PRAZO = "Obsoleta por prazo"   # evidenciada parada sem reincidir (prevencao.fechar_por_prazo); reincide se voltar
 # o item que alguém ainda vai fazer (a regra diz quem está na fila, não quem saiu: cada estado novo de saída — descartado,
 # bloqueado, desativado, devolvido "depende de você"… — travava a evolução até alguém listá-lo)
 NA_FILA = ("(status='em_andamento' OR (status='pendente' AND COALESCE(desativado,0)=0 "
@@ -439,8 +440,8 @@ class Licoes:
         if sig not in origens:
             self.s.x("UPDATE licoes SET origens=? WHERE id=?", (json.dumps(origens + [sig]), lic["id"]))
         # lição de teste só reincide pela reexecução no main (checar_testes), não pelo worktree de um Developer
-        reincidiu = (lic["status"] in ("validada", "evidenciada", "sem_prevencao") or (lic["status"], lic["classe"]) == ("obsoleta", "estrutural")) \
-            and not alvo_de(lic)
+        obsoleta_que_reincide = lic["classe"] == "estrutural" or (lic["prevencao"] or "").startswith(OBSOLETA_POR_PRAZO)
+        reincidiu = (lic["status"] in ("validada", "evidenciada", "sem_prevencao") or (lic["status"] == "obsoleta" and obsoleta_que_reincide)) and not alvo_de(lic)
         if reincidiu:
             self.s.x("UPDATE licoes SET status='reincidente', reincidencias=reincidencias+1, ocorrencias=ocorrencias+1, "
                      "ultima_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
@@ -534,7 +535,7 @@ class Licoes:
         """Roda todo giro. Acompanha o item de cada lição e fecha as que provaram a correção."""
         from .gemeas import gemea_aberta, reabrir_todas
         from .curador_licoes import curar_no_main
-        from .prevencao import checagem_de, cobrar_teste, exigir, sem_prevencao
+        from .prevencao import checagem_de, cobrar_teste, exigir, fechar_por_prazo, sem_prevencao
         log = self.unir_duplicatas() + curar_no_main(self.s, self.repo)
         tick, agora = self.s.tick, time.time()
         for lic in self.s.q("""SELECT l.*, r.status item_status, r.evidencia item_evidencia FROM licoes l
@@ -564,7 +565,7 @@ class Licoes:
             if node_por_causa(lic["assinatura"]) or gemea_aberta(self.s, lic):
                 continue                  # o alias dá um teste à lição (só fecha pela reexecução); a gêmea, o erro vivo
             self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, updated_at=? WHERE id=?", (tick, agora, lic["id"]))
-        log += exigir(self.s, tick, agora, self.repo) + cobrar_teste(self.s)
+        log += exigir(self.s, tick, agora, self.repo) + fechar_por_prazo(self.s, tick, agora, self.repo) + cobrar_teste(self.s)
         log += reabrir_todas(self.s, self.reply)
         for lic in self.s.q("SELECT * FROM licoes WHERE status='validada' AND corrigida_tick <= ? AND ultima_tick <= corrigida_tick",
                             (tick - EVID_GIROS,)):
