@@ -20,6 +20,8 @@ import json
 import time
 from typing import Any, Callable, Mapping
 
+from . import regras
+
 MIN_N = 40
 GANHO_MIN = 0.15
 GANHO_MANTER = 0.05
@@ -108,6 +110,7 @@ CACHEAVEIS = ("vigia_trava", "vigia_acao", "idle_task", "medico_")
 CACHE_TTL = 600
 _cache: dict[str, tuple[float, Any]] = {}
 CACHE_CHAVE = "__cache__"
+REGRAS_CHAVE = "__regras__"
 PASSE = ("worth_spending", "should_evolve", "dado_na_evidencia", "indaga_pert")   # as 4 reescritas em 1.47.0; o painel mede antes × depois
 PASSE_VERSAO = "1.47.0"
 
@@ -172,8 +175,10 @@ def preparar(store, jev, state: Mapping[str, Any], questions: Mapping[str, Any])
     catalogar(store, questions)
     if getattr(jev, "source", "") != "jev":
         return dict(questions), {}
+    decididas, auditar = regras.antes_do_jev(store, state, questions)     # par repetido: a regra decide antes do Jev
+    questions = {k: v for k, v in questions.items() if k not in decididas}
     at = ativas(store)
-    enviar, mapa = dict(questions), {}
+    enviar, mapa = dict(questions), {REGRAS_CHAVE: (decididas, auditar)}
     lembradas = {}
     for qid, q in questions.items():
         if cacheavel(qid) and (d := lembrar(qid, q, state, jev)) is not None:
@@ -202,6 +207,11 @@ def preparar(store, jev, state: Mapping[str, Any], questions: Mapping[str, Any])
 def colher(store, out: dict, mapa: dict, modelo: str | None = None) -> dict:
     """Separa as respostas do laboratório, registra o par (atual × variante) e devolve só as perguntas pedidas."""
     from .decision import Decision
+    decididas, auditar = mapa.pop(REGRAS_CHAVE, ({}, {}))
+    for qid, regra_id in auditar.items():
+        if qid in out:
+            regras.conferir(store, regra_id, out[qid])
+    out.update(decididas)
     lembradas, estado, perguntas, jev = mapa.get(CACHE_CHAVE, ({}, {}, {}, None))
     for qid, d in lembradas.items():
         out[qid] = Decision(d.name, d.kind, d.value, d.confidence, d.source, {**(d.probabilities or {}), "cache": True})
