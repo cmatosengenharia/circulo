@@ -1,6 +1,6 @@
 # Arquitetura
 
-Versão documentada: **1.69.2**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
+Versão documentada: **1.70.0**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
 painel. Toda decisão passa primeiro pelo Jev (cascata regra → aluno → Jev → LLM).
 
 ## Constituição
@@ -85,7 +85,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `lancamentos_email.py` | 41 | E-mail de notificação do banco → lançamentos, sem rede e sem LLM (o texto chega pronto, nunca do Gmail aqui). |
 | `lancamentos_import.py` | 138 | Importa extrato bancário (OFX/CSV) para o ledger, sem rede e sem LLM. |
 | `lancamentos_pasta.py` | 131 | Pasta monitorada de extratos: cada .ofx/.csv/.eml novo vai para o ledger e sai da pasta. |
-| `licoes.py` | 900 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
+| `licoes.py` | 898 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
 | `limite_uso.py` | 100 | Limite de uso do Claude Code: até quando não chamar a LLM, lido da própria mensagem de erro. |
 | `links.py` | 130 | Catálogo de links da empresa por assunto: colo o link com um rótulo curto e acho em segundos. |
 | `llm.py` | 258 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
@@ -112,27 +112,27 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 29 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 618 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
-| `planejador.py` | 552 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
+| `perguntas.py` | 626 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `planejador.py` | 567 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
 | `policy.py` ⚖️ | 282 | Política do círculo: versionada, com guard que impede a auto-evolução de remover proteções. |
 | `portao_previo.py` | 63 | Portão de reincidência (pergunta do conselho #85): não abrir PR de item que já fechou 2x sem merge com os mesmos checks. |
 | `pre_pr.py` | 85 | Portão pré-PR (pergunta do conselho #74): não abrir PR enquanto o CI da main está vermelho ou nem iniciou. |
-| `prevencao.py` | 108 | Lição #15 (pergunta #239): a lição só fica 'validada' se a Prevenção cita um teste ou uma checagem determinística. |
+| `prevencao.py` | 123 | Lição #15 (pergunta #239): a lição só fica 'validada' se a Prevenção cita um teste ou uma checagem determinística. |
 | `projects.py` | 301 | Projetos vivos: cada pedido vira um projeto que o círculo evolui com o propósito dele. |
 | `prova.py` | 72 | Prova de melhora por item mergeado (pergunta do conselho #57): a métrica do critério de sucesso do item, lida no planejamento (antes) e 7 dias depois do merge (depois), gravada na trilha (`elos`: item:N → medicao:N:antes|depois). |
 | `rastro.py` | 448 | Rastreabilidade de ponta a ponta: de onde veio cada mudança do loop até a prova de que ela funciona rodando. |
 | `registro.py` | 97 | Registro estruturado das chamadas de LLM. |
-| `reparo.py` | 707 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
+| `reparo.py` | 723 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
 | `repo_stats.py` | 65 | Números do repositório do loop (commits), lidos do clone local. Cache curto: o painel atualiza a cada poucos segundos. |
 | `reproducao.py` | 282 | Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo. |
 | `resumo_semanal.py` | 77 | Resumo semanal para a equipe: o changelog (produto/infra, cada PR com o pedido de origem, e a fração de produto contra a meta), os PRs sem pedido listados à parte, o uso medido (leituras do digest em 7 dias) e as consultas 7d de cada PR de produto, com os que ninguém consultou sinalizados, e os pedidos abertos ainda sem PR de produto mergeado, do mais velho ao mais novo, para a equipe ver o que vem a seguir. Cada consulta fica em `uso_resumo` (recurso, created_at): 'resumo' e 'pr:<número>' de cada PR de produto mostrado. Compõe `changelog` e `digest_semanal`; não refaz a coleta nem a classificação. |
 | `revisao_uso.py` | 112 | Pedido de revisão por entrega de produto sem uso: um por PR, para sempre. A chave é `pr_numero UNIQUE` e a abertura é `INSERT ... ON CONFLICT DO NOTHING`, então repetição (seguida ou em paralelo, de qualquer conexão) não duplica e pedido fechado não reabre: a chave não expira nem é podada. O destino (usar, ajustar ou remover) segue a regra da chave de idempotência: o primeiro fica, e uma repetição com destino diferente vira divergência registrada. |
-| `revisor.py` | 406 | Revisor: o agente que valida cada PR do Developer DENTRO do ecossistema, para vários PRs andarem em paralelo. |
+| `revisor.py` | 407 | Revisor: o agente que valida cada PR do Developer DENTRO do ecossistema, para vários PRs andarem em paralelo. |
 | `roadmap.py` | 200 | Roadmap: todo item nasce de uma pergunta do conselho; `Origem` só existe com um pergunta_id válido. |
 | `rodadas_revisao.py` | 76 | Rodadas de comentário de revisão até o merge (pergunta do conselho #446): só mede. |
 | `saida_json.py` | 59 | Contrato de saída JSON de um papel (lição #22): as chaves obrigatórias do esquema chegam inteiras, ou um motivo tipado. |
-| `self_dev.py` ⚖️ | 900 | Developer do projeto zero: o círculo corrigindo o próprio código. |
+| `self_dev.py` ⚖️ | 899 | Developer do projeto zero: o círculo corrigindo o próprio código. |
 | `sentinela.py` | 94 | Sentinela da entrega: olha o RESULTADO (o que entrou na main), não os erros. |
 | `state.py` | 736 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
 | `status.py` | 57 | Estado do loop para humanos, derivado do batimento + controles + etapa. Usado pelo painel. |
@@ -141,8 +141,9 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `tema.py` | 210 | Tema único das telas do loop: as cores, os botões, os chips e a legenda são os mesmos em todas as páginas. |
 | `trabalho.py` | 266 | Meu trabalho: a tela que junta o dia a dia do engenheiro — assuntos, daily, links, orçamento de IA, contexto para o Cursor e o mapa do GAIA — e a semente de dados de exemplo que deixa o esqueleto inteiro funcionando antes do dado real. |
 | `uso_entregas.py` | 83 | Entregas de produto sem uso: os PRs de produto mergeados há 7 dias ou mais sem nenhum evento com o nome do `evento_esperado` gravado no merge depois do `merged_at`. Uso anterior ao merge não conta: é de antes da entrega. O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, em `entrega_uso` (gravado pela rota do painel chamada, com o último instante por nome) e nos `events` do loop (kind). |
+| `validador.py` | 135 | Validador: os agentes de validação que ficam entre o Developer e o PR (1.70). |
 | `verificacao.py` | 150 | Verificação de ponta a ponta do painel, com um mapa de funcionalidades (Lauren Tan: "verification skills"). |
-| `vigia.py` | 569 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
+| `vigia.py` | 602 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
 
 ## Telas
 

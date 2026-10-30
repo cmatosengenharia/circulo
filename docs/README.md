@@ -1,6 +1,6 @@
 # Documentação do Círculo
 
-Gerada pelo **Redator técnico** do loop em 29/10/2026 (versão 1.69.2) a partir do código, do banco e do CHANGELOG —
+Gerada pelo **Redator técnico** do loop em 30/10/2026 (versão 1.70.0) a partir do código, do banco e do CHANGELOG —
 nenhum número aqui é estimado. O agente roda quando há entrega nova e abre um PR só com esta pasta.
 
 | Documento | O que tem |
@@ -9,6 +9,6 @@ nenhum número aqui é estimado. O agente roda quando há entrega nova e abre um
 | [Arquitetura](arquitetura.md) | constituição, módulos, telas e APIs |
 | [Decisões Jev First](decisoes.md) | o catálogo de perguntas que o código faz ao Jev |
 | [Evolução](evolucao.md) | versões e as 200 entregas que o loop fez sozinho, classificadas pelo Jev |
-| [Lições](licoes.md) | as 83 lições aprendidas e o estado de cada uma |
+| [Lições](licoes.md) | as 85 lições aprendidas e o estado de cada uma |
 
 Sistema de design das telas: [`circulo/DESIGN.md`](../circulo/DESIGN.md). Histórico completo: [`CHANGELOG.md`](../CHANGELOG.md).
