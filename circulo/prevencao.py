@@ -6,6 +6,7 @@ checagem, ou a lição que já reincidiu e só tem texto, fica 'sem_prevencao' (
 from __future__ import annotations
 
 import re
+import subprocess
 import time
 from pathlib import Path
 
@@ -14,10 +15,24 @@ from .licoes import FORA_DA_FILA, alvo_de, titulo_curto
 REINCIDENCIAS_PARA_TESTE = 3
 
 
-def checagem_de(store, lic: dict) -> str | None:
-    """O que segura a lição sem depender de texto: o teste dela (node id ou alias da causa), um portão aprendido
-    executável, ou o portão do teste de regressão que o PR do item já precisou passar."""
-    node = alvo_de(lic)
+def teste_de_regressao(repo, lic: dict) -> str | None:
+    """O teste que `cobrar_teste` pede, já na main do repositório e citando a lição (lição #47: o arquivo existia e a
+    lição seguia sem_prevencao, porque só o portão do item contava e cada reincidência reabre o item)."""
+    if not repo or not (Path(repo) / ".git").exists():
+        return None
+    teste, _ = arquivos_do_teste(lic, Path(repo))
+    for ref in ("origin/main", "main"):
+        p = subprocess.run(["git", "show", f"{ref}:{teste}"], cwd=repo, capture_output=True, text=True)
+        if p.returncode == 0:
+            return teste if re.search(rf"(?i)li[cç][aã]o[ _#-]*{lic['id']}\b", p.stdout) else None
+    return None
+
+
+def checagem_de(store, lic: dict, repo=None) -> str | None:
+    """O que segura a lição sem depender de texto: o teste dela (node id ou alias da causa), o teste de regressão
+    que o item dela cobra, um portão aprendido executável, ou o portão do teste de regressão que o PR do item já
+    precisou passar."""
+    node = alvo_de(lic) or teste_de_regressao(repo, lic)
     if node:
         return f"teste {node}"
     feito = lic.get("item_id") and store.one("SELECT 1 FROM roadmap WHERE id=? AND status='feito'", (lic["item_id"],))
@@ -32,12 +47,12 @@ def sem_prevencao(lic: dict) -> str:
             f"não repetir: {lic['descricao']}")[:500]
 
 
-def exigir(store, tick: int, agora: float) -> list[str]:
+def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
     """A que já reincidiu provou que texto não segura: validada só com checagem; ganhou uma, volta a validada."""
     log = []
     for lic in map(dict, store.q("SELECT * FROM licoes WHERE status='sem_prevencao' "
                                  "OR (status='validada' AND reincidencias > 0)")):
-        checagem = checagem_de(store, lic)
+        checagem = checagem_de(store, lic, repo)
         if lic["status"] == "validada" and not checagem:
             store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
                     (sem_prevencao(lic), agora, lic["id"]))
