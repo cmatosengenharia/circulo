@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 56 · **correcao** 55 · **funcionalidade** 41 · **documentacao** 23 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 41 · **documentacao** 25 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #273 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #272 | 30/10/2026 | documentacao (94%) | sim | Curador em sombra: contar lições abertas elegíveis a 'resolvida_por_silêncio' sem fechar nenhuma | pergunta do curador_licoes: “Das lições abertas, quantas não tiveram nenhuma reincidência (mesma assinatura n” |
 | #271 | 30/10/2026 | velocidade (51%) | sim | Planejador: reaproveitar resultado de pergunta do conselho com evidência quase igual em 24 h | pergunta do economista: “Nas últimas 24 h, quais neurônios gastaram mais tokens em tarefas de baixa compl” |
 | #270 | 30/10/2026 | velocidade (39%) | sim | Pedido do humano que parece lançamento de uma linha vai para lancamento_manual e responde… | pergunta do financeiro: “Dá para aceitar um lançamento manual de uma linha (por exemplo 'gastei 42,90 mer” |
 | #269 | 30/10/2026 | correcao (32%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 56 · **correcao** 55 · **funcionalidade** 41 · 
 | #36 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #35 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #34 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
-| #33 | 20/10/2026 | correcao (87%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
-| #32 | 20/10/2026 | correcao (47%) | sim | Developer: classificar a causa de cada falha de testes e rodar pré-voo dos testes afetados na main antes de ga | pergunta do operador: “O neurônio developer:testes foi barrado 6 de 22 vezes em 24 h: qual é a causa qu” |
