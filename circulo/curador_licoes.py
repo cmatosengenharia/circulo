@@ -16,6 +16,9 @@ from typing import Callable
 NODE = re.compile(r"(tests/[\w./-]+?\.py)((?:::\w+)+)")
 CAUSA = "Fechada: referência a teste inexistente"
 FECHAVEIS = ("aberta", "em_correcao", "reincidente")
+ARQUIVO = re.compile(r"\b((?:circulo|tests)/[\w/]+\.py)\b")
+ABERTAS = ("aberta", "reincidente", "sem_prevencao")
+SILENCIO_DIAS = 14
 
 
 def node_ids(texto: str) -> list[str]:
@@ -71,15 +74,47 @@ def curar(store, ler: Callable[[str], str | None]) -> list[str]:
     return log
 
 
+def arquivos(texto: str) -> list[str]:
+    return list(dict.fromkeys(ARQUIVO.findall(texto or "")))
+
+
+def elegiveis_silencio(store, coberto: Callable[[str], bool], agora: float) -> dict:
+    """Só leitura (pergunta do conselho #561): a lição aberta cuja assinatura (neurônio + arquivo + código) não ocorre há
+    SILENCIO_DIAS e cujo arquivo citado algum teste da main cita seria fechada como 'resolvida_por_silêncio'. A hora da
+    ocorrência é a do giro em `metrics` (sem ela, `updated_at`, que nunca é anterior a ela)."""
+    elegiveis, com_reincidencia, sem_teste = {}, [], []
+    for lic in store.q("SELECT l.id, l.assinatura, l.descricao, l.node_id, l.origens, COALESCE(m.created_at, l.updated_at) em "
+                       "FROM licoes l LEFT JOIN metrics m ON m.tick=l.ultima_tick "
+                       f"WHERE l.status IN ({','.join('?' * len(ABERTAS))}) ORDER BY l.id", ABERTAS):
+        if lic["em"] > agora - SILENCIO_DIAS * 86400:
+            com_reincidencia.append(lic["id"])
+        elif not any(coberto(a) for a in arquivos(_texto(lic))):
+            sem_teste.append(lic["id"])
+        else:
+            elegiveis[str(lic["id"])] = time.strftime("%Y-%m-%d", time.localtime(lic["em"]))
+    return {"licoes_elegiveis_silencio": len(elegiveis), "elegiveis": elegiveis, "com_reincidencia": com_reincidencia,
+            "sem_teste": sem_teste, "dias": SILENCIO_DIAS}
+
+
 def _git(repo: Path, *a: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True)
 
 
 def curar_no_main(store, repo) -> list[str]:
-    """`curar` lendo tests/ do main (origin/main ou main); sem o main não há como provar que o teste não existe."""
+    """`curar` lendo tests/ do main (origin/main ou main); sem o main não há como provar que o teste não existe.
+    Grava em sombra, todo giro, as lições elegíveis a silêncio: o teste que está na main passou no CI para entrar."""
     repo = Path(repo) if repo else None
     ref = next((r for r in ("origin/main", "main") if repo and (repo / ".git").exists()
                 and _git(repo, "rev-parse", "--verify", "-q", r).returncode == 0), None)
+
+    def coberto(arquivo: str) -> bool:
+        modulo = arquivo.removesuffix(".py").replace("/", ".")
+        pai, _, nome = modulo.rpartition(".")
+        if ref is not None and arquivo.startswith("tests/"):
+            return _git(repo, "cat-file", "-e", f"{ref}:{arquivo}").returncode == 0
+        return ref is not None and _git(repo, "grep", "-q", "-F", "-e", arquivo, "-e", modulo, "-e", f"from {pai} import {nome}",
+                                        ref, "--", "tests").returncode == 0
+    store.set("curador_silencio", elegiveis_silencio(store, coberto, time.time()))
     if ref is None:
         return []
     fontes: dict[str, str | None] = {}

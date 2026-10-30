@@ -417,7 +417,10 @@ def _m_conflitos_pr(s, agora):
 
 def _m_licoes_abertas(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')")
-    return (min(1.0, n / 6), {"licoes_abertas": n, "licoes_telemetria": len(licoes_de_telemetria(s))})
+    sombra = s.get("curador_silencio") or {}           # gravado pelo curador a cada giro
+    return (min(1.0, n / 6), {"licoes_abertas": n, "licoes_telemetria": len(licoes_de_telemetria(s)),
+                              "licoes_elegiveis_silencio": sombra.get("licoes_elegiveis_silencio"),
+                              "ultima_ocorrencia": sombra.get("elegiveis")})
 
 
 def _m_lancamentos(s, agora):
