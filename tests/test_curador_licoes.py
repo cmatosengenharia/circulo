@@ -3,7 +3,8 @@ causa, e reabre se o teste citado aparecer."""
 import subprocess
 import time
 
-from circulo.curador_licoes import CAUSA, inexistentes, node_ids
+from circulo.curador_licoes import CAUSA, curar_no_main, inexistentes, node_ids
+from circulo.perguntas import METRICAS
 
 SUMIDO = "tests/test_vigia_trava_estado.py::test_200_decisoes_de_vigia_trava_saem_da_duvida_concordando_com_a_regra"
 
@@ -72,3 +73,40 @@ def test_sem_repositorio_nao_fecha_nada(circle):
     licao(s, 26, f"ERROR: file or directory not found: {SUMIDO}")
     L.revisar()
     assert status(s, 26) == "aberta"
+
+
+def ocorreu(store, lid, tick, dias_atras):
+    """A última ocorrência da assinatura: o tick dela e a hora em que o giro foi gravado."""
+    store.x("UPDATE licoes SET ultima_tick=? WHERE id=?", (tick, lid))
+    store.x("INSERT OR REPLACE INTO metrics(tick,body,created_at) VALUES(?,?,?)", (tick, "{}", time.time() - dias_atras * 86400))
+
+
+def test_curador_em_sombra_conta_as_elegiveis_a_silencio_sem_fechar_nenhuma(circle, tmp_path):
+    """Pergunta do conselho #561: das lições abertas, quantas ficaram 14 dias sem reincidir e têm teste na main citando o
+    arquivo. Só conta (licoes_elegiveis_silencio, com a data da última ocorrência); nenhuma muda de estado."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q", "-b", "main")
+    commit(repo, {"tests/test_alvo.py": "from circulo import alvo\n\ndef test_alvo():\n    assert alvo\n"})
+    s = circle.store
+    licao(s, 91, "developer:testes: KeyError em circulo/alvo.py", status="sem_prevencao", assinatura="developer:alvo:KeyError")
+    licao(s, 92, "developer:testes: KeyError em circulo/orfao.py", status="sem_prevencao", assinatura="developer:orfao:KeyError")
+    licao(s, 93, "planejador: ValueError em circulo/alvo.py", status="reincidente", assinatura="planejador:alvo:ValueError")
+    ocorreu(s, 91, 500, dias_atras=2)            # reincidiu há 2 dias
+    ocorreu(s, 92, 100, dias_atras=20)           # quieta, mas nenhum teste da main cita circulo/orfao.py
+    ocorreu(s, 93, 101, dias_atras=20)           # quieta e coberta: a única elegível
+    antes = s.q("SELECT id, status, prevencao, updated_at FROM licoes ORDER BY id")
+    curar_no_main(s, repo)
+    sombra = s.get("curador_silencio")
+    assert sombra["licoes_elegiveis_silencio"] == 1
+    assert sombra["elegiveis"] == {"93": time.strftime("%Y-%m-%d", time.localtime(time.time() - 20 * 86400))}
+    assert sombra["com_reincidencia"] == [91] and sombra["sem_teste"] == [92]
+    assert s.q("SELECT id, status, prevencao, updated_at FROM licoes ORDER BY id") == antes      # em sombra: nada fecha
+    _, evidencia = METRICAS["licoes_abertas"][1](s, time.time())
+    assert evidencia["licoes_elegiveis_silencio"] == 1
+
+
+def test_curador_em_sombra_grava_a_contagem_mesmo_sem_a_main(circle):
+    licao(circle.store, 93, "planejador: ValueError em circulo/alvo.py", status="reincidente")
+    curar_no_main(circle.store, None)
+    assert circle.store.get("curador_silencio")["licoes_elegiveis_silencio"] == 0
