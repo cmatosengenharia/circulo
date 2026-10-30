@@ -50,10 +50,18 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **correcao** 57 · **observabilidade** 55 · **funcionalidade** 40 · **documentacao** 22 · **seguranca** 22 · **velocidade** 4.
+Por tipo: **observabilidade** 56 · **correcao** 55 · **funcionalidade** 41 · **documentacao** 23 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #271 | 30/10/2026 | velocidade (51%) | sim | Planejador: reaproveitar resultado de pergunta do conselho com evidência quase igual em 24 h | pergunta do economista: “Nas últimas 24 h, quais neurônios gastaram mais tokens em tarefas de baixa compl” |
+| #270 | 30/10/2026 | velocidade (39%) | sim | Pedido do humano que parece lançamento de uma linha vai para lancamento_manual e responde… | pergunta do financeiro: “Dá para aceitar um lançamento manual de uma linha (por exemplo 'gastei 42,90 mer” |
+| #269 | 30/10/2026 | correcao (32%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #268 | 30/10/2026 | correcao (28%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
+| #267 | 30/10/2026 | observabilidade (44%) | sim | Painel: candidatos a modelo menor, com saída curta, falha zero e n≥30 por papel LLM em 7 dias | pergunta do mercado: “Quais neurônios só classificam, roteiam ou geram saída estruturada curta e rodam” |
+| #266 | 30/10/2026 | funcionalidade (45%) | sim | Status por regra: incluir a primeira causa de trava com idade e o próximo passo automático | pergunta do tech_lead: “Dos pedidos do humano da última semana, quantos eram só perguntas de status (por” |
+| #265 | 30/10/2026 | funcionalidade (30%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #264 | 30/10/2026 | documentacao (89%) | — | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
 | #263 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #262 | 30/10/2026 | documentacao (98%) | sim | Varredura retroativa: fechar lições abertas cujo texto é JSON de estatística sem sinal de erro | pergunta do cetico: “A lição #83 guarda só um dump de subagent_stats com todos os contadores em 0 (co” |
 | #261 | 30/10/2026 | correcao (87%) | sim | Reabrir lição evidenciada cujo teste de 'Fechada:' sumiu, foi renomeado ou está skip/xfail | pergunta do curador_licoes: “Lições como #12 e #7 estão 'evidenciada' com Prevenção 'Fechada: tests/...::test” |
@@ -246,11 +254,3 @@ Por tipo: **correcao** 57 · **observabilidade** 55 · **funcionalidade** 40 · 
 | #34 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #33 | 20/10/2026 | correcao (87%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #32 | 20/10/2026 | correcao (47%) | sim | Developer: classificar a causa de cada falha de testes e rodar pré-voo dos testes afetados na main antes de ga | pergunta do operador: “O neurônio developer:testes foi barrado 6 de 22 vezes em 24 h: qual é a causa qu” |
-| #31 | 20/10/2026 | velocidade (38%) | sim | Vigia: drenar sozinho a pergunta validada mais antiga quando a fila passa do prazo, 1 por ciclo | pergunta do operador: “O Vigia mede a trava “6 pergunta(s) validada(s) pelo Jev esperando há 31 min sem” |
-| #30 | 20/10/2026 | funcionalidade (65%) | sim | Vigia: 13 pergunta(s) validada(s) pelo Jev esperando há 395 min sem virar item (último progresso há 198 min) | item #54 (loop) |
-| #29 | 20/10/2026 | correcao (81%) | sim | Jardineiro: podar linhas com `noqa` (lint silenciado) | item #52 (loop) |
-| #28 | 20/10/2026 | correcao (81%) | sim | Planejador: vetar antes da LLM item cujo alvo toca a constituição e registrar a causa de cada falha de abrir_p | pergunta do operador: “O neurônio developer:abrir_pr foi barrado 5 de 19 vezes em 24 h: qual é a causa ” |
-| #27 | 20/10/2026 | seguranca (98%) | sim | Orçamento diário de tokens configurável (1M/dia), com alerta e corte, medido por job do Jev | pergunta do cassio: “aumente o limite de token da llm para 1milha por dia” |
-| #26 | 20/10/2026 | seguranca (99%) | sim | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
-| #25 | 19/10/2026 | correcao (74%) | — | Vigia: 6 pergunta(s) validada(s) pelo Jev esperando há 31 min sem virar item (último progresso há 111 min) | item #50 (loop) |
-| #24 | 19/10/2026 | correcao (46%) | sim | Planejador no mesmo giro da pergunta validada, 1 retry com jitter e espera por sub-etapa gravada | pergunta do operador: “A etapa “da pergunta validada ao item do roteiro (Planejador + porteiro)” levou ” |
