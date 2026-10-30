@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 56 · **funcionalidade** 56 · **correcao** 42 · **seguranca** 24 · **documentacao** 18 · **velocidade** 4.
+Por tipo: **observabilidade** 61 · **correcao** 55 · **funcionalidade** 37 · **seguranca** 25 · **documentacao** 18 · **velocidade** 4.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #252 | 30/10/2026 | correcao (99%) | sim | Rebaixar lição 'validada' cuja Checagem cita teste inexistente (arquivo ou função não resolve) | pergunta do cetico: “Quantas lições com status 'validada' citam na Prevenção um teste ou checagem (co” |
+| #251 | 30/10/2026 | correcao (99%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #250 | 30/10/2026 | correcao (86%) | — | Verificar que o teste citado na Prevenção de lição validada existe no repositório (arquivo e função) | pergunta do auditor: “Entre as lições com status 'validada' (como a #59, que cita tests/test_developer” |
 | #249 | 30/10/2026 | correcao (68%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #248 | 30/10/2026 | velocidade (47%) | sim | Medir repetição de prompts (modo sombra) e só então ligar cache LLM com TTL curto | pergunta do economista: “Nas chamadas de LLM das últimas 24 h, quantos prompts têm entrada normalizada id” |
@@ -198,28 +200,28 @@ Por tipo: **observabilidade** 56 · **funcionalidade** 56 · **correcao** 42 · 
 | #109 | 21/10/2026 | observabilidade (95%) | sim | Classificar a falha do developer:agente pela causa real (subtype/is_error), não pelo trecho cru do… | pergunta do operador: “O neurônio developer:agente foi barrado 17 de 181 vezes em 24 h: qual é a causa ” |
 | #108 | 21/10/2026 | correcao (50%) | sim | Disjuntor por assinatura de causa no abrir_pr: após 2 barras iguais no mesmo item, não gasta até a… | pergunta do operador: “O neurônio developer:abrir_pr:aprendido foi barrado 495 de 1910 vezes em 24 h: q” |
 | #107 | 21/10/2026 | seguranca (26%) | sim | Gravar os arquivos realmente em conflito (git merge-tree) de cada PR devolvido e contar por arquivo… | pergunta do operador: “Nos PRs devolvidos por conflito com a main nos últimos 7 dias (hoje 2), quais ar” |
-| #106 | 21/10/2026 | funcionalidade (0%) | — | Estado de dado_na_evidencia com features numéricas: o número do campo 'dado' aparece literal na… | pergunta do economista: “O Jev decide “dado_na_evidencia” com dúvida (a regra decidiu 27% de 26 vezes em ” |
-| #105 | 21/10/2026 | funcionalidade (0%) | — | TTL de lição de estrutura: marcar obsoleta se a assinatura não reincide em 6 h | pergunta do operador: “O Vigia mede a trava “3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a e” |
-| #104 | 21/10/2026 | funcionalidade (0%) | — | Estado do revisor_seguro com linhas alteradas, nº de arquivos, categoria dominante e se há teste no… | pergunta do economista: “O Jev decide “revisor_seguro” com dúvida (a regra decidiu 41% de 22 vezes em 24 ” |
-| #103 | 21/10/2026 | funcionalidade (0%) | — | Assinar lição de erro de coleta do pytest pelo módulo e exceção, e fechá-la com --collect-only… | pergunta do curador_licoes: “A lição #9 (developer:testes: ==================================== ERRORS ======” |
-| #102 | 21/10/2026 | funcionalidade (0%) | — | Pytest com alvo inexistente (exit 4) vira lição obsoleta e não conta como nova ocorrência | pergunta do curador_licoes: “A lição #27 (developer:abrir_pr: ERROR: file or directory not found: tests/test_” |
-| #101 | 21/10/2026 | funcionalidade (0%) | — | Planejador lê a hora de reset do limite de uso e retoma sozinho, sem sondar a LLM | pergunta do operador: “O Planejador não planeja porque “Claude Code no limite de uso”: essa trava é leg” |
-| #100 | 21/10/2026 | funcionalidade (0%) | — | Vigia: 3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a evolução | item #102 (loop) |
-| #99 | 21/10/2026 | funcionalidade (0%) | — | Migração: coluna origem_status e marcar itens antigos sem pergunta como 'legado' | item #133 (sub_item) |
-| #98 | 21/10/2026 | funcionalidade (0%) | — | Contrato único de saída JSON: extrator tolerante a truncamento para estudo, meta e planejador | pergunta do curador_licoes: “A lição #22 (estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters” |
-| #97 | 21/10/2026 | funcionalidade (0%) | — | Extrair erro do agente de JSON estruturado, não de fatia de texto bruto, antes de gravar a lição | pergunta do curador_licoes: “A lição #18 (developer:agente: s","fast_mode_state":"off","fast_mode_disabled_re” |
-| #96 | 21/10/2026 | funcionalidade (0%) | — | Recusar item de roteiro sem pergunta de origem antes de gastar, com causa tipada | pergunta do operador: “O neurônio rastro:cadeia foi barrado 3 de 13 vezes em 24 h: qual é a causa que s” |
-| #95 | 21/10/2026 | funcionalidade (0%) | — | Tipo Origem(pergunta_id) validado, sem DB, em circulo/roadmap.py | item #132 (sub_item) |
-| #94 | 21/10/2026 | funcionalidade (0%) | — | Dar ao estado de evidencia_sustenta o resultado medido do teste citado e as execuções seguidas | pergunta do economista: “O Jev decide “evidencia_sustenta” com dúvida (a regra decidiu 35% de 20 vezes em” |
-| #93 | 21/10/2026 | funcionalidade (0%) | — | revisar_prs: classificar a causa da falha e adiar sem gastar (rede, checks pendentes, atrás da main) | pergunta do operador: “O neurônio execucao:idle:revisar_prs foi barrado 3 de 3 vezes em 24 h: qual é a ” |
-| #92 | 21/10/2026 | funcionalidade (0%) | — | Lição #56: Corrigir erro: RuntimeError em idle:propor_feature | item #127 (erro) |
-| #91 | 21/10/2026 | funcionalidade (0%) | — | Lição #54: developer:agente: credit balance is too low — Credit balance is too low | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
-| #90 | 21/10/2026 | funcionalidade (0%) | — | Lição #53: gate:ci: checks falhando: Evidência reforçada, Container, Testes (Python 3.13), Testes… | item #118 (erro) |
-| #89 | 21/10/2026 | funcionalidade (0%) | — | Lição #50: gate:main: CI da main falhou no 93fe8ef: algo entrou quebrado | item #117 (erro) |
-| #88 | 21/10/2026 | funcionalidade (0%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #87 | 21/10/2026 | funcionalidade (0%) | — | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
-| #86 | 21/10/2026 | funcionalidade (0%) | — | Lição #44: corpo:evidencia: erros nos primeiros giros do código novo: … | item #98 (erro) |
-| #47 | 20/10/2026 | funcionalidade (0%) | — | Obter o numstat real via merge-base com a base | item #93 (sub_item) |
+| #106 | 21/10/2026 | documentacao (100%) | sim | Estado de dado_na_evidencia com features numéricas: o número do campo 'dado' aparece literal na… | pergunta do economista: “O Jev decide “dado_na_evidencia” com dúvida (a regra decidiu 27% de 26 vezes em ” |
+| #105 | 21/10/2026 | observabilidade (38%) | sim | TTL de lição de estrutura: marcar obsoleta se a assinatura não reincide em 6 h | pergunta do operador: “O Vigia mede a trava “3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a e” |
+| #104 | 21/10/2026 | observabilidade (51%) | sim | Estado do revisor_seguro com linhas alteradas, nº de arquivos, categoria dominante e se há teste no… | pergunta do economista: “O Jev decide “revisor_seguro” com dúvida (a regra decidiu 41% de 22 vezes em 24 ” |
+| #103 | 21/10/2026 | observabilidade (47%) | sim | Assinar lição de erro de coleta do pytest pelo módulo e exceção, e fechá-la com --collect-only… | pergunta do curador_licoes: “A lição #9 (developer:testes: ==================================== ERRORS ======” |
+| #102 | 21/10/2026 | correcao (72%) | sim | Pytest com alvo inexistente (exit 4) vira lição obsoleta e não conta como nova ocorrência | pergunta do curador_licoes: “A lição #27 (developer:abrir_pr: ERROR: file or directory not found: tests/test_” |
+| #101 | 21/10/2026 | correcao (72%) | sim | Planejador lê a hora de reset do limite de uso e retoma sozinho, sem sondar a LLM | pergunta do operador: “O Planejador não planeja porque “Claude Code no limite de uso”: essa trava é leg” |
+| #100 | 21/10/2026 | correcao (27%) | sim | Vigia: 3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a evolução | item #102 (loop) |
+| #99 | 21/10/2026 | correcao (36%) | sim | Migração: coluna origem_status e marcar itens antigos sem pergunta como 'legado' | item #133 (sub_item) |
+| #98 | 21/10/2026 | funcionalidade (86%) | sim | Contrato único de saída JSON: extrator tolerante a truncamento para estudo, meta e planejador | pergunta do curador_licoes: “A lição #22 (estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters” |
+| #97 | 21/10/2026 | funcionalidade (77%) | sim | Extrair erro do agente de JSON estruturado, não de fatia de texto bruto, antes de gravar a lição | pergunta do curador_licoes: “A lição #18 (developer:agente: s","fast_mode_state":"off","fast_mode_disabled_re” |
+| #96 | 21/10/2026 | correcao (81%) | sim | Recusar item de roteiro sem pergunta de origem antes de gastar, com causa tipada | pergunta do operador: “O neurônio rastro:cadeia foi barrado 3 de 13 vezes em 24 h: qual é a causa que s” |
+| #95 | 21/10/2026 | seguranca (56%) | sim | Tipo Origem(pergunta_id) validado, sem DB, em circulo/roadmap.py | item #132 (sub_item) |
+| #94 | 21/10/2026 | observabilidade (62%) | sim | Dar ao estado de evidencia_sustenta o resultado medido do teste citado e as execuções seguidas | pergunta do economista: “O Jev decide “evidencia_sustenta” com dúvida (a regra decidiu 35% de 20 vezes em” |
+| #93 | 21/10/2026 | observabilidade (63%) | sim | revisar_prs: classificar a causa da falha e adiar sem gastar (rede, checks pendentes, atrás da main) | pergunta do operador: “O neurônio execucao:idle:revisar_prs foi barrado 3 de 3 vezes em 24 h: qual é a ” |
+| #92 | 21/10/2026 | funcionalidade (41%) | sim | Lição #56: Corrigir erro: RuntimeError em idle:propor_feature | item #127 (erro) |
+| #91 | 21/10/2026 | correcao (94%) | sim | Lição #54: developer:agente: credit balance is too low — Credit balance is too low | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
+| #90 | 21/10/2026 | correcao (86%) | sim | Lição #53: gate:ci: checks falhando: Evidência reforçada, Container, Testes (Python 3.13), Testes… | item #118 (erro) |
+| #89 | 21/10/2026 | correcao (87%) | sim | Lição #50: gate:main: CI da main falhou no 93fe8ef: algo entrou quebrado | item #117 (erro) |
+| #88 | 21/10/2026 | correcao (86%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
+| #87 | 21/10/2026 | correcao (78%) | sim | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
+| #86 | 21/10/2026 | correcao (81%) | — | Lição #44: corpo:evidencia: erros nos primeiros giros do código novo: … | item #98 (erro) |
+| #47 | 20/10/2026 | correcao (74%) | — | Obter o numstat real via merge-base com a base | item #93 (sub_item) |
 | #46 | 20/10/2026 | funcionalidade (0%) | — | Lição #2: corpo:atualizar: > with pytest.raises(RuntimeError): # o erro do incidente, sem o caminho… | item #30 (erro) |
 | #45 | 20/10/2026 | funcionalidade (0%) | — | Comparar o total com o limite de tamanho e devolver veredito | item #92 (sub_item) |
 | #43 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 56 · **funcionalidade** 56 · **correcao** 42 · 
 | #15 | 19/10/2026 | observabilidade (68%) | sim | Developer: ao chegar a 3 falhas, dividir o item e repetir só o sub-item que falhou, com o erro anterior | — |
 | #14 | 18/10/2026 | seguranca (82%) | sim | Developer: proteger a constituição em camadas (somente leitura + reversão pós-edição + lista no prompt) | — |
 | #13 | 18/10/2026 | seguranca (78%) | sim | Curador de lições: unir por node id e fechar por reexecução verde isolada do main, reabrindo na falha | — |
-| #11 | 18/10/2026 | documentacao (0%) | sim | Developer: ruff --fix determinístico + 1 rodada de reparo com saída focada antes do PR | — |
-| #10 | 18/10/2026 | correcao (64%) | — | Expor métricas do loop via prometheus_client (/metrics) e dashboard Grafana opcional | — |
