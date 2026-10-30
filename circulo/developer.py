@@ -35,7 +35,7 @@ CAUSA_ALVO = "alvo_inexistente"
 ALVO_INEXISTENTE = f"{REPARO}:{CAUSA_ALVO}"   # uma lição, seja qual for o teste citado (lições #31 e #35)
 NAO_COLETADO = (4, 5)                       # pytest: id não achado (erro de uso) e nenhum teste coletado
 
-LIMITE_PASSOS = 40                          # o --max-turns padrão do ClaudeCodeAgent
+LIMITE_PASSOS = 80                          # o --max-turns padrão do ClaudeCodeAgent (1.70: 40 → 80)
 PASSOS_BASE, PASSOS_POR_ARQUIVO, PASSOS_POR_FUNCAO = 8, 6, 3   # ler/testar/lint/commit; ler e editar; editar e testar
 LIMIAR_INICIAL, PERCENTIL, MIN_AMOSTRAS = 0.8, 0.2, 5
 PASSOS = "developer_passos"                 # kv: título da tarefa -> {"fracao", "limite", "em"}

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.70.0 — 2026-10-30
+
+**Regra: o loop nunca para de evoluir. Agentes de validação entre o Developer e o PR. Sem limite de tokens.**
+
+- Diagnóstico (29/10): 6 PRs de código até 01:52 e depois 18 h em marcha lenta — a lição estrutural #47 segurava o
+  Planejador ("primeiro corrige, depois evolui"), o Jev adiava o item da correção a cada hora por "evidência
+  insuficiente", a fila esvaziou e o Vigia só repetia "nada na fila". Ao destravar (20:28), o Developer falhou no
+  `git add -A` por uma pasta `.shim297/…/repo/` (clone de fixture sem commit, deixado pelo agente) e nasceu a lição #87,
+  que travou tudo de novo. Decisão do Cássio: continuar evoluindo sempre, validar com agentes, sem limite de tokens.
+- **Nunca parar** (`licoes.bloqueia_evolucao`, `TRAVA_ESTRUTURAL_S`): a lição estrutural aberta segura o Planejador
+  por no máximo 30 min desde que (re)abriu — tempo de a correção entrar primeiro; depois a evolução segue em paralelo,
+  com `correcao_na_frente` na evidência do Planejador (o item de erro continua à frente da fila).
+- **Corrigir erro próprio nunca espera evidência** (`self_dev.run_once`): item de origem `erro` não passa pelo
+  `should_evolve` — o erro é a evidência; o custo de não corrigir é o loop parado. Itens planejados seguem a regra do Jev.
+- **Agentes de validação** (`circulo/validador.py`, pela porta do `revisor`): (1) `validar_worktree` roda depois de
+  toda saída do agente de código e apaga o que nunca deveria virar commit (`.shim*`, caches, repositório aninhado) com
+  registro em `verificacoes` (`validador:worktree`) — a lição #87 fica impossível; (2) `revisar_pr`, revisor
+  independente (LLM no papel `validador`, modelo escolhido pelo Jev, chamada registrada) lê o diff depois dos portões e
+  só reprova com problema concreto; reprovado = UMA rodada de correção local e os portões de novo, nunca descarte; sem
+  LLM ou sem JSON = aprovado. `.shim*/` entrou no `.gitignore` e a pasta `.shim259` que dois PRs do loop tinham
+  commitado saiu do repositório.
+- **Velocidade**: Claude Code com 80 passos e 60 min (eram 40/30: lição #59 reincidiu 24 vezes); `PISO_TETO` de
+  tokens por item 100k → 400k e `_reabrir_teto`: a árvore bloqueada pelo disjuntor do teto volta sozinha quando o teto
+  de hoje comporta o que ela gastou (item #115 parado 17 h "até o Arquiteto dividir"); Planejador com `MAX_POR_DIA` 48,
+  `FOLGA` 3 e `INTERVALO` 10 min. O orçamento continua só medindo: nenhum limite de tokens foi adicionado.
+- Testes: `tests/test_nunca_parar.py`, `tests/test_validador.py`; `test_licao_59_risco_de_passos…` fixa o agente em 40
+  passos (a fração é do limite do agente em uso).
+
 ## 1.69.2 — 2026-10-28
 
 **Cobrança do prazo de 48 h do Norte: a cadeia girava em falso — o conselho para de insistir.**

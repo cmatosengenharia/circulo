@@ -187,9 +187,9 @@ def s_licao_bloqueia(s, now):
     r = s.one("SELECT COUNT(*) n, MIN(COALESCE(aberta_em, created_at)) em FROM licoes WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente')")
     if not r["n"] or now - float(r["em"] or now) < LICAO_BLOQUEIA:
         return None
-    return {"chave": "licao_bloqueia", "titulo": f"{r['n']} lição(ões) de estrutura aberta(s) há {int((now - r['em']) / 3600)} h bloqueando a evolução",
+    return {"chave": "licao_bloqueia", "titulo": f"{r['n']} lição(ões) de estrutura aberta(s) há {int((now - r['em']) / 3600)} h sem correção entregue",
             "evidencia": {"licoes": r["n"], "ha_horas": round((now - r["em"]) / 3600, 1)}, "gravidade": 0.8,
-            "sugestao": "o Developer precisa corrigir a lição antes de qualquer evolução; ver por que o item dela não anda"}
+            "sugestao": "a evolução segue (1.70: a trava do Planejador dura 30 min), mas a correção não chega: ver por que o item dela não anda"}
 
 
 def s_jev_duvida(s, now):

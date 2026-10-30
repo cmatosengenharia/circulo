@@ -31,6 +31,7 @@ from typing import Any
 
 from .decision import Decision, Question, SN
 from .diff_size import parse_numstat
+from .validador import feedback_validador as feedback_validador, revisar_pr as revisar_pr, validar_worktree as validar_worktree  # a porta do Validador (1.70) para a constituição
 
 MAX_PRS_ABERTOS = 3           # PRs do Developer abertos ao mesmo tempo
 SEGURO_MIN = 0.5              # p(seguro) abaixo disso, com confiança, o Jev rejeita mesmo sem problema medido

@@ -35,12 +35,12 @@ from .licoes import titulo_curto
 from .merge_gate import CONSTITUICAO
 from .roadmap import SemPerguntaOrigem, exigir_pergunta, gravar_item
 
-MAX_POR_DIA = 24            # antes 6: no Mac o teto parou o loop por 10 h com 3 perguntas validadas esperando (19/10)
-FREIO_POR_DIA = 6           # teto quando a qualidade cai (maioria dos últimos PRs fechada sem merge)
-INTERVALO = 900             # com um item já na fila: planeja o próximo com calma
+MAX_POR_DIA = 48            # 1.70: dobrado (24 segurava 2 por hora); antes 6: o teto parou o loop por 10 h (19/10)
+FREIO_POR_DIA = 8           # teto quando a qualidade cai (maioria dos últimos PRs fechada sem merge)
+INTERVALO = 600             # com um item já na fila: planeja o próximo com calma (1.70: 15 → 10 min)
 INTERVALO_RAPIDO = 120      # fila vazia: o Developer vai ficar parado, planeja já
 GATE = "planejador_gate"    # kv: por que o planejador não planejou agora (medido)
-FOLGA = 2                 # itens prontos ou a caminho na fila antes de o planejador parar de planejar
+FOLGA = 3                 # itens prontos ou a caminho na fila antes de o planejador parar (1.70: 2 → 3, um por PR paralelo)
 EST_TOKENS = 3000
 MAX_TOKENS = 1500   # lição: com 700 a resposta (em português, detalhada) era cortada e o JSON ficava inválido
 PORTEIRO = "porteiro_planejador"   # kv: decisão do porteiro worth_spending.idle_evolution sobre a pergunta, a cada ciclo
@@ -130,7 +130,8 @@ class Planejador:
             return f"{FILA_CHEIA} ({fila} itens)"
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
-            return "lição estrutural aberta: primeiro corrige, depois evolui"
+            # a trava vence sozinha (licoes.TRAVA_ESTRUTURAL_S): depois disso a correção segue na frente da fila e a evolução anda junto
+            return "lição estrutural aberta: a correção entra primeiro (trava de meia hora; o loop nunca para de evoluir)"
         espera = INTERVALO_RAPIDO if fila == 0 else INTERVALO
         desde = time.time() - float((self.s.get("planejador") or {}).get("em", 0))
         if desde < espera and not no_giro:
@@ -173,6 +174,10 @@ class Planejador:
             "rodadas_revisao_7d": rodadas_revisao.resumo_7d(s),
             "verificacoes_24h": (getattr(self.ctx, "licoes", None).resumo()["verificacoes_24h"]
                                  if getattr(self.ctx, "licoes", None) is not None else []),
+            # lição de estrutura aberta cuja trava já venceu: a correção segue na frente da fila; o item novo não pode depender dela
+            "correcao_na_frente": [f"lição #{r['id']} {r['assinatura']}" for r in s.q(
+                "SELECT id, assinatura FROM licoes WHERE classe='estrutural' AND status IN ('aberta','em_correcao','reincidente') "
+                "ORDER BY id DESC LIMIT 3")],
         }
 
     def montar_prompt(self, pergunta, personas: dict | None = None, ev: dict | None = None) -> str:
