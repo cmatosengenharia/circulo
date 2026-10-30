@@ -1,0 +1,84 @@
+"""Pergunta #533: pares (entrada normalizada → decisão) que o Jev repete com o mesmo resultado viram regra determinística
+consultada antes do Jev; a regra é auditada contra o Jev e desligada se divergir mais de 10%."""
+import json
+import time
+
+from circulo import aluno, regras
+from circulo.decision import SN, Decision, Question
+
+Q = Question("noul", "A trava `achados.0.titulo` é real?", SN("sim", "não"))
+
+
+class Jev:
+    """Jev que conta chamadas e responde sempre o mesmo valor."""
+    source = "jev"
+    model = "jev-1.13.0"
+
+    def __init__(self, valor=0.9):
+        self.valor, self.chamadas = valor, []
+
+    def ask_many(self, state, questions):
+        self.chamadas.append(sorted(questions))
+        return {qid: Decision(qid, q.kind, self.valor, 0.8, "jev") for qid, q in questions.items()}, 10
+
+
+def _decisoes(s, pergunta, estado, valores, idade=3600):
+    for v in valores:
+        s.x("INSERT INTO decisions(tick,question,value,confidence,source,created_at,estado) VALUES(0,?,?,0.8,'jev',?,?)",
+            (pergunta, json.dumps(v), time.time() - idade, aluno.compactar(estado)))
+
+
+def _estado(i):
+    return {"achados": [{"titulo": f"Item #{i} parado", "gravidade": 0.7}]}
+
+
+def test_tres_pares_mais_repetidos_e_consistentes_viram_regra_com_n_e_taxa(circle):
+    s = circle.store
+    _decisoes(s, "vigia_trava_0", _estado(1), [0.9] * 30)
+    _decisoes(s, "vigia_trava_0", _estado(2), [0.1] * 25)
+    _decisoes(s, "vigia_acao_0", _estado(3), [0.8] * 23 + [0.2])          # 23/24 = 96 %
+    _decisoes(s, "vigia_acao_0", _estado(4), [0.9] * 21)                  # 4º: fica de fora
+    _decisoes(s, "vigia_acao_0", _estado(5), [0.9] * 15 + [0.1] * 10)     # inconsistente
+    _decisoes(s, "vigia_acao_0", _estado(6), [0.9] * 19)                  # n < 20
+    _decisoes(s, "vigia_acao_0", _estado(7), [0.9] * 40, idade=8 * 86400)  # fora dos 7 dias
+    promovidas = regras.promover(s)
+    assert [(r["question"], r["n"]) for r in promovidas] == [("vigia_trava_0", 30), ("vigia_trava_0", 25), ("vigia_acao_0", 24)]
+    assert promovidas[2]["taxa"] == round(23 / 24, 4)
+    assert s.one("SELECT COUNT(*) c FROM regras_jev WHERE ativa=1")["c"] == 3
+
+
+def test_par_promovido_e_decidido_sem_chamar_o_jev(circle):
+    s = circle.store
+    _decisoes(s, "indaga_pert_0", _estado(1), [0.9] * 20)
+    regras.promover(s)
+    circle.ctx.dl.jev = jev = Jev()
+    d = circle.ctx.dl.ask_many(_estado(1), {"indaga_pert_0": Q})["indaga_pert_0"]
+    assert jev.chamadas == [] and d.source == "local" and d.value == 0.9
+    circle.ctx.dl.ask_many(_estado(99), {"indaga_pert_0": Q})                # entrada sem regra: o Jev decide
+    assert jev.chamadas == [["indaga_pert_0"]]
+
+
+def test_decisao_divergente_do_jev_desliga_a_regra_e_o_jev_volta_a_decidir(circle):
+    s = circle.store
+    _decisoes(s, "indaga_pert_0", _estado(1), [0.9] * 20)
+    regras.promover(s)
+    circle.ctx.dl.jev = jev = Jev(valor=0.1)
+    for _ in range(regras.AUDITAR_A_CADA):
+        circle.ctx.dl.ask_many(_estado(1), {"indaga_pert_0": Q})
+    assert len(jev.chamadas) == 1                                           # só a auditoria chamou o Jev
+    r = s.one("SELECT ativa, conferidas, erros FROM regras_jev")
+    assert (r["ativa"], r["conferidas"], r["erros"]) == (0, 1, 1)
+    d = circle.ctx.dl.ask_many(_estado(1), {"indaga_pert_0": Q})["indaga_pert_0"]
+    assert len(jev.chamadas) == 2 and d.source == "jev"
+    assert regras.promover(s) == []                                         # desligada não volta sozinha
+
+
+def test_regra_que_concorda_com_o_jev_continua_ligada(circle):
+    s = circle.store
+    _decisoes(s, "indaga_pert_0", _estado(1), [0.9] * 20)
+    regras.promover(s)
+    circle.ctx.dl.jev = Jev(valor=0.85)
+    for _ in range(regras.AUDITAR_A_CADA):
+        circle.ctx.dl.ask_many(_estado(1), {"indaga_pert_0": Q})
+    r = s.one("SELECT ativa, usos, conferidas, erros FROM regras_jev")
+    assert (r["ativa"], r["usos"], r["conferidas"], r["erros"]) == (1, regras.AUDITAR_A_CADA - 1, 1, 0)
