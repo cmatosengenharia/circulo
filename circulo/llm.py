@@ -265,6 +265,62 @@ def build_llm():
         return None
 
 
+# A/B de modelo menor por papel: a flag `modelo_menor:<papel>` (kv, desligada por padrão) manda 10% das chamadas ao
+# modelo pequeno. O balde sai de um hash salgado com o nome do experimento: estável por id e independente entre papéis.
+BALDES, FATIA_MENOR, MIN_POR_BRACO, MIN_FALHAS_MENOR = 10_000, 1_000, 30, 2
+
+
+def _flag(papel: str) -> str:
+    return f"modelo_menor:{papel}"
+
+
+def balde(papel: str, chave) -> int:
+    import hashlib
+    return int(hashlib.sha256(f"{_flag(papel)}:{chave}".encode()).hexdigest(), 16) % BALDES
+
+
+def ligar_modelo_menor(store, papel: str) -> None:
+    store.set(_flag(papel), {"ligada": True, "desde": time.time()})
+
+
+def variante(store, papel: str, chave) -> str | None:
+    """None com a flag desligada; senão 'menor' ou 'controle'."""
+    if not (store.get(_flag(papel)) or {}).get("ligada"):
+        return None
+    return "menor" if balde(papel, chave) < FATIA_MENOR else "controle"
+
+
+def modelo_da_variante(modelo: str, var: str | None) -> str:
+    return next(m for m, p in PORTE_ANTHROPIC.items() if p == "pequena") if var == "menor" else modelo
+
+
+def reverter_se_preciso(store, papel: str) -> str | None:
+    """Desliga a flag se o menor tem ≥2 falhas e taxa acima da do controle, ou se, com n≥30 por braço, os tokens por
+    item aceito não caem em relação ao controle. Devolve o motivo, ou None se o experimento segue."""
+    flag = store.get(_flag(papel)) or {}
+    if not flag.get("ligada"):
+        return None
+    br = {r["variante"]: r for r in store.q(
+        "SELECT variante, COUNT(*) n, SUM(ok=0) f, SUM(tokens) t, SUM(aceita=1) a FROM llm_calls "
+        "WHERE papel=? AND variante IS NOT NULL AND created_at>=? GROUP BY variante", (papel, flag.get("desde", 0)))}
+    m, c = br.get("menor"), br.get("controle")
+    if not m:
+        return None
+    taxa_c = (c["f"] or 0) / c["n"] if c else 0.0
+
+    def por_aceito(r) -> float:
+        return r["t"] / r["a"] if r["a"] else float("inf")
+
+    motivo = None
+    if (m["f"] or 0) >= MIN_FALHAS_MENOR and m["f"] / m["n"] > taxa_c:
+        motivo = f"falhas: menor {m['f']}/{m['n']} acima do controle {taxa_c:.0%}"
+    elif c and min(m["n"], c["n"]) >= MIN_POR_BRACO and por_aceito(m) >= por_aceito(c):
+        motivo = f"tokens por item aceito: menor {por_aceito(m):.0f} ≥ controle {por_aceito(c):.0f}"
+    if motivo:
+        store.set(_flag(papel), {**flag, "ligada": False, "revertida_em": time.time(), "motivo": motivo})
+    return motivo
+
+
 def descricao() -> str:
     """Para o painel e o diagnóstico: provedor e modelos em uso, sem chave."""
     nome = provedor()

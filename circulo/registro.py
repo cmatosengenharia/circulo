@@ -18,7 +18,8 @@ from .state import Store
 
 def registrar(store: Store, *, tick: int, project_id: int | None, papel: str, modelo: str, escolha: dict | None = None,
               tokens: int = 0, duracao_ms: int | None = None, ok: bool = True, erro: str | None = None,
-              entrada: str = "", saida: str = "", uso: LLMResult | None = None, retry: int = 0) -> int:
+              entrada: str = "", saida: str = "", uso: LLMResult | None = None, retry: int = 0,
+              variante: str | None = None) -> int:
     """`uso` é a resposta da LLM: dela saem o custo e o uso separado em entrada, saída e cache. `retry` = 1 na repetição."""
     e = escolha or {}
     if uso is not None:
@@ -26,11 +27,11 @@ def registrar(store: Store, *, tick: int, project_id: int | None, papel: str, mo
     detalhe = (uso.entrada, uso.saida, uso.cache_lido, uso.cache_escrito) if uso is not None else (None,) * 4
     return store.x(
         "INSERT INTO llm_calls(tick,project_id,papel,modelo,nivel,decidido_por,confianca,contexto,tokens,duracao_ms,ok,erro,entrada,saida,"
-        "tokens_entrada,tokens_saida,cache_lido,cache_escrito,job,retry,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "tokens_entrada,tokens_saida,cache_lido,cache_escrito,job,retry,variante,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (tick, project_id, papel, modelo, e.get("nivel"), e.get("decidido_por", "fixo"), e.get("confianca"),
          json.dumps(e.get("contexto") or {}, ensure_ascii=False, default=str)[:2000], int(tokens or 0), duracao_ms,
          int(bool(ok)), (erro or None) and erro[:500], (entrada or "")[:400], (saida or "")[:600], *detalhe,
-         jobs.da_missao(store, project_id), int(retry), time.time()))
+         jobs.da_missao(store, project_id), int(retry), variante, time.time()))
 
 
 def tokens_retry(store: Store, dias: int = 7) -> dict[str, int]:
