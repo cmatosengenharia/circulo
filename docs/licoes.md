@@ -90,4 +90,4 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 85 | developer:agente:n_started_in_background:_n_max_depth:_n_ | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 2089 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 86 | developer:agente:unset:_n_started_in_background:_n_max_de | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 2086 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 87 | incidente:37e8abc2882fd909 | estrutural | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
-| 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | validada | 1 | 0 | Não repetir: developer:agente: nd: n max depth: n spawned by subagents: — nd": 0, "max_depth": 0, "spawned_by_subagents" |
+| 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | evidenciada | 1 | 0 | Não repetir: developer:agente: nd: n max depth: n spawned by subagents: — nd": 0, "max_depth": 0, "spawned_by_subagents" |
