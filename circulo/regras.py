@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import statistics
 import time
 from collections import Counter, defaultdict
@@ -200,6 +201,50 @@ def avaliar(store, regra_id: int, agora: float | None = None) -> bool:
     store.x("UPDATE regras_jev SET assumiu_em=?, concordancia_inf=? WHERE id=?",
             ((r["assumiu_em"] or agora) if assume else None, round(inf, 4), regra_id))
     return assume
+
+
+_FORTE = ((re.compile(r"[\w.\-]*/[\w./\-]*|[\w\-]+\.(?:py|md|json|html|txt|ya?ml|toml)\b"), "<caminho>"),
+          (re.compile(r"#\d+"), "#<id>"), (re.compile(r"\d+"), "<n>"))
+
+
+def _forte(v: Any) -> Any:
+    """Sobre a entrada já normalizada: caminhos, ids (#N) e números dentro dos textos viram marcadores."""
+    if isinstance(v, str):
+        for padrao, marca in _FORTE:
+            v = padrao.sub(marca, v)
+        return v
+    if isinstance(v, list):
+        return [_forte(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _forte(x) for k, x in v.items()}
+    return v
+
+
+def entrada_forte(e: str) -> str:
+    return json.dumps(_forte(json.loads(e)), ensure_ascii=False, sort_keys=True)
+
+
+def auditar(store, agora: float | None = None) -> list[dict]:
+    """Só leitura (pergunta #540): reprocessa as decisões da janela em cada regra ligada, com a entrada como a regra a
+    compara (acionou) e com a normalização forte (quase_acionou: casaria só depois de normalizar). Regra sem
+    acionamento leva o rótulo 'falta normalização' se quase acionou, senão 'específica demais'."""
+    _esquema(store)
+    agora = agora or time.time()
+    vistas: dict[str, str] = {}
+    saida = []
+    for r in store.q("SELECT id, question, entrada FROM regras_jev WHERE ativa=1 ORDER BY id"):
+        forte, acionou, quase = entrada_forte(r["entrada"]), 0, 0
+        for d in store.q("SELECT estado FROM decisions WHERE question=? AND estado IS NOT NULL AND created_at>=?",
+                         (r["question"], agora - JANELA)):
+            e = vistas.setdefault(d["estado"], entrada(d["estado"]))
+            if e == r["entrada"]:
+                acionou += 1
+            elif entrada_forte(e) == forte:
+                quase += 1
+        rot = None if acionou else ("falta normalização" if quase else "específica demais")
+        saida.append({"id": r["id"], "question": r["question"], "entrada": r["entrada"], "acionou": acionou,
+                      "quase_acionou": quase, "rotulo": rot})
+    return saida
 
 
 def desfechos(store) -> int:
