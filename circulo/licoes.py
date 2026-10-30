@@ -666,6 +666,7 @@ class Licoes:
     def checar_testes(self, sha: str, rodar, impressao=None) -> list[str]:
         """`rodar(node_id)` devolve o exit code do pytest no main em `sha` (None = sem resultado);
         `impressao(node_id)`, a impressão do teste emprestado pelo alias (None = o teste não existe)."""
+        from .prevencao import pede_stub
         tick, agora, log = self.s.tick, time.time(), []
         for lic in self._a_rodar(sha):
             checagens = json.loads(lic.get("checagens") or "[]")
@@ -686,7 +687,7 @@ class Licoes:
                     self.s.x("UPDATE licoes SET status='obsoleta' WHERE id=?", (lic["id"],))
                     log.append(f"lição #{lic['id']} obsoleta")
             elif aberta and len(ultimas) == VERDES_PARA_FECHAR and all(c["exit"] == 0 for c in ultimas) \
-                    and len({c.get("teste") for c in ultimas}) == 1:
+                    and len({c.get("teste") for c in ultimas}) == 1 and not pede_stub(lic):
                 self.s.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=? WHERE id=?",
                          (tick, f"Fechada: {node} passou no main (sha {sha[:12]}, exit 0 em {VERDES_PARA_FECHAR} "
                                 f"execuções seguidas{', alias da causa' if alias else ''}); não repetir: {lic['descricao']}",
@@ -708,16 +709,15 @@ class Licoes:
     def reclassificar_ambiente(self) -> list[int]:
         """Lição aberta como 'estrutural' cujo erro é de ambiente (GitHub 502, rede, limite) vira 'ambiente' e solta o
         item que abriu. No Mac (19/10) um 'HTTP Error 502: Bad Gateway' travou o planejador por ser lido como erro do loop."""
-        ids = []
-        for r in self.s.q("SELECT id, descricao, item_id FROM licoes WHERE classe!='ambiente' AND status IN ('aberta','em_correcao','reincidente')"):
-            if not AMBIENTE.search(r["descricao"] or ""):
+        from .prevencao import ambiente_provado
+        ids, agora = [], time.time()
+        for r in self.s.q("SELECT * FROM licoes WHERE classe!='ambiente' AND status IN ('aberta','em_correcao','reincidente')"):
+            if not ambiente_provado(self.s, dict(r)):
                 continue
-            agora = time.time()
             self.s.x("UPDATE licoes SET classe='ambiente', prevencao=?, updated_at=? WHERE id=?",
                      (f"Erro de ambiente (não é do loop): {r['descricao']}"[:500], agora, r["id"]))
-            if r["item_id"]:
-                self.s.x("UPDATE roadmap SET status='descartado', evidencia=?, updated_at=? WHERE id=? AND status='pendente'",
-                         ("lição reclassificada como ambiente: não é erro do loop", agora, r["item_id"]))
+            self.s.x("UPDATE roadmap SET status='descartado', evidencia=?, updated_at=? WHERE id=? AND status='pendente'",
+                     ("lição reclassificada como ambiente: não é erro do loop", agora, r["item_id"]))
             self.reply(f"Lição #{r['id']} reclassificada: era erro de ambiente, não do loop; não trava mais a evolução.", "licao")
             ids.append(r["id"])
         return ids
