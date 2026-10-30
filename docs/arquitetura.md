@@ -69,7 +69,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `graph.py` | 182 | Grafo de missões: as missões se conhecem, compartilham memória e contexto, e se integram. |
 | `guardrails.py` ⚖️ | 153 | Guardrails da autoevolução (Prompt Mestre §11) que não cabem em outro lugar. |
 | `harness_lab.py` | 117 | Evolução do harness: A/B online de prompts de papel (estilo otimização de prompts), sempre com gates. |
-| `higiene.py` | 93 | Higiene do roteiro e das lições — o que as telas mostravam em 20/10: itens "dependem de você" que ninguém olha há dias, títulos de 500 caracteres com JSON dentro, a mesma falha do agente em várias lições (uma por ponto de truncamento). |
+| `higiene.py` | 100 | Higiene do roteiro e das lições — o que as telas mostravam em 20/10: itens "dependem de você" que ninguém olha há dias, títulos de 500 caracteres com JSON dentro, a mesma falha do agente em várias lições (uma por ponto de truncamento). |
 | `impressao_pr.py` | 30 | Impressão digital de PR: título normalizado + conjunto de checks falhos, num hash. |
 | `incidents.py` | 134 | Registro de erros e autocorreção em tempo de execução. |
 | `indagador.py` | 540 | Indagador: o agente da autoevolução. Faz as perguntas certas para cada missão, e o Jev classifica cada uma. |
@@ -114,7 +114,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 29 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 626 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `perguntas.py` | 627 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
 | `planejador.py` | 567 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
 | `policy.py` ⚖️ | 282 | Política do círculo: versionada, com guard que impede a auto-evolução de remover proteções. |
@@ -140,7 +140,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `state.py` | 752 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
 | `status.py` | 57 | Estado do loop para humanos, derivado do batimento + controles + etapa. Usado pelo painel. |
 | `telemetria.py` | 422 | Trilha de eventos tipados do loop, no vocabulário OpenTelemetry GenAI, e o painel de timeline + grafo. |
-| `telemetria_sem_erro.py` | 37 | Lição #83: um dump de estatística (subagent_stats com completed/failed/killed/spawned) não é erro. |
+| `telemetria_sem_erro.py` | 51 | Lição #83: um dump de estatística (subagent_stats com completed/failed/killed/spawned) não é erro. |
 | `tema.py` | 210 | Tema único das telas do loop: as cores, os botões, os chips e a legenda são os mesmos em todas as páginas. |
 | `trabalho.py` | 266 | Meu trabalho: a tela que junta o dia a dia do engenheiro — assuntos, daily, links, orçamento de IA, contexto para o Cursor e o mapa do GAIA — e a semente de dados de exemplo que deixa o esqueleto inteiro funcionando antes do dado real. |
 | `uso_entregas.py` | 83 | Entregas de produto sem uso: os PRs de produto mergeados há 7 dias ou mais sem nenhum evento com o nome do `evento_esperado` gravado no merge depois do `merged_at`. Uso anterior ao merge não conta: é de antes da entrega. O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, em `entrega_uso` (gravado pela rota do painel chamada, com o último instante por nome) e nos `events` do loop (kind). |
