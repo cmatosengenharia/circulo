@@ -6,7 +6,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
 | 59 | developer:agente:maximo_de_passos | trabalho | validada | 24 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
-| 15 | rastro:lacuna | trabalho | validada | 18 | 8 | Checagem: teste tests/test_licao_15_regressao.py; não repetir: rastro:cadeia: item planejado pelo loop sem a pergunta do |
+| 15 | rastro:lacuna | trabalho | obsoleta | 18 | 8 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 47 | loop:estagnado | estrutural | reincidente | 17 | 8 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |
 | 60 | painel:frescor_atrasado | ambiente | obsoleta | 211 | 3 | Obsoleta por prazo: evidenciada há 5567 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
@@ -62,7 +62,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 58 | developer:testes:teste:tests/test_ci_indisponivel.py::test_espera_de_c | trabalho | evidenciada | 2 | 0 | Fechada: tests/test_ci_indisponivel.py::test_espera_de_ci_nao_iniciado_cai_assim_que_os_jobs_rodam passou no main (sha 4 |
 | 64 | developer:base:teste:tests/test_memoria.py::test_estudo_parecido_e_ite | trabalho | evidenciada | 2 | 0 | Fechada: tests/test_memoria.py::test_estudo_parecido_e_item_parecido passou no main (sha 4582daeebe18, exit 0 em 2 execu |
 | 66 | developer:abrir_pr:- reprodução primeiro: os testes novos já passam n | trabalho | obsoleta | 2 | 0 | Obsoleta por prazo: evidenciada há 15091 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
-| 89 | developer:testes:teste:tests/test_decision.py::test_jev_fora_do_ar_nao | ambiente | aberta | 2 | 0 | Erro de ambiente (não é do loop): developer:testes: raise TimeoutError("timeout") |
+| 89 | developer:testes:teste:tests/test_decision.py::test_jev_fora_do_ar_nao | desconhecida | sem_prevencao | 2 | 0 | Sem prevenção verificável: causa desconhecida, o timeout não prova erro de ambiente; falta tests/test_licao_89_regressao |
 | 5 | developer:testes:teste:tests/test_camadas.py::test_merge_vira_marco_no | trabalho | evidenciada | 1 | 0 | Fechada: tests/test_camadas.py::test_merge_vira_marco_no_grafico passou no main (sha 960bf25528e3, exit 0 em 2 execuções |
 | 6 | developer:lint:lint:B905 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 18575 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 10 | developer:reparo:- constituição intacta: altera a constituição: .gi | trabalho | evidenciada | 1 | 0 | Não repetir: developer:reparo: rodada 1/1 não resolveu; 15041 tokens |
@@ -89,5 +89,5 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 84 | developer:testes:lint:B007,B905,E501 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 3049 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 85 | developer:agente:n_started_in_background:_n_max_depth:_n_ | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 2089 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 86 | developer:agente:unset:_n_started_in_background:_n_max_de | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 2086 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
-| 87 | incidente:37e8abc2882fd909 | estrutural | validada | 1 | 0 | Já corrigido (lição #87 · erro não ocorre há 200 giros); checagem: portão #53 teste de regressão marcado com a lição #87 |
-| 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | aberta | 1 | 0 | Não repetir: developer:agente: nd: n max depth: n spawned by subagents: — nd": 0, "max_depth": 0, "spawned_by_subagents" |
+| 87 | incidente:37e8abc2882fd909 | estrutural | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
+| 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | validada | 1 | 0 | Não repetir: developer:agente: nd: n max depth: n spawned by subagents: — nd": 0, "max_depth": 0, "spawned_by_subagents" |

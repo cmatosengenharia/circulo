@@ -50,10 +50,13 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 58 · **correcao** 56 · **funcionalidade** 40 · **seguranca** 22 · **documentacao** 20 · **velocidade** 4.
+Por tipo: **correcao** 58 · **observabilidade** 56 · **funcionalidade** 40 · **seguranca** 22 · **documentacao** 20 · **velocidade** 4.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #261 | 30/10/2026 | correcao (87%) | sim | Reabrir lição evidenciada cujo teste de 'Fechada:' sumiu, foi renomeado ou está skip/xfail | pergunta do curador_licoes: “Lições como #12 e #7 estão 'evidenciada' com Prevenção 'Fechada: tests/...::test” |
+| #260 | 30/10/2026 | correcao (87%) | sim | Prevenção: 'erro de ambiente' só com evidência; timeout em teste de resiliência fica aberto | pergunta do operador: “A lição #89 mostra test_jev_fora_do_ar_nao_para_o_circulo falhando com TimeoutEr” |
+| #259 | 30/10/2026 | documentacao (94%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #258 | 30/10/2026 | funcionalidade (47%) | sim | Auditar regras mortas: reprocessar decisões de 7d com entrada normalizada e listar regras com 0… | pergunta do analista_reincidencia: “Das regras determinísticas que já existem, quantas não decidiram nada nos último” |
 | #257 | 30/10/2026 | funcionalidade (51%) | sim | Regra promovida roda em sombra e só assume com limite inferior de concordância ≥90% | pergunta do analista_reincidencia: “Quando uma regra for promovida (por exemplo, as dos pares repetidos de entrada e” |
 | #256 | 30/10/2026 | funcionalidade (77%) | sim | Regra de causa-raiz de CI: com ≥3 checks falhando juntos, agir só sobre o primeiro da ordem de… | pergunta do analista_reincidencia: “A lição #53 mostra 7 checks de CI falhando juntos (Constituição, Container, Test” |
@@ -251,6 +254,3 @@ Por tipo: **observabilidade** 58 · **correcao** 56 · **funcionalidade** 40 · 
 | #24 | 19/10/2026 | correcao (46%) | sim | Planejador no mesmo giro da pergunta validada, 1 retry com jitter e espera por sub-etapa gravada | pergunta do operador: “A etapa “da pergunta validada ao item do roteiro (Planejador + porteiro)” levou ” |
 | #23 | 19/10/2026 | correcao (42%) | sim | Canário de falha para painel:frescor: provar com teste que o ponto detecta painel velho | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
 | #22 | 19/10/2026 | observabilidade (65%) | — | Vigia: recusa do porteiro não é trava; limitar espera da pergunta com prazo máximo e envelhecimento | — |
-| #21 | 19/10/2026 | documentacao (0%) | sim | Registrar o job de cada pedido humano (regra do Jev, limiar calibrado) e antecipar jobs recorrentes | — |
-| #20 | 19/10/2026 | observabilidade (38%) | — | Gravar o id do item na falha local ao registrá-la; nunca agregar por caminho .circulo-wt-* | — |
-| #19 | 19/10/2026 | observabilidade (51%) | — | Vigia: registrar o resultado real de cada tentativa do planejador e diagnosticar a trava por ele | — |
