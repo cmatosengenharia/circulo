@@ -240,3 +240,19 @@ def test_card_ao_vivo_nao_recalcula_dias_de_historico(circle, monkeypatch):
         time.sleep(0.02)
     assert ids(confianca(circle.store, t1 + 1))["slos"]["dado_em"] == t1
     assert quem and threading.current_thread() not in quem, "histórico recalculado na thread que empurra o card"
+
+
+def test_versao_do_painel_muda_quando_o_servidor_do_card_muda(tmp_path):
+    """lição #60 (painel:frescor_atrasado, p99 3562 → 3583 ms depois do #264): a versão era o hash só do painel.html;
+    o #264 mudou o servidor (confianca.py) e a janela de 24 h seguiu julgando amostras de antes do conserto. A versão
+    é a do código que produz o que a tela mostra: qualquer arquivo do pacote muda a versão."""
+    from circulo.confianca import versao_do_codigo
+    (tmp_path / "painel.html").write_text("<html></html>")
+    (tmp_path / "confianca.py").write_text("x = 1\n")
+    antes = versao_do_codigo(tmp_path)
+    assert versao_do_codigo(tmp_path) == antes
+    (tmp_path / "confianca.py").write_text("x = 2\n")
+    depois = versao_do_codigo(tmp_path)
+    assert depois != antes
+    (tmp_path / "observabilidade.py").write_text("y = 1\n")
+    assert versao_do_codigo(tmp_path) not in (antes, depois)

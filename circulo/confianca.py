@@ -17,9 +17,12 @@ dado foi produzido. O painel marca cada card como obsoleto quando a leitura pass
 """
 from __future__ import annotations
 
+import functools
+import hashlib
 import json
 import threading
 import time
+from pathlib import Path
 
 from . import intencoes, parada
 from .state import Store
@@ -370,11 +373,19 @@ def confianca(store: Store, now: float | None = None) -> dict:
 FRESCOR_MAX_MS = 3000       # SLO do painel: p99 do atraso dado → tela ≤ 3 s numa janela de 24 h
 
 
+def versao_do_codigo(raiz: Path) -> str:
+    """Hash de todo o código do pacote (página e servidor): o atraso da tela depende dos dois (lição #60)."""
+    h = hashlib.sha256()
+    for f in sorted(p for ext in ("*.py", "*.html") for p in raiz.rglob(ext)):
+        h.update(f.relative_to(raiz).as_posix().encode() + b"\0" + f.read_bytes() + b"\0")
+    return h.hexdigest()[:12]
+
+
+@functools.cache
 def versao_painel() -> str:
-    """Versão da página do painel no ar: a página servida a carrega e a devolve em cada medição de frescor."""
-    import hashlib
-    from importlib import resources
-    return hashlib.sha256(resources.files("circulo").joinpath("painel.html").read_bytes()).hexdigest()[:12]
+    """Versão do painel no ar (o código carregado neste processo): a página servida a carrega e a devolve em cada
+    medição de frescor, então um conserto no servidor ou na página recomeça a janela do SLO."""
+    return versao_do_codigo(Path(__file__).parent)
 
 
 def amostras_frescor(store: Store, desde: float) -> list[float]:
