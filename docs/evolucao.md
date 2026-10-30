@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **correcao** 58 · **observabilidade** 56 · **funcionalidade** 40 · **seguranca** 22 · **documentacao** 20 · **velocidade** 4.
+Por tipo: **correcao** 57 · **observabilidade** 55 · **funcionalidade** 40 · **documentacao** 22 · **seguranca** 22 · **velocidade** 4.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #263 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #262 | 30/10/2026 | documentacao (98%) | sim | Varredura retroativa: fechar lições abertas cujo texto é JSON de estatística sem sinal de erro | pergunta do cetico: “A lição #83 guarda só um dump de subagent_stats com todos os contadores em 0 (co” |
 | #261 | 30/10/2026 | correcao (87%) | sim | Reabrir lição evidenciada cujo teste de 'Fechada:' sumiu, foi renomeado ou está skip/xfail | pergunta do curador_licoes: “Lições como #12 e #7 estão 'evidenciada' com Prevenção 'Fechada: tests/...::test” |
 | #260 | 30/10/2026 | correcao (87%) | sim | Prevenção: 'erro de ambiente' só com evidência; timeout em teste de resiliência fica aberto | pergunta do operador: “A lição #89 mostra test_jev_fora_do_ar_nao_para_o_circulo falhando com TimeoutEr” |
 | #259 | 30/10/2026 | documentacao (94%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -252,5 +254,3 @@ Por tipo: **correcao** 58 · **observabilidade** 56 · **funcionalidade** 40 · 
 | #26 | 20/10/2026 | seguranca (99%) | sim | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #25 | 19/10/2026 | correcao (74%) | — | Vigia: 6 pergunta(s) validada(s) pelo Jev esperando há 31 min sem virar item (último progresso há 111 min) | item #50 (loop) |
 | #24 | 19/10/2026 | correcao (46%) | sim | Planejador no mesmo giro da pergunta validada, 1 retry com jitter e espera por sub-etapa gravada | pergunta do operador: “A etapa “da pergunta validada ao item do roteiro (Planejador + porteiro)” levou ” |
-| #23 | 19/10/2026 | correcao (42%) | sim | Canário de falha para painel:frescor: provar com teste que o ponto detecta painel velho | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #22 | 19/10/2026 | observabilidade (65%) | — | Vigia: recusa do porteiro não é trava; limitar espera da pergunta com prazo máximo e envelhecimento | — |
