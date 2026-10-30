@@ -51,10 +51,10 @@ def _plan(circle, llm):
     return Planejador(circle.ctx, Dev())
 
 
-def _pergunta(circle):
+def _pergunta(circle, texto="q?"):
     t = time.time()
     return circle.store.x("INSERT INTO perguntas(chave,persona,texto,status,cerebro,score,created_at,updated_at) "
-                          "VALUES('k','operador','q?','valida','loop',0.5,?,?)", (t, t))
+                          "VALUES('k','operador',?,'valida','loop',0.5,?,?)", (texto, t, t))
 
 
 def _itens(circle):
