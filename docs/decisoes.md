@@ -27,12 +27,12 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `decision.py:948` | score | português |  |
 | `documentador.py:98` | choice | inglês | What kind of change is delivery `entregas.{…}.titulo` (files `entregas.{…}.arquivos`)? |
 | `documentador.py:99` | noul | inglês | Delivery `entregas.{…}.titulo` changes what the human sees or does in the panel or in the loop's behaviour. |
-| `engine.py:174` | score | português | Valor do próximo ciclo para “{…}” (nota atual {…}) |
-| `engine.py:221` | choice | português | Qual projeto ganha mais com o próximo ciclo (maior melhoria esperada por custo)? |
-| `engine.py:319` | noul | português | Este achado é relevante para o pedido e verificável? {…} |
-| `engine.py:357` | noul | português | Este critério é mensurável na entrega (não é vago)? {…} |
-| `engine.py:553` | noul | português | A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução? |
-| `engine.py:556` | noul | português | A nova versão piorou algo importante em relação à anterior? |
+| `engine.py:166` | score | português | Valor do próximo ciclo para “{…}” (nota atual {…}) |
+| `engine.py:213` | choice | português | Qual projeto ganha mais com o próximo ciclo (maior melhoria esperada por custo)? |
+| `engine.py:311` | noul | português | Este achado é relevante para o pedido e verificável? {…} |
+| `engine.py:349` | noul | português | Este critério é mensurável na entrega (não é vago)? {…} |
+| `engine.py:545` | noul | português | A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução? |
+| `engine.py:548` | noul | português | A nova versão piorou algo importante em relação à anterior? |
 | `estudo.py:209` | noul | português | A evidência encontrada sustenta {…} o pedido em vez de executá-lo como está? |
 | `evolution.py:387` | noul | português | A última mudança de política piorou a saúde do sistema e deve ser desfeita? |
 | `graph.py:55` | choice | português | Qual a relação entre “{…}” e “{…}”? |
