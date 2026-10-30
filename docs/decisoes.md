@@ -54,7 +54,7 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `medico.py:165` | noul | inglês | Finding `achados.{…}.titulo` (evidence `achados.{…}.evidencia`) is blocking the loop's progress right now. |
 | `medico.py:169` | choice | inglês | Who owns the cause of `achados.{…}.titulo`, given `achados.{…}.evidencia`? |
 | `medico.py:170` | score | inglês | What is the safe response to `achados.{…}.titulo` now? |
-| `perguntas.py:330` | choice | português | Qual destas perguntas, respondida agora, mais ajuda o objetivo do loop pelo menor custo? |
+| `perguntas.py:331` | choice | português | Qual destas perguntas, respondida agora, mais ajuda o objetivo do loop pelo menor custo? |
 | `planejador.py:358` | noul | português | O dado citado pelo planejador aparece de fato na evidência do loop? |
 | `projects.py:144` | choice | português | Que tipo de solução este pedido pede? |
 | `revisor.py:167` | noul | português | O PR do Developer `pr` é seguro para entrar na main junto com os outros PRs abertos `prs_abertos`? |
