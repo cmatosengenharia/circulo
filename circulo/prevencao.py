@@ -41,9 +41,10 @@ def teste_de_regressao(repo, lic: dict) -> str | None:
 def checagem_de(store, lic: dict, repo=None) -> str | None:
     """O que segura a lição sem depender de texto: o teste dela (node id ou alias da causa), o teste de regressão
     que o item dela cobra, um portão aprendido executável, ou o portão do teste de regressão que o PR do item já
-    precisou passar."""
+    precisou passar. O teste que não existe no repositório não segura nada (pergunta #528: o alias da #59 revalidava
+    a lição a cada giro com o teste renomeado)."""
     node = alvo_de(lic) or teste_de_regressao(repo, lic)
-    if node:
+    if node and not testes_inexistentes(repo, node):
         return f"teste {node}"
     feito = lic.get("item_id") and store.one("SELECT 1 FROM roadmap WHERE id=? AND status='feito'", (lic["item_id"],))
     for p in store.q("SELECT id, tipo, descricao FROM portoes WHERE licao_id=? AND ativo=1 ORDER BY id", (lic["id"],)):
@@ -52,9 +53,10 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
     return None
 
 
-def sem_prevencao(lic: dict) -> str:
-    return (f"Sem prevenção verificável: falta um teste de regressão (lição #{lic['id']}) ou checagem determinística; "
-            f"não repetir: {lic['descricao']}")[:500]
+def sem_prevencao(lic: dict, faltam: list[str] | None = None) -> str:
+    causa = f"teste citado não existe ({', '.join(faltam)})" if faltam else \
+        f"falta um teste de regressão (lição #{lic['id']}) ou checagem determinística"
+    return f"Sem prevenção verificável: {causa}; não repetir: {lic['descricao']}"[:500]
 
 
 def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
@@ -63,11 +65,11 @@ def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
     log = []
     for lic in map(dict, store.q("SELECT * FROM licoes WHERE status IN ('sem_prevencao','validada')")):
         if lic["status"] == "validada":
-            if not testes_inexistentes(repo, lic["prevencao"]) and (
-                    lic["reincidencias"] == 0 or checagem_de(store, lic, repo)):
+            faltam = testes_inexistentes(repo, lic["prevencao"])
+            if not faltam and (lic["reincidencias"] == 0 or checagem_de(store, lic, repo)):
                 continue
             store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
-                    (sem_prevencao(lic), agora, lic["id"]))
+                    (sem_prevencao(lic, faltam), agora, lic["id"]))
             log.append(f"lição #{lic['id']} sem prevenção")
         elif checagem := checagem_de(store, lic, repo):
             store.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=?, updated_at=? WHERE id=?",
