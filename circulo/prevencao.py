@@ -5,18 +5,62 @@ checagem, ou a lição que já reincidiu e só tem texto, fica 'sem_prevencao' (
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import time
 from pathlib import Path
 
 from .developer import alvo_pytest_existe
-from .licoes import BANNER_ERROS, FORA_DA_FILA, LICAO_DE_COLETA, OBSOLETA_POR_PRAZO, alvo_de, titulo_curto
+from .licoes import (AMBIENTE, BANNER_ERROS, FORA_DA_FILA, LICAO_DE_COLETA, OBSOLETA_POR_PRAZO, alvo_de, teste_que_falhou,
+                     titulo_curto)
 
 REINCIDENCIAS_PARA_TESTE = 3
 PRAZO_GIROS, PRAZO_DIAS = 30, 7   # evidenciada parada tanto tempo sem a assinatura voltar fecha como obsoleta
 TESTE_CITADO = re.compile(r"\btests/[\w/.-]+?\.py(?:::\w+)*(?![\w/.:-])")
 RAIZ = Path(__file__).resolve().parent.parent
+RESILIENCIA = re.compile(r"fora_do_ar|nao_para|fallback|timeout")   # o nome do teste diz que ele tolera falha externa
+
+
+def _teste_e_erro(lic: dict) -> tuple[str | None, re.Match | None]:
+    desc = lic.get("descricao") or ""
+    node = alvo_de(lic) or teste_que_falhou(desc)
+    return node, AMBIENTE.search(desc.replace(node, "") if node else desc)
+
+
+def pede_stub(lic: dict) -> bool:
+    """Lição #89: o teste que prova resiliência a falha externa (o nome diz) e falhou com erro de cara de ambiente
+    (TimeoutError) só fecha com um teste de regressão determinístico: o Jev simulado por um stub que lança TimeoutError.
+    Vale para todo caminho que fecha lição: `checagem_de` (Prevenção) e a reexecução do próprio teste no main
+    (`Licoes.checar_testes`), que sem isso a fecharia e a Prevenção a reabriria a cada giro."""
+    node, erro = _teste_e_erro(lic)
+    return bool(node and erro and RESILIENCIA.search(node.rsplit("::", 1)[-1]))
+
+
+def ambiente_provado(store, lic: dict) -> bool:
+    """Lição #89: 'erro de ambiente' é conclusão, não palpite pelo tipo do erro. A falha de teste com cara de ambiente
+    só é ambiente com evidência: a reexecução do mesmo teste passou, ou o erro apareceu fora de teste em outro ponto.
+    O teste de resiliência nunca: o timeout pode ser a falha que ele existe para pegar (`pede_stub`)."""
+    node, erro = _teste_e_erro(lic)
+    if not erro or not node or pede_stub(lic):
+        return bool(erro) and not node
+    if any(c.get("exit") == 0 for c in json.loads(lic.get("checagens") or "[]")):
+        return True
+    return bool(store.one("SELECT 1 FROM licoes WHERE id!=? AND ponto!=? AND classe='ambiente' AND node_id IS NULL "
+                          "AND instr(lower(descricao), ?)", (lic["id"], lic["ponto"], erro.group(0).lower())))
+
+
+def desrotular_ambiente(store, agora: float) -> list[str]:
+    """Lição #89: a lição de teste rotulada 'erro de ambiente' sem evidência volta a causa 'desconhecida' e segue
+    aberta; a de teste de resiliência fica sem_prevencao até o teste de regressão com o stub chegar à main."""
+    log = []
+    for lic in map(dict, store.q("SELECT * FROM licoes WHERE classe='ambiente'")):
+        if not _teste_e_erro(lic)[0] or ambiente_provado(store, lic):
+            continue
+        store.x("UPDATE licoes SET classe='desconhecida', status=?, prevencao=?, updated_at=? WHERE id=?",
+                ("sem_prevencao" if pede_stub(lic) else lic["status"], sem_prevencao(lic), agora, lic["id"]))
+        log.append(f"lição #{lic['id']} sem evidência de ambiente: causa desconhecida")
+    return log
 
 
 def testes_inexistentes(repo, texto: str | None) -> list[str]:
@@ -44,9 +88,12 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
     que o item dela cobra, um portão aprendido executável, ou o portão do teste de regressão que o PR do item já
     precisou passar. O teste que não existe no repositório não segura nada (pergunta #528: o alias da #59 revalidava
     a lição a cada giro com o teste renomeado)."""
-    node = alvo_de(lic) or teste_de_regressao(repo, lic)
+    stub = pede_stub(lic)
+    node = teste_de_regressao(repo, lic) if stub else alvo_de(lic) or teste_de_regressao(repo, lic)
     if node and not testes_inexistentes(repo, node):
         return f"teste {node}"
+    if stub:
+        return None
     feito = lic.get("item_id") and store.one("SELECT 1 FROM roadmap WHERE id=? AND status='feito'", (lic["item_id"],))
     for p in store.q("SELECT id, tipo, descricao FROM portoes WHERE licao_id=? AND ativo=1 ORDER BY id", (lic["id"],)):
         if p["tipo"] != "obrigatorio" or feito:
@@ -56,18 +103,21 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
 
 def sem_prevencao(lic: dict, faltam: list[str] | None = None) -> str:
     causa = f"teste citado não existe ({', '.join(faltam)})" if faltam else \
+        f"causa desconhecida, o timeout não prova erro de ambiente; falta {_stub(lic)}" if pede_stub(lic) else \
         f"falta um teste de regressão (lição #{lic['id']}) ou checagem determinística"
     return f"Sem prevenção verificável: {causa}; não repetir: {lic['descricao']}"[:500]
 
 
 def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
     """A que já reincidiu provou que texto não segura: validada só com checagem; ganhou uma, volta a validada.
-    Toda validada cuja Prevenção cita um teste que não existe no repositório cai também (pergunta #522)."""
-    log = []
+    Toda validada cuja Prevenção cita um teste que não existe no repositório cai também (pergunta #522), e a de teste
+    de resiliência sem o teste de regressão com o stub (lição #89)."""
+    log = desrotular_ambiente(store, agora)
     for lic in map(dict, store.q("SELECT * FROM licoes WHERE status IN ('sem_prevencao','validada')")):
         if lic["status"] == "validada":
             faltam = testes_inexistentes(repo, lic["prevencao"])
-            if not faltam and (lic["reincidencias"] == 0 or checagem_de(store, lic, repo)):
+            sem_exigencia = lic["reincidencias"] == 0 and not pede_stub(lic)
+            if not faltam and (sem_exigencia or checagem_de(store, lic, repo)):
                 continue
             store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
                     (sem_prevencao(lic, faltam), agora, lic["id"]))
@@ -117,6 +167,12 @@ def arquivos_do_teste(lic: dict, raiz: Path | None = None) -> tuple[str, str | N
     prefixo = re.split(r"[:/.\s]", (lic.get("ponto") or "").strip(), maxsplit=1)[0]
     modulo = f"circulo/{prefixo}.py" if prefixo and re.fullmatch(r"\w+", prefixo) and (raiz / "circulo" / f"{prefixo}.py").is_file() else None
     return teste, modulo
+
+
+def _stub(lic: dict) -> str:
+    teste, _ = arquivos_do_teste(lic)
+    return (f"{teste} (cita \"lição #{lic['id']}\") verde na main, determinístico: o Jev simulado por um stub que lança "
+            "TimeoutError")
 
 
 def _detalhe_do_teste(lic: dict) -> str:
