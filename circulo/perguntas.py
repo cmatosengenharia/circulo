@@ -26,6 +26,7 @@ from typing import Callable
 from . import jobs, jtbd, pedido_claro, pedidos_repetidos
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
+from .higiene import licoes_de_telemetria
 from .json_llm import objeto
 from .licoes import item_de
 
@@ -416,7 +417,7 @@ def _m_conflitos_pr(s, agora):
 
 def _m_licoes_abertas(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')")
-    return (min(1.0, n / 6), {"licoes_abertas": n})
+    return (min(1.0, n / 6), {"licoes_abertas": n, "licoes_telemetria": len(licoes_de_telemetria(s))})
 
 
 def _m_lancamentos(s, agora):

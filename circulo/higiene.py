@@ -62,17 +62,24 @@ def unir_licoes_de_json(store: Store, agora: float) -> int:
     return n
 
 
-def tirar_licoes_de_telemetria(store: Store, agora: float) -> int:
-    """Lição #83: lição aberta cujo texto (ou o último motivo) é JSON de estatística sem erro não é erro: fica obsoleta."""
-    n = 0
-    for r in store.q("SELECT id, ponto, assinatura, descricao FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao')"):
+def licoes_de_telemetria(store: Store) -> list[int]:
+    """Lição #83/#88: lições abertas ou validadas cujo texto (ou o último motivo) é JSON de estatística sem erro."""
+    ids = []
+    for r in store.q("SELECT id, ponto, assinatura, descricao FROM licoes WHERE status IN ('aberta','reincidente','sem_prevencao','validada')"):
         ultimo = store.one("SELECT motivo FROM verificacoes WHERE assinatura=? AND ok=0 ORDER BY id DESC LIMIT 1", (r["assinatura"],))
         textos = ((r["descricao"] or "").removeprefix(f"{r['ponto']}: "), ultimo["motivo"] if ultimo else "")
         if any(map(telemetria_sem_erro, textos)):
-            store.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=?",
-                    (f"Obsoleta ({CAUSA}): o texto é JSON de estatística sem failed/killed>0, exceção ou exit≠0", agora, r["id"]))
-            n += 1
-    return n
+            ids.append(r["id"])
+    return ids
+
+
+def tirar_licoes_de_telemetria(store: Store, agora: float) -> int:
+    """Telemetria sem erro não é erro: a lição fica obsoleta."""
+    ids = licoes_de_telemetria(store)
+    for i in ids:
+        store.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=?",
+                (f"Obsoleta ({CAUSA.replace('_', ' ')}): o texto é JSON de estatística sem failed/killed>0, exceção ou exit≠0", agora, i))
+    return len(ids)
 
 
 def rodar(store: Store, agora: float | None = None, forcar: bool = False) -> dict | None:
@@ -90,4 +97,4 @@ def rodar(store: Store, agora: float | None = None, forcar: bool = False) -> dic
     return rel
 
 
-__all__ = ["rodar", "expirar_dependentes", "encurtar_titulos", "unir_licoes_de_json", "tirar_licoes_de_telemetria", "EXPIRA_DIAS"]
+__all__ = ["rodar", "expirar_dependentes", "encurtar_titulos", "unir_licoes_de_json", "licoes_de_telemetria", "tirar_licoes_de_telemetria", "EXPIRA_DIAS"]
