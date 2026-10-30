@@ -323,7 +323,7 @@ def test_so_a_causa_transitoria_aciona_o_retry_com_backoff_do_planejador(circle,
     llm = LLMSeq(TimeoutError("The read operation timed out"))
     assert _plan(circle, llm).run() and llm.chamadas == 2 and len(esperas) == 1
     circle.store.x("UPDATE perguntas SET status='descartada'")
-    _pergunta(circle)
+    _pergunta(circle, "outra pergunta?")     # a mesma pergunta já respondida seria reaproveitada sem LLM (planejador_cache)
     llm = LLMSeq(TimeoutError("disjuntor aberto: a LLM está em pausa"))
     try:
         _plan(circle, llm).run()
