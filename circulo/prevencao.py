@@ -10,9 +10,19 @@ import subprocess
 import time
 from pathlib import Path
 
+from .developer import alvo_pytest_existe
 from .licoes import FORA_DA_FILA, alvo_de, titulo_curto
 
 REINCIDENCIAS_PARA_TESTE = 3
+TESTE_CITADO = re.compile(r"\btests/[\w/.-]+?\.py(?:::\w+)*(?![\w/.:-])")
+RAIZ = Path(__file__).resolve().parent.parent
+
+
+def testes_inexistentes(repo, texto: str | None) -> list[str]:
+    """Pergunta #522: os ids 'tests/arquivo.py[::nome]' que o texto cita e que não existem no repositório (arquivo e
+    função, por ast). A lição 'validada' que cita um teste inexistente não está segura por nada."""
+    raiz = Path(repo) if repo else RAIZ
+    return [t for t in dict.fromkeys(TESTE_CITADO.findall(texto or "")) if not alvo_pytest_existe(raiz, t)]
 
 
 def teste_de_regressao(repo, lic: dict) -> str | None:
@@ -48,16 +58,18 @@ def sem_prevencao(lic: dict) -> str:
 
 
 def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
-    """A que já reincidiu provou que texto não segura: validada só com checagem; ganhou uma, volta a validada."""
+    """A que já reincidiu provou que texto não segura: validada só com checagem; ganhou uma, volta a validada.
+    Toda validada cuja Prevenção cita um teste que não existe no repositório cai também (pergunta #522)."""
     log = []
-    for lic in map(dict, store.q("SELECT * FROM licoes WHERE status='sem_prevencao' "
-                                 "OR (status='validada' AND reincidencias > 0)")):
-        checagem = checagem_de(store, lic, repo)
-        if lic["status"] == "validada" and not checagem:
+    for lic in map(dict, store.q("SELECT * FROM licoes WHERE status IN ('sem_prevencao','validada')")):
+        if lic["status"] == "validada":
+            if not testes_inexistentes(repo, lic["prevencao"]) and (
+                    lic["reincidencias"] == 0 or checagem_de(store, lic, repo)):
+                continue
             store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
                     (sem_prevencao(lic), agora, lic["id"]))
             log.append(f"lição #{lic['id']} sem prevenção")
-        elif lic["status"] == "sem_prevencao" and checagem:
+        elif checagem := checagem_de(store, lic, repo):
             store.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=?, updated_at=? WHERE id=?",
                     (tick, f"Checagem: {checagem}; não repetir: {lic['descricao']}"[:500], agora, lic["id"]))
             log.append(f"lição #{lic['id']} validada")
