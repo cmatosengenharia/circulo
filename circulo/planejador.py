@@ -87,6 +87,12 @@ Responda só com JSON numa linha, sem markdown: {"titulo": "até 100 caracteres"
 Se a resposta já existe ou exige mexer na constituição, responda {"sem_item": "por quê, em 1 frase"}."""
 
 
+def roteiro_cheio(store) -> str | None:
+    """Mais de ROTEIRO_CHEIO pendentes de qualquer origem: um item novo só espera. A única regra, lida por motivo() e _tentar."""
+    n = store.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0")["n"]
+    return f"roteiro cheio: {n} itens pendentes (limite {ROTEIRO_CHEIO})" if n > ROTEIRO_CHEIO else None
+
+
 class Planejador:
     def __init__(self, ctx: Ctx, self_dev=None):
         self.ctx = ctx
@@ -128,6 +134,8 @@ class Planejador:
                           "AND evidencia NOT LIKE '%depende de você%'")["n"]
         if fila >= FOLGA:
             return f"{FILA_CHEIA} ({fila} itens)"
+        if cheio := roteiro_cheio(self.s):   # a mesma regra de _tentar: roteiro cheio não é trabalho pendente (lição #47)
+            return cheio
         lic = getattr(self.ctx, "licoes", None)
         if lic is not None and lic.bloqueia_evolucao():
             # a trava vence sozinha (licoes.TRAVA_ESTRUTURAL_S): depois disso a correção segue na frente da fila e a evolução anda junto
@@ -263,9 +271,9 @@ class Planejador:
         from .perguntas import Conselho, gerar, personas
         conselho = Conselho(self.ctx)
         conselho.acompanhar()
-        pendentes = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0")["n"]
+        cheio = roteiro_cheio(self.s)
         try:
-            if pendentes <= ROTEIRO_CHEIO:
+            if not cheio:
                 gerar(self.ctx)      # o Questionador (LLM especializada): 1x por dia, ou antes se as perguntas se esgotarem
         except Exception:  # noqa: BLE001 — gerar perguntas nunca impede de responder as que já existem
             pass
@@ -295,9 +303,9 @@ class Planejador:
         if ja:                 # idempotente pelo id da pergunta: uma nova tentativa não grava um segundo item
             conselho.marcar(pid, "virou_item")
             return pid, "repetida", f"a pergunta já virou o item #{ja['item_id']}", None
-        if pendentes > ROTEIRO_CHEIO:    # por regra, sem tokens: com o roteiro cheio, um item novo só espera (pergunta #419)
+        if cheio:              # por regra, sem tokens: com o roteiro cheio, um item novo só espera (pergunta #419)
             conselho.marcar(pid, "descartada")
-            return pid, "descartada", f"sem item novo: roteiro cheio: {pendentes} itens pendentes (limite {ROTEIRO_CHEIO})", None
+            return pid, "descartada", f"sem item novo: {cheio}", None
         ev = self.evidencia()
         if not autorizado:     # chamado pelo loop, o gasto já foi decidido lá: um porteiro só
             gate = self.ctx.dl.worth_spending("planejar_roteiro", {"est_tokens": EST_TOKENS, "value_signal": 0.8,
