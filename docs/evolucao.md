@@ -54,6 +54,8 @@ Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 41 · 
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #275 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #274 | 30/10/2026 | documentacao (99%) | sim | Developer: registrar passos usados por tarefa e expor % de tarefas acima de 80% do limite | pergunta do curador_licoes: “A lição #59 (developer:agente: maximo de passos) está em 'sem_prevencao': não há” |
 | #273 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #272 | 30/10/2026 | documentacao (94%) | sim | Curador em sombra: contar lições abertas elegíveis a 'resolvida_por_silêncio' sem fechar nenhuma | pergunta do curador_licoes: “Das lições abertas, quantas não tiveram nenhuma reincidência (mesma assinatura n” |
 | #271 | 30/10/2026 | velocidade (51%) | sim | Planejador: reaproveitar resultado de pergunta do conselho com evidência quase igual em 24 h | pergunta do economista: “Nas últimas 24 h, quais neurônios gastaram mais tokens em tarefas de baixa compl” |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 41 · 
 | #38 | 20/10/2026 | documentacao (99%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #37 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #36 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
-| #35 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
-| #34 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
