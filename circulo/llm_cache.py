@@ -15,7 +15,7 @@ import hashlib
 import json
 import time
 
-from .llm import LLMResult
+from .llm import LLMResult, pode_repetir
 from .registro import registrar
 from .state import Store
 
@@ -63,15 +63,21 @@ def gerar(store: Store, llm, *, papel: str, project_id: int | None, system: str,
                         uso=out, duracao_ms=0, entrada=prompt, saida=out.text)
         _anotar(store, h, papel, cid, True, None, servido=True)
         return out
-    t0 = time.time()
-    try:
-        out = llm.generate(system=system, prompt=prompt, model=model, max_tokens=max_tokens, web_search=web_search)
-    except Exception as exc:
-        cid = registrar(store, tick=store.tick, project_id=project_id, papel=papel, modelo=model, escolha=escolha,
-                        duracao_ms=int((time.time() - t0) * 1000), ok=False, erro=f"{type(exc).__name__}: {exc}", entrada=prompt)
-        _anotar(store, h, papel, cid, anterior is not None, None)
-        raise
+    retry = 0
+    while True:
+        t0 = time.time()
+        try:
+            out = llm.generate(system=system, prompt=prompt, model=model, max_tokens=max_tokens, web_search=web_search)
+            break
+        except Exception as exc:
+            cid = registrar(store, tick=store.tick, project_id=project_id, papel=papel, modelo=model, escolha=escolha,
+                            duracao_ms=int((time.time() - t0) * 1000), ok=False, erro=f"{type(exc).__name__}: {exc}",
+                            entrada=prompt, retry=retry)
+            _anotar(store, h, papel, cid, anterior is not None, None)
+            if not pode_repetir(exc, retry):
+                raise
+            retry += 1
     cid = registrar(store, tick=store.tick, project_id=project_id, papel=papel, modelo=model, escolha=escolha,
-                    uso=out, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text)
+                    uso=out, duracao_ms=int((time.time() - t0) * 1000), entrada=prompt, saida=out.text, retry=retry)
     _anotar(store, h, papel, cid, anterior is not None, out)
     return out
