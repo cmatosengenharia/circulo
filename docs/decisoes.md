@@ -49,13 +49,13 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `jev_lab.py:79` | noul | inglês | Did the new version make something important worse than the previous one? |
 | `jev_lab.py:86` | choice | inglês | Which model tier is enough for this task? |
 | `jev_lab.py:93` | noul | inglês | Is this lesson worth keeping in the loop's memory? |
-| `loop.py:459` | choice | português | Qual tarefa de manutenção tem mais valor agora? |
-| `loop.py:511` | noul | português | vale gastar agora? |
+| `loop.py:457` | choice | português | Qual tarefa de manutenção tem mais valor agora? |
+| `loop.py:509` | noul | português | vale gastar agora? |
 | `medico.py:165` | noul | inglês | Finding `achados.{…}.titulo` (evidence `achados.{…}.evidencia`) is blocking the loop's progress right now. |
 | `medico.py:169` | choice | inglês | Who owns the cause of `achados.{…}.titulo`, given `achados.{…}.evidencia`? |
 | `medico.py:170` | score | inglês | What is the safe response to `achados.{…}.titulo` now? |
 | `perguntas.py:331` | choice | português | Qual destas perguntas, respondida agora, mais ajuda o objetivo do loop pelo menor custo? |
-| `planejador.py:358` | noul | português | O dado citado pelo planejador aparece de fato na evidência do loop? |
+| `planejador.py:373` | noul | português | O dado citado pelo planejador aparece de fato na evidência do loop? |
 | `projects.py:144` | choice | português | Que tipo de solução este pedido pede? |
 | `revisor.py:167` | noul | português | O PR do Developer `pr` é seguro para entrar na main junto com os outros PRs abertos `prs_abertos`? |
 | `vigia.py:357` | noul | português | O achado `achados.{…}.titulo` é uma trava real da autoevolução do loop agora? |
