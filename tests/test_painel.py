@@ -595,3 +595,39 @@ def test_cada_pedido_dos_7_dias_tem_exatamente_um_estado_com_idade_no_painel(tmp
     pagina = pagina_saude({**saude(st.db), "pedidos": ps}).decode()
     linhas = pagina.split('aria-label="Estado de cada pedido seu"', 1)[1].split("</ol>", 1)[0].count("<li")
     assert linhas == 10 and "PR #104 mergeado" in pagina and "boom" in pagina
+
+
+def test_candidatos_a_modelo_menor_por_papel_em_7_dias(tmp_path):
+    """Pergunta #553: por papel em 7 dias, n, falhas, tokens e tokens por chamada; candidato a sombra = saída
+    estruturada curta, falhas=0 e n≥30, ordenado por tokens (o planejador primeiro é o alvo da sombra)."""
+    import time
+
+    from circulo.modelo_menor import modelos_menores
+    from circulo.painel import pagina_saude, saude
+    from circulo.state import Store
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+
+    def chamadas(papel, n, tokens, falhas=0, idade=3600):
+        for i in range(n):
+            st.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,created_at) VALUES(1,?,'m','fixo',?,?,?)",
+                 (papel, tokens, int(i >= falhas), agora - idade))
+
+    chamadas("planejador", 40, 16700)
+    chamadas("questionador", 35, 2000)
+    chamadas("validador", 30, 1000, falhas=1)                   # falhou uma vez: fora
+    chamadas("estudo_duvida", 29, 500)                          # n<30: fora
+    chamadas("developer", 100, 50000)                           # saída longa: nunca candidato
+    chamadas("questionador", 50, 9999, idade=8 * 86400)         # fora da janela de 7 dias
+    m = modelos_menores(st.db, agora)
+    assert [p["papel"] for p in m] == ["developer", "planejador", "questionador", "validador", "estudo_duvida"]
+    plan = m[1]
+    assert (plan["n"], plan["falhas"], plan["tokens"], plan["tokens_por_chamada"], plan["candidato"]) == (
+        40, 0, 668000, 16700, True)
+    assert [p["papel"] for p in m if p["candidato"]] == ["planejador", "questionador"]
+    h = saude(st.db)
+    assert h["modelos_menores"] == m
+    card = pagina_saude(h).decode().split('aria-label="Candidatos a modelo menor"', 1)[1].split("</section>", 1)[0]
+    assert card.index("planejador") < card.index("questionador") and "validador" not in card and "developer" not in card
+    assert "16700 tokens/chamada" in card
+    assert modelos_menores(Store(tmp_path / "v.db").db, agora) == []
