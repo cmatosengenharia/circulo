@@ -238,7 +238,8 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "add":
         print(f"enfileirado #{c.submit(' '.join(args.texto))}")
     elif args.cmd == "status":
-        print(json.dumps(c.status(), ensure_ascii=False, indent=2))
+        from .status import trava
+        print(json.dumps({**c.status(), "trava": trava(c.store)}, ensure_ascii=False, indent=2))
     elif args.cmd == "resumo":
         print(c.write_summary().read_text(encoding="utf-8"))
     elif args.cmd == "respostas":
