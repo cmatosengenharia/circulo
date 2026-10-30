@@ -11,9 +11,10 @@ import time
 from pathlib import Path
 
 from .developer import alvo_pytest_existe
-from .licoes import FORA_DA_FILA, alvo_de, titulo_curto
+from .licoes import BANNER_ERROS, FORA_DA_FILA, LICAO_DE_COLETA, OBSOLETA_POR_PRAZO, alvo_de, titulo_curto
 
 REINCIDENCIAS_PARA_TESTE = 3
+PRAZO_GIROS, PRAZO_DIAS = 30, 7   # evidenciada parada tanto tempo sem a assinatura voltar fecha como obsoleta
 TESTE_CITADO = re.compile(r"\btests/[\w/.-]+?\.py(?:::\w+)*(?![\w/.:-])")
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -75,6 +76,33 @@ def exigir(store, tick: int, agora: float, repo=None) -> list[str]:
             store.x("UPDATE licoes SET status='validada', corrigida_tick=?, prevencao=?, updated_at=? WHERE id=?",
                     (tick, f"Checagem: {checagem}; não repetir: {lic['descricao']}"[:500], agora, lic["id"]))
             log.append(f"lição #{lic['id']} validada")
+    return log
+
+
+def fechar_por_prazo(store, tick: int, agora: float, repo=None) -> list[str]:
+    """Pergunta #529: 'evidenciada' não tinha saída (6 lições paradas em 20835 giros). A que reincidiu
+    REINCIDENCIAS_PARA_TESTE vezes sem checagem escala para sem_prevencao (`cobrar_teste` abre o item); a parada
+    PRAZO_GIROS giros ou PRAZO_DIAS dias sem a assinatura voltar fica obsoleta, com a regra e o prazo na Prevenção, e
+    reincide se a assinatura voltar. A de teste ou de coleta não entra: fecha e reabre pela reexecução no main."""
+    log = []
+    for lic in map(dict, store.q("SELECT * FROM licoes WHERE status='evidenciada'")):
+        if alvo_de(lic) or LICAO_DE_COLETA.search(lic["assinatura"] or "") or BANNER_ERROS.search(lic["descricao"] or ""):
+            continue
+        if lic["reincidencias"] >= REINCIDENCIAS_PARA_TESTE and not checagem_de(store, lic, repo):
+            store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
+                    (sem_prevencao(lic), agora, lic["id"]))
+            log.append(f"lição #{lic['id']} sem prevenção: reincidiu {lic['reincidencias']}x")
+            continue
+        giros = tick - max(lic["evidenciada_tick"] or 0, lic["ultima_tick"] or 0)
+        dias = (agora - lic["updated_at"]) / 86400
+        if giros < PRAZO_GIROS and dias < PRAZO_DIAS:
+            continue
+        parada = f"{giros} giros" if giros >= PRAZO_GIROS else f"{int(dias)} dias"
+        store.x("UPDATE licoes SET status='obsoleta', prevencao=?, updated_at=? WHERE id=?",
+                (f"{OBSOLETA_POR_PRAZO}: evidenciada há {parada} sem reincidir (regra: {PRAZO_GIROS} giros ou "
+                 f"{PRAZO_DIAS} dias); reincide se a assinatura voltar; não repetir: {lic['descricao']}"[:500],
+                 agora, lic["id"]))
+        log.append(f"lição #{lic['id']} obsoleta por prazo ({parada})")
     return log
 
 
