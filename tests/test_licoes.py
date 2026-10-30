@@ -734,3 +734,34 @@ def test_obsoleta_so_reincide_se_estrutural_ou_fechada_por_prazo(circle):
     L.verificar("gate:ci", False, motivo="erro 92", assinatura=alvo)
     st = {r["id"]: (r["status"], r["reincidencias"]) for r in s.q("SELECT id, status, reincidencias FROM licoes")}
     assert st[91] == ("reincidente", 1) and st[92] == ("obsoleta", 0)
+
+
+FECHADAS_543 = {12: "tests/test_sumiu.py::test_constituicao_revertida",            # arquivo removido
+                7: "tests/test_casa.py::test_200_decisoes_antigo",                  # função renomeada
+                15: "tests/test_casa.py::test_pulado",                              # @pytest.mark.skip
+                17: "tests/test_casa.py::Classe::test_dentro",                      # classe com @pytest.mark.xfail
+                73: "tests/test_casa.py::test_vivo"}                                # resolve e roda: fica
+
+
+def test_licoes_12_7_15_17_73_evidenciadas_com_teste_de_fechada_irresolvivel_reabrem(circle, tmp_path):
+    """Pergunta #543: lição #12, lição #7, lição #15 e lição #17 'evidenciada' com 'Fechada: tests/arq.py::nome'
+    apontando para teste removido, renomeado ou marcado skip/xfail não estão seguras por nada: reabrem (sem_prevencao)
+    no giro, com o motivo; a lição #73, cujo teste resolve e roda, segue evidenciada. Tudo por ast, sem executar."""
+    s = circle.store
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_casa.py").write_text(
+        "import pytest\n\n\ndef test_200_decisoes():\n    pass\n\n\n@pytest.mark.skip(reason='x')\ndef test_pulado():\n"
+        "    pass\n\n\n@pytest.mark.xfail\nclass Classe:\n    def test_dentro(self):\n        pass\n\n\n"
+        "@pytest.mark.parametrize('n', [1])\ndef test_vivo(n):\n    pass\n")
+    for lid, node in FECHADAS_543.items():
+        _licao(s, lid, 0, s.tick, prevencao=f"Fechada: {node} passou no main (sha abc, exit 0); não repetir: erro {lid}")
+    log = Licoes(s, repo=repo).revisar()
+    st = {r["id"]: r for r in s.q("SELECT id, status, prevencao FROM licoes")}
+    for lid in (12, 7, 15, 17):
+        assert st[lid]["status"] == "sem_prevencao", lid
+        assert FECHADAS_543[lid] in st[lid]["prevencao"], st[lid]["prevencao"]
+        assert f"lição #{lid} sem prevenção" in log
+    assert "skip/xfail" in st[15]["prevencao"] and "skip/xfail" in st[17]["prevencao"]
+    assert st[73]["status"] == "evidenciada"
