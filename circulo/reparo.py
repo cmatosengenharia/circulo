@@ -65,7 +65,7 @@ from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git,
 REVERTIDA = "developer:constituicao_revertida"
 BASE = "developer:base"
 TETO, REPETIDA = CORTES
-PISO_TETO = 100_000
+PISO_TETO = 400_000      # 1.70: 4× (o Developer gasta 15-25k por chamada; 100k cortava no 4º passo e travava a árvore)
 JANELA_TETO = 86400
 ULTIMA_FALHA = "developer_ultima_falha"         # {worktree do item: assinatura_falha da última falha local}
 PREFIXO_TITULO = re.compile(r"^(?:reparo|conserto do PR #\d+): ")
@@ -259,6 +259,7 @@ class DeveloperComReparo(SelfDeveloper):
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()
         self._reabrir_base()
+        self._reabrir_teto()
         bloqueado = self.s.one("SELECT status, evidencia FROM roadmap WHERE id=? AND status IN (?,?,?)",
                                (item_id, BLOQUEADO, BLOQUEADO_BASE, ESCALADA))
         if bloqueado:
@@ -319,6 +320,21 @@ class DeveloperComReparo(SelfDeveloper):
             todos.pop(str(r["id"]), None)
             self.s.set(DISJUNTOR, todos)
             self._set_item(r["id"], "pendente", "disjuntor fechado: o que a barra do abrir_pr citava mudou na main")
+
+    def _reabrir_teto(self) -> None:
+        """1.70: árvore bloqueada pelo disjuntor do teto volta à fila quando o teto de hoje comporta o que ela já gastou
+        (o piso subiu, ou a mediana dos PRs do dia): a contagem de tetos zera e ela ganha uma rodada."""
+        teto, todos = self.teto(), self.s.get(TETO_RAIZ) or {}
+        for r in self.s.q("SELECT id, titulo FROM roadmap WHERE status=? AND evidencia LIKE '%disjuntor do teto%'", (BLOQUEADO,)):
+            gastos, _ = self._tokens_do_item(r["titulo"])
+            if gastos + self._estimativa(gastos, 1) >= teto:
+                continue
+            todos.pop(str(r["id"]), None)
+            self.s.set(TETO_RAIZ, todos)
+            self.s.x("WITH RECURSIVE arvore(id) AS (SELECT ? UNION SELECT r.id FROM roadmap r JOIN arvore a ON r.pai = a.id) "
+                     "UPDATE roadmap SET status='pendente', desativado=0, evidencia=?, updated_at=? WHERE id IN (SELECT id FROM arvore) "
+                     "AND status=?", (r["id"], f"disjuntor do teto fechado: o teto de hoje ({teto}) comporta os {gastos} tokens gastos",
+                                      time.time(), BLOQUEADO))
 
     def _reabrir_base(self) -> None:
         """O item de base vermelha volta à fila quando a main muda: o pré-voo roda de novo (verde segue; a mesma falha

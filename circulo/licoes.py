@@ -1,12 +1,10 @@
 """Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez.
 
-Ciclo de maturidade (cada etapa deixa rastro no banco):
-  estudar (evidência) → testar → VALIDAR (a mudança funciona: verificação local, CI, gate)
-  → aprender (falha vira lição com assinatura) → corrigir (item do roteiro → PR)
-  → EVIDENCIAR (o erro parou de acontecer nos dados reais) → evoluir (só sem lição de estrutura aberta).
+Ciclo de maturidade (cada etapa deixa rastro no banco): estudar (evidência) → testar → VALIDAR (verificação local,
+CI, gate) → aprender (falha vira lição com assinatura) → corrigir (item do roteiro → PR) → EVIDENCIAR (o erro parou
+de acontecer nos dados reais) → evoluir (a correção vai na frente; a evolução não espera mais que TRAVA_ESTRUTURAL_S).
 
-1. Todo ponto de verificação chama `verificar(ponto, ok, ...)`. Passou ou falhou, fica em `verificacoes`
-   (monitoramento: taxa de falha por ponto, painel).
+1. Todo ponto de verificação chama `verificar(ponto, ok, ...)`. Passou ou falhou, fica em `verificacoes`.
 2. Falha vira lição pela assinatura (ex.: `ci:lint:B905`, `planejador:saida_invalida`). As classes:
    - estrutural: erro do próprio loop. Abre item do roteiro na PRIMEIRA vez, sem esperar repetir;
    - trabalho: erro no trabalho do Developer/missões (lint, teste). Vira prevenção nos prompts, sem item próprio;
@@ -16,7 +14,7 @@ Ciclo de maturidade (cada etapa deixa rastro no banco):
    Validada exige a Prevenção citar um teste ou checagem determinística; senão, `sem_prevencao` (prevencao.py).
 4. Reincidência: assinatura que volta depois de validada/evidenciada. Alerta, o item volta para o topo da fila e a
    contagem fica no painel. Zero reincidências é o indicador de maturidade.
-5. Com lição estrutural aberta, o loop não se autoevolui (planejador e evolução do círculo esperam): primeiro corrige.
+5. Lição estrutural aberta segura o planejador e a evolução do círculo por TRAVA_ESTRUTURAL_S, não mais (nunca parar).
 6. Toda lição validada entra no contexto do Developer e do planejador como "erros que você já cometeu".
 7. Lição de teste (assinatura com `teste:<node id>`): a impressão digital é o node id. Falhas do mesmo node id em
    pontos diferentes (developer:testes, developer:abrir_pr…) são uma lição só, com a lista de origens. Ela fecha
@@ -53,6 +51,7 @@ MAX_VERIFICACOES = 20_000   # janela do monitoramento
 VERDES_PARA_FECHAR = 2      # execuções seguidas com exit 0 no main
 NAO_COLETADO = (4, 5)       # pytest: node id inválido / nada coletado
 TTL_ESTRUTURA = 6 * 3600   # lição de estrutura sem reincidir por tanto tempo, com o caminho exercitado, fica obsoleta
+TRAVA_ESTRUTURAL_S = 1800  # quanto uma lição de estrutura aberta segura o Planejador; depois a evolução segue em paralelo (nunca parar)
 PASSAGENS_PARA_EXPIRAR = 3  # passagens pelo caminho na janela: silêncio sem exposição não prova a correção
 ABERTAS = ("aberta", "em_correcao", "reincidente", "obsoleta", "sem_prevencao")
 # o item que alguém ainda vai fazer (a regra diz quem está na fila, não quem saiu: cada estado novo de saída — descartado,
@@ -231,9 +230,7 @@ def causa_de_json(m: str) -> str | None:
     if terminal and terminal.group(1) != "completed":
         return normalizar(terminal.group(1), 40)
     causa = normalizar(erro_legivel(m), 40).replace(" ", "_")
-    if causa:
-        return causa
-    return "agente_falhou" if re.search(r'"(?:subtype|is_error|terminal_reason)"', m) else "log_cortado"
+    return causa or ("agente_falhou" if re.search(r'"(?:subtype|is_error|terminal_reason)"', m) else "log_cortado")
 
 
 def node_id_de(assinatura: str | None) -> str | None:
@@ -298,11 +295,10 @@ def coletar_no_main(repo: str | Path, sha: str | None = None, python: str | None
 
 
 def _pytest_no_main(repo, argumentos: dict[str, list[str]], sha, python, timeout) -> tuple[str, dict]:
-    repo = Path(repo)
+    repo, rodadas = Path(repo), {}
     sha = sha or sha_do_main(repo)
     tmp = Path(tempfile.mkdtemp(prefix="circulo-licao-"))
     wt = tmp / "main"
-    rodadas = {}
     try:
         _git(repo, "worktree", "add", "--detach", "-q", str(wt), sha)
         amb = {**os.environ, "PYTHONPATH": str(wt), "PYTHONDONTWRITEBYTECODE": "1"}
@@ -349,8 +345,7 @@ def subir(camada: str | None) -> str:
 
 def alvo_inexistente(store, repo: str | Path | None, motivo: str) -> str | None:
     """O arquivo de teste que o pytest não achou (exit 4), se ele não está na main nem num item pendente do roteiro."""
-    m = ALVO_SUMIDO.search(motivo or "")
-    if not m:
+    if not (m := ALVO_SUMIDO.search(motivo or "")):
         return None
     arquivo = m.group(1)
     if repo and (Path(repo) / ".git").exists():
@@ -747,11 +742,14 @@ class Licoes:
                        "Se a assinatura voltar, ela reincide.", "licao")
         return log
 
-    def bloqueia_evolucao(self) -> bool:
-        """Lição de estrutura ainda não corrigida: primeiro corrige, depois evolui."""
+    def bloqueia_evolucao(self, agora: float | None = None) -> bool:
+        """Lição de estrutura aberta trava a evolução por no máximo TRAVA_ESTRUTURAL_S desde que (re)abriu. Regra da 1.70,
+        nunca parar: a correção vai na frente da fila e anda em PARALELO (29/10: 18 h parado por um item que o Jev adiava)."""
         self.reclassificar_ambiente()
-        return self.s.one("SELECT COUNT(*) n FROM licoes WHERE classe='estrutural' "
-                          "AND status IN ('aberta','em_correcao','reincidente')")["n"] > 0
+        r = self.s.one("SELECT COUNT(*) n, MAX(COALESCE(aberta_em, created_at)) em FROM licoes WHERE classe='estrutural' "
+                       "AND status IN ('aberta','em_correcao','reincidente')")
+        agora = time.time() if agora is None else agora
+        return r["n"] > 0 and agora - float(r["em"] or agora) < TRAVA_ESTRUTURAL_S
 
     def contexto(self, limite: int = 15, resolvidas_so_titulo: bool = False) -> str:
         """resolvidas_so_titulo: obsoleta/evidenciada já foram corrigidas, vão depois das ativas e só com o título."""

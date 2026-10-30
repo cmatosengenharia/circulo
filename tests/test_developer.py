@@ -158,8 +158,10 @@ def test_licao_59_estimar_passos_com_entradas_conhecidas():
 
 
 def test_licao_59_risco_de_passos_acima_do_limiar_vai_ao_fatiador_antes(circle, repo):  # noqa: F811
-    """lição #59: 2 módulos e 5 funções não passam dos limites do fatiador, mas preveem 87,5% dos passos: divide."""
+    """lição #59: 2 módulos e 5 funções não passam dos limites do fatiador, mas preveem 87,5% dos passos: divide.
+    (1.70: o limite padrão subiu para 80 passos; o agente aqui tem 40, a fração é do limite do agente em uso.)"""
     item, dev, agent, llm = preparar(circle, repo)
+    agent.max_turns = 40
     circle.store.x("UPDATE roadmap SET detalhe=? WHERE id=?", (
         "Em circulo/alfa.py mudar contar() e somar() e medir(); em circulo/beta.py mudar ler() e gravar()", item))
     alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)

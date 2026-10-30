@@ -1,22 +1,14 @@
 """Developer do projeto zero: o círculo corrigindo o próprio código.
 
-Fecha o ciclo "registra o erro → aprende → se autocorrige":
-  item do roteiro (erro recorrente) → Jev autoriza → worktree numa branch `circulo/fix-…`
-  → agente de código (Claude Code headless) faz a correção + teste de regressão
-  → testes rodam localmente → commit → push → PR → o gate de merge decide (checks verdes etc.)
-  → quando o incidente para de acontecer, o item do roteiro vira "feito" sozinho.
+Fecha o ciclo "registra o erro → aprende → se autocorrige": item do roteiro → Jev autoriza (erro próprio nunca espera
+evidência) → worktree numa branch `circulo/fix-…` → agente de código (Claude Code headless) corrige + teste de regressão
+→ portões (lint, testes, reprodução, aprendidos) → Validador (1.70: árvore limpa + revisor independente do diff)
+→ Revisor (main atual, outros PRs) → commit → push → PR → gate de merge → quando o incidente some, o item vira "feito".
 
-Limites duros:
-- até MAX_PRS_ABERTOS PRs do Developer abertos ao mesmo tempo (1.29: antes era um), cada um revisado pelo Revisor
-  antes de abrir (main atual trazida + testes, arquivos e merge simulado contra os outros PRs abertos) e no gate;
-  rejeitado pelo Revisor, o PR não abre (ou é fechado) e o item volta para a fila;
-- a constituição nunca é alterada: o gate recusa o PR na hora;
-- se a verificação local (lint + testes, igual ao CI) falhar, nada é empurrado; o item volta para pendente;
-- se o agente terminar com erro (limite da conta, máximo de passos), o trabalho parcial é descartado; no limite da
-  conta o Developer espera o horário de reset em vez de tentar de novo a cada giro;
-- PR reprovado pelo CI (ou sem teste novo) volta para o próprio Developer consertar na mesma branch, com o log do CI;
-  depois de MAX_CONSERTOS tentativas o PR é fechado (reabrível) e o item volta para a fila.
-- itens de roteiro que são pedidos grandes do humano não são pegos sozinhos (só com `circulo dev --item`).
+Limites duros: até MAX_PRS_ABERTOS PRs do Developer abertos (rejeitado pelo Revisor, o item volta à fila); a
+constituição nunca é alterada (o gate recusa na hora); verificação local falhou = nada é empurrado; agente com erro
+(limite da conta, máximo de passos) guarda o parcial e espera o reset; PR reprovado pelo CI volta ao Developer na
+mesma branch e, depois de MAX_CONSERTOS, é fechado (reabrível); pedidos grandes do humano só com `circulo dev --item`.
 """
 from __future__ import annotations
 
@@ -26,8 +18,8 @@ import os
 import re
 import shutil
 import subprocess
-import threading
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +29,6 @@ from .agents import Ctx
 from .budget import TZ
 from .merge_gate import protegidos
 from .reproducao import SEGREDOS, ambiente_isolado, liberar_worktree
-
 from .revisor import MAX_PRS_ABERTOS, disjuntor_abandonos, sem_mudanca_seguida
 
 _liberar_worktree = liberar_worktree
@@ -64,7 +55,8 @@ Regras:
   tipos, uma única forma de fazer), depois um teste ou regra de lint que o pegue; instrução em texto é o último recurso.
 - A menor mudança que resolve. Não deixe comentário explicando gambiarra: conserte ou não faça.
 - Antes de terminar rode o mesmo que o CI: `python -m ruff check circulo tests --select E,F,W,B --ignore E501`
-  (se o ruff existir) e `python -m pytest -q`. Só termine com os dois limpos.
+  (se o ruff existir) e `python -m pytest -q`. Só termine com os dois limpos. Nada temporário dentro do repositório:
+  nenhuma pasta `.shim*`, runner improvisado ou clone de fixture (vá para /tmp); o que sobrar é apagado antes do commit.
 - Mudança pequena e completa: prefira entregar uma parte pronta e testada a uma mudança grande pela metade.
 - Se a tarefa é uma lição (#N), o teste de regressão precisa citar "lição #N" (nome, docstring ou comentário): é ele
   que garante que o erro não volta. O PR só é aberto se todos os portões passarem.
@@ -113,17 +105,12 @@ def limite_ate(log: str, agora: float) -> float | None:
         return agora + 3600
     from datetime import datetime, timedelta
     h, mi, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").lower()
-    if ap == "pm" and h < 12:
-        h += 12
-    elif ap == "am" and h == 12:
-        h = 0
+    h = h + 12 if ap == "pm" and h < 12 else 0 if ap == "am" and h == 12 else h
     if h > 23 or mi > 59:
         return agora + 3600
     now = datetime.fromtimestamp(agora, TZ)
     alvo = now.replace(hour=h, minute=mi, second=0, microsecond=0)
-    if alvo <= now:
-        alvo += timedelta(days=1)
-    return alvo.timestamp() + 120     # 2 min de folga depois do reset
+    return (alvo + timedelta(days=1) if alvo <= now else alvo).timestamp() + 120     # 2 min de folga depois do reset
 
 
 def concluir_mergeados(store) -> int:
@@ -188,7 +175,7 @@ def _fazendo(store, o_que: str | None = None, passo: str | None = None, item: in
 class ClaudeCodeAgent:
     """Claude Code em modo não interativo dentro do worktree."""
 
-    def __init__(self, cmd: str | None = None, max_turns: int = 40, timeout: int = 1800):
+    def __init__(self, cmd: str | None = None, max_turns: int = 80, timeout: int = 3600):   # 1.70: 40 passos/30 min cortavam a tarefa no meio (lição #59, 24 vezes)
         self.cmd = cmd or os.environ.get("CIRCULO_CODE_AGENT", "claude")
         self.max_turns = max_turns
         self.timeout = timeout
@@ -211,7 +198,7 @@ class ClaudeCodeAgent:
                               "--allowedTools", ferramentas, "--max-turns", str(self.max_turns)], cwd=workdir, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, env=env)
         data, bruto = self._acompanhar(p)
-        tokens, u = 0, data.get("usage", {})
+        u = data.get("usage", {})
         tokens = int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
         modelos = list((data.get("modelUsage") or {}).keys())
         erro = bool(data.get("is_error"))   # saída 0 não basta: o Claude Code devolve is_error (limite da conta, máximo de passos) com trabalho pela metade
@@ -220,7 +207,6 @@ class ClaudeCodeAgent:
 
     def _acompanhar(self, p) -> tuple[dict, str]:
         """Lê o streaming linha a linha: passos para o ouvinte, o evento `result` como dado final. Mata no timeout."""
-        import threading
         from .registro import passo_do_evento
         self._passos: list[str] = []
         data, linhas = {}, []
@@ -324,11 +310,9 @@ class SelfDeveloper:
     # ------------------------------------------------------------ PRs abertos (vários)
     def abertos(self) -> list[dict]:
         """PRs do Developer ainda abertos, do mais antigo ao mais novo (a tabela prs é a fonte; o kv é só retrato)."""
-        out = []
-        for r in self.s.q("SELECT * FROM prs WHERE status='aberto' AND item_id IS NOT NULL ORDER BY created_at, number"):
-            d = dict(r)
+        out = [dict(r) for r in self.s.q("SELECT * FROM prs WHERE status='aberto' AND item_id IS NOT NULL ORDER BY created_at, number")]
+        for d in out:
             d["conserto"] = json.loads(d["conserto"]) if d.get("conserto") else None
-            out.append(d)
         return out
 
     def _salvar_pr(self, pr: int, **campos) -> None:
@@ -350,8 +334,7 @@ class SelfDeveloper:
         self.s.set("self_dev_aberto", st)
 
     def recuperar(self) -> int:
-        """Execução interrompida (loop reiniciado no meio do trabalho): o item volta para a fila em vez de ficar
-        preso em "em andamento" sem PR."""
+        """Execução interrompida (loop reiniciado no meio): o item volta para a fila em vez de ficar preso em "em andamento" sem PR."""
         abertos = ",".join(str(int(a["item_id"])) for a in self.abertos()) or "-1"
         return self.s.run("UPDATE roadmap SET status='pendente', evidencia='retomado: a execução anterior foi interrompida', "
                           "updated_at=? WHERE status='em_andamento' AND evidencia LIKE 'branch %' AND id NOT IN (" + abertos + ")",
@@ -511,6 +494,18 @@ class SelfDeveloper:
         monitorar(self.ctx, ABRIR_PR, False, sujeito=titulo, motivo=texto)
         return False, texto
 
+    def _validar(self, wt: Path, base: str, item: dict) -> tuple[bool, str]:
+        """1.70, agente de validação depois dos portões: um revisor independente lê o diff. Reprovado com problema concreto
+        = UMA rodada de correção local e os portões de novo; o veredito fica registrado e nunca descarta o item."""
+        from .revisor import feedback_validador, revisar_pr
+        v = revisar_pr(self.ctx, wt, base, item)
+        if v["aprovado"]:
+            return True, ""
+        _fazendo(self.s, passo="Validador reprovou: " + "; ".join(v["problemas"])[:120])
+        self._agente(CORRECAO_LOCAL.format(titulo=item["titulo"], falhas=feedback_validador(v), licoes=self._licoes_txt(item["id"])),
+                     wt, f"correção local: {item['titulo']}", item_id=item["id"])
+        return self.portao_pr(wt, base, item["id"], item["titulo"])      # a árvore mudou (ou não): os portões decidem de novo
+
     def verificar(self, wt: Path, registrar: bool = True) -> tuple[bool, str]:
         """O mesmo que o CI roda: lint (se o ruff existir aqui) e testes, em ambiente isolado. Todo resultado é monitorado."""
         if self.lint_cmd is None:
@@ -589,6 +584,8 @@ class SelfDeveloper:
             dia = datetime.now(TZ).date().isoformat()
             a = self.s.get("assinatura_tokens") or {}
             self.s.set("assinatura_tokens", {dia: int(a.get(dia, 0)) + int(out["tokens"])})
+        from .revisor import validar_worktree
+        validar_worktree(self.ctx, wt, item_id)     # 1.70: toda saída do agente passa pelo validador da árvore (lixo, repositório aninhado: lição #87)
         return out
 
     def _limite(self, out: dict) -> str | None:
@@ -630,7 +627,7 @@ class SelfDeveloper:
             return DevResult(item["id"], "adiado", gate.reason or "Jev: não compensa agora")
         evo = self.ctx.dl.should_evolve("domain", {"occurrences": n, "consistency": 1.0,   # nível "domain": a mudança ainda passa por testes locais, CI, gate de merge e rollback de saúde
                                                     "kind": "self_fix", "description": item["titulo"]})
-        if not evo.allowed:
+        if not evo.allowed and item["origem"] != "erro":   # 1.70: corrigir um erro próprio nunca espera evidência (o erro É a evidência; 29/10: #87 adiado por 18 h)
             return DevResult(item["id"], "adiado", "Jev: evidência insuficiente para mexer no código")
 
         wip = (self.s.get("self_dev_wip") or {}).get(str(item["id"]))   # trabalho parcial de uma sessão interrompida (limite da conta, máximo de passos) é retomado, não refeito
@@ -683,6 +680,8 @@ class SelfDeveloper:
                 self.ctx.reply(f"Developer: “{item['titulo']}” só se corrige mexendo na constituição, que o loop não altera. "
                                "Ficou para você no roteiro.", "fora_alcance")
                 return DevResult(item["id"], "fora_do_alcance", falha[-800:])
+            if ok:
+                ok, falha = self._validar(wt, base, item)       # 1.70: agentes de validação (árvore limpa + revisor independente)
             if not ok:
                 self._set_item(item["id"], "pendente", "barrado nos portões antes do PR (lint, testes, constituição, tamanho, teste novo, portões aprendidos)")
                 self.ctx.reply(f"Developer: “{item['titulo']}” foi barrado nos portões antes do PR; nada foi enviado.", "saude")
