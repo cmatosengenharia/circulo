@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 41 · **documentacao** 25 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 42 · **documentacao** 24 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #277 | 30/10/2026 | documentacao (0%) | sim | Retry de neurônio limitado a 1, só para causa transitória por regra, com tokens de retry registrados | pergunta do operador: “Quando um neurônio falha (ex.: loop:progresso, 5 falhas em 9 chamadas), o retry ” |
+| #276 | 30/10/2026 | funcionalidade (30%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #275 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #274 | 30/10/2026 | documentacao (99%) | sim | Developer: registrar passos usados por tarefa e expor % de tarefas acima de 80% do limite | pergunta do curador_licoes: “A lição #59 (developer:agente: maximo de passos) está em 'sem_prevencao': não há” |
 | #273 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 41 · 
 | #41 | 20/10/2026 | correcao (46%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
 | #39 | 20/10/2026 | seguranca (41%) | — | Parser puro de numstat com soma total e categoria dominante | item #91 (sub_item) |
 | #38 | 20/10/2026 | documentacao (99%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
-| #37 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
-| #36 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
