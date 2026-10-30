@@ -18,6 +18,7 @@ dado foi produzido. O painel marca cada card como obsoleto quando a leitura pass
 from __future__ import annotations
 
 import json
+import threading
 import time
 
 from . import intencoes, parada
@@ -47,6 +48,69 @@ def _ms(v: float) -> str:
 
 def _hora(ts: float | None) -> str:
     return time.strftime("%H:%M:%S", time.localtime(ts)) if ts else "—"
+
+
+LENTO_S = 60                # rastro e SLOs leem dias de histórico: recalculados no máximo 1 vez por minuto, fora do card
+_retratos: dict[str, tuple[float, list[dict]]] = {}
+_em_curso: set[str] = set()
+_trava = threading.Lock()
+
+
+def _historico(s: Store, now: float) -> list[dict]:
+    """Rastreabilidade e SLOs (observabilidade.py): cada entrega tem o fio inteiro? os objetivos de serviço estão de pé?"""
+    ck: list[dict] = []
+    try:
+        from .observabilidade import slos as _slos
+        from .rastro import completude
+        comp = completude(s, now=now)
+        if comp["total"]:
+            ck.append(_c("rastro", "seguranca", "Rastro de ponta a ponta",
+                         "ok" if not comp["incompletos"] else "atencao", f"{comp['completos']} de {comp['total']} entregas",
+                         "cada entrega ligada da origem (pedido, pergunta ou lição) até a evidência no código rodando"
+                         if not comp["incompletos"] else "com lacuna: " + "; ".join(f"#{x['id']} {x['lacunas'][0]}" for x in comp["incompletos"][:3]),
+                         now))
+        lista = [x for x in _slos(s, now) if x["estado"] != "sem_dados"]
+        if lista:
+            ruins = [x for x in lista if x["estado"] == "violado"]
+            risco = [x for x in lista if x["estado"] == "em_risco"]
+            ck.append(_c("slos", "seguranca", "Objetivos de serviço (SLOs)", "atencao" if ruins or risco else "ok",
+                         f"{len(lista) - len(ruins)} de {len(lista)} cumpridos",
+                         "violado: " + ", ".join(x["nome"].lower() for x in ruins) if ruins else
+                         "orçamento de erro acabando: " + ", ".join(x["nome"].lower() for x in risco) if risco else
+                         "todos dentro do alvo, com orçamento de erro sobrando", now))
+    except Exception:  # noqa: BLE001 — a central de confiança nunca cai por causa de um indicador
+        pass
+    return ck
+
+
+def _recalcular(path: str, now: float) -> None:
+    try:
+        s = Store(path)
+        try:
+            _retratos[path] = (now, _historico(s, now))
+        finally:
+            s.db.close()
+    finally:
+        with _trava:
+            _em_curso.discard(path)
+
+
+def _checks_do_historico(store: Store, now: float) -> list[dict]:
+    """A única porta do card ao vivo para o histórico (lição #60): o card é empurrado a cada 1,5 s e a idade conta do
+    início do cálculo, então ele mostra o último retrato (com a hora dele) e o recálculo roda numa thread com conexão
+    própria. Só o primeiro card do processo, ou um banco em memória (outra conexão não o enxerga), espera o cálculo."""
+    path = store.path
+    feito = _retratos.get(path)
+    if feito is None or path == ":memory:":
+        feito = (now, _historico(store, now))
+        if path != ":memory:":
+            _retratos[path] = feito
+    elif now - feito[0] > LENTO_S:
+        with _trava:
+            if path not in _em_curso:
+                _em_curso.add(path)
+                threading.Thread(target=_recalcular, args=(path, now), daemon=True, name="confianca-historico").start()
+    return feito[1]
 
 
 def confianca(store: Store, now: float | None = None) -> dict:
@@ -244,28 +308,7 @@ def confianca(store: Store, now: float | None = None) -> dict:
                      ", ".join(p["nome"] for p in paradas)[:200] + (f"; terminando o ciclo em curso: {', '.join(parando)}" if parando else
                                                                     "; nenhum ciclo delas rodando"), now))
 
-    # rastreabilidade e SLOs (observabilidade.py): cada entrega tem o fio inteiro? os objetivos de serviço estão de pé?
-    try:
-        from .observabilidade import slos as _slos
-        from .rastro import completude
-        comp = completude(s, now=now)
-        if comp["total"]:
-            ck.append(_c("rastro", "seguranca", "Rastro de ponta a ponta",
-                         "ok" if not comp["incompletos"] else "atencao", f"{comp['completos']} de {comp['total']} entregas",
-                         "cada entrega ligada da origem (pedido, pergunta ou lição) até a evidência no código rodando"
-                         if not comp["incompletos"] else "com lacuna: " + "; ".join(f"#{x['id']} {x['lacunas'][0]}" for x in comp["incompletos"][:3]),
-                         now))
-        lista = [x for x in _slos(s, now) if x["estado"] != "sem_dados"]
-        if lista:
-            ruins = [x for x in lista if x["estado"] == "violado"]
-            risco = [x for x in lista if x["estado"] == "em_risco"]
-            ck.append(_c("slos", "seguranca", "Objetivos de serviço (SLOs)", "atencao" if ruins or risco else "ok",
-                         f"{len(lista) - len(ruins)} de {len(lista)} cumpridos",
-                         "violado: " + ", ".join(x["nome"].lower() for x in ruins) if ruins else
-                         "orçamento de erro acabando: " + ", ".join(x["nome"].lower() for x in risco) if risco else
-                         "todos dentro do alvo, com orçamento de erro sobrando", now))
-    except Exception:  # noqa: BLE001 — a central de confiança nunca cai por causa de um indicador
-        pass
+    ck += _checks_do_historico(s, now)
 
     # ---------------------------------------------------------------- PROJETAR: o que vem a seguir
     prox = b.get("proximo_giro_em")
