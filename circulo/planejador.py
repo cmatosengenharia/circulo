@@ -15,6 +15,7 @@ Limites:
   MAX_TENTATIVAS ou IDADE_MAX, e então (ou na hora, se a falha é permanente) vai para a quarentena com o motivo;
 - o Jev decide antes se vale o gasto (worth_spending) e qual modelo usar (pick_model);
 - título repetido de item que já existe é descartado;
+- a mesma pergunta com cada número da evidência a menos de 5% em 24 h reaproveita a resposta, sem LLM (planejador_cache);
 - a constituição continua fora do alcance: item que cita um caminho dela é vetado aqui, antes do Developer (o gate
   recusaria o PR).
 """
@@ -27,7 +28,7 @@ import sqlite3
 import time
 import urllib.error
 
-from . import limite_uso, pedidos, rastro, rodadas_revisao
+from . import limite_uso, pedidos, planejador_cache, rastro, rodadas_revisao
 from .agents import Ctx
 from .decision import Question, norm
 from .json_llm import objeto, objeto_ou_corte
@@ -53,7 +54,9 @@ FILA_CHEIA = "fila cheia"   # prefixo do motivo de contrapressão: o Developer t
 MAX_TENTATIVAS = 4          # tentativas com falha antes da quarentena
 IDADE_MAX = 3600            # pergunta mais velha que isso que falha vai para a quarentena
 PRAZO_PORTEIRO = 2 * 3600   # pergunta mais velha que isso que o porteiro recusa abaixo do limiar é descartada (destino explícito)
-PROGRESSO = ("virou_item", "descartada", "repetida")
+PROGRESSO = ("virou_item", "descartada", "repetida", "planejador_cache")
+EM_ANDAMENTO = planejador_cache.EM_ANDAMENTO   # a mesma pergunta está na LLM noutro giro: esta volta para a fila sem chamar
+SEM_JSON = "resposta sem JSON válido"
 TRANSITORIAS = (TimeoutError, ConnectionError, urllib.error.URLError, sqlite3.OperationalError)
 PERMANENTES = (KeyError, TypeError, AttributeError, ValueError, NameError, ImportError, IndexError)
 ESPERA_RETRY = 2.0          # s antes da única nova tentativa (5xx ou timeout), mais o jitter
@@ -219,7 +222,7 @@ class Planejador:
             if classe == "transitoria" and rec["tentativas"] and rec["quarentena"] is None:
                 self.s.set(REAGENDA, {"pergunta_id": pid, "vence_em": time.time() + REAGENDA_S})
             raise
-        registrar_tentativa(self.s, pid, desfecho, motivo, classe="transitoria" if desfecho == "porteiro_recusou" else None,
+        registrar_tentativa(self.s, pid, desfecho, motivo, classe="transitoria" if desfecho in ("porteiro_recusou", EM_ANDAMENTO) else None,
                             reply=self.ctx.reply, validada=alvo is not None and alvo["id"] == pid)
         return item
 
@@ -306,6 +309,18 @@ class Planejador:
         if cheio:              # por regra, sem tokens: com o roteiro cheio, um item novo só espera (pergunta #419)
             conselho.marcar(pid, "descartada")
             return pid, "descartada", f"sem item novo: {cheio}", None
+        guardada = planejador_cache.reservar(self.s, pergunta.texto, pergunta.evidencia, pid)
+        if guardada is not None:   # a mesma pergunta com evidência quase igual em 24 h: a resposta já existe, sem LLM
+            return _reaproveitar(conselho, pid, guardada)
+        res = None
+        try:
+            res = self._responder(autorizado, conselho, pid, pergunta, PERSONAS)
+        finally:   # só a resposta válida da LLM fica guardada; falha, porteiro ou JSON inválido liberam a entrada
+            respondida = res is not None and res[1] in PROGRESSO and res[2] != SEM_JSON
+            planejador_cache.concluir(self.s, pergunta.texto, pid, res[1] if respondida else None, res[2] if respondida else "")
+        return res
+
+    def _responder(self, autorizado: bool, conselho, pid: int, pergunta, PERSONAS: dict) -> tuple[int, str, str, dict | None]:
         ev = self.evidencia()
         if not autorizado:     # chamado pelo loop, o gasto já foi decidido lá: um porteiro só
             gate = self.ctx.dl.worth_spending("planejar_roteiro", {"est_tokens": EST_TOKENS, "value_signal": 0.8,
@@ -342,7 +357,7 @@ class Planejador:
             return pid, "descartada", f"sem item novo: {sem_item[:200]}", None
         if not item:
             conselho.marcar(pid, "descartada")
-            return pid, "descartada", "resposta sem JSON válido", None
+            return pid, "descartada", SEM_JSON, None
         from .neuronios import cita_constituicao
         const = cita_constituicao(f"{item['titulo']}\n{item['detalhe']}")
         if const:
@@ -440,6 +455,17 @@ def _sub_itens(d: dict) -> list[dict] | None:
     out = [{k: str(p.get(k) or "").strip() for k in ("titulo", "detalhe", "teste")} for p in partes if isinstance(p, dict)]
     out = [p for p in out if p["titulo"] and p["detalhe"] and p["teste"]]
     return out[:5] if len(out) >= 2 else None
+
+
+def _reaproveitar(conselho, pid: int, guardada: dict) -> tuple[int, str, str, None]:
+    """O evento 'planejador_cache': a pergunta fica ligada ao desfecho da origem (o item dela, ou sem item)."""
+    origem = guardada["pergunta_id"]
+    if guardada["estado"] == planejador_cache.EM_ANDAMENTO:
+        return pid, EM_ANDAMENTO, f"a mesma pergunta (#{origem}) está na LLM agora", None
+    item = guardada["item_id"]
+    conselho.marcar(pid, "repetida" if item else "descartada", item)
+    de = f"pergunta #{origem}" + (f", item #{item}" if item else "")
+    return pid, "planejador_cache", f"reaproveitou {de} (evidência a menos de 5%): {guardada['motivo']}"[:300], None
 
 
 def _sem_item(texto: str) -> str | None:

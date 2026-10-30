@@ -156,3 +156,50 @@ def test_roteiro_cheio_de_pendentes_nao_chama_a_llm(circle, repo):  # noqa: F811
     assert ultima["desfecho"] == "descartada" and "roteiro cheio: 13 itens pendentes" in ultima["motivo"]
     llm, plan = com_pendentes(5)
     assert plan.run() is not None and any(p.startswith("Pergunta do conselho") for p in llm.prompts)
+
+
+def _perguntar(circle, plan, tokens_24h, texto="Quantos tokens o planejador gasta sem PR em 24 h?"):
+    import time
+    t = time.time()
+    pid = circle.store.x("INSERT INTO perguntas(chave,persona,texto,evidencia,status,cerebro,score,created_at,updated_at) "
+                         "VALUES('economista:tokens','economista',?,?,'valida','loop',0.5,?,?)",
+                         (texto, json.dumps({"metrica": "tokens_por_pr", "tokens_24h": tokens_24h, "prs_24h": 18}), t, t))
+    plan.run(pergunta_id=pid)
+    return pid
+
+
+def test_pergunta_repetida_com_evidencia_quase_igual_nao_volta_a_llm(circle, repo):  # noqa: F811
+    """O planejador gastou 455588 tokens sem PR em 24 h reperguntando ao LLM a mesma pergunta do conselho. A mesma
+    pergunta normalizada com cada número da evidência a menos de 5% reaproveita a resposta (uma chamada só, evento
+    'planejador_cache' com a origem); a 5% ou mais, pergunta de novo. Tolerância relativa, não hash de arredondados."""
+    import time
+    from circulo.planejador import TENTATIVAS
+    llm = PlanLLM(titulo="Cache do planejador por pergunta normalizada")
+    _, plan = preparar(circle, repo, llm)
+    circle.store.set("conselho_gerado", {"em": time.time()})
+    a = _perguntar(circle, plan, 1_000_000)
+    item = circle.store.one("SELECT item_id FROM perguntas WHERE id=?", (a,))["item_id"]
+    assert item and len(llm.prompts) == 1
+    b = _perguntar(circle, plan, 1_049_999, texto="  quantos TOKENS o planejador gasta sem PR em 24 h? ")
+    assert len(llm.prompts) == 1                                       # 4,99%: reaproveitou, sem LLM
+    assert circle.store.one("SELECT status, item_id FROM perguntas WHERE id=?", (b,))["item_id"] == item
+    ultima = circle.store.get(TENTATIVAS)["ultima"]
+    assert ultima["desfecho"] == "planejador_cache" and f"pergunta #{a}" in ultima["motivo"] and f"item #{item}" in ultima["motivo"]
+    _perguntar(circle, plan, 1_050_000)
+    assert len(llm.prompts) == 2                                       # 5%: evidência mudou, pergunta de novo
+
+
+def test_pergunta_em_andamento_noutro_giro_nao_chama_a_llm_de_novo(circle, repo):  # noqa: F811
+    """Enquanto um giro espera a LLM, a entrada fica em andamento: outro giro com a mesma pergunta não chama a LLM e
+    a pergunta volta para a fila."""
+    import time
+    from circulo import planejador_cache
+    llm = PlanLLM(titulo="Cache do planejador em andamento")
+    _, plan = preparar(circle, repo, llm)
+    circle.store.set("conselho_gerado", {"em": time.time()})
+    assert planejador_cache.reservar(circle.store, "Quantos tokens o planejador gasta sem PR em 24 h?", {"tokens_24h": 1}, 999) is None
+    b = _perguntar(circle, plan, 1_000_000)
+    assert llm.prompts == [] and circle.store.one("SELECT status FROM perguntas WHERE id=?", (b,))["status"] == "valida"
+    planejador_cache.concluir(circle.store, "Quantos tokens o planejador gasta sem PR em 24 h?", 999, None)
+    _perguntar(circle, plan, 1_000_000)
+    assert len(llm.prompts) == 1
