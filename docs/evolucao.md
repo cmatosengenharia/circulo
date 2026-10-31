@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 57 · **correcao** 50 · **funcionalidade** 42 · **documentacao** 26 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 57 · **correcao** 48 · **funcionalidade** 42 · **documentacao** 28 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #286 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #285 | 31/10/2026 | documentacao (94%) | sim | Curador: lição com 'checagem:' vazia não fecha como corrigida e volta a sem_prevencao | pergunta do curador_licoes: “A lição #47 (loop:estagnado) consta como 'Já corrigido (PR #244 mergeado)' mas c” |
 | #284 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #283 | 31/10/2026 | documentacao (93%) | sim | Planejador: pular a LLM em pergunta repetida (hash + evidência) e dividir item grande por regra | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
 | #282 | 31/10/2026 | observabilidade (70%) | sim | Painel: 'incidentes_abertos=0' vira 'silêncio suspeito' quando há estagnações e lições de estrutura… | pergunta do cetico: “Que indicador do painel diz 'tudo bem' e pode estar mentindo, e como cruzá-lo co” |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 57 · **correcao** 50 · **funcionalidade** 42 · 
 | #89 | 21/10/2026 | correcao (87%) | sim | Lição #50: gate:main: CI da main falhou no 93fe8ef: algo entrou quebrado | item #117 (erro) |
 | #88 | 21/10/2026 | correcao (86%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
 | #87 | 21/10/2026 | correcao (78%) | sim | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
-| #86 | 21/10/2026 | correcao (81%) | — | Lição #44: corpo:evidencia: erros nos primeiros giros do código novo: … | item #98 (erro) |
-| #47 | 20/10/2026 | correcao (74%) | — | Obter o numstat real via merge-base com a base | item #93 (sub_item) |
