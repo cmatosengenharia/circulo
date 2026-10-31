@@ -50,10 +50,14 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 57 · **correcao** 48 · **funcionalidade** 42 · **documentacao** 28 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 59 · **correcao** 44 · **funcionalidade** 42 · **documentacao** 30 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #290 | 31/10/2026 | observabilidade (80%) | — | Latência pedido→merge: etapa dominante dos 5 PRs mais lentos, derivada das decisões do gate já… | pergunta do tech_lead: “Nos pedidos do humano da última semana, quanto tempo passou entre o pedido e o P” |
+| #289 | 31/10/2026 | observabilidade (78%) | sim | Estagnação: gravar item, estado e etapa parados no registro de cada disparo e usar como causa | pergunta do analista_reincidencia: “A lição #47 (loop:estagnado: trabalho pendente e nada avançou em 10 giros) reinc” |
+| #288 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #287 | 31/10/2026 | documentacao (100%) | — | Simulação de estagnação: pendência sintética parada N giros prova limiar e recuperação, e registra… | pergunta do auditor: “A métrica 'estagnacao' já chegou a disparar algum alerta ou ação (escalar, pausa” |
 | #286 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #285 | 31/10/2026 | documentacao (94%) | sim | Curador: lição com 'checagem:' vazia não fecha como corrigida e volta a sem_prevencao | pergunta do curador_licoes: “A lição #47 (loop:estagnado) consta como 'Já corrigido (PR #244 mergeado)' mas c” |
 | #284 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -250,7 +254,3 @@ Por tipo: **observabilidade** 57 · **correcao** 48 · **funcionalidade** 42 · 
 | #93 | 21/10/2026 | observabilidade (63%) | sim | revisar_prs: classificar a causa da falha e adiar sem gastar (rede, checks pendentes, atrás da main) | pergunta do operador: “O neurônio execucao:idle:revisar_prs foi barrado 3 de 3 vezes em 24 h: qual é a ” |
 | #92 | 21/10/2026 | funcionalidade (41%) | sim | Lição #56: Corrigir erro: RuntimeError em idle:propor_feature | item #127 (erro) |
 | #91 | 21/10/2026 | correcao (94%) | sim | Lição #54: developer:agente: credit balance is too low — Credit balance is too low | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
-| #90 | 21/10/2026 | correcao (86%) | sim | Lição #53: gate:ci: checks falhando: Evidência reforçada, Container, Testes (Python 3.13), Testes… | item #118 (erro) |
-| #89 | 21/10/2026 | correcao (87%) | sim | Lição #50: gate:main: CI da main falhou no 93fe8ef: algo entrou quebrado | item #117 (erro) |
-| #88 | 21/10/2026 | correcao (86%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #87 | 21/10/2026 | correcao (78%) | sim | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
