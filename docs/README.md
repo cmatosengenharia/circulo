@@ -1,6 +1,6 @@
 # Documentação do Círculo
 
-Gerada pelo **Redator técnico** do loop em 30/10/2026 (versão 1.70.0) a partir do código, do banco e do CHANGELOG —
+Gerada pelo **Redator técnico** do loop em 31/10/2026 (versão 1.70.0) a partir do código, do banco e do CHANGELOG —
 nenhum número aqui é estimado. O agente roda quando há entrega nova e abre um PR só com esta pasta.
 
 | Documento | O que tem |

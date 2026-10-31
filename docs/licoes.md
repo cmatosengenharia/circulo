@@ -6,7 +6,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
 | 59 | developer:agente:maximo_de_passos | trabalho | validada | 24 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
-| 47 | loop:estagnado | estrutural | reincidente | 23 | 8 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
+| 47 | loop:estagnado | estrutural | reincidente | 30 | 8 | Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão marcado com a lição #47; não repetir: loop:prog |
 | 15 | rastro:lacuna | trabalho | obsoleta | 18 | 8 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 60 | painel:frescor_atrasado | ambiente | obsoleta | 274 | 6 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |

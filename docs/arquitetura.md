@@ -107,7 +107,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `norte.py` | 164 | Norte: para onde o loop evolui, em resultados mensuráveis — não em erros. |
 | `observabilidade.py` | 385 | Observabilidade do loop: sinais de ouro, SLOs com orçamento de erro, métricas no padrão Prometheus e exportação OTLP. |
 | `orcamento_dia.py` | 62 | Orçamento diário de tokens vindo da configuração, com aviso antes do corte. |
-| `painel.py` | 895 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
+| `painel.py` | 900 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
 | `parada.py` | 91 | Parada verificável (kill switch): o botão do painel, a confirmação do loop e o teste semanal. |
 | `pastas.py` | 53 | Pastas padrão por assunto no Mac, espelhando os assuntos do console (`circulo assunto novo`). |
 | `pausa.py` | 131 | Pausar e retomar missão por missão, sem parar o loop inteiro. |
@@ -139,6 +139,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `saida_json.py` | 59 | Contrato de saída JSON de um papel (lição #22): as chaves obrigatórias do esquema chegam inteiras, ou um motivo tipado. |
 | `self_dev.py` ⚖️ | 899 | Developer do projeto zero: o círculo corrigindo o próprio código. |
 | `sentinela.py` | 94 | Sentinela da entrega: olha o RESULTADO (o que entrou na main), não os erros. |
+| `silencio.py` | 25 | Silêncio suspeito (pergunta #619): zero incidente aberto só é verde se o loop também não estagnou nem tem lição de estrutura aberta nos últimos 7 dias; ausência de alerta não prova saúde. |
 | `state.py` | 766 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
 | `status.py` | 106 | Estado do loop para humanos, derivado do batimento + controles + etapa. Usado pelo painel. |
 | `telemetria.py` | 422 | Trilha de eventos tipados do loop, no vocabulário OpenTelemetry GenAI, e o painel de timeline + grafo. |
