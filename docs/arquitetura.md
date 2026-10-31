@@ -61,6 +61,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `fatiador.py` | 246 | Fatiador: item do roteiro que acumula falhas locais vira sub-itens validados um a um. |
 | `fazendo.py` | 76 | O que cada agente está fazendo agora — não só quem está trabalhando, mas em quê, e o passo em curso. |
 | `finance.py` | 100 | Cálculos financeiros e invariantes. Só inteiros em centavos. Nenhum agente altera este arquivo sozinho. |
+| `financeiro.py` | 20 | Prontidão do cérebro financeiro: quantos lançamentos reais e meses cobertos faltam para a 1ª pergunta útil (gasto por categoria no mês). Sintético é o lançamento que veio de evento com origem 'demo'. |
 | `fluxo.py` | 388 | Fluxo dos agentes ao vivo: quem fez o quê em cada giro, na ordem, para a tela animar a passagem entre agentes. |
 | `gasto_cursor.py` | 163 | Gasto do Cursor em US$ por dia, assunto e tipo de tarefa, com a projeção do dia em que o limite do mês acaba. |
 | `gate_causa.py` | 43 | Causa da falha de checks no gate (pergunta do conselho #76): o PR caiu sozinho ou com o CI inteiro? |
@@ -116,7 +117,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 73 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 633 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `perguntas.py` | 635 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
 | `planejador.py` | 606 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planejador_cache.py` | 81 | A mesma pergunta do conselho com a métrica quase igual em 7 dias não volta à LLM do Planejador. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
