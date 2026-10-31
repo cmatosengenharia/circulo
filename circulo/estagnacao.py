@@ -6,7 +6,7 @@ Tarefa que o idle não deixa rodar não é trabalho pendente: `pode_rodar` é a 
 """
 
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura); o Vigia age a partir dele
-DESTRAVAR_EM = 10   # K: o disparo da estagnação que não vê o loop avançar em K giros conta como 'nao_destravou'
+EXPIRA_EM = 30      # cada disparo da estagnação fecha: 'destravou' se o loop avança em até 30 giros, senão 'expirou'
 SEGURAS = ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")   # modo seguro: só baixo risco
 COMPONENTE = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}     # (corrigir_codigo tem quarentena própria)
 
@@ -30,12 +30,22 @@ def anotar_giro(st: dict, r) -> None:
 
 
 def medir_disparos(store, giro: int, avancou: bool) -> None:
-    """Cada disparo da estagnação (vigia_disparos) ganha o resultado: destravou em N giros ou não em DESTRAVAR_EM."""
+    """Fecha cada disparo da estagnação (vigia_disparos) no mesmo registro: destravou em N giros ou expirou em EXPIRA_EM."""
     if avancou:
         store.x("UPDATE vigia_disparos SET resultado='destravou', giros_ate_destravar=?-giro WHERE chave='estagnacao' "
-                "AND resultado IS NULL AND giro IS NOT NULL AND ?-giro<=?", (giro, giro, DESTRAVAR_EM))
-    store.x("UPDATE vigia_disparos SET resultado='nao_destravou' WHERE chave='estagnacao' AND resultado IS NULL "
-            "AND giro IS NOT NULL AND ?-giro>=?", (giro, DESTRAVAR_EM))
+                "AND resultado IS NULL AND giro IS NOT NULL AND ?-giro<=?", (giro, giro, EXPIRA_EM))
+    store.x("UPDATE vigia_disparos SET resultado='expirou' WHERE chave='estagnacao' AND resultado IS NULL "
+            "AND giro IS NOT NULL AND ?-giro>=?", (giro, EXPIRA_EM))
+
+
+def pendencias(store, st: dict, now: float) -> dict:
+    """O último estado de cada pendência no disparo e a causa por regra: a primeira que segura o loop, nesta ordem."""
+    ci = int(store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"])
+    teto = sum(int(n) for n in (st.get("recusas") or {}).values())
+    llm = float((store.get("self_dev_espera") or {}).get("ate", 0)) > now
+    causa = "aguardando CI" if ci else "aguardando teto" if teto else "aguardando LLM" if llm else "sem tarefa elegível"
+    return {"aguardando_ci": ci, "aguardando_teto": teto, "aguardando_llm": llm,
+            "sem_tarefa_elegivel": causa == "sem tarefa elegível", "causa": causa}
 
 
 def parado(store) -> dict | None:

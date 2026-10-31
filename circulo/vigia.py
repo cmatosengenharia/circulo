@@ -26,7 +26,7 @@ from typing import Any, Callable
 
 from . import roadmap
 from .decision import SN, Decision, Question, norm
-from .estagnacao import DESTRAVAR_EM, ESTAGNADO, parado
+from .estagnacao import ESTAGNADO, EXPIRA_EM, parado, pendencias
 from .licoes import Licoes
 from .metrics import seguro
 from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
@@ -47,7 +47,7 @@ ACOES = {"abrir_item": "a trava é estrutural e repetível: um item pequeno no r
          "alertar": "a trava é real mas transitória ou depende do humano/ambiente: avisar na linha do tempo basta",
          "observar": "ainda não dá para dizer se é trava: registrar e medir de novo na próxima passagem"}
 CONF_AGIR = 0.5
-ALVO_DESTRAVAR = 0.8            # dos disparos da estagnação com resultado, ao menos 80% destravam o loop em DESTRAVAR_EM giros
+ALVO_DESTRAVAR = 0.8            # dos disparos da estagnação com resultado, ao menos 80% destravam o loop em EXPIRA_EM giros
 
 
 def _um(s, sql, args=()):
@@ -243,7 +243,8 @@ def s_estagnacao(s, now):
     if sem < ESTAGNADO:
         return None
     return {"chave": "estagnacao", "titulo": f"{sem} giros seguidos com trabalho pendente e nada avançando",
-            "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}, "parado": parado(s)},
+            "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}, "parado": parado(s),
+                          "pendencias": pendencias(s, p, now)},
             "gravidade": min(1.0, sem / 20),
             "sugestao": "ver recusas do porteiro e a fila"}
 
@@ -589,11 +590,11 @@ def disparos_30d(store, chave: str, now: float | None = None) -> int:
 
 def resultado_30d(store, chave: str, now: float | None = None) -> dict[str, Any]:
     """Dos disparos de `chave` nos últimos 30 dias: quantos já têm resultado e a taxa dos que destravaram o loop em até
-    DESTRAVAR_EM giros (alvo ALVO_DESTRAVAR). O resultado é gravado pelo loop (estagnacao.medir_disparos)."""
+    EXPIRA_EM giros (alvo ALVO_DESTRAVAR), sobre os disparos fechados. O desfecho é gravado pelo loop (estagnacao.medir_disparos)."""
     r = store.one("SELECT COUNT(*) n, COUNT(resultado) com, COALESCE(SUM(resultado='destravou'), 0) d FROM vigia_disparos "
                   "WHERE chave=? AND em>=?", (chave, (now or time.time()) - 30 * 86400))
     return {"disparos": r["n"], "com_resultado": r["com"], "destravou": r["d"],
-            "taxa_destravou": round(r["d"] / r["com"], 2) if r["com"] else None, "em_giros": DESTRAVAR_EM, "alvo": ALVO_DESTRAVAR}
+            "taxa_destravou": round(r["d"] / r["com"], 2) if r["com"] else None, "em_giros": EXPIRA_EM, "alvo": ALVO_DESTRAVAR}
 
 
 def resumo(store, limite: int = 20) -> dict[str, Any]:
