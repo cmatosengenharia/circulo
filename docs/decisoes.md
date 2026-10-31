@@ -58,5 +58,5 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `planejador.py:382` | noul | português | O dado citado pelo planejador aparece de fato na evidência do loop? |
 | `projects.py:144` | choice | português | Que tipo de solução este pedido pede? |
 | `revisor.py:167` | noul | português | O PR do Developer `pr` é seguro para entrar na main junto com os outros PRs abertos `prs_abertos`? |
-| `vigia.py:357` | noul | português | O achado `achados.{…}.titulo` é uma trava real da autoevolução do loop agora? |
-| `vigia.py:362` | choice | português | O que o loop deve fazer com o achado `achados.{…}.titulo`? |
+| `vigia.py:359` | noul | português | O achado `achados.{…}.titulo` é uma trava real da autoevolução do loop agora? |
+| `vigia.py:364` | choice | português | O que o loop deve fazer com o achado `achados.{…}.titulo`? |
