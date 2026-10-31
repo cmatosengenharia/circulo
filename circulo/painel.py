@@ -27,6 +27,7 @@ from .orcamento_dia import limite_hoje, tokens_dia
 from .pedido_estado import pedidos, secao
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
+from .silencio import card_incidentes, sinais_7d
 from .state import Store
 from .uso_entregas import classificar, nome_uso, registrar_uso, resumo_7d
 
@@ -279,7 +280,10 @@ def saude(conn) -> dict:
     abertos = conn.execute("SELECT kind, stage, message, count FROM incidents WHERE status!='resolvido' "
                            "ORDER BY CASE status WHEN 'isolado' THEN 0 ELSE 1 END, last_seen DESC").fetchall()
     g = _um(conn, "SELECT ponto, ok, sujeito, motivo, created_at FROM verificacoes WHERE ponto LIKE 'gate:%' ORDER BY id DESC LIMIT 1")
+    estag, estrut = sinais_7d(conn, agora)
     out = {"giros": int(json.loads(tick[0])) if tick else 0, "jev_duvida_pct": _pct(jev), "incidentes_abertos": len(abertos),
+           "estagnacoes_7d": estag, "licoes_de_estrutura_7d": estrut,
+           "incidentes_card": card_incidentes(len(abertos), estag, estrut),
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
            "falhas_24h": falhas_por_causa(f24 := conn.execute(
                "SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
@@ -319,8 +323,9 @@ def pagina_saude(h: dict) -> bytes:
     g = h["gate"]
     gate = "—" if g is None else f"{'✓ ok' if g['ok'] else '✕ falhou'} · {g['ponto']} {g['sujeito'] or ''}"
     nums = (("Giros", str(h["giros"])), ("Jev em dúvida (24 h)", f"{h['jev_duvida_pct']}%"),
-            ("Incidentes abertos", str(h["incidentes_abertos"])),
             ("Falhas de LLM (7 d)", f"{h['llm_falhas_7d_pct']}% de {h['llm_chamadas_7d']}"), ("Gate (último)", gate))
+    incid = (f'<div class="card" style="border-left:5px solid var(--{(ic := h["incidentes_card"])["tom"]})"><span>Incidentes abertos</span>'
+             f'<b>{ic["valor"]}</b><small style="color:var(--{ic["tom"]})">{ic["glifo"]} {escape(ic["texto"])}</small></div>')
     causa = f'<p class="causa" style="color:var(--{tom})"><b>Causa:</b> {escape(h["causa"])}</p>' if h["causa"] else ""
 
     def delta(atual, anterior):
@@ -368,7 +373,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
             f'<main>{componentes}{pedido}{falhas}{sem_uso}{contest}{plano}{modelo_menor.card(h["modelos_menores"])}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
-            f'<b>{glifo} {h["semaforo"]}</b></div>'
+            f'<b>{glifo} {h["semaforo"]}</b></div>{incid}'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
 

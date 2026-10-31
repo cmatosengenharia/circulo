@@ -208,6 +208,39 @@ def test_faixa_de_saude_verde_sem_sinal_ruim(tmp_path):
     from circulo.state import Store
     h = saude(Store(tmp_path / "s.db").db)
     assert h["semaforo"] == "verde" and h["causa"] is None and h["gate"] is None
+    assert h["incidentes_card"]["tom"] == "ok" and "Incidentes abertos" in pagina_saude_html(h)
+
+
+def pagina_saude_html(h):
+    from circulo.painel import pagina_saude
+    return pagina_saude(h).decode()
+
+
+def test_incidentes_zero_com_estagnacoes_e_licoes_de_estrutura_e_silencio_suspeito(tmp_path):
+    """Pergunta #619 (cetico): incidentes_abertos=0 só é verde se estagnações e lições de estrutura abertas
+    dos últimos 7 dias também forem 0; senão o card sai âmbar com os dois números."""
+    import time
+
+    from circulo.painel import card_incidentes, saude
+    from circulo.state import Store
+    assert card_incidentes(0, 29, 13) == {"tom": "llm", "glifo": "!", "valor": "0",
+                                          "texto": "sem incidente, mas 29 estagnações e 13 lições de estrutura"}
+    assert card_incidentes(0, 1, 0)["tom"] == "llm" and card_incidentes(0, 0, 0)["tom"] == "ok"
+    st = Store(tmp_path / "s.db")
+    agora = time.time()
+    for i in range(29):
+        st.x("INSERT INTO verificacoes(tick,ponto,ok,created_at) VALUES(1,'loop:progresso',0,?)", (agora - i,))
+    st.x("INSERT INTO verificacoes(tick,ponto,ok,created_at) VALUES(1,'loop:progresso',0,?)", (agora - 8 * 86400,))
+    for i, status in enumerate(["aberta"] * 10 + ["reincidente"] * 2 + ["sem_prevencao"] + ["validada", "obsoleta"]):
+        st.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,created_at,updated_at) "
+             "VALUES(?,'loop:progresso','estrutural','x',?,1,0,?,?)", (f"s{i}", status, agora, agora))
+    st.x("INSERT INTO licoes(assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,created_at,updated_at) "
+         "VALUES('velha','x','estrutural','x','aberta',1,0,?,?)", (agora - 8 * 86400, agora - 8 * 86400))
+    h = saude(st.db)
+    assert h["incidentes_abertos"] == 0 and h["estagnacoes_7d"] == 29 and h["licoes_de_estrutura_7d"] == 13
+    assert h["incidentes_card"]["tom"] == "llm"
+    html = pagina_saude_html(h)
+    assert "sem incidente, mas 29 estagnações e 13 lições de estrutura" in html and "var(--llm)" in html
 
 
 def test_falhas_do_painel_agrupadas_por_causa_somam_o_total_e_aparecem_no_topo(tmp_path):
