@@ -21,6 +21,7 @@ ABERTAS = ("aberta", "reincidente", "sem_prevencao")
 SILENCIO_DIAS = 14
 CHECAGEM = re.compile(r"(?i)\bchecagem:([^;]*)")
 PORTAO = re.compile(r"portão #(\d+)")
+JA_CORRIGIDO = re.compile(r"(?i)\s*j[áa] corrigido\b")
 COM_CHECAGEM = ("aberta", "em_correcao", "reincidente", "validada", "evidenciada")
 
 
@@ -77,13 +78,20 @@ def curar(store, ler: Callable[[str], str | None]) -> list[str]:
     return log
 
 
-def checagem_resolvivel(store, repo, checagem: str) -> bool:
-    """A checagem cita ao menos um teste ou portão, e todo teste citado existe e roda e todo portão citado está ativo."""
-    from .prevencao import TESTE_CITADO, irresolviveis
-    portoes = PORTAO.findall(checagem)
-    if not (portoes or TESTE_CITADO.search(checagem)) or any(irresolviveis(repo, checagem)):
+def checagem_resolvivel(store, repo, checagem: str, lic: dict) -> bool:
+    """A checagem cita ao menos um teste ou portão e todo teste citado existe e roda. Um id tests/arq.py::nome citado
+    basta. Sem ele, a lição 'Já corrigido' (pergunta #762) só fica com um portão ativo que roda contra o código
+    (comando: pytest, lint); as outras, com todo portão citado ativo e que a segura (`prevencao.segura`)."""
+    from .prevencao import TESTE_CITADO, irresolviveis, segura
+    portoes = [store.one("SELECT tipo FROM portoes WHERE id=? AND ativo=1", (int(n),)) for n in PORTAO.findall(checagem)]
+    citados = TESTE_CITADO.findall(checagem)
+    if not (portoes or citados) or any(irresolviveis(repo, checagem)):
         return False
-    return all(store.one("SELECT 1 FROM portoes WHERE id=? AND ativo=1", (int(p),)) for p in portoes)
+    if any("::" in t for t in citados):
+        return True
+    if JA_CORRIGIDO.match(lic.get("prevencao") or ""):
+        return any(p and p["tipo"] == "comando" for p in portoes)
+    return all(p and segura(p, lic) for p in portoes)
 
 
 def exigir_checagem(store, repo) -> list[str]:
@@ -96,7 +104,7 @@ def exigir_checagem(store, repo) -> list[str]:
     for lic in map(dict, store.q(f"SELECT * FROM licoes WHERE status IN ({','.join('?' * len(COM_CHECAGEM))}) "
                                  "AND prevencao LIKE '%checagem:%'", COM_CHECAGEM)):
         checagem = CHECAGEM.search(lic["prevencao"]).group(1).strip()
-        if checagem_resolvivel(store, repo, checagem):
+        if checagem_resolvivel(store, repo, checagem, lic):
             continue
         store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
                 (sem_prevencao(lic), agora, lic["id"]))

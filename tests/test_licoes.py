@@ -765,3 +765,65 @@ def test_licoes_12_7_15_17_73_evidenciadas_com_teste_de_fechada_irresolvivel_rea
         assert f"lição #{lid} sem prevenção" in log
     assert "skip/xfail" in st[15]["prevencao"] and "skip/xfail" in st[17]["prevencao"]
     assert st[73]["status"] == "evidenciada"
+
+
+def test_licao_47_ja_corrigido_pelo_portao_obrigatorio_vira_sem_prevencao_e_pede_teste(circle, tmp_path):
+    """Lição #47 (pergunta do conselho #762): 'Já corrigido (PR #244 mergeado); checagem: portão #28 teste de regressão
+    marcado com a lição #47' e reincidiu 8x. O portão obrigatório só exige um texto no PR, não roda contra o código:
+    depois de reincidir não segura a lição. Ela cai para sem_prevencao, aparece em sem_checagem, ganha o item do teste
+    e não volta a 'validada' pelo mesmo portão no giro seguinte. A que cita tests/arq.py::nome que existe fica."""
+    from circulo.curador_licoes import sem_checagem
+    s = circle.store
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    (repo / "tests" / "test_loop.py").write_text("def test_progresso():\n    pass\n")
+    for a in (["init", "-q", "-b", "main"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"]):
+        subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
+    s.x("INSERT INTO roadmap(id,titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+        "VALUES(244,'estagnado','x','erro','feito','PR #244 mergeado',1,0,0)")
+    desc = "loop:progresso: havia trabalho pendente e nada avançou em 10 giros"
+    for lid, checagem in ((47, "portão #28 teste de regressão marcado com a lição #47"),
+                          (46, "teste tests/test_loop.py::test_progresso")):
+        _licao(s, lid, 8, s.tick, ponto="loop:estagnado", status="reincidente",
+               prevencao=f"Já corrigido (PR #244 mergeado); checagem: {checagem}; não repetir: {desc}")
+        s.x("UPDATE licoes SET item_id=? WHERE id=?", (244 if lid == 47 else None, lid))
+        s.x("INSERT INTO portoes(id,neuronio,tipo,spec,descricao,licao_id,ativo,avaliacoes,bloqueios,created_at,updated_at) "
+            "VALUES(?,'abrir_pr','obrigatorio',?,?,?,1,0,0,0,0)",
+            (lid - 19, json.dumps({"regex": f"lição #{lid}", "em": "teste", "item": 244}),
+             f"teste de regressão marcado com a lição #{lid}", lid))
+    L = Licoes(s, repo=repo)
+    L.revisar()
+    L.revisar()
+    st = {r["id"]: r for r in s.q("SELECT id, status, prevencao FROM licoes")}
+    assert st[47]["status"] == "sem_prevencao" and st[47]["prevencao"].startswith("Sem prevenção verificável")
+    assert sem_checagem(s) == [47]
+    assert s.one("SELECT 1 FROM perguntas WHERE chave='licao:47:teste_regressao' AND item_id IS NOT NULL")
+    assert st[46]["status"] == "reincidente"
+
+
+def test_licao_47_ja_corrigido_so_fica_com_id_caminho_nome_que_existe(circle, tmp_path):
+    """Lição #47 (pergunta do conselho #762): toda lição 'Já corrigido' cuja checagem não resolve para um id
+    tests/arq.py::nome que existe (ou um portão que roda contra o código) cai para sem_prevencao e entra em
+    sem_checagem, mesmo sem reincidir: texto livre, portão obrigatório e arquivo sem ::nome. Fica a que cita o id que
+    existe (mesmo ao lado de um portão obrigatório) e a de portão de lint."""
+    from circulo.curador_licoes import sem_checagem
+    s = circle.store
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    (repo / "tests" / "test_loop.py").write_text("def test_progresso():\n    pass\n")
+    for a in (["init", "-q", "-b", "main"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"]):
+        subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
+    for pid, tipo in ((30, "obrigatorio"), (31, "comando")):
+        s.x("INSERT INTO portoes(id,neuronio,tipo,spec,descricao,licao_id,ativo,avaliacoes,bloqueios,created_at,updated_at) "
+            "VALUES(?,'abrir_pr',?,?,'x',NULL,1,0,0,0,0)", (pid, tipo, json.dumps({"n": pid})))
+    casos = {60: "revisão do loop no portão do PR", 61: "portão #30 teste de regressão marcado com a lição #61",
+             62: "teste tests/test_loop.py", 63: "teste tests/test_loop.py::test_progresso, portão #30",
+             64: "portão #31 lint B905"}
+    for lid, checagem in casos.items():
+        _licao(s, lid, 0, s.tick, status="validada",
+               prevencao=f"Já corrigido (PR #244 mergeado); checagem: {checagem}; não repetir: erro {lid}")
+    Licoes(s, repo=repo).revisar()
+    Licoes(s, repo=repo).revisar()
+    st = {r["id"]: r["status"] for r in s.q("SELECT id, status FROM licoes")}
+    assert [st[i] for i in casos] == ["sem_prevencao"] * 3 + ["validada"] * 2
+    assert sem_checagem(s) == [60, 61, 62]

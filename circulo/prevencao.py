@@ -115,6 +115,12 @@ def teste_de_regressao(repo, lic: dict) -> str | None:
     return None
 
 
+def segura(portao, lic: dict) -> bool:
+    """Lição #47 (pergunta #762): o portão obrigatório só exige um texto no PR (o teste marcado com a lição), não roda
+    contra o código; a lição que reincidiu provou que ele não a segura. Os outros portões executam (lint, pytest)."""
+    return portao["tipo"] != "obrigatorio" or not lic.get("reincidencias")
+
+
 def checagem_de(store, lic: dict, repo=None) -> str | None:
     """O que segura a lição sem depender de texto: o teste dela (node id ou alias da causa), o teste de regressão
     que o item dela cobra, um portão aprendido executável, ou o portão do teste de regressão que o PR do item já
@@ -128,7 +134,7 @@ def checagem_de(store, lic: dict, repo=None) -> str | None:
         return None
     feito = lic.get("item_id") and store.one("SELECT 1 FROM roadmap WHERE id=? AND status='feito'", (lic["item_id"],))
     for p in store.q("SELECT id, tipo, descricao FROM portoes WHERE licao_id=? AND ativo=1 ORDER BY id", (lic["id"],)):
-        if p["tipo"] != "obrigatorio" or feito:
+        if segura(p, lic) and (p["tipo"] != "obrigatorio" or feito):
             return f"portão #{p['id']} {p['descricao']}"
     return None
 
