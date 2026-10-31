@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from . import jobs, jtbd, pedido_claro, pedidos_repetidos
+from .curador_licoes import sem_checagem
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
 from .higiene import licoes_de_telemetria
@@ -421,7 +422,7 @@ def _m_licoes_abertas(s, agora):
     sombra = s.get("curador_silencio") or {}           # gravado pelo curador a cada giro
     return (min(1.0, n / 6), {"licoes_abertas": n, "licoes_telemetria": len(licoes_de_telemetria(s)),
                               "licoes_elegiveis_silencio": sombra.get("licoes_elegiveis_silencio"),
-                              "ultima_ocorrencia": sombra.get("elegiveis")})
+                              "ultima_ocorrencia": sombra.get("elegiveis"), "sem_checagem": sem_checagem(s)})
 
 
 def _m_lancamentos(s, agora):
