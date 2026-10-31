@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import jobs, jtbd, pedido_claro, pedidos_repetidos
+from . import financeiro, jobs, jtbd, pedido_claro, pedidos_repetidos
 from .curador_licoes import sem_checagem
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
@@ -426,8 +426,10 @@ def _m_licoes_abertas(s, agora):
 
 
 def _m_lancamentos(s, agora):
-    n = _um(s, "SELECT COUNT(*) FROM ledger")
-    return (1.0 if n == 0 else max(0.0, 1 - n / 30), {"lancamentos": n})
+    p = financeiro.prontidao(s)
+    n = p["reais"]
+    return (1.0 if n == 0 else max(0.0, 1 - n / p["minimo_lancamentos"]),
+            {"lancamentos": _um(s, "SELECT COUNT(*) FROM ledger"), **p})
 
 
 def _m_pedidos_humano(s, agora):
