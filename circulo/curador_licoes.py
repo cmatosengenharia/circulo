@@ -19,6 +19,9 @@ FECHAVEIS = ("aberta", "em_correcao", "reincidente")
 ARQUIVO = re.compile(r"\b((?:circulo|tests)/[\w/]+\.py)\b")
 ABERTAS = ("aberta", "reincidente", "sem_prevencao")
 SILENCIO_DIAS = 14
+CHECAGEM = re.compile(r"(?i)\bchecagem:([^;]*)")
+PORTAO = re.compile(r"portão #(\d+)")
+COM_CHECAGEM = ("aberta", "em_correcao", "reincidente", "validada", "evidenciada")
 
 
 def node_ids(texto: str) -> list[str]:
@@ -74,6 +77,40 @@ def curar(store, ler: Callable[[str], str | None]) -> list[str]:
     return log
 
 
+def checagem_resolvivel(store, repo, checagem: str) -> bool:
+    """A checagem cita ao menos um teste ou portão, e todo teste citado existe e roda e todo portão citado está ativo."""
+    from .prevencao import TESTE_CITADO, irresolviveis
+    portoes = PORTAO.findall(checagem)
+    if not (portoes or TESTE_CITADO.search(checagem)) or any(irresolviveis(repo, checagem)):
+        return False
+    return all(store.one("SELECT 1 FROM portoes WHERE id=? AND ativo=1", (int(p),)) for p in portoes)
+
+
+def exigir_checagem(store, repo) -> list[str]:
+    """Lição #47 (pergunta do conselho #645): 'Já corrigido (PR #244 mergeado); checagem: ' vazia, e reincidiu 8x. A lição
+    fechada ou reincidente cuja Prevenção declara uma checagem vazia ou que não resolve cai para sem_prevencao, com um
+    elo 'sem_checagem' (idempotente pela checagem)."""
+    from .prevencao import sem_prevencao
+    from .rastro import elo
+    log, agora = [], time.time()
+    for lic in map(dict, store.q(f"SELECT * FROM licoes WHERE status IN ({','.join('?' * len(COM_CHECAGEM))}) "
+                                 "AND prevencao LIKE '%checagem:%'", COM_CHECAGEM)):
+        checagem = CHECAGEM.search(lic["prevencao"]).group(1).strip()
+        if checagem_resolvivel(store, repo, checagem):
+            continue
+        store.x("UPDATE licoes SET status='sem_prevencao', prevencao=?, updated_at=? WHERE id=?",
+                (sem_prevencao(lic), agora, lic["id"]))
+        elo(store, f"licao:{lic['id']}", f"checagem:{checagem or 'vazia'}", "sem_checagem", {"status": lic["status"]})
+        log.append(f"lição #{lic['id']} sem prevenção: checagem '{checagem}' não resolve")
+    return log
+
+
+def sem_checagem(store) -> list[int]:
+    """As lições ainda sem_prevencao que o curador rebaixou por checagem vazia ou que não resolve."""
+    return [r["id"] for r in store.q("SELECT DISTINCT l.id FROM licoes l JOIN elos e ON e.de='licao:' || l.id "
+                                     "WHERE e.relacao='sem_checagem' AND l.status='sem_prevencao' ORDER BY l.id")]
+
+
 def arquivos(texto: str) -> list[str]:
     return list(dict.fromkeys(ARQUIVO.findall(texto or "")))
 
@@ -124,4 +161,4 @@ def curar_no_main(store, repo) -> list[str]:
             p = _git(repo, "show", f"{ref}:{arquivo}")
             fontes[arquivo] = p.stdout if p.returncode == 0 else None
         return fontes[arquivo]
-    return curar(store, ler)
+    return curar(store, ler) + exigir_checagem(store, repo)

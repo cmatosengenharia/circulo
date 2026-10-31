@@ -110,3 +110,32 @@ def test_curador_em_sombra_grava_a_contagem_mesmo_sem_a_main(circle):
     licao(circle.store, 93, "planejador: ValueError em circulo/alvo.py", status="reincidente")
     curar_no_main(circle.store, None)
     assert circle.store.get("curador_silencio")["licoes_elegiveis_silencio"] == 0
+
+
+def test_licao_47_corrigida_com_checagem_vazia_ou_inexistente_volta_a_sem_prevencao(circle, tmp_path):
+    """Lição #47 (pergunta do conselho #645): 'Já corrigido (PR #244 mergeado); checagem: ' vazia, e reincidiu 8x. A lição
+    corrigida, validada ou reincidente cuja checagem não cita um teste que existe nem um portão ativo cai para
+    sem_prevencao, com um elo só (idempotente), e aparece na leitura do curador."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q", "-b", "main")
+    commit(repo, {"tests/test_loop.py": "def test_progresso():\n    pass\n"})
+    s = circle.store
+    desc = "loop:progresso: havia trabalho pendente e nada avançou em 10 giros"
+    for lid, st, checagem in ((47, "reincidente", ""), (48, "validada", "teste tests/test_loop.py::test_sumiu"),
+                              (49, "reincidente", "teste tests/test_loop.py::test_progresso"),
+                              (50, "evidenciada", "portão #7 lint B905"), (51, "reincidente", "portão #8 lint F811")):
+        licao(s, lid, desc, status=st, assinatura=f"loop:estagnado:{lid}")
+        s.x("UPDATE licoes SET reincidencias=8, prevencao=? WHERE id=?",
+            (f"Já corrigido (PR #244 mergeado); checagem: {checagem}; não repetir: {desc}", lid))
+    agora = time.time()
+    s.x("INSERT INTO portoes(id,neuronio,tipo,spec,descricao,licao_id,ativo,avaliacoes,bloqueios,created_at,updated_at) "
+        "VALUES(7,'abrir_pr','comando','{}','lint B905',50,1,0,0,?,?)", (agora, agora))
+    curar_no_main(s, repo)
+    curar_no_main(s, repo)
+    assert [status(s, i) for i in (47, 48, 49, 50, 51)] == ["sem_prevencao", "sem_prevencao", "reincidente", "evidenciada",
+                                                            "sem_prevencao"]
+    assert s.one("SELECT prevencao FROM licoes WHERE id=47")["prevencao"].startswith("Sem prevenção verificável")
+    assert s.one("SELECT COUNT(*) n FROM elos WHERE relacao='sem_checagem'")["n"] == 3
+    _, evidencia = METRICAS["licoes_abertas"][1](s, time.time())
+    assert evidencia["sem_checagem"] == [47, 48, 51]
