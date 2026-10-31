@@ -14,20 +14,20 @@ from __future__ import annotations
 
 import functools
 import random
-import re
 import time
 from typing import Any, Callable
+
+from .llm import EXTERNA, FalhaExterna, conferir_saida
 
 FECHADO, ABERTO, MEIO_ABERTO = "fechado", "aberto", "meio-aberto"
 KV = "disjuntor_llm"
 BASE_S = 300            # primeira pausa
-TETO_S = 6 * 3600       # nenhuma pausa passa disso
+TETO_S = 3600           # nenhuma pausa passa disso (pergunta #576)
 TESTE_S = 3600          # a chamada de teste do meio-aberto sem desfecho depois disso libera outra
 JITTER = 0.25          # a pausa vai de 75% a 100% do degrau: o próximo degrau (2×) é sempre maior
-EXTERNA = re.compile(r"credit balance", re.I)
 
 
-class CircuitoAberto(RuntimeError):
+class CircuitoAberto(FalhaExterna):
     """A LLM está em pausa pelo disjuntor (conta sem crédito); nenhuma chamada saiu."""
 
 
@@ -99,7 +99,7 @@ class LLMProtegida:
         if not self._passo("consulta"):
             raise CircuitoAberto(f"LLM em pausa pelo disjuntor até {self._store.get(KV)['proxima']:.0f} (sem crédito)")
         try:
-            r = getattr(self._llm, metodo)(*a, **kw)
+            r = conferir_saida(getattr(self._llm, metodo)(*a, **kw))
         except Exception as exc:
             self._passo(classificar(str(exc)))
             raise

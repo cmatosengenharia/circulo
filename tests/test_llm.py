@@ -47,6 +47,39 @@ def test_causa_por_regra_timeout_e_saida_invalida_sao_transitorias():
     assert causa_da_falha(RuntimeError("provedor caiu")) == "desconhecida"
 
 
+class LLMSemCreditoNaSaida:
+    """A conta sem crédito que volta como texto de resposta (sem exceção): antes virava a entrega e a barra da missão."""
+
+    def __init__(self):
+        self.chamadas, self.texto = 0, "Credit balance is too low"
+
+    def generate(self, *, system, prompt, model, max_tokens, web_search=0):
+        self.chamadas += 1
+        return LLMResult(self.texto, 0, model, entrada=10, saida=5)
+
+
+def test_credito_esgotado_e_causa_externa_e_pausa_as_chamadas_com_um_aviso():
+    """Pergunta #576 (lição #54): 'credit balance is too low' é falha externa por regra, não 'desconhecida'. Na saída,
+    abre o disjuntor antes de virar entrega; 5 falhas seguidas dão 1 aviso e 0 chamadas na pausa, de no máximo 1 h;
+    a primeira chamada que passa fecha o disjuntor."""
+    from circulo.disjuntor import FECHADO, KV, LLMProtegida, pausa
+    assert causa_da_falha(RuntimeError("claude -p: Credit balance is too low")) == "externa"
+    s, llm, relogio = Store(), LLMSemCreditoNaSaida(), [1000.0]
+    protegida = LLMProtegida(llm, s, agora=lambda: relogio[0])
+    for _ in range(5):
+        with pytest.raises(Exception) as erro:
+            _gerar(s, protegida)
+        assert causa_da_falha(erro.value) == "externa"
+    assert llm.chamadas == 1
+    assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'LLM em pausa%'")["n"] == 1
+    assert s.get(KV)["proxima"] - relogio[0] <= 3600 and pausa(30, 1.0) <= 3600
+    relogio[0] = s.get(KV)["proxima"]
+    llm.texto = "ok"
+    out = llm_cache.gerar(s, protegida, papel="builder", project_id=1, system="sys", prompt="teste do meio-aberto",
+                          model="m", max_tokens=100)
+    assert out.text == "ok" and s.get(KV)["estado"] == FECHADO and llm.chamadas == 2
+
+
 def test_causa_desconhecida_nao_gera_retry():
     s, llm = Store(), LLMQueFalha(RuntimeError("provedor caiu"))
     with pytest.raises(RuntimeError):

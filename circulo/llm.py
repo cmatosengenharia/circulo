@@ -63,10 +63,27 @@ PORTE_ANTHROPIC = {"claude-haiku-5-5": "pequena", "claude-sonnet-5-5": "grande"}
 
 
 MAX_RETRY = 1                # retries por chamada de neurônio, só em llm_cache.gerar (pergunta #563)
+EXTERNA = re.compile(r"credit balance", re.I)      # conta sem crédito: não depende do código nem passa repetindo
+
+
+class FalhaExterna(RuntimeError):
+    """A LLM não pode responder por causa de fora do código (conta sem crédito): nenhuma lição nem retry resolve."""
+
+
+def conferir_saida(saida):
+    """A resposta que é a própria falta de crédito (curta: uma entrega que só cita o termo passa) vira FalhaExterna antes
+    de chegar a quem a usaria como entrega."""
+    texto = getattr(saida, "text", saida[0] if isinstance(saida, tuple) else saida)
+    if isinstance(texto, str) and len(texto) <= 200 and EXTERNA.search(texto):
+        raise FalhaExterna(f"saída da LLM: {texto}")
+    return saida
 
 
 def causa_da_falha(exc: BaseException) -> str:
-    """A causa da falha pela regra do item #299 (vigia.classificar_causa): timeout e saída inválida são transitórias."""
+    """A causa da falha por regra: 'externa' (conta sem crédito) antes de tudo; o resto pela regra do item #299
+    (vigia.classificar_causa): timeout e saída inválida são transitórias."""
+    if isinstance(exc, FalhaExterna) or EXTERNA.search(str(exc)):
+        return "externa"
     from .vigia import classificar_causa
     return classificar_causa(f"{type(exc).__name__}: {exc}")
 
