@@ -28,7 +28,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `causas.py` | 25 | Alias causa raiz → node id: lição sem teste próprio herda a checagem determinística de outra lição da mesma causa. |
 | `changelog.py` | 25 | Changelog semanal: os PRs mergeados em 7 dias agrupados em produto e infra, cada um com o pedido de origem, e a fração de produto contra a meta do Norte. Usa os PRs de `digest_semanal.prs_da_semana`; PR sem origem sai marcado 'sem pedido', nunca omitido. |
 | `ci_causa.py` | 74 | Causa da falha de CI pelos sinais diretos da API de checks, não pela contagem de checks que caíram. |
-| `cli.py` | 259 | circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas |
+| `cli.py` | 264 | circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas |
 | `cofre.py` | 247 | Cofre de chaves: o cadastro das integrações sai do arquivo de texto e vai para o cofre do sistema. |
 | `conexoes.py` | 129 | Conexões ao vivo: o que o loop depende de fora — Jev, Claude Code, LLM, GitHub — e se cada uma responde agora. |
 | `confianca.py` | 427 | Central de confiança: a pergunta que o painel responde primeiro é "posso confiar no loop agora?". |
@@ -39,7 +39,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `corpo.py` ⚖️ | 237 | Corpo: o loop passa a rodar o código que ele mesmo evoluiu, com evidência antes e depois. |
 | `corpo_caminho.py` | 65 | Caminho livre para o corpo trocar de código (lição #1). |
 | `corpo_pr.py` | 63 | Corpo do PR do Developer: template fixo de impacto e risco. |
-| `curador_licoes.py` | 164 | Curador de lições (pergunta do conselho #190): a lição que cita um node id de pytest que não existe em tests/ não tem o que corrigir. Ela fecha (`obsoleta`) com a causa e reabre se o teste citado aparecer. |
+| `curador_licoes.py` | 172 | Curador de lições (pergunta do conselho #190): a lição que cita um node id de pytest que não existe em tests/ não tem o que corrigir. Ela fecha (`obsoleta`) com a causa e reabre se o teste citado aparecer. |
 | `custo.py` | 84 | Custo do Developer por desfecho do item: quanto do gasto virou PR e quanto foi para item sem PR. |
 | `daily.py` | 103 | Pauta da daily às 8h, por assunto: o que fiz ontem (das notas), o que farei hoje (pendências) e o que me bloqueia. |
 | `decision.py` | 1000 | DecisionLayer — Jev First: todo ponto do círculo que vai gastar recurso pergunta primeiro aqui. JevHttpClient (API da TypeSafe, POST /v1/systemone) e LocalJev (regra determinística) têm o MESMO contrato. |
@@ -54,7 +54,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `eficacia.py` | 131 | Veredito de eficácia por PR mergeado: o critério de sucesso do item melhorou de verdade ou só oscilou? |
 | `engine.py` | 630 | Motor genérico de projetos: o "kit geral" que atende qualquer tipo de pedido. |
 | `equipe.py` | 375 | A equipe: os agentes do loop vistos como um time de engenharia que entrega qualquer produto. |
-| `estagnacao.py` | 58 | A causa medida da estagnação: o que cada giro parado fez de fato (lição #47). |
+| `estagnacao.py` | 68 | A causa medida da estagnação: o que cada giro parado fez de fato (lição #47). |
 | `estudo.py` | 282 | Neurônio de estudo: o pedido é uma hipótese, não uma ordem gravada em pedra. |
 | `evolution.py` | 403 | Meta-Learner (evolução nível 1 e 2), Shadow mode e Health Monitor (rollback automático). |
 | `falhas_painel.py` | 71 | Funções puras do card de falhas do painel: agrupar por causa e por componente e o delta contra as 24 h anteriores. |
@@ -83,7 +83,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `json_llm.py` | 73 | A única forma de ler o objeto JSON que uma LLM respondeu (lição #22). |
 | `jtbd.py` | 50 | O agrupador de jobs ligado ao loop: no idle, cada job com ≥3 pedidos em 7 dias vira a missão 'antecipar:<job>' e exatamente 1 proposta antecipada no roteiro, presa à última pergunta do entrevistador_jtbd (lição #15). Os pedidos vêm dos eventos (job gravado) e dos itens 'pedido_cassio' do roteiro (job pelas palavras-chave do texto). |
 | `kit.py` | 196 | `circulo init`: o motor do loop cuidando de QUALQUER repositório, não só deste. |
-| `lancamento_manual.py` | 96 | Entrada manual de uma linha ('mercado 45,90 ontem') → lançamento, sem LLM. |
+| `lancamento_manual.py` | 131 | Entrada manual de uma linha ('mercado 45,90 ontem') → lançamento, sem LLM. |
 | `lancamentos_email.py` | 41 | E-mail de notificação do banco → lançamentos, sem rede e sem LLM (o texto chega pronto, nunca do Gmail aqui). |
 | `lancamentos_import.py` | 138 | Importa extrato bancário (OFX/CSV) para o ledger, sem rede e sem LLM. |
 | `lancamentos_pasta.py` | 131 | Pasta monitorada de extratos: cada .ofx/.csv/.eml novo vai para o ledger e sai da pasta. |
@@ -124,7 +124,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `policy.py` ⚖️ | 282 | Política do círculo: versionada, com guard que impede a auto-evolução de remover proteções. |
 | `portao_previo.py` | 63 | Portão de reincidência (pergunta do conselho #85): não abrir PR de item que já fechou 2x sem merge com os mesmos checks. |
 | `pre_pr.py` | 85 | Portão pré-PR (pergunta do conselho #74): não abrir PR enquanto o CI da main está vermelho ou nem iniciou. |
-| `prevencao.py` | 255 | Lição #15 (pergunta #239): a lição só fica 'validada' se a Prevenção cita um teste ou uma checagem determinística. |
+| `prevencao.py` | 261 | Lição #15 (pergunta #239): a lição só fica 'validada' se a Prevenção cita um teste ou uma checagem determinística. |
 | `projects.py` | 301 | Projetos vivos: cada pedido vira um projeto que o círculo evolui com o propósito dele. |
 | `prova.py` | 72 | Prova de melhora por item mergeado (pergunta do conselho #57): a métrica do critério de sucesso do item, lida no planejamento (antes) e 7 dias depois do merge (depois), gravada na trilha (`elos`: item:N → medicao:N:antes|depois). |
 | `rastro.py` | 448 | Rastreabilidade de ponta a ponta: de onde veio cada mudança do loop até a prova de que ela funciona rodando. |
@@ -151,7 +151,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `uso_entregas.py` | 83 | Entregas de produto sem uso: os PRs de produto mergeados há 7 dias ou mais sem nenhum evento com o nome do `evento_esperado` gravado no merge depois do `merged_at`. Uso anterior ao merge não conta: é de antes da entrega. O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, em `entrega_uso` (gravado pela rota do painel chamada, com o último instante por nome) e nos `events` do loop (kind). |
 | `validador.py` | 135 | Validador: os agentes de validação que ficam entre o Developer e o PR (1.70). |
 | `verificacao.py` | 150 | Verificação de ponta a ponta do painel, com um mapa de funcionalidades (Lauren Tan: "verification skills"). |
-| `vigia.py` | 613 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
+| `vigia.py` | 614 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
 
 ## Telas
 
