@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 59 · **correcao** 44 · **funcionalidade** 42 · **documentacao** 30 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 59 · **correcao** 43 · **funcionalidade** 41 · **documentacao** 32 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #292 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #291 | 31/10/2026 | documentacao (0%) | sim | Métrica 'lancamentos_reais' com mínimo exigido: faltam N lançamentos e M meses para a 1ª resposta | pergunta do financeiro: “A métrica 'lancamentos' é 1.0 (falta total de dados reais), mas não diz quanto f” |
 | #290 | 31/10/2026 | observabilidade (80%) | — | Latência pedido→merge: etapa dominante dos 5 PRs mais lentos, derivada das decisões do gate já… | pergunta do tech_lead: “Nos pedidos do humano da última semana, quanto tempo passou entre o pedido e o P” |
 | #289 | 31/10/2026 | observabilidade (78%) | sim | Estagnação: gravar item, estado e etapa parados no registro de cada disparo e usar como causa | pergunta do analista_reincidencia: “A lição #47 (loop:estagnado: trabalho pendente e nada avançou em 10 giros) reinc” |
 | #288 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 59 · **correcao** 44 · **funcionalidade** 42 · 
 | #95 | 21/10/2026 | seguranca (56%) | sim | Tipo Origem(pergunta_id) validado, sem DB, em circulo/roadmap.py | item #132 (sub_item) |
 | #94 | 21/10/2026 | observabilidade (62%) | sim | Dar ao estado de evidencia_sustenta o resultado medido do teste citado e as execuções seguidas | pergunta do economista: “O Jev decide “evidencia_sustenta” com dúvida (a regra decidiu 35% de 20 vezes em” |
 | #93 | 21/10/2026 | observabilidade (63%) | sim | revisar_prs: classificar a causa da falha e adiar sem gastar (rede, checks pendentes, atrás da main) | pergunta do operador: “O neurônio execucao:idle:revisar_prs foi barrado 3 de 3 vezes em 24 h: qual é a ” |
-| #92 | 21/10/2026 | funcionalidade (41%) | sim | Lição #56: Corrigir erro: RuntimeError em idle:propor_feature | item #127 (erro) |
-| #91 | 21/10/2026 | correcao (94%) | sim | Lição #54: developer:agente: credit balance is too low — Credit balance is too low | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
