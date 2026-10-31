@@ -26,7 +26,7 @@ from typing import Any, Callable
 
 from . import roadmap
 from .decision import SN, Decision, Question, norm
-from .estagnacao import DESTRAVAR_EM, ESTAGNADO
+from .estagnacao import DESTRAVAR_EM, ESTAGNADO, parado
 from .licoes import Licoes
 from .metrics import seguro
 from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
@@ -243,7 +243,8 @@ def s_estagnacao(s, now):
     if sem < ESTAGNADO:
         return None
     return {"chave": "estagnacao", "titulo": f"{sem} giros seguidos com trabalho pendente e nada avançando",
-            "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}}, "gravidade": min(1.0, sem / 20),
+            "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}, "parado": parado(s)},
+            "gravidade": min(1.0, sem / 20),
             "sugestao": "ver recusas do porteiro e a fila"}
 
 

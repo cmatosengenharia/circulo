@@ -601,7 +601,7 @@ class Circle:
         st.setdefault("desde", time.time())
         anotar_giro(st, r)
         if st["sem"] in (ESTAGNADO, ESTAGNADO * 5, ESTAGNADO * 25):
-            causa = causa_provavel(st)
+            causa = causa_provavel(st, s)
             from .licoes import registrar as monitorar
             monitorar(self.ctx, "loop:progresso", False, sujeito=f"{st['sem']} giros sem avançar",
                       motivo=f"havia trabalho pendente e nada avançou em {st['sem']} giros; causa provável: {causa}",
