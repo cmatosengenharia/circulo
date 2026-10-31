@@ -165,3 +165,56 @@ def test_sem_marcador_de_conflito_no_repositorio():
         if any(linha.startswith((abre, fecha)) or linha == meio for linha in linhas):
             sujos.append(nome)
     assert sujos == []
+
+
+def test_simulacao_de_estagnacao_dispara_uma_vez_zera_e_registra_se_destravou(circle, monkeypatch):
+    """Pergunta #666 (lição #47): pendência sintética que não avança por N giros. A métrica passa do limiar, a ação
+    dispara uma única vez, giros_sem_avanco volta a 0 com o avanço e cada disparo grava se destravou em DESTRAVAR_EM giros."""
+    import time
+
+    from circulo import vigia
+    from circulo.decision import Decision
+    from circulo.estagnacao import DESTRAVAR_EM, ESTAGNADO
+    from circulo.perguntas import METRICAS
+
+    class JevSeguro:
+        source, ultimo_modelo = "jev", "jev-1.13.0"
+
+        def ask_many(self, state, qs):
+            return {qid: Decision(qid, "noul", 0.9, 0.9, "jev") if q.kind == "noul" else Decision(qid, "choice", "alertar", 0.9, "jev")
+                    for qid, q in qs.items()}, 10
+    s, agora = circle.store, time.time()
+    circle.ctx.dl.jev = JevSeguro()
+    v = vigia.Vigia(circle.ctx)
+    avancando, foto = [False], [0]
+
+    def progresso():                                                          # só muda de foto quando o teste manda avançar
+        foto[0] += avancando[0]
+        return (foto[0],)
+    monkeypatch.setattr(circle, "trabalho_pendente", lambda ignorar_estagnacao=False: True)   # a pendência sintética
+    monkeypatch.setattr(circle, "_progresso", progresso)
+
+    def girar(n):
+        for _ in range(n):
+            circle.tick()
+            v.rodar(agora + s.tick)
+
+    def disparos():
+        return [dict(r) for r in s.q("SELECT * FROM vigia_disparos WHERE chave='estagnacao' ORDER BY id")]
+    girar(ESTAGNADO + 2)
+    assert METRICAS["estagnacao"][1](s, agora)[0] == 1.0                      # a métrica passou do limiar
+    assert len(disparos()) == 1 and disparos()[0]["resultado"] is None        # uma única ação, ainda sem resultado
+    assert s.one("SELECT COUNT(*) n FROM alerts WHERE message LIKE 'Estagnação:%'")["n"] == 1
+    avancando[0] = True                                                       # a recuperação: o loop volta a avançar
+    girar(1)
+    avancando[0] = False
+    assert int(s.get("progresso")["sem"]) == 0
+    d = disparos()[0]
+    assert d["resultado"] == "destravou" and 1 <= d["giros_ate_destravar"] <= DESTRAVAR_EM
+
+    girar(ESTAGNADO + DESTRAVAR_EM + 1)                                       # outro episódio, que não destrava em K giros
+    assert len(disparos()) == 2 and disparos()[1]["resultado"] == "nao_destravou"
+    r = vigia.resultado_30d(s, "estagnacao", agora + s.tick)
+    assert r == {"disparos": 2, "com_resultado": 2, "destravou": 1, "taxa_destravou": 0.5, "em_giros": DESTRAVAR_EM, "alvo": 0.8}
+    assert vigia.resumo(s)["resultado_30d"]["estagnacao"]["com_resultado"] == 2
+    assert METRICAS["estagnacao"][1](s, agora + s.tick)[1]["resultado_30d"]["taxa_destravou"] == 0.5

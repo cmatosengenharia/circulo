@@ -442,9 +442,10 @@ def _m_pedidos_humano(s, agora):
 
 
 def _m_estagnacao(s, agora):
-    from .vigia import disparos_30d
+    from .vigia import disparos_30d, resultado_30d
     sem = int((s.get("progresso") or {}).get("sem", 0))
-    return (min(1.0, sem / 10), {"giros_sem_avanco": sem, "disparos_30d": disparos_30d(s, "estagnacao", agora)})
+    return (min(1.0, sem / 10), {"giros_sem_avanco": sem, "disparos_30d": disparos_30d(s, "estagnacao", agora),
+                                 "resultado_30d": resultado_30d(s, "estagnacao", agora)})
 
 
 METRICAS: dict[str, tuple[str, Callable]] = {

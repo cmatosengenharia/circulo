@@ -26,7 +26,7 @@ from typing import Any, Callable
 
 from . import roadmap
 from .decision import SN, Decision, Question, norm
-from .estagnacao import ESTAGNADO
+from .estagnacao import DESTRAVAR_EM, ESTAGNADO
 from .licoes import Licoes
 from .metrics import seguro
 from .planejador import ESPERA, FILA_CHEIA, GATE, MAX_TENTATIVAS, PORTEIRO, PROGRESSO, TENTATIVAS
@@ -47,6 +47,7 @@ ACOES = {"abrir_item": "a trava é estrutural e repetível: um item pequeno no r
          "alertar": "a trava é real mas transitória ou depende do humano/ambiente: avisar na linha do tempo basta",
          "observar": "ainda não dá para dizer se é trava: registrar e medir de novo na próxima passagem"}
 CONF_AGIR = 0.5
+ALVO_DESTRAVAR = 0.8            # dos disparos da estagnação com resultado, ao menos 80% destravam o loop em DESTRAVAR_EM giros
 
 
 def _um(s, sql, args=()):
@@ -545,7 +546,7 @@ class Vigia:
 
     def _agir(self, c: dict, now: float) -> None:
         ev = c["evidencia"] if isinstance(c["evidencia"], str) else json.dumps(c["evidencia"], ensure_ascii=False, default=str)
-        self.s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em) VALUES(?,?,?,?)", (c["chave"], c["acao"], ev, now))
+        self.s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em,giro) VALUES(?,?,?,?,?)", (c["chave"], c["acao"], ev, now, self.s.tick))
         if c["acao"] == "abrir_item":
             titulo = f"Vigia: {c['titulo'][:150]}"
             ja = self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE ?", (f"Vigia: {c['chave'].split(':')[0]}%",))
@@ -585,6 +586,15 @@ def disparos_30d(store, chave: str, now: float | None = None) -> int:
     return int(_um(store, "SELECT COUNT(*) FROM vigia_disparos WHERE chave=? AND em>=?", (chave, (now or time.time()) - 30 * 86400)))
 
 
+def resultado_30d(store, chave: str, now: float | None = None) -> dict[str, Any]:
+    """Dos disparos de `chave` nos últimos 30 dias: quantos já têm resultado e a taxa dos que destravaram o loop em até
+    DESTRAVAR_EM giros (alvo ALVO_DESTRAVAR). O resultado é gravado pelo loop (estagnacao.medir_disparos)."""
+    r = store.one("SELECT COUNT(*) n, COUNT(resultado) com, COALESCE(SUM(resultado='destravou'), 0) d FROM vigia_disparos "
+                  "WHERE chave=? AND em>=?", (chave, (now or time.time()) - 30 * 86400))
+    return {"disparos": r["n"], "com_resultado": r["com"], "destravou": r["d"],
+            "taxa_destravou": round(r["d"] / r["com"], 2) if r["com"] else None, "em_giros": DESTRAVAR_EM, "alvo": ALVO_DESTRAVAR}
+
+
 def resumo(store, limite: int = 20) -> dict[str, Any]:
     abertas = [dict(r) for r in store.q("SELECT * FROM vigia WHERE status='aberta' ORDER BY gravidade DESC, primeira_em")]
     hist = [dict(r) for r in store.q("SELECT id, chave, titulo, veredito, acao, conf, item_id, primeira_em, resolvida_em FROM vigia "
@@ -599,4 +609,4 @@ def resumo(store, limite: int = 20) -> dict[str, Any]:
     travas = [a for a in abertas if a["veredito"] == "trava"]
     return {"estado": "travado" if travas else ("observando" if abertas else "livre"), "travas": len(travas), "abertas": abertas,
             "resolvidas": hist, "ultima_em": ult.get("em"), "sondas": [f.__name__[2:] for f in SONDAS], "intervalo_s": INTERVALO,
-            "disparos_30d": {"estagnacao": disparos_30d(store, "estagnacao")}}
+            "disparos_30d": {"estagnacao": disparos_30d(store, "estagnacao")}, "resultado_30d": {"estagnacao": resultado_30d(store, "estagnacao")}}

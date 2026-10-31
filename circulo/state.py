@@ -632,7 +632,9 @@ class Store:
                   ("prs", "item_id", "INTEGER"), ("prs", "arquivos", "TEXT"), ("prs", "conserto", "TEXT"),
                   ("prs", "consertos", "INTEGER DEFAULT 0"), ("prs", "conserto_sha", "TEXT"),
                   ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"),
-                  ("frescor", "versao", "TEXT"))
+                  ("frescor", "versao", "TEXT"),
+                  ("vigia_disparos", "giro", "INTEGER"), ("vigia_disparos", "resultado", "TEXT"),
+                  ("vigia_disparos", "giros_ate_destravar", "INTEGER"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
