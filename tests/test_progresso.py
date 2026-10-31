@@ -97,3 +97,37 @@ def test_esperar_o_espacamento_nao_e_estagnacao(circle):
     assert not circle.trabalho_pendente(ignorar_estagnacao=True)
     circle.store.set("idle_last", {"corrigir_codigo": circle.store.tick - 2})
     assert circle.trabalho_pendente(ignorar_estagnacao=True)
+
+
+def test_licao_47_nenhum_disparo_com_mais_de_30_giros_fica_sem_desfecho(circle):
+    """Lição #47: 13 de 15 disparos da estagnação ficavam sem resultado, e a taxa_destravou=1.0 vinha de 2 casos.
+    Todo disparo fecha no mesmo registro: 'destravou' quando o avanço volta, 'expirou' após 30 giros sem avanço."""
+    from circulo.estagnacao import EXPIRA_EM, medir_disparos
+    s = circle.store
+    for giro in range(80):
+        if giro in (0, 5, 40):
+            s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em,giro) VALUES('estagnacao','alertar','{}',?,?)", (time.time(), giro))
+        medir_disparos(s, giro, avancou=giro == 25)      # um avanço 25 giros depois do 1º disparo; o 3º nunca destrava
+    d = {r["giro"]: (r["resultado"], r["giros_ate_destravar"]) for r in s.q("SELECT * FROM vigia_disparos")}
+    assert EXPIRA_EM == 30
+    assert d == {0: ("destravou", 25), 5: ("destravou", 20), 40: ("expirou", None)}
+    assert not s.one("SELECT COUNT(*) n FROM vigia_disparos WHERE resultado IS NULL AND giro<=?", (79 - EXPIRA_EM,))["n"]
+
+
+def test_licao_47_disparo_grava_o_estado_de_cada_pendencia_e_a_causa_por_regra(circle):
+    """Lição #47: no lugar do palpite, o disparo guarda o último estado de cada pendência (CI, teto, LLM, tarefa
+    elegível) e a causa sai da primeira que segura o loop."""
+    from circulo import vigia
+    s = circle.store
+    s.set("progresso", {"sem": ESTAGNADO, "recusas": {"estudar_pedido": 4}})
+    p = vigia.s_estagnacao(s, time.time())["evidencia"]["pendencias"]
+    assert p == {"aguardando_ci": 0, "aguardando_teto": 4, "aguardando_llm": False, "sem_tarefa_elegivel": False,
+                 "causa": "aguardando teto"}
+    s.x("INSERT INTO prs(number,titulo,status,created_at,updated_at) VALUES(9,'t','aberto',0,0)")
+    assert vigia.s_estagnacao(s, time.time())["evidencia"]["pendencias"]["causa"] == "aguardando CI"
+    s.x("UPDATE prs SET status='mergeado'")
+    s.set("progresso", {"sem": ESTAGNADO})
+    s.set("self_dev_espera", {"ate": time.time() + 600, "motivo": "limite"})
+    assert vigia.s_estagnacao(s, time.time())["evidencia"]["pendencias"]["causa"] == "aguardando LLM"
+    s.set("self_dev_espera", None)
+    assert vigia.s_estagnacao(s, time.time())["evidencia"]["pendencias"]["causa"] == "sem tarefa elegível"

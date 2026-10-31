@@ -590,7 +590,7 @@ class Circle:
         vira lição (com a causa medida em estagnacao), a confiança do painel cai e o ritmo vai para o descanso longo."""
         s = self.store
         st, avancou = s.get("progresso") or {"sem": 0}, not havia_trabalho or self._progresso() != antes
-        medir_disparos(s, s.tick, avancou)       # o disparo da estagnação grava se destravou o loop em DESTRAVAR_EM giros
+        medir_disparos(s, s.tick, avancou)       # fecha cada disparo da estagnação: destravou ou expirou em EXPIRA_EM giros
         if avancou:
             if st.get("sem", 0) >= ESTAGNADO:
                 from .licoes import registrar as monitorar

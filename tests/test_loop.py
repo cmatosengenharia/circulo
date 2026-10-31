@@ -169,12 +169,12 @@ def test_sem_marcador_de_conflito_no_repositorio():
 
 def test_simulacao_de_estagnacao_dispara_uma_vez_zera_e_registra_se_destravou(circle, monkeypatch):
     """Pergunta #666 (lição #47): pendência sintética que não avança por N giros. A métrica passa do limiar, a ação
-    dispara uma única vez, giros_sem_avanco volta a 0 com o avanço e cada disparo grava se destravou em DESTRAVAR_EM giros."""
+    dispara uma única vez, giros_sem_avanco volta a 0 com o avanço e cada disparo grava se destravou em EXPIRA_EM giros."""
     import time
 
     from circulo import vigia
     from circulo.decision import Decision
-    from circulo.estagnacao import DESTRAVAR_EM, ESTAGNADO
+    from circulo.estagnacao import ESTAGNADO, EXPIRA_EM
     from circulo.perguntas import METRICAS
 
     class JevSeguro:
@@ -210,11 +210,11 @@ def test_simulacao_de_estagnacao_dispara_uma_vez_zera_e_registra_se_destravou(ci
     avancando[0] = False
     assert int(s.get("progresso")["sem"]) == 0
     d = disparos()[0]
-    assert d["resultado"] == "destravou" and 1 <= d["giros_ate_destravar"] <= DESTRAVAR_EM
+    assert d["resultado"] == "destravou" and 1 <= d["giros_ate_destravar"] <= EXPIRA_EM
 
-    girar(ESTAGNADO + DESTRAVAR_EM + 1)                                       # outro episódio, que não destrava em K giros
-    assert len(disparos()) == 2 and disparos()[1]["resultado"] == "nao_destravou"
+    girar(ESTAGNADO + EXPIRA_EM + 1)                                          # outro episódio, que não destrava em K giros
+    assert len(disparos()) == 2 and disparos()[1]["resultado"] == "expirou"
     r = vigia.resultado_30d(s, "estagnacao", agora + s.tick)
-    assert r == {"disparos": 2, "com_resultado": 2, "destravou": 1, "taxa_destravou": 0.5, "em_giros": DESTRAVAR_EM, "alvo": 0.8}
+    assert r == {"disparos": 2, "com_resultado": 2, "destravou": 1, "taxa_destravou": 0.5, "em_giros": EXPIRA_EM, "alvo": 0.8}
     assert vigia.resumo(s)["resultado_30d"]["estagnacao"]["com_resultado"] == 2
     assert METRICAS["estagnacao"][1](s, agora + s.tick)[1]["resultado_30d"]["taxa_destravou"] == 0.5
