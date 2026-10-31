@@ -278,7 +278,7 @@ def confianca(store: Store, now: float | None = None) -> dict:
     ck.append(_c("progresso", "seguranca", "Avançando?", "ok" if sem < 3 else "atencao" if sem < ESTAGNADO else "falha",
                  "sim" if sem < 3 else f"{sem} giros sem avançar",
                  (f"último avanço {_hora(pg.get('ultimo_avanco_em'))}" if sem < 3 else
-                  f"há trabalho esperando e nada avança; {causa_provavel(pg)}"),
+                  f"há trabalho esperando e nada avança; {causa_provavel(pg, s)}"),
                  pg.get("ultimo_avanco_em") or now))
     q = {k: x for k, x in (s.get("quarentena") or {}).items() if x.get("ate_tick", 0) > s.tick}
     if q:
