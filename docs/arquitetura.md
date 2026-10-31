@@ -28,7 +28,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `causas.py` | 25 | Alias causa raiz → node id: lição sem teste próprio herda a checagem determinística de outra lição da mesma causa. |
 | `changelog.py` | 25 | Changelog semanal: os PRs mergeados em 7 dias agrupados em produto e infra, cada um com o pedido de origem, e a fração de produto contra a meta do Norte. Usa os PRs de `digest_semanal.prs_da_semana`; PR sem origem sai marcado 'sem pedido', nunca omitido. |
 | `ci_causa.py` | 74 | Causa da falha de CI pelos sinais diretos da API de checks, não pela contagem de checks que caíram. |
-| `cli.py` | 253 | circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | status | resumo | respostas |
+| `cli.py` | 259 | circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas |
 | `cofre.py` | 247 | Cofre de chaves: o cadastro das integrações sai do arquivo de texto e vai para o cofre do sistema. |
 | `conexoes.py` | 129 | Conexões ao vivo: o que o loop depende de fora — Jev, Claude Code, LLM, GitHub — e se cada uma responde agora. |
 | `confianca.py` | 427 | Central de confiança: a pergunta que o painel responde primeiro é "posso confiar no loop agora?". |
@@ -54,7 +54,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `eficacia.py` | 131 | Veredito de eficácia por PR mergeado: o critério de sucesso do item melhorou de verdade ou só oscilou? |
 | `engine.py` | 630 | Motor genérico de projetos: o "kit geral" que atende qualquer tipo de pedido. |
 | `equipe.py` | 375 | A equipe: os agentes do loop vistos como um time de engenharia que entrega qualquer produto. |
-| `estagnacao.py` | 33 | A causa medida da estagnação: o que cada giro parado fez de fato (lição #47). |
+| `estagnacao.py` | 58 | A causa medida da estagnação: o que cada giro parado fez de fato (lição #47). |
 | `estudo.py` | 282 | Neurônio de estudo: o pedido é uma hipótese, não uma ordem gravada em pedra. |
 | `evolution.py` | 403 | Meta-Learner (evolução nível 1 e 2), Shadow mode e Health Monitor (rollback automático). |
 | `falhas_painel.py` | 71 | Funções puras do card de falhas do painel: agrupar por causa e por componente e o delta contra as 24 h anteriores. |
@@ -86,12 +86,13 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `lancamentos_email.py` | 41 | E-mail de notificação do banco → lançamentos, sem rede e sem LLM (o texto chega pronto, nunca do Gmail aqui). |
 | `lancamentos_import.py` | 138 | Importa extrato bancário (OFX/CSV) para o ledger, sem rede e sem LLM. |
 | `lancamentos_pasta.py` | 131 | Pasta monitorada de extratos: cada .ofx/.csv/.eml novo vai para o ledger e sai da pasta. |
+| `latencia.py` | 55 | Latência até o merge (pergunta do conselho #695): só lê as decisões do gate (tabela `merges`). |
 | `licoes.py` | 900 | Lições: o loop aprende com os próprios erros como um humano, e o mesmo erro de estrutura só acontece uma vez. |
 | `limite_uso.py` | 100 | Limite de uso do Claude Code: até quando não chamar a LLM, lido da própria mensagem de erro. |
 | `links.py` | 130 | Catálogo de links da empresa por assunto: colo o link com um rótulo curto e acho em segundos. |
 | `llm.py` | 345 | Cliente de LLM do círculo. Só é chamado depois que o Jev autoriza (cascata de custo). |
 | `llm_cache.py` | 83 | Cache exato das respostas da LLM, por (neurônio + modelo + prompt normalizado), com TTL curto. |
-| `loop.py` | 898 | O círculo: loop infinito, Jev First, retoma de onde parou, pausa só por orçamento. |
+| `loop.py` | 899 | O círculo: loop infinito, Jev First, retoma de onde parou, pausa só por orçamento. |
 | `medico.py` | 319 | O Médico do loop: plano de controle que diagnostica gargalos por PADRÃO medido e responde pela escada mais barata. |
 | `memoria.py` | 494 | Memória de trabalho do time: o que o círculo já viu, recuperado por relevância na hora em que um agente precisa. |
 | `memory.py` | 112 | Memória do círculo (RAG) e playbooks por tipo de pedido. |
@@ -115,7 +116,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 73 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 632 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `perguntas.py` | 633 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
 | `planejador.py` | 606 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planejador_cache.py` | 81 | A mesma pergunta do conselho com a métrica quase igual em 7 dias não volta à LLM do Planejador. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
@@ -140,7 +141,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `self_dev.py` ⚖️ | 899 | Developer do projeto zero: o círculo corrigindo o próprio código. |
 | `sentinela.py` | 94 | Sentinela da entrega: olha o RESULTADO (o que entrou na main), não os erros. |
 | `silencio.py` | 25 | Silêncio suspeito (pergunta #619): zero incidente aberto só é verde se o loop também não estagnou nem tem lição de estrutura aberta nos últimos 7 dias; ausência de alerta não prova saúde. |
-| `state.py` | 766 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
+| `state.py` | 768 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
 | `status.py` | 106 | Estado do loop para humanos, derivado do batimento + controles + etapa. Usado pelo painel. |
 | `telemetria.py` | 422 | Trilha de eventos tipados do loop, no vocabulário OpenTelemetry GenAI, e o painel de timeline + grafo. |
 | `telemetria_sem_erro.py` | 51 | Lição #83: um dump de estatística (subagent_stats com completed/failed/killed/spawned) não é erro. |
@@ -149,7 +150,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `uso_entregas.py` | 83 | Entregas de produto sem uso: os PRs de produto mergeados há 7 dias ou mais sem nenhum evento com o nome do `evento_esperado` gravado no merge depois do `merged_at`. Uso anterior ao merge não conta: é de antes da entrega. O evento esperado de cada entrega fica em `entrega_uso_esperado` (um por PR); o uso, em `entrega_uso` (gravado pela rota do painel chamada, com o último instante por nome) e nos `events` do loop (kind). |
 | `validador.py` | 135 | Validador: os agentes de validação que ficam entre o Developer e o PR (1.70). |
 | `verificacao.py` | 150 | Verificação de ponta a ponta do painel, com um mapa de funcionalidades (Lauren Tan: "verification skills"). |
-| `vigia.py` | 602 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
+| `vigia.py` | 613 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
 
 ## Telas
 
