@@ -39,7 +39,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `corpo.py` ⚖️ | 237 | Corpo: o loop passa a rodar o código que ele mesmo evoluiu, com evidência antes e depois. |
 | `corpo_caminho.py` | 65 | Caminho livre para o corpo trocar de código (lição #1). |
 | `corpo_pr.py` | 63 | Corpo do PR do Developer: template fixo de impacto e risco. |
-| `curador_licoes.py` | 127 | Curador de lições (pergunta do conselho #190): a lição que cita um node id de pytest que não existe em tests/ não tem o que corrigir. Ela fecha (`obsoleta`) com a causa e reabre se o teste citado aparecer. |
+| `curador_licoes.py` | 164 | Curador de lições (pergunta do conselho #190): a lição que cita um node id de pytest que não existe em tests/ não tem o que corrigir. Ela fecha (`obsoleta`) com a causa e reabre se o teste citado aparecer. |
 | `custo.py` | 84 | Custo do Developer por desfecho do item: quanto do gasto virou PR e quanto foi para item sem PR. |
 | `daily.py` | 103 | Pauta da daily às 8h, por assunto: o que fiz ontem (das notas), o que farei hoje (pendências) e o que me bloqueia. |
 | `decision.py` | 1000 | DecisionLayer — Jev First: todo ponto do círculo que vai gastar recurso pergunta primeiro aqui. JevHttpClient (API da TypeSafe, POST /v1/systemone) e LocalJev (regra determinística) têm o MESMO contrato. |
@@ -115,7 +115,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedido_estado.py` | 63 | Estado único de cada pedido do humano no painel (pergunta #472): recebido, andamento (com o PR), bloqueado (com o motivo) ou entregue (com a evidência), e há quanto tempo está nele. |
 | `pedidos.py` | 73 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
-| `perguntas.py` | 631 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
+| `perguntas.py` | 632 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
 | `planejador.py` | 606 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
 | `planejador_cache.py` | 81 | A mesma pergunta do conselho com a métrica quase igual em 7 dias não volta à LLM do Planejador. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
