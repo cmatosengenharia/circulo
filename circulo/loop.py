@@ -22,7 +22,7 @@ from .disjuntor import protegida
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
 from .engine import Engine
-from .estagnacao import ESTAGNADO, anotar_giro, causa_provavel, pode_rodar
+from .estagnacao import ESTAGNADO, anotar_giro, causa_provavel, medir_disparos, pode_rodar
 from .graph import MissionGraph
 from .harness_lab import HarnessLab
 from .reparo import build_developer
@@ -589,8 +589,9 @@ class Circle:
         """Girar sem avançar é um erro de estrutura, não "tudo bem". Havia trabalho e nada mudou por ESTAGNADO giros:
         vira lição (com a causa medida em estagnacao), a confiança do painel cai e o ritmo vai para o descanso longo."""
         s = self.store
-        st = s.get("progresso") or {"sem": 0}
-        if not havia_trabalho or self._progresso() != antes:
+        st, avancou = s.get("progresso") or {"sem": 0}, not havia_trabalho or self._progresso() != antes
+        medir_disparos(s, s.tick, avancou)       # o disparo da estagnação grava se destravou o loop em DESTRAVAR_EM giros
+        if avancou:
             if st.get("sem", 0) >= ESTAGNADO:
                 from .licoes import registrar as monitorar
                 monitorar(self.ctx, "loop:progresso", True, sujeito=f"voltou a avançar depois de {st['sem']} giros")
