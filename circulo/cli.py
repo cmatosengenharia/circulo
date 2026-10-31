@@ -1,4 +1,4 @@
-"""circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | status | resumo | respostas"""
+"""circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas"""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> None:
     cm = sub.add_parser("caminho", help="o caminho de um pedido até o merge, com o tempo de cada etapa e o que espera agora")
     cm.add_argument("ref", nargs="?", default=None, help="arquivo do pedido ou ev<N> (padrão: o último pedido do console)")
     cm.add_argument("--json", action="store_true")
+    sub.add_parser("latencia", help="os 5 PRs mais lentos da semana até o merge, com a etapa dominante (CI, rebase, merge)")
     sub.add_parser("status")
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
@@ -142,6 +143,11 @@ def main(argv: list[str] | None = None) -> None:
         if c is None:
             raise SystemExit("pedido não encontrado (use o nome do arquivo que o `circulo pedir` mostrou ou ev<N>)")
         print(json.dumps(c, ensure_ascii=False, indent=2) if args.json else caminho.texto(c))
+        return
+    if args.cmd == "latencia":
+        from . import latencia
+        from .state import Store
+        print(latencia.texto(latencia.mais_lentos(Store(os.path.join(args.data, "circulo.db")))))
         return
     if args.cmd == "digest":
         from . import digest_semanal
