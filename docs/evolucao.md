@@ -50,10 +50,14 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 59 · **correcao** 43 · **funcionalidade** 41 · **documentacao** 32 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 57 · **correcao** 44 · **funcionalidade** 41 · **documentacao** 34 · **seguranca** 19 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #296 | 31/10/2026 | correcao (81%) | sim | Lição com 'já corrigido' e checagem sem id caminho::nome vira sem_prevencao e pede teste | pergunta do curador_licoes: “A lição #47 (loop:estagnado, 'nada avançou em 10 giros') está marcada como reinc” |
+| #295 | 31/10/2026 | correcao (82%) | sim | Fechar todo disparo de estagnação com desfecho (destravou/expirou) para medir os 13 sem resultado | pergunta do operador: “A lição #47 (loop:estagnado, 'sem recusa registrada') reincidiu mesmo com o PR #” |
+| #294 | 31/10/2026 | documentacao (56%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #293 | 31/10/2026 | documentacao (100%) | — | Entrada manual em lote: colar várias linhas de uma vez, com resumo por linha e pergunta nas ambíguas | pergunta do financeiro: “Hoje há zero lançamentos reais. Dá para criar uma entrada manual de uma linha (p” |
 | #292 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #291 | 31/10/2026 | documentacao (0%) | sim | Métrica 'lancamentos_reais' com mínimo exigido: faltam N lançamentos e M meses para a 1ª resposta | pergunta do financeiro: “A métrica 'lancamentos' é 1.0 (falta total de dados reais), mas não diz quanto f” |
 | #290 | 31/10/2026 | observabilidade (80%) | — | Latência pedido→merge: etapa dominante dos 5 PRs mais lentos, derivada das decisões do gate já… | pergunta do tech_lead: “Nos pedidos do humano da última semana, quanto tempo passou entre o pedido e o P” |
@@ -250,7 +254,3 @@ Por tipo: **observabilidade** 59 · **correcao** 43 · **funcionalidade** 41 · 
 | #99 | 21/10/2026 | correcao (36%) | sim | Migração: coluna origem_status e marcar itens antigos sem pergunta como 'legado' | item #133 (sub_item) |
 | #98 | 21/10/2026 | funcionalidade (86%) | sim | Contrato único de saída JSON: extrator tolerante a truncamento para estudo, meta e planejador | pergunta do curador_licoes: “A lição #22 (estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters” |
 | #97 | 21/10/2026 | funcionalidade (77%) | sim | Extrair erro do agente de JSON estruturado, não de fatia de texto bruto, antes de gravar a lição | pergunta do curador_licoes: “A lição #18 (developer:agente: s","fast_mode_state":"off","fast_mode_disabled_re” |
-| #96 | 21/10/2026 | correcao (81%) | sim | Recusar item de roteiro sem pergunta de origem antes de gastar, com causa tipada | pergunta do operador: “O neurônio rastro:cadeia foi barrado 3 de 13 vezes em 24 h: qual é a causa que s” |
-| #95 | 21/10/2026 | seguranca (56%) | sim | Tipo Origem(pergunta_id) validado, sem DB, em circulo/roadmap.py | item #132 (sub_item) |
-| #94 | 21/10/2026 | observabilidade (62%) | sim | Dar ao estado de evidencia_sustenta o resultado medido do teste citado e as execuções seguidas | pergunta do economista: “O Jev decide “evidencia_sustenta” com dúvida (a regra decidiu 35% de 20 vezes em” |
-| #93 | 21/10/2026 | observabilidade (63%) | sim | revisar_prs: classificar a causa da falha e adiar sem gastar (rede, checks pendentes, atrás da main) | pergunta do operador: “O neurônio execucao:idle:revisar_prs foi barrado 3 de 3 vezes em 24 h: qual é a ” |
