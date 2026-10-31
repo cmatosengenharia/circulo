@@ -50,10 +50,12 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 57 · **correcao** 51 · **funcionalidade** 43 · **documentacao** 24 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 57 · **correcao** 50 · **funcionalidade** 42 · **documentacao** 26 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #284 | 31/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #283 | 31/10/2026 | documentacao (93%) | sim | Planejador: pular a LLM em pergunta repetida (hash + evidência) e dividir item grande por regra | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
 | #282 | 31/10/2026 | observabilidade (70%) | sim | Painel: 'incidentes_abertos=0' vira 'silêncio suspeito' quando há estagnações e lições de estrutura… | pergunta do cetico: “Que indicador do painel diz 'tudo bem' e pode estar mentindo, e como cruzá-lo co” |
 | #281 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #280 | 30/10/2026 | funcionalidade (30%) | sim | Disjuntor de LLM: falha externa 'credit balance is too low' pausa chamadas com backoff e um único… | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
@@ -252,5 +254,3 @@ Por tipo: **observabilidade** 57 · **correcao** 51 · **funcionalidade** 43 · 
 | #87 | 21/10/2026 | correcao (78%) | sim | Lição #45: planejador:saida: resposta sem JSON válido (cortada pelo limite de tokens ou fora do… | item #106 (erro) |
 | #86 | 21/10/2026 | correcao (81%) | — | Lição #44: corpo:evidencia: erros nos primeiros giros do código novo: … | item #98 (erro) |
 | #47 | 20/10/2026 | correcao (74%) | — | Obter o numstat real via merge-base com a base | item #93 (sub_item) |
-| #46 | 20/10/2026 | funcionalidade (69%) | sim | Lição #2: corpo:atualizar: > with pytest.raises(RuntimeError): # o erro do incidente, sem o caminho… | item #30 (erro) |
-| #45 | 20/10/2026 | correcao (90%) | — | Comparar o total com o limite de tamanho e devolver veredito | item #92 (sub_item) |

@@ -58,7 +58,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `estudo.py` | 282 | Neurônio de estudo: o pedido é uma hipótese, não uma ordem gravada em pedra. |
 | `evolution.py` | 403 | Meta-Learner (evolução nível 1 e 2), Shadow mode e Health Monitor (rollback automático). |
 | `falhas_painel.py` | 71 | Funções puras do card de falhas do painel: agrupar por causa e por componente e o delta contra as 24 h anteriores. |
-| `fatiador.py` | 236 | Fatiador: item do roteiro que acumula falhas locais vira sub-itens validados um a um. |
+| `fatiador.py` | 246 | Fatiador: item do roteiro que acumula falhas locais vira sub-itens validados um a um. |
 | `fazendo.py` | 76 | O que cada agente está fazendo agora — não só quem está trabalhando, mas em quê, e o passo em curso. |
 | `finance.py` | 100 | Cálculos financeiros e invariantes. Só inteiros em centavos. Nenhum agente altera este arquivo sozinho. |
 | `fluxo.py` | 388 | Fluxo dos agentes ao vivo: quem fez o quê em cada giro, na ordem, para a tela animar a passagem entre agentes. |
@@ -116,8 +116,8 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `pedidos.py` | 73 | Canal de origem de cada pedido (pergunta do conselho #441): só mede, não integra Slack nem GitHub. |
 | `pedidos_repetidos.py` | 52 | Pergunta #399 (entrevistador_jtbd): pedido do humano que reformula um anterior é sinal de que a entrega não resolveu. |
 | `perguntas.py` | 631 | Conselho de perguntas: a autoevolução do loop parte de PERGUNTAS, feitas por quem tem o olhar certo. |
-| `planejador.py` | 601 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
-| `planejador_cache.py` | 70 | A mesma pergunta do conselho com evidência quase igual em 24 h não volta à LLM do Planejador. |
+| `planejador.py` | 606 | Planejador do roteiro: o loop nunca fica sem o que evoluir. |
+| `planejador_cache.py` | 81 | A mesma pergunta do conselho com a métrica quase igual em 7 dias não volta à LLM do Planejador. |
 | `planos.py` | 71 | Plano do Developer por item (passos, arquivos, premissas) e a fração de PRs com plano antes do primeiro commit (item #276). |
 | `policy.py` ⚖️ | 282 | Política do círculo: versionada, com guard que impede a auto-evolução de remover proteções. |
 | `portao_previo.py` | 63 | Portão de reincidência (pergunta do conselho #85): não abrir PR de item que já fechou 2x sem merge com os mesmos checks. |
