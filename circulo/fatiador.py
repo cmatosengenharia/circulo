@@ -84,6 +84,16 @@ def _fatias(item: dict, est: dict, passos_demais: bool = False) -> list[tuple[di
     return out
 
 
+def fatias_por_regra(item: dict) -> list[dict]:
+    """Item que já estourou o teto de tokens: grande demais por medida, um sub-item por módulo citado. [] = um módulo só."""
+    return [p for p, _ in _fatias(item, estimar_tamanho(item["titulo"], item["detalhe"]), passos_demais=True)]
+
+
+def estourou_teto(s, item_id: int) -> bool:
+    return s.one("SELECT 1 FROM verificacoes WHERE ponto='developer:teto' AND ok=0 AND sujeito=? LIMIT 1",
+                 (sujeito(item_id),)) is not None
+
+
 def medicoes(s) -> list[dict]:
     """Estimativa x tokens reais de cada sub-item pré-dividido, para recalibrar LIMITE_MODULOS/LIMITE_SIMBOLOS."""
     from .reparo import tokens_do_item

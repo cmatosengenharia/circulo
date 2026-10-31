@@ -556,7 +556,7 @@ CREATE INDEX IF NOT EXISTS pergunta_etapas_p ON pergunta_etapas(pergunta_id, id)
 -- resposta do Planejador por pergunta normalizada (circulo/planejador_cache.py): a mesma pergunta com evidência quase
 -- igual em 24 h não volta à LLM; em_andamento enquanto a LLM responde, para dois giros não perguntarem juntos
 CREATE TABLE IF NOT EXISTS planejador_cache (
-  chave TEXT PRIMARY KEY,         -- texto da pergunta normalizado
+  chave TEXT PRIMARY KEY,         -- sha256 da pergunta e do nome da métrica normalizados
   estado TEXT NOT NULL,           -- em_andamento | completa
   pergunta_id INTEGER NOT NULL,   -- a pergunta que a LLM respondeu (a origem do acerto)
   evidencia TEXT,                 -- a evidência dessa pergunta: comparada número a número por tolerância relativa

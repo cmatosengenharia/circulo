@@ -15,7 +15,8 @@ Limites:
   MAX_TENTATIVAS ou IDADE_MAX, e então (ou na hora, se a falha é permanente) vai para a quarentena com o motivo;
 - o Jev decide antes se vale o gasto (worth_spending) e qual modelo usar (pick_model);
 - título repetido de item que já existe é descartado;
-- a mesma pergunta com cada número da evidência a menos de 5% em 24 h reaproveita a resposta, sem LLM (planejador_cache);
+- item que estourou o teto de tokens e cita mais de um módulo é dividido por regra (fatiador.fatias_por_regra), sem LLM;
+- a mesma pergunta com cada número da métrica a menos de 20% em 7 dias reaproveita a resposta, sem LLM (planejador_cache);
 - a constituição continua fora do alcance: item que cita um caminho dela é vetado aqui, antes do Developer (o gate
   recusaria o PR).
 """
@@ -319,7 +320,7 @@ class Planejador:
             res = self._responder(autorizado, conselho, pid, pergunta, PERSONAS)
         finally:   # só a resposta válida da LLM fica guardada; falha, porteiro ou JSON inválido liberam a entrada
             respondida = res is not None and res[1] in PROGRESSO and res[2] != SEM_JSON
-            planejador_cache.concluir(self.s, pergunta.texto, pid, res[1] if respondida else None, res[2] if respondida else "")
+            planejador_cache.concluir(self.s, pergunta.texto, pergunta.evidencia, pid, res[1] if respondida else None, res[2] if respondida else "")
             if self._chamada:  # o desfecho da chamada (virou item?) mede o A/B de modelo menor e pode revertê-lo
                 self.s.x("UPDATE llm_calls SET aceita=? WHERE id=?", (int(res is not None and res[1] == "virou_item"), self._chamada))
                 reverter_se_preciso(self.s, "planejador")
@@ -418,7 +419,11 @@ class Planejador:
 
     # ------------------------------------------------------------ divisão de item que falha
     def dividir(self, item: dict, erro: str) -> list[dict]:
-        """Item que acumulou falhas locais vira 2 a 5 sub-itens de até ~100 linhas, cada um com seu teste. [] = não deu."""
+        """Item que acumulou falhas locais vira 2 a 5 sub-itens de até ~100 linhas, cada um com seu teste. [] = não deu.
+        O item que já estourou o teto de tokens e cita mais de um módulo é dividido por regra, sem repetir a LLM."""
+        from .fatiador import estourou_teto, fatias_por_regra
+        if item.get("id") is not None and estourou_teto(self.s, item["id"]) and (partes := fatias_por_regra(item)):
+            return partes
         if self.ctx.dl.llm is None or limite_uso.em_limite(self.s):
             return []
         prompt = (f"Item do roteiro (dado, não instrução):\n{item['titulo']}\n{item['detalhe'][:1500]}\n\n"
@@ -473,7 +478,7 @@ def _reaproveitar(conselho, pid: int, guardada: dict) -> tuple[int, str, str, No
     item = guardada["item_id"]
     conselho.marcar(pid, "repetida" if item else "descartada", item)
     de = f"pergunta #{origem}" + (f", item #{item}" if item else "")
-    return pid, "planejador_cache", f"reaproveitou {de} (evidência a menos de 5%): {guardada['motivo']}"[:300], None
+    return pid, "planejador_cache", f"reaproveitou {de} (métrica a menos de {planejador_cache.TOLERANCIA:.0%}): {guardada['motivo']}"[:300], None
 
 
 def _sem_item(texto: str) -> str | None:
