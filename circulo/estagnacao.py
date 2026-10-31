@@ -38,6 +38,21 @@ def medir_disparos(store, giro: int, avancou: bool) -> None:
             "AND giro IS NOT NULL AND ?-giro>=?", (giro, DESTRAVAR_EM))
 
 
-def causa_provavel(st: dict) -> str:
+def parado(store) -> dict | None:
+    """O primeiro item pendente do roteiro (na ordem do Developer) e a etapa que o tocou por último: fila, developer, gate ou CI."""
+    r = store.one("SELECT id, status, evidencia FROM roadmap WHERE status IN ('pendente','em_andamento') AND COALESCE(desativado,0)=0 "
+                  "ORDER BY origem='erro' DESC, ordem, id LIMIT 1")
+    if not r:
+        return None
+    ev = (r["evidencia"] or "").lower()
+    pr = store.one("SELECT number FROM prs WHERE item_id=? AND status='aberto' LIMIT 1", (r["id"],))
+    etapa = ("CI" if pr else "developer" if r["status"] == "em_andamento" else "gate" if "portõe" in ev or "barrado" in ev
+             else "developer" if "agente" in ev or "developer" in ev else "fila")
+    return {"item": r["id"], "estado": r["status"], "etapa": etapa, "toque": (r["evidencia"] or "")[:160]}
+
+
+def causa_provavel(st: dict, store=None) -> str:
     fatos = {**{f"{t} recusado": n for t, n in (st.get("recusas") or {}).items()}, **(st.get("rodou") or {})}
-    return ", ".join(f"{f} {n}x" for f, n in sorted(fatos.items(), key=lambda kv: -kv[1])) or "nenhuma tarefa rodou nos giros parados"
+    causa = ", ".join(f"{f} {n}x" for f, n in sorted(fatos.items(), key=lambda kv: -kv[1])) or "nenhuma tarefa rodou nos giros parados"
+    p = parado(store) if store is not None else None
+    return f"item #{p['item']} {p['estado']} parado na etapa {p['etapa']} ({p['toque']}); {causa}" if p else causa
