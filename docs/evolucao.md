@@ -50,10 +50,13 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 42 · **documentacao** 24 · **seguranca** 20 · **velocidade** 5.
+Por tipo: **observabilidade** 56 · **correcao** 52 · **funcionalidade** 43 · **documentacao** 24 · **seguranca** 20 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #280 | 30/10/2026 | funcionalidade (30%) | sim | Disjuntor de LLM: falha externa 'credit balance is too low' pausa chamadas com backoff e um único… | pergunta do operador: “A lição #54 (credit_balance_is_too_low) foi 'corrigida' no PR #91, mas esse erro” |
+| #279 | 30/10/2026 | seguranca (33%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #278 | 30/10/2026 | documentacao (72%) | — | Planejador: A/B de 10% com modelo menor por hash salgado, variante gravada e reversão por limite | pergunta do economista: “Qual neurônio do loop tem a menor taxa de rejeição de saída e as tarefas mais si” |
 | #277 | 30/10/2026 | documentacao (0%) | sim | Retry de neurônio limitado a 1, só para causa transitória por regra, com tokens de retry registrados | pergunta do operador: “Quando um neurônio falha (ex.: loop:progresso, 5 falhas em 9 chamadas), o retry ” |
 | #276 | 30/10/2026 | funcionalidade (30%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #275 | 30/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -251,6 +254,3 @@ Por tipo: **observabilidade** 56 · **correcao** 53 · **funcionalidade** 42 · 
 | #45 | 20/10/2026 | correcao (90%) | — | Comparar o total com o limite de tamanho e devolver veredito | item #92 (sub_item) |
 | #43 | 20/10/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #42 | 20/10/2026 | correcao (42%) | sim | Lição #43: Corrigir erro: JSONDecodeError em meta | item #97 (erro) |
-| #41 | 20/10/2026 | correcao (46%) | — | Lição #22: estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters-forge/agentic-job/issues/556"," | item #55 (erro) |
-| #39 | 20/10/2026 | seguranca (41%) | — | Parser puro de numstat com soma total e categoria dominante | item #91 (sub_item) |
-| #38 | 20/10/2026 | documentacao (99%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
