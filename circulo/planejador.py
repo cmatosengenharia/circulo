@@ -29,9 +29,10 @@ import sqlite3
 import time
 import urllib.error
 
-from . import limite_uso, pedidos, planejador_cache, rastro, rodadas_revisao
+from . import experimentos, limite_uso, pedidos, planejador_cache, rastro, rodadas_revisao
 from .agents import Ctx
 from .decision import Question, norm
+from .experimentos import METRICAS, Experimento, ExperimentoIncompleto
 from .json_llm import objeto, objeto_ou_corte
 from .licoes import titulo_curto
 from .llm import modelo_da_variante, reverter_se_preciso, variante
@@ -68,6 +69,7 @@ REAGENDA_S = 120            # prazo da volta (≤ 15 min, o alvo de pergunta_par
 ETAPAS = ("validada", "porteiro_decidiu", "planejador_chamado", "item_gravado")
 dormir = time.sleep
 
+METRICAS_PROMPT = ", ".join(f"{k} ({sentido} é melhor)" for k, (_f, sentido, _g) in METRICAS.items())
 SYSTEM = """Você é o Planejador do círculo autoevolutivo (repositório Python `circulo`, só stdlib, SQLite).
 O círculo é um loop 24/7 que recebe pedidos, transforma em missões, mede, aprende e corrige o próprio código por PR.
 O Jev (decisor tipado) decide antes de qualquer LLM; a regra determinística decide quando o Jev está em dúvida.
@@ -88,8 +90,10 @@ Marque a base do problema que o item resolve: "medido" (um número da evidência
 
 Responda só com JSON numa linha, sem markdown: {"titulo": "até 100 caracteres", "detalhe": "até 3 frases: o que mudar e onde",
 "sucesso": "métrica e alvo", "base": "medido|inferido|chutado", "dado": "o número da evidência que mostra o problema",
-"modulo": "circulo/arquivo.py"}
-Se a resposta já existe ou exige mexer na constituição, responda {"sem_item": "por quê, em 1 frase"}."""
+"modulo": "circulo/arquivo.py", "experimento": {"hipotese": "o que muda e por quê", "metrica": "uma de: """ + METRICAS_PROMPT + """",
+"baseline": número de hoje, "alvo": número esperado, "margem": tolerância de não inferioridade (> 0, na unidade da métrica),
+"janela_h": horas até medir, "n_min": eventos mínimos na janela}}
+Item sem experimento completo é recusado. Se a resposta já existe ou exige mexer na constituição, responda {"sem_item": "por quê, em 1 frase"}."""
 
 
 def roteiro_cheio(store) -> str | None:
@@ -407,11 +411,17 @@ class Planejador:
             self.ctx.reply(f"Conselho ({pergunta.persona}): “{item['titulo'][:90]}” já existe como item #{par['id']} "
                            f"({par['status']}, {int(par['parecido'] * 100)}% parecido). Não abri outro.", "roteiro")
             return pid, "repetida", f"parecido com o item #{par['id']}: {par['titulo'][:90]}", None
+        try:
+            exp = Experimento.de(item.get("experimento"), self.s)
+        except ExperimentoIncompleto as exc:
+            conselho.marcar(pid, "descartada")
+            return pid, "descartada", f"sem experimento: {exc}"[:300], None
         detalhe = f"{item['detalhe']}\nSucesso: {item['sucesso']}" + (
             f"\nEvidência ({item['base']}): {item['dado']}" if item.get("dado") else "")
         detalhe = f"Pergunta do conselho #{pid} ({pergunta.persona}): {pergunta.texto}\n{detalhe}"
         rid = gravar_item(self.s, pid, titulo_curto(item["titulo"]), detalhe, f"pergunta do conselho #{pid}: {pergunta.persona}",
                           modulo_de(item))
+        experimentos.gravar(self.s, rid, exp)
         conselho.marcar(pid, "virou_item", rid)
         marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")
@@ -490,7 +500,8 @@ def _parse(texto: str) -> dict | None:
 
 
 def _item(d: dict) -> dict | None:
-    item = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado", "modulo")}
+    item: dict = {k: str(d.get(k) or "").strip() for k in ("titulo", "detalhe", "sucesso", "base", "dado", "modulo")}
+    item["experimento"] = d.get("experimento")
     return item if item["titulo"] and item["detalhe"] else None
 
 

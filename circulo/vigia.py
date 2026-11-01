@@ -490,6 +490,8 @@ class Vigia:
                 skills.pedir_instalacao(self.s, repo_dir, now)
             with contextlib.suppress(Exception):
                 garimpo.garimpar(self.s, now, reply=self.ctx.reply)
+        from . import experimentos
+        experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
         norte.cobrar(self.s, self.ctx.reply, now)                    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita
         from . import conta
         try:

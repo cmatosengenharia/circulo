@@ -10,6 +10,7 @@ from test_self_dev import erro_recorrente, repo  # noqa: F401 — fixture do rep
 from circulo import planejador as pl
 from circulo.neuronios import ABRIR_PR, Resultado, causa_da_falha, cita_constituicao
 from circulo.planejador import Planejador
+from test_planejador import EXPERIMENTO
 
 
 class LLMItem:
@@ -18,7 +19,8 @@ class LLMItem:
 
     def complete(self, system, prompt, max_tokens):
         self.chamadas += 1
-        return json.dumps({"titulo": "Item novo da pergunta do operador", "detalhe": self.detalhe, "sucesso": "0 falhas"}), 400
+        return json.dumps({"titulo": "Item novo da pergunta do operador", "detalhe": self.detalhe, "sucesso": "0 falhas",
+                           "experimento": EXPERIMENTO}), 400
 
 
 def _pergunta(circle):

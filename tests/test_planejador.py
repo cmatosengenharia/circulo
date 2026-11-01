@@ -7,6 +7,9 @@ from circulo.planejador import MAX_POR_DIA, Planejador, _parse
 from test_self_dev import TEST_CMD, FakeGH, FixAgent, repo  # noqa: F401 — fixture do repositório
 from circulo.self_dev import SelfDeveloper
 
+EXPERIMENTO = {"hipotese": "o item melhora a métrica", "metrica": "lead_time_h", "baseline": 1.2, "alvo": 0.8,
+               "margem": 0.1, "janela_h": 48, "n_min": 3}
+
 
 class PlanLLM:
     def __init__(self, titulo="Pergunta do worth_spending com estado mais rico"):
@@ -16,7 +19,8 @@ class PlanLLM:
     def complete(self, system, prompt, max_tokens):
         self.prompts.append(prompt)
         return json.dumps({"titulo": self.titulo, "detalhe": "incluir histórico de aceitação no estado",
-                           "sucesso": "menos de 50% das decisões do worth_spending abaixo de jev_incerto"}), 400
+                           "sucesso": "menos de 50% das decisões do worth_spending abaixo de jev_incerto",
+                           "experimento": EXPERIMENTO}), 400
 
 
 def preparar(circle, repo, llm):  # noqa: F811
@@ -105,7 +109,7 @@ def test_item_medido_leva_o_dado_no_detalhe(circle, repo):  # noqa: F811
     class Medido(PlanLLM):
         def complete(self, system, prompt, max_tokens):
             return json.dumps({"titulo": "Pergunta do worth em inglês", "detalhe": "x", "sucesso": "confiança ≥ 0,5",
-                               "base": "medido", "dado": "44% das decisões abaixo de jev_incerto"}), 300
+                               "base": "medido", "dado": "44% das decisões abaixo de jev_incerto", "experimento": EXPERIMENTO}), 300
     _, plan = preparar(circle, repo, Medido())
     item = plan.run()
     assert "Evidência (medido): 44%" in circle.store.one("SELECT detalhe FROM roadmap WHERE id=?", (item["id"],))["detalhe"]
