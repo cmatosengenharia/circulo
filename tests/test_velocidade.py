@@ -141,7 +141,8 @@ def test_funil_medido_vira_a_primeira_pergunta_do_loop(circle):
     assert f["etapas"]["item_para_pr"]["mediana_min"] == 10 and f["etapas"]["pr_para_merge"]["mediana_min"] == 10
     c = indagador.candidatas_funil(s)
     assert c and c[0]["chave"] == "funil:pergunta_para_item" and c[0]["evidencia"]["base"] == "medido" and "60 min" in c[0]["texto"]
-    assert indagador.candidatas(circle.ctx, None)[0]["chave"] == "funil:pergunta_para_item"   # é a primeira pergunta do loop
+    cands = indagador.candidatas(circle.ctx, None)                                              # 1.71: produto vai na frente;
+    assert [c["chave"] for c in cands if c.get("eixo") != "produto"][0] == "funil:pergunta_para_item"   # o funil é a primeira das demais
     r = indagador.indagar(circle.ctx, None)
     row = s.one("SELECT status, eixo FROM perguntas WHERE chave='funil:pergunta_para_item'")
     assert row and row["status"] in ("valida", "inconclusa") and r["candidatas"] >= 1

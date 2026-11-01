@@ -87,13 +87,16 @@ def rodar(store: Store, agora: float | None = None, forcar: bool = False) -> dic
     ult = store.get(KV) or {}
     if not forcar and agora - float(ult.get("em", 0)) < A_CADA:
         return None
+    from . import insistencia
+    fila = insistencia.rodar(store, agora)                     # sub-item parado 7 dias sai; bloqueado há 3 dias ganha nova rodada
     rel = {"em": agora, "expirados": expirar_dependentes(store, agora), "titulos": encurtar_titulos(store, agora), "licoes_unidas": unir_licoes_de_json(store, agora),
-           "licoes_telemetria": tirar_licoes_de_telemetria(store, agora)}
+           "licoes_telemetria": tirar_licoes_de_telemetria(store, agora), "sub_itens": len(fila["sub_itens_expirados"]), "reabertos": len(fila["bloqueados_reabertos"])}
     store.set(KV, rel)
-    if any(rel[k] for k in ("expirados", "titulos", "licoes_unidas", "licoes_telemetria")):
+    if any(rel[k] for k in ("expirados", "titulos", "licoes_unidas", "licoes_telemetria", "sub_itens", "reabertos")):
         store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('controle',?,?,1)",
                 (f"Higiene: {rel['expirados']} item(ns) 'depende de você' expirado(s), {rel['titulos']} título(s) encurtado(s), {rel['licoes_unidas']} lição(ões) de JSON unida(s), "
-                 f"{rel['licoes_telemetria']} lição(ões) de telemetria sem erro obsoleta(s).", agora))
+                 f"{rel['licoes_telemetria']} lição(ões) de telemetria sem erro obsoleta(s), {rel['sub_itens']} sub-item(ns) parado(s) descartado(s), "
+                 f"{rel['reabertos']} bloqueado(s) reaberto(s).", agora))
     return rel
 
 

@@ -60,6 +60,10 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
         out.append(_item("pergunta_esgotada", f"Conselho parou de repetir “{chave}”: {e.get('entregas')} entregas sem a dor cair",
                          "A resposta não está em mais um item igual: mude o desenho (a pergunta, a persona ou a métrica) ou aceite a dor.",
                          e.get("em"), [], 2, ref=chave, link="/loop#evolucao"))
+    for lid, e in (store.get("licoes_esgotadas") or {}).items():            # lição com 3 PRs mergeados que ainda reincide
+        out.append(_item("licao_esgotada", f"Lição #{lid} esgotada: {e.get('prs')} PRs mergeados e o erro volta",
+                         "O loop parou de abrir item para ela: a correção não ataca a causa. Mude o desenho ou aceite o erro.",
+                         e.get("em"), [], 1, ref=lid, link="/loop#evolucao"))
     par = store.get("entrega_parada") or {}
     if par:
         out.append(_item("entrega_parada", f"Entrega parada há {par.get('horas', '?')} h com {par.get('prontos', '?')} item(ns) prontos",

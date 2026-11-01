@@ -41,6 +41,8 @@ ACAO = ("a pergunta é tão ampla ou vaga que nenhum item pequeno a responde (ex
         "a pergunta aponta uma direção, mas o item que a responde ainda precisa ser descoberto por pesquisa ou várias tentativas",
         "a pergunta cabe num item pequeno e medível: dá para dizer o que muda, onde, e como se mede que respondeu")
 PERTINENTE_MIN = 0.6
+PERTINENTE_VETO = 0.25        # pergunta de produto (persona do Norte): o Jev só veta, com p abaixo disto
+VAGAS_PRODUTO = 2             # candidatas de produto que entram na frente do funil em cada passagem
 ACAO_MIN = 1
 # Ritmo (1.30): o Indagador é um dos agentes mais atuantes. Com vaga na fila de válidas, volta a cada INTERVALO_FOME;
 # espera INTERVALO_VAZIO quando a última passagem não achou pergunta nova, e com a fila cheia não indaga.
@@ -95,10 +97,14 @@ def candidatas(ctx, project: dict | None) -> list[dict]:
     if project is None:
         from .perguntas import Conselho
         # primeiro o funil (onde o tempo está indo), depois o especialista (assunto a assunto), depois o conselho
-        out = candidatas_funil(s)
+        conselho = [{"chave": p.id, "persona": p.persona, "texto": p.texto, "relevancia": p.relevancia, "eixo": p.eixo,
+                     "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()]
+        # 31/10: as perguntas de produto (Norte, épicos) entravam por último e o corte em MAX_CANDIDATAS as deixava de fora
+        # em quase toda passagem; agora VAGAS_PRODUTO delas vão na frente do funil e do especialista
+        produto = [c for c in conselho if c.get("eixo") == "produto"][:VAGAS_PRODUTO]
+        out = produto + candidatas_funil(s)
         out += sorted(candidatas_especialista(s), key=lambda c: -c["relevancia"])
-        out += [{"chave": p.id, "persona": p.persona, "texto": p.texto, "relevancia": p.relevancia,
-                 "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()]
+        out += [c for c in conselho if c not in produto]
         fora = ja_julgadas(s, "loop")
         return [c for c in out if c["chave"] not in fora][:MAX_CANDIDATAS]
     from .perguntas import personas_da_missao
@@ -166,8 +172,13 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
         p, e, a = out[f"indaga_pert_{i}"], out[f"indaga_eixo_{i}"], out[f"indaga_acao_{i}"]
         inconclusa = any(d.source == "local" for d in (p, e, a)) and getattr(ctx.dl.jev, "source", "") == "jev"
         pert, eixo, acao = float(p.value), str(e.value), int(float(a.value))
-        if inconclusa:
+        de_produto = c.get("persona") in ("tech_lead", "pm", "mercado") or c.get("eixo") == "produto"   # perguntas.NORTE_PERSONAS
+        if de_produto:
+            eixo = "produto"                  # a pergunta é de produto por construção: o Jev decide se passa, não o eixo
+        if inconclusa and not de_produto:
             veredito = "inconclusa"           # o Jev ficou em dúvida e a regra decidiu: não passa, volta depois
+        elif de_produto:
+            veredito = "valida" if pert >= PERTINENTE_VETO else "descartada"      # veto, não porteiro
         elif pert >= PERTINENTE_MIN and eixo != "nenhum" and acao >= ACAO_MIN:
             veredito = "valida"
         else:

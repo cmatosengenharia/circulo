@@ -264,7 +264,44 @@ def _mercado(s, agora) -> list[Pergunta]:
     return out
 
 
-SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro, _norte, _mercado]
+NORTE_PERSONAS = ("tech_lead", "pm", "mercado")
+# 31/10: a fila nunca fica vazia. Em 280 giros o Developer trabalhou em 12: a única fonte de itens era o conselho, e o
+# Jev descartava 94 % das perguntas. Os épicos são a direção de produto em pedaços (kv `norte_epicos` sobrescreve):
+# cada um vira uma pergunta do PM com eixo produto sempre que não há item de produto pendente. Descanso e "esgotada"
+# valem para eles como para qualquer chave; o Jev só veta.
+EPICOS = (
+    ("meu_trabalho_daily", "Como PM, o que falta para a pauta da daily (tela Meu trabalho) nascer das pendências e decisões anotadas no "
+                           "banco, e não só dos arquivos em notas/?"),
+    ("meu_trabalho_cursor", "Como PM, como o engenheiro importa o CSV real de uso do Cursor pela tela Meu trabalho e vê o gasto por "
+                            "assunto sem a linha de comando?"),
+    ("meu_trabalho_jev", "Como PM, como a nota ambígua (regra local não sabe o assunto) vai ao Jev e volta arquivada, em vez de ser recusada?"),
+    ("meu_trabalho_graft", "Como PM, como 'o que decidimos sobre X?' usa o Graft por significado quando a palavra não bate, com a fonte?"),
+    ("fabrica_segundo_repo", "Como tech lead, o que falta para `circulo init` num segundo repositório (Python ou .NET) receber um pedido e "
+                             "entregar um PR com testes, sem tocar o código do loop?"),
+    ("fabrica_pedido_pr", "Como tech lead, como um pedido em uma frase vira PR com critério de aceite verificável no corpo e o "
+                          "resultado do critério no merge?"),
+    ("fabrica_console", "Como tech lead, o que na Equipe ao vivo me diz em 10 s o que cada agente está fazendo por um pedido meu e onde parou?"),
+    ("fabrica_harness", "Como tech lead, como o loop gera e mantém AGENTS.md/regras do Cursor de um repositório cliente a partir das "
+                        "lições dele, por PR?"),
+    ("fabrica_gaia", "Como tech lead, como as etapas de governança (GAIA) viram portões configuráveis por repositório, com evidência "
+                     "guardada por etapa?"),
+    ("meu_trabalho_links", "Como PM, como os links guardados aparecem agrupados por assunto na tela Meu trabalho, com busca por "
+                           "significado e atalho para guardar?"),
+)
+
+
+def _epicos(s, agora) -> list[Pergunta]:
+    """Fila nunca vazia: sem item de produto pendente, cada épico vira uma pergunta do PM com eixo produto."""
+    pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND (origem='pedido_cassio' "
+                  "OR EXISTS (SELECT 1 FROM perguntas p WHERE p.item_id=roadmap.id AND p.eixo IN ('produto','missao')))")
+    if pend:
+        return []
+    epicos = s.get("norte_epicos") or [{"chave": c, "texto": x} for c, x in EPICOS]
+    return [Pergunta(f"epico:{e['chave']}", "pm", str(e["texto"])[:400], float(e.get("relevancia", 0.7)),
+                     {"epico": e["chave"], "base": "medido", "fila_de_produto": 0}, eixo="produto") for e in epicos if e.get("texto")]
+
+
+SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro, _norte, _mercado, _epicos]
 
 
 # ------------------------------------------------------------------ o conselho

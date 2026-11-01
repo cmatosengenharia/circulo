@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.71.0 — 2026-10-31
+
+**O loop estava faminto, não lento: fila nunca vazia, Jev só veta produto, higiene da fila, lição esgotada.**
+
+- Diagnóstico (31/10, relatório das 21:51): 280 giros, Developer em 12; 11 PRs de código em 0,47 h cada — a esteira
+  entrega, falta trabalho entrando. A única fonte era o conselho; as perguntas de produto (Norte) entravam por último
+  na lista do Indagador (corte em 6) e o Jev exigia p ≥ 0,6: 201 de 213 descartadas. 9 sub-itens parados desde 22/10
+  mantinham o roteiro "cheio" (12) e o Planejador descartava pergunta nova por regra. 12 itens bloqueados por lint
+  desde 25/10 sem sonda. Lição #47 (estagnação): 9 reincidências, 5 PRs no dia tentando fechá-la.
+- `perguntas.EPICOS` + `_epicos`: sem item de produto pendente, cada épico (Meu trabalho: daily do banco, CSV do
+  Cursor, Jev na nota ambígua, Graft, links; fábrica: 2º repositório, pedido → PR com critério, console, harness,
+  GAIA) vira pergunta do PM com eixo produto; kv `norte_epicos` sobrescreve a lista. Descanso e "esgotada" valem.
+- `indagador`: `VAGAS_PRODUTO` = 2 perguntas de produto na frente do funil; para persona do Norte o Jev só veta
+  (`PERTINENTE_VETO` = 0,25, inconclusa passa) e o eixo gravado é `produto`.
+- `circulo/insistencia.py` (higiene, 1×/h): sub-item pendente 7 dias sem ninguém pegar → descartado; item
+  `bloqueado` pelo disjuntor há 3 dias → volta à fila com o contador zerado (2 por passagem; o teto tem a própria
+  sonda); `licao_esgotada`: lição com 3 PRs mergeados que ainda reincide não abre mais item, avisa uma vez e entra
+  no "Precisa de você" (`licao_esgotada`).
+- Testes: `tests/test_insistencia.py`.
+
 ## 1.70.0 — 2026-10-30
 
 **Regra: o loop nunca para de evoluir. Agentes de validação entre o Developer e o PR. Sem limite de tokens.**

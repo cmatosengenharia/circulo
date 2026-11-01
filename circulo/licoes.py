@@ -67,16 +67,10 @@ AMBIENTE = re.compile(r"\b429\b|rate[ _-]?limit|session limit|usage limit|hit yo
                       r"timeout|connection (?:reset|refused|aborted)|temporar|urlerror|http(?: error:?)? ?5\d\d|bad gateway|"
                       r"service unavailable|gateway time|"
                       r"remotedisconnected|name resolution|ssl|credit balance", re.I)
-# Lição #53: o gate recusa pelos arquivos, antes dos checks, o PR que toca a constituição; o check "Constituição"
-# falhando num PR que chegou aos checks é o CI que caiu inteiro (Actions, main), não o PR: ambiente, sem item.
-CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")
-# Lição #27: o exit 4 do pytest é qualquer erro de uso; só o caminho citado, conferido na main e no roteiro, diz que o
-# alvo não existe. Alvo que ninguém vai criar não é erro novo: 128 ocorrências do mesmo arquivo de um item descartado.
-ALVO_SUMIDO = re.compile(r"file or directory not found: (tests/[\w./-]+\.py)")
+CI_INTEIRO = re.compile(r"^checks falhando:.*\bConstitui")   # lição #53: "Constituição" falhando após os checks = CI inteiro caiu (ambiente)
+ALVO_SUMIDO = re.compile(r"file or directory not found: (tests/[\w./-]+\.py)")   # lição #27: exit 4 é uso; só o caminho citado diz "alvo sumiu"
 ALVO_PYTEST = re.compile(r"ERROR: (?:file or directory )?not found:")
-# Lição #19: o pytest imprime o código do teste que falhou; um `timeout=10` ali não é timeout, o teste é a causa.
-# O resumo `FAILED arquivo::teste` dá o nó; sem ele (saída cortada), vale o cabeçalho `____ teste ____` do bloco.
-FALHOU_RESUMO = re.compile(r"FAILED (tests/[\w/]+\.py::\w+)")
+FALHOU_RESUMO = re.compile(r"FAILED (tests/[\w/]+\.py::\w+)")   # lição #19: o resumo FAILED dá o nó; `timeout=10` no código impresso não é timeout
 FALHOU_CABECALHO = re.compile(r"^_{3,} ([\w.]*test\w*(?:\[[^\]]*\])?) _{3,}$", re.M)
 
 
@@ -503,6 +497,9 @@ class Licoes:
                     forcar: bool = False) -> None:
         agora = time.time()
         detalhe = detalhe_do_item(lic, motivo, detalhe_item)
+        from .insistencia import licao_esgotada
+        if lic.get("item_id") and licao_esgotada(self.s, lic, self.reply, agora):    # 3 PRs mergeados e reincide: não insiste
+            return
         if lic.get("item_id"):
             if detalhe_item and "Subir de camada" in detalhe_item:
                 self.s.x("UPDATE roadmap SET detalhe=detalhe || ? WHERE id=? AND instr(detalhe, ?)=0",
