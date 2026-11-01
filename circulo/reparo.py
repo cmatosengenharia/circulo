@@ -1,7 +1,8 @@
 """Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente.
 
 Fica fora da constituição (estende o `SelfDeveloper`, sem mexer nele):
-  1. developer:lint falhou → `ruff check --fix` (e `ruff format` nos arquivos novos) sem LLM, e reavalia.
+  1. developer:lint falhou → `lint_fix` (B905 por AST + `ruff check --fix` do CI) e `ruff format` nos arquivos novos,
+     sem LLM, e reavalia.
      O que o autofix resolve não gasta token (Stripe Minions: nó determinístico antes do nó de agente).
   2. lint ou testes ainda falham → no máximo MAX_RODADAS_REPARO rodada do agente. O teto está aqui no código, não no
      prompt (Aider: contador de reflexões fixo). A entrada é a saída focada: resumo do pytest (`--tb=short -q`, ids dos
@@ -77,8 +78,8 @@ PROTEGIDOS = (f"\nNUNCA altere a constituição (somente leitura; o que mudar ne
 MAX_RODADAS_REPARO = 1
 LINHAS_FEEDBACK = 60
 ALTERADOS, NOVOS = "{alterados}", "{novos}"      # marcadores nos comandos de autofix: viram a lista de arquivos .py
-SELECAO_CI = LINT_CMD[LINT_CMD.index("--select"):]  # --select E,F,W,B --ignore E501
-RUFF_FIX = [[sys.executable, "-m", "ruff", "check", "--fix", *SELECAO_CI, ALTERADOS],
+LINT_FIX = "circulo.lint_fix"                   # roda no processo: o worktree pode não ter o pacote circulo
+RUFF_FIX = [[LINT_FIX, ALTERADOS],              # B905 por AST + ruff --fix do CI, só em tests/
             [sys.executable, "-m", "ruff", "format", NOVOS]]
 ERRO_LINT = re.compile(r":\d+:\d+: [A-Z]+\d+")
 RESUMO_PYTEST = re.compile(r"^=+ short test summary info =+$")
@@ -618,7 +619,11 @@ class DeveloperComReparo(SelfDeveloper):
                 argv += alterados if x == ALTERADOS else novos if x == NOVOS else [x]
             if (ALTERADOS in cmd and not alterados) or (NOVOS in cmd and not novos):
                 continue
-            subprocess.run(argv, cwd=wt, capture_output=True, text=True, timeout=300, env=_ambiente())
+            if cmd[0] == LINT_FIX:
+                from .lint_fix import corrigir
+                corrigir(alterados, wt)
+            else:
+                subprocess.run(argv, cwd=wt, capture_output=True, text=True, timeout=300, env=_ambiente())
             rodou = True
         return rodou
 
