@@ -68,9 +68,13 @@ def neurogenese(store, licao: dict) -> list[int]:
     sig, novos = licao["assinatura"], []
     m = re.search(r":lint:([A-Z0-9,]+)$", sig)
     if m:
-        novos.append(criar_portao(store, ABRIR_PR, "comando",
-                                  {"argv": ["-m", "ruff", "check", "circulo", "tests", "--select", m.group(1)]},
-                                  f"lint {m.group(1)} (lição #{licao['id']})", licao["id"]))
+        from .self_dev import LINT_CMD     # lição #72: o código que o CI ignora não vira portão
+        ignorados = LINT_CMD[LINT_CMD.index("--ignore") + 1].split(",")
+        codigos = ",".join(c for c in m.group(1).split(",") if c not in ignorados)
+        if codigos:
+            novos.append(criar_portao(store, ABRIR_PR, "comando",
+                                      {"argv": ["-m", "ruff", "check", "circulo", "tests", "--select", codigos]},
+                                      f"lint {codigos} (lição #{licao['id']})", licao["id"]))
     m = re.search(r":teste:(tests/[\w/]+\.py::\w+)$", sig)
     if m:
         novos.append(criar_portao(store, ABRIR_PR, "comando", {"argv": ["-m", "pytest", "-q", m.group(1)]},
