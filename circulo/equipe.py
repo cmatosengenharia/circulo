@@ -342,6 +342,20 @@ def quadro(store: Store) -> list[dict]:
     ]
 
 
+def por_pessoa(store: Store) -> list[dict]:
+    """Os pedidos de cada pessoa (o `de:` da caixa): os abertos e os entregues em 7 dias, quem tem mais aberto primeiro."""
+    rows = store.q("SELECT id, status FROM roadmap WHERE origem='pedido_cassio' AND COALESCE(desativado,0)=0 "
+                   "AND (status!='feito' OR updated_at>=?) ORDER BY id", (time.time() - 7 * 86400,))
+    from .caixa import quem_pediu
+    quem = quem_pediu(store, [r["id"] for r in rows])
+    out: dict[str, dict] = {}
+    for r in rows:
+        p = out.setdefault(quem[r["id"]], {"de": quem[r["id"]], "itens": [], "abertos": 0, "feitos": 0})
+        p["itens"].append(r["id"])
+        p["feitos" if r["status"] == "feito" else "abertos"] += 1
+    return sorted(out.values(), key=lambda p: (-p["abertos"], p["de"]))
+
+
 def retrato(store: Store, pedido: str | None = None) -> dict[str, Any]:
     """Quem faz o quê e o quadro; com `pedido` (ev<N>), também o fio daquele pedido até o merge (caminho.caminho)."""
     ativo, detalhe, desde = _agora(store)
@@ -369,7 +383,7 @@ def retrato(store: Store, pedido: str | None = None) -> dict[str, Any]:
     motivo.alertar_sem_motivo(store, sorted({k["id"] for col in q for k in col["cards"] if (k.get("motivo") or {}).get("codigo") == "sem_motivo"}))
     r = {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
          "gargalo": cap.get("gargalo"), "paralelo": cap.get("paralelo") or {},
-         "quadro": q, "tick": store.tick}
+         "quadro": q, "por_pessoa": por_pessoa(store), "tick": store.tick}
     if pedido:
         from .caminho import caminho
         r["pedido"] = caminho(store, pedido)
