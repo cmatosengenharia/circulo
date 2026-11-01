@@ -250,7 +250,9 @@ class GitHubComConvencoes:
         criterio = criterio_aceite.linha_pr(self._s, int(m.group(1)) if m else None)
         if criterio.startswith("Critério: ✗"):
             raise RuntimeError(f"PR não aberto: {criterio}")
-        return self._gh.create_pr(head, base, title, f"{body}\n\n{linha_pr(ev)}\n\n{criterio}")
+        from . import risco
+        linha_risco = risco.portao(self._s, title, head, risco.acoes_do_pr(head, body), int(m.group(1)) if m else None)
+        return self._gh.create_pr(head, base, title, f"{body}\n\n{linha_pr(ev)}\n\n{criterio}\n\n{linha_risco}")
 
 
 def relatorio_convencoes(s, desde: float = 0.0) -> dict:
