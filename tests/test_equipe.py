@@ -78,3 +78,26 @@ def test_pagina_equipe_api_e_menu_em_todas_as_telas(circle, painel):  # noqa: F8
     req = urllib.request.Request(painel + "/loop")
     with urllib.request.urlopen(req, timeout=5) as r:                           # /loop leva à missão do loop
         assert 'id="navTopo"' in r.read().decode() and "/missao/" in r.geturl()
+
+
+def test_filtrar_por_pedido_mostra_a_linha_do_tempo_e_onde_esta_agora(circle, painel):  # noqa: F811
+    """/api/equipe?pedido=evN: o fio daquele pedido (caixa → item → estudo → Developer/PR → merge) com o tempo de cada etapa."""
+    s = circle.store
+    t0 = time.time() - 3600
+    ev = s.x("INSERT INTO events(kind,payload,status,created_at) VALUES('pedido',?,'done',?)",
+             (json.dumps({"text": "Quero um atalho de busca"}), t0))
+    i = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) VALUES(?,?,'humano','pendente','',1,?,?)",
+            ("Quero um atalho de busca", "d", t0 + 60, t0 + 60))
+    s.x("INSERT INTO elos(de,para,relacao,em) VALUES(?,?,'virou_item',?)", (f"pedido:{ev}", f"item:{i}", t0 + 60))
+    with urllib.request.urlopen(painel + f"/api/equipe?pedido=ev{ev}", timeout=5) as r:
+        d = json.loads(r.read())
+    assert d["membros"] and d["quadro"]                                         # a Equipe continua inteira
+    p = d["pedido"]
+    assert p["evento"] == ev and p["item"] == i and p["texto"] == "Quero um atalho de busca"
+    etapas = {e["etapa"]: e for e in p["etapas"]}
+    assert etapas["item"]["feita"] and abs(etapas["item"]["dur_s"] - 60) < 0.01     # o tempo da etapa caixa → item
+    assert p["esperando"]["etapa"] == "estudo"                                  # onde está agora
+    with urllib.request.urlopen(painel + "/api/equipe?pedido=ev999999", timeout=5) as r:
+        assert json.loads(r.read())["pedido"] is None
+    with urllib.request.urlopen(painel + "/api/equipe", timeout=5) as r:
+        assert "pedido" not in json.loads(r.read())                             # sem filtro, o retrato de sempre
