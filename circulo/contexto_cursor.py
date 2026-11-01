@@ -74,7 +74,8 @@ def _itens_do_repositorio(store: Store) -> list[tuple[str, str]]:
                              "ORDER BY COALESCE(evidenciada_tick, 0) DESC, id DESC")]
 
 
-def gerar(store: Store, assunto: str | None = None, readme: str = "", nome: str | None = None) -> dict[str, str]:
+def gerar(store: Store, assunto: str | None = None, readme: str = "", nome: str | None = None,
+          teto: int = LIMITE_AGENTS) -> dict[str, str]:
     """{caminho relativo: conteúdo}. Com `assunto`, da memória dele; sem, das lições evidenciadas do repositório."""
     titulo = assunto or nome or "repositório"
     itens = _itens_do_assunto(store, assunto) if assunto else _itens_do_repositorio(store)
@@ -90,19 +91,19 @@ def gerar(store: Store, assunto: str | None = None, readme: str = "", nome: str 
             escopo.setdefault(g, []).append(linha)
         else:
             geral[secao].append(linha)
-    arquivos = {"AGENTS.md": _agents(titulo, geral)}
+    arquivos = {"AGENTS.md": _agents(titulo, geral, min(teto, LIMITE_AGENTS))}
     for g, linhas in list(escopo.items())[:MAX_REGRAS]:
         arquivos[f".cursor/rules/{_slug(titulo)}-{_slug(g)}.mdc"] = _regra(titulo, g, linhas)
     return arquivos
 
 
-def _agents(titulo: str, geral: dict[str, list[str]]) -> str:
+def _agents(titulo: str, geral: dict[str, list[str]], teto: int) -> str:
     linhas = [f"# {titulo}", "", "Só o que não está no código nem no README; gerado da memória do círculo, muda só por PR."]
     for secao, rotulo in SECOES:
-        if not geral[secao] or len(linhas) + 3 > LIMITE_AGENTS:
+        if not geral[secao] or len(linhas) + 3 > teto:
             continue
         linhas += ["", f"## {rotulo}"]
-        linhas += [f"- {x}" for x in geral[secao][:LIMITE_AGENTS - len(linhas)]]
+        linhas += [f"- {x}" for x in geral[secao][:teto - len(linhas)]]
     return "\n".join(linhas) + "\n"
 
 
