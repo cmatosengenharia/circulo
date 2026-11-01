@@ -756,11 +756,11 @@ class Licoes:
         rows = self.s.q(f"SELECT id, status, assinatura, prevencao, reincidencias, {resolvida} resolvida FROM licoes "
                         "WHERE classe!='ambiente' AND status!='unida' "
                         "ORDER BY resolvida, reincidencias DESC, ocorrencias DESC, id DESC LIMIT ?", (limite,))
-        if not rows:
-            return ""
         linhas = [f"- #{r['id']} [{r['status']}{', reincidiu ' + str(r['reincidencias']) + 'x' if r['reincidencias'] else ''}] "
                   f"{r['assinatura']}" + ("" if r["resolvida"] else f": {r['prevencao']}") for r in rows]
-        return "Erros que o círculo já cometeu (lições). Não repita nenhum deles:\n" + "\n".join(linhas)
+        erros = "Erros que o círculo já cometeu (lições). Não repita nenhum deles:\n" + "\n".join(linhas) if rows else ""
+        from .praticas import bloco   # as práticas ativas (≤ 3) vão a cada prompt que leva as lições: Planejador e Developer
+        return "\n\n".join(t for t in (bloco(self.s), erros) if t)
 
     def resumo(self) -> dict:
         por_status = {r["status"]: r["n"] for r in self.s.q("SELECT status, COUNT(*) n FROM licoes GROUP BY status")}
