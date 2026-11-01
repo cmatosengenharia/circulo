@@ -8,7 +8,8 @@ Dentro de cada nota:
     bloqueio: texto  (ou `- [ ] bloqueio: texto`)   entra em "bloqueia"
     qualquer outra linha (ou `- [x] texto`)         entra em "ontem" se a nota é de ontem
 A data da nota é a do nome (`2026-10-25-...md`) ou, sem ela, a da última modificação.
-O que você anotou pela tela (assunto_notas) entra junto: toda pendência em "hoje", a decisão de ontem em "ontem".
+O que você anotou pela tela (assunto_notas) entra junto: pendência aberta em "hoje" (a marcada
+feita sai da pauta), a decisão de ontem em "ontem".
 
 A partir das HORA h, uma vez por dia, a pauta (até MAX_LINHAS linhas) vai ao console e à notificação do macOS.
 """
@@ -60,7 +61,7 @@ def _ler_assunto_notas(store) -> list[tuple[str, str, str]]:
     assuntos.preparar(store)
     return [(r["nome"], _dia(r["created_at"]), f"- [ ] {r['texto']}" if r["tipo"] == "pendencia" else f"decisão: {r['texto']}")
             for r in store.q("SELECT n.tipo, n.texto, n.created_at, a.nome FROM assunto_notas n JOIN assuntos a ON a.id=n.assunto_id "
-                             "WHERE n.tipo IN ('pendencia','decisao') ORDER BY n.created_at, n.id")]
+                             "WHERE n.tipo='decisao' OR (n.tipo='pendencia' AND n.feita_em IS NULL) ORDER BY n.created_at, n.id")]
 
 
 def tem_fonte(store, data_dir: Path) -> bool:

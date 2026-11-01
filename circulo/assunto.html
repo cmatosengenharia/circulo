@@ -122,12 +122,20 @@ async function carregar() {
     $("#nDecisoes").textContent = `· ${f.decisoes.length}`; $("#nPendencias").textContent = `· ${f.pendencias.length}`;
     $("#nNotas").textContent = `· ${f.notas.length}`; $("#nLinks").textContent = `· ${f.links.length}`;
     lista("#decisoes", f.decisoes, nota, "nenhuma decisão anotada");
-    lista("#pendencias", f.pendencias, nota, "nenhuma pendência");
+    lista("#pendencias", f.pendencias, n => n.feita
+      ? `<li><s>${esc(n.texto)}</s> <span class="muted">${esc(n.data)} · feita em ${esc(n.feita)}</span> <button type="button" data-id="${n.id}" data-feita="0" aria-label="Reabrir: ${esc(n.texto)}">Reabrir</button></li>`
+      : `<li>${esc(n.texto)} <span class="muted">${esc(n.data)}</span> <button type="button" data-id="${n.id}" data-feita="1" aria-label="Marcar como feita: ${esc(n.texto)}">Feita</button></li>`, "nenhuma pendência");
     lista("#notas", f.notas, nota, "nenhuma nota");
     lista("#links", f.links, l => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.rotulo)}</a>${l.rotulo === l.url ? "" : ` <span class="muted">${esc(l.url)}</span>`}</li>`, "nenhum link");
     $("#agents").textContent = f.agents; $("#ficha").hidden = false;
   } catch { $("#msg").textContent = "sem conexão com o painel"; }
 }
+$("#pendencias").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-id]"); if (!b) return;
+  const j = await (await fetch("/api/trabalho/pendencia", {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"},
+    body: JSON.stringify({id: Number(b.dataset.id), feita: b.dataset.feita === "1"})})).json();
+  $("#msg").textContent = j.erro || (j.nota.feita ? `feita em ${j.nota.feita}: ${j.nota.texto}` : `reaberta: ${j.nota.texto}`); carregar();
+});
 carregar();
 </script>
 </body>
