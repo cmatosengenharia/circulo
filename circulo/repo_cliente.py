@@ -6,15 +6,18 @@ loop: o repositório do cliente é clonado do remoto num worktree isolado (`<dad
 e do repositório do loop), numa branch `circulo/<pedido>` criada a partir da base. `entregar` comita só nessa branch,
 roda o teste do cliente e, verde, empurra a branch para o remoto: a base do PR é a do registro.
 
+Portões do cliente: os comandos de `[tool.circulo.etapas]` (lidos do clone registrado, não da branch do pedido: o diff
+não afrouxa o próprio portão) rodam no worktree em cada etapa — 'pedido' ao receber, 'desenvolvimento' e 'pr' ao
+entregar. Cada comando vira uma linha de `etapas_repo` (a evidência do pedido, na ficha da missão); qualquer etapa
+vermelha barra o push, mesmo com o teste verde.
+
 Isolamento por construção: o único push é `HEAD:refs/heads/circulo/<n>` e é recusado se a branch não começa com
 `circulo/`, se é a base, ou se o clone não é a raiz do próprio repositório git.
 """
 from __future__ import annotations
 
-import shlex
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -42,6 +45,15 @@ ESQUEMA = ("""CREATE TABLE IF NOT EXISTS repos_cliente (
   commit_sha TEXT,
   created_at REAL NOT NULL,
   updated_at REAL NOT NULL
+)""", """CREATE TABLE IF NOT EXISTS etapas_repo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL,
+  etapa TEXT NOT NULL,
+  comando TEXT NOT NULL,
+  ok INTEGER NOT NULL,
+  codigo INTEGER,
+  saida TEXT NOT NULL,
+  em REAL NOT NULL
 )""")
 
 
@@ -132,15 +144,34 @@ def receber(store, pid: int, texto: str, raiz: Path) -> dict:
         store.x("DELETE FROM pedidos_repo WHERE id=?", (n,))
         raise
     store.x("UPDATE pedidos_repo SET branch=?, pasta=? WHERE id=?", (branch, str(clone), n))
+    _etapa(store, n, r["caminho"], clone, "pedido")
     return _pedido(store, n)
 
 
+def _etapa(store, pedido_id: int, caminho: str, clone: Path, etapa: str) -> bool:
+    """Roda a etapa do kit do cliente no worktree e grava cada comando como evidência do pedido. True = passou."""
+    res = kits.rodar(kits.carregar(caminho), etapa, cwd=clone)
+    for x in res:
+        store.x("INSERT INTO etapas_repo(pedido_id,etapa,comando,ok,codigo,saida,em) VALUES(?,?,?,?,?,?,?)",
+                (pedido_id, etapa, x["comando"], int(x["ok"]), x["codigo"], x["saida"], time.time()))
+    return all(x["ok"] for x in res)
+
+
+def evidencias(store, pedido_id: int) -> list[dict]:
+    _esquema(store)
+    return [{**dict(r), "ok": bool(r["ok"])} for r in store.q(
+        "SELECT etapa, comando, ok, codigo, saida, em FROM etapas_repo WHERE pedido_id=? ORDER BY id", (pedido_id,))]
+
+
+def fichas(store, pid: int) -> list[dict]:
+    """Os pedidos do projeto, cada um com a evidência das etapas (a ficha na tela da missão)."""
+    return [{"id": p["id"], "texto": p["texto"], "branch": p["branch"], "status": p["status"], "commit": p["commit_sha"],
+             "etapas": evidencias(store, p["id"])} for p in reversed(pedidos(store, pid))]
+
+
 def _testes(clone: Path, cmd: str) -> bool:
-    argv = shlex.split(cmd)
-    if argv and argv[0] in ("python", "python3"):
-        argv[0] = sys.executable                         # o mesmo intérprete do loop: `python` pode nem existir no PATH
     try:
-        return subprocess.run(argv, cwd=str(clone), capture_output=True, timeout=900).returncode == 0
+        return subprocess.run(kits.argv(cmd), cwd=str(clone), capture_output=True, timeout=900).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -158,14 +189,19 @@ def entregar(store, pedido_id: int, mensagem: str) -> dict:
         raise ValueError(f"pedido {pedido_id}: nada mudou no clone")
     _git(clone, "add", "-A")
     _git(clone, *AUTOR, "commit", "-q", "-m", mensagem)
-    ok = _testes(clone, r["testes"])
+    pedido_ok = all(e["ok"] for e in evidencias(store, pedido_id) if e["etapa"] == "pedido")
+    dev = _etapa(store, pedido_id, r["caminho"], clone, "desenvolvimento")
+    testes_ok = _testes(clone, r["testes"])
+    pr = _etapa(store, pedido_id, r["caminho"], clone, "pr")
+    bloqueado = [e for e, passou in (("pedido", pedido_ok), ("desenvolvimento", dev), ("pr", pr)) if not passou]
+    ok = testes_ok and not bloqueado
     sha = _git(clone, "rev-parse", "HEAD")
     if ok:
         _git(clone, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=600)
     store.x("UPDATE pedidos_repo SET status=?, commit_sha=?, updated_at=? WHERE id=?",
             ("entregue" if ok else "vermelho", sha, time.time(), pedido_id))
-    return {"branch": branch, "base": r["base"], "commit": sha, "testes_ok": ok,
+    return {"branch": branch, "base": r["base"], "commit": sha, "testes_ok": testes_ok, "bloqueado_por": bloqueado,
             "diff": _git(clone, "diff", "--stat", f"origin/{r['base']}...HEAD")}
 
 
-__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar"]
+__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar", "evidencias", "fichas"]

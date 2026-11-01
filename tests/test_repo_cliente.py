@@ -99,3 +99,38 @@ def test_circulo_init_cliente_registra_sem_mexer_na_configuracao_do_loop(tmp_pat
     env = Path(configuracao.ENV_FILE)
     assert not env.exists() or "CIRCULO_REPO_DIR" not in env.read_text(encoding="utf-8")
     assert not (pasta / ".github").exists()                     # registrar o cliente não escreve na branch padrão dele
+
+
+def test_etapa_pr_do_cliente_que_falha_bloqueia_o_pr_e_cada_etapa_vira_evidencia_na_ficha(tmp_path):
+    """`[tool.circulo.etapas]` do cliente roda em cada etapa (kit.checar): o resultado de cada comando fica gravado como
+    evidência do pedido e aparece na ficha da missão; um comando que falha em 'pr' barra o push mesmo com o teste verde."""
+    from circulo import projects
+    etapas = ('\n[tool.circulo.etapas]\npedido = ["python -c pass"]\ndesenvolvimento = ["python -c pass"]\n'
+              'pr = ["python -c pass", "python -c \\"raise SystemExit(3)\\""]\n')
+    remoto, pasta = tmp_path / "remoto.git", tmp_path / "cliente"
+    shutil.copytree(FIXTURE, pasta)
+    (pasta / "pyproject.toml").write_text((pasta / "pyproject.toml").read_text() + etapas)
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remoto))
+    git(pasta, "init", "-q", "-b", "main")
+    git(pasta, "add", "-A")
+    git(pasta, "commit", "-q", "-m", "inicial")
+    git(pasta, "remote", "add", "origin", remoto.as_uri())
+    git(pasta, "push", "-q", "origin", "main")
+    store = Store(tmp_path / "circulo.db")
+    reg = repo_cliente.registrar(store, pasta)
+
+    p = repo_cliente.receber(store, reg["id"], "subtrair", tmp_path / "fabrica")
+    (Path(p["pasta"]) / "calc.py").write_text((Path(p["pasta"]) / "calc.py").read_text() + "\n\ndef subtrair(a, b):\n    return a - b\n")
+    r = repo_cliente.entregar(store, p["id"], "subtrair")
+
+    assert r["testes_ok"] and r["bloqueado_por"] == ["pr"]
+    assert not git(remoto, "branch", "--list", p["branch"])                    # etapa 'pr' vermelha: o PR não sai
+    assert repo_cliente.pedidos(store, reg["id"])[0]["status"] == "vermelho"
+    ev = [(e["etapa"], e["comando"], e["ok"]) for e in repo_cliente.evidencias(store, p["id"])]
+    assert ev == [("pedido", "python -c pass", True), ("desenvolvimento", "python -c pass", True),
+                  ("pr", "python -c pass", True), ("pr", 'python -c "raise SystemExit(3)"', False)]
+    assert repo_cliente.evidencias(store, p["id"])[-1]["codigo"] == 3
+
+    projeto = store.one("SELECT * FROM projects WHERE id=?", (reg["id"],))
+    [ficha] = projects.metricas(store, projeto)["pedidos"]
+    assert ficha["id"] == p["id"] and [e["ok"] for e in ficha["etapas"]] == [True, True, True, False]
