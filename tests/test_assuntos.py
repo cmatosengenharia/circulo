@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from circulo import assuntos, graft
+from circulo import assuntos, graft, trabalho
 from circulo.budget import TZ
 
 
@@ -54,6 +54,22 @@ def test_graft_indexa_e_acha_por_significado(ws, monkeypatch):
     monkeypatch.setattr(graft, "recuperar", lambda texto, k=12: [{"tipo": "assunto_nota", "ref": str(n["id"]), "score": 0.9}])
     r = assuntos.perguntar(s, "o que decidimos sobre a ordem de saída dos assistentes virtuais?")
     assert [x["id"] for x in r] == [n["id"]]
+
+
+def test_achada_so_por_significado_vem_marcada_e_cita_a_nota_de_origem(ws, monkeypatch):
+    s, dl = ws.store, ws.ctx.dl
+    monkeypatch.setattr(graft, "inserir", lambda *a, **k: None)
+    sig = assuntos.anotar(s, dl, "decidimos que o bot de boas-vindas sai da Blip primeiro")
+    pal = assuntos.anotar(s, dl, "decidimos usar fila SQS no serviço de SMS")
+    monkeypatch.setattr(graft, "recuperar", lambda texto, k=12: [{"tipo": "assunto_nota", "ref": str(sig["id"]), "score": 0.9},
+                                                                  {"tipo": "assunto_nota", "ref": str(pal["id"]), "score": 0.5}])
+    r = assuntos.perguntar(s, "o que decidimos sobre a ordem de saída dos assistentes virtuais e a fila do SMS?")
+    assert [(x["id"], x["por"]) for x in r] == [(sig["id"], "significado"), (pal["id"], "palavra")]
+    linhas = assuntos.responder(r).splitlines()
+    assert "por significado" in linhas[0] and "decidimos que o bot de boas-vindas sai da Blip primeiro" in linhas[0]
+    assert "por significado" not in linhas[1]
+    via_tela = trabalho.api_get(s, ws.data_dir, "/api/trabalho/perguntar", {"q": ["o que decidimos sobre os assistentes virtuais?"]})
+    assert via_tela["notas"][0]["por"] == "significado" and "por significado" in via_tela["texto"]
 
 
 def test_console_anota_e_pergunta(tmp_path):
