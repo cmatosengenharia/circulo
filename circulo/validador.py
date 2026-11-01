@@ -136,12 +136,14 @@ def _chamar_llm(ctx, item: dict):
     def chamar(system: str, prompt: str) -> str:
         dl, s = ctx.dl, ctx.store
         escolha = dl.pick_model_detalhe("validador", {"tarefa": item.get("titulo", ""), "tipo": "validador"})
+        from . import alavancas
+        modelo, teto = alavancas.aplicar(s, "validador", escolha["modelo"], MAX_TOKENS)
         t0 = time.time()
-        out = dl.llm.generate(system=system, prompt=prompt, model=escolha["modelo"], max_tokens=MAX_TOKENS)
+        out = dl.llm.generate(system=system, prompt=prompt, model=modelo, max_tokens=teto)
         ctx.budget.charge(out.tokens, "llm")
         with contextlib.suppress(Exception):
             from .registro import registrar
-            registrar(s, tick=s.tick, project_id=dl.project_id, papel="validador", modelo=escolha["modelo"], escolha=escolha,
+            registrar(s, tick=s.tick, project_id=dl.project_id, papel="validador", modelo=modelo, escolha=escolha,
                       uso=out, duracao_ms=int((time.time() - t0) * 1000), ok=True, entrada=item.get("titulo", ""), saida=out.text)
         return out.text
     return chamar

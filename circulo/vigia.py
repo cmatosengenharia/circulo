@@ -490,8 +490,9 @@ class Vigia:
                 skills.pedir_instalacao(self.s, repo_dir, now)
             with contextlib.suppress(Exception):
                 garimpo.garimpar(self.s, now, reply=self.ctx.reply, dl=self.ctx.dl)
-        from . import experimentos, praticas
+        from . import alavancas, experimentos, praticas
         experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
+        alavancas.girar(self.s, self.ctx.reply, now)                # uma alavanca de economia por vez, com guarda de qualidade
         praticas.retrospectivo(self.s, now, os.environ.get("CIRCULO_REPO_DIR"), self.ctx.reply)   # 1×/dia: até 3 práticas
         norte.cobrar(self.s, self.ctx.reply, now)                    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita
         from . import conta
