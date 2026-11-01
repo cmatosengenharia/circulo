@@ -110,3 +110,43 @@ def test_fracao_abaixo_da_meta_poe_a_pergunta_de_produto_na_frente_do_roteiro(ci
     assert digest_semanal.prioriza_produto(s)
     assert indagador.espiar(s, "loop")["id"] == produto
     assert indagador.proxima(s, "loop")["id"] == produto
+
+
+def test_markdown_para_o_time_lista_o_que_entrou_quem_pediu_e_o_tempo_ate_o_merge(circle):
+    """/api/digest?formato=md: a versão 'para o time' do mesmo digest (prs_da_semana), em markdown copiável, com cada PR
+    mergeado na semana, quem pediu e o tempo do pedido ao merge; o botão 'Copiar digest' fica em Meu trabalho."""
+    s = circle.store
+    pid = s.x("INSERT INTO perguntas(chave,persona,texto,evidencia,status,eixo,created_at,updated_at) "
+              "VALUES('pm:x','pm','O time usaria?','{}','entregue','produto',?,?)", (AGORA - 3 * 86400 - 600, AGORA))
+    _pr(s, 801, _item(s, "Exportar CSV", "pedido_cassio"))                    # item criado 1 h antes; merge 10 min antes
+    _pr(s, 802, _item(s, "Painel da equipe", "circulo", pid))                 # pergunta feita 3 dias antes do merge
+    _pr(s, 803, None)
+    md = digest_semanal.markdown(digest_semanal.prs_da_semana(s, AGORA))
+    linhas = md.splitlines()
+    assert linhas[0].startswith("## Digest da semana") and "3 PRs" in linhas[0]
+    l801, l802, l803 = (next(x for x in linhas if f"#{n}" in x) for n in (801, 802, 803))
+    assert l801.startswith("- **#801 PR 801**") and "pedido por cassio" in l801 and "pedido→merge 50 min" in l801
+    assert "pedido por pm" in l802 and "pedido→merge 3,0 d" in l802
+    assert "sem pedido" in l803 and "pedido→merge —" in l803
+    assert digest_semanal.markdown([]).splitlines()[-1] == "Nenhum PR mergeado na semana."
+
+
+def test_api_digest_formato_md_e_botao_no_painel(circle):
+    import urllib.request
+
+    from circulo.painel import serve
+    _pr(circle.store, 901, _item(circle.store, "Exportar CSV", "pedido_cassio"), quando=time.time() - 60)
+    srv = serve(circle.store.path, port=0, background=True)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/api/digest?formato=md", timeout=5) as r:
+            tipo, md = r.headers["Content-Type"], r.read().decode()
+        with urllib.request.urlopen(base + "/api/digest", timeout=5) as r:
+            prs = json.loads(r.read())["prs"]
+        with urllib.request.urlopen(base + "/trabalho", timeout=5) as r:
+            html = r.read().decode()
+    finally:
+        srv.shutdown()
+    assert tipo.startswith("text/markdown") and md.startswith("## Digest da semana") and "#901" in md
+    assert [p["number"] for p in prs] == [901]
+    assert "Copiar digest" in html and "/api/digest?formato=md" in html
