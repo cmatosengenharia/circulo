@@ -20,7 +20,7 @@ import json
 import time
 from typing import Any, Callable, Mapping
 
-from . import regras
+from . import landing, regras
 
 MIN_N = 40
 GANHO_MIN = 0.15
@@ -460,4 +460,5 @@ def regra_evidencia(s: Mapping[str, Any]) -> float:
     return 0.5 + (p - 0.5) * f
 
 
-REGRAS = {"evidencia_sustenta": regra_evidencia, "dado_na_evidencia": regra_dado}   # regras do LocalJev que moram aqui
+REGRAS = {"evidencia_sustenta": regra_evidencia, "dado_na_evidencia": regra_dado,   # regras do LocalJev que moram aqui
+          landing.PERGUNTA: landing.regra_clareza}
