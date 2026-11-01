@@ -15,7 +15,7 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import assuntos, contexto_cursor, daily, digest_semanal, gasto_cursor, pastas
+from . import assuntos, contexto_cursor, daily, digest_semanal, gasto_cursor, pastas, roadmap
 from .budget import TZ
 from .links import Links
 
@@ -246,6 +246,8 @@ def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | str | None:
     if caminho == "/api/digest":
         return digest_semanal.ler(store, formato=digest_semanal.markdown) if um("formato") == "md" else \
             {"prs": digest_semanal.prs_da_semana(store)}
+    if caminho == "/api/trabalho/criterios":
+        return roadmap.ler_criterios(store)
     if caminho == "/api/trabalho/perguntar":
         notas = assuntos.perguntar(store, um("q")[:300])
         return {"notas": notas, "texto": assuntos.responder(notas)}
