@@ -196,6 +196,14 @@ def _gasto_por(store, coluna: str, desde: date) -> list[dict]:
                     (desde.isoformat(),))]
 
 
+def _links_por_assunto(store) -> list[dict]:
+    """Um grupo por assunto, em ordem alfabética, e os sem assunto por último; cada um com o total e os links pelo rótulo."""
+    grupos: dict[str, list[dict]] = {}
+    for r in store.q("SELECT * FROM catalogo_links ORDER BY assunto='', assunto, rotulo"):
+        grupos.setdefault(r["assunto"], []).append(Links._linha(r))
+    return [{"assunto": a, "total": len(ls), "links": ls} for a, ls in grupos.items()]
+
+
 def visao(store, data_dir: Path, agora: float | None = None) -> dict:
     """Tudo que a tela mostra, em uma chamada."""
     agora = agora or time.time()
@@ -220,7 +228,7 @@ def visao(store, data_dir: Path, agora: float | None = None) -> dict:
         "orcamento": {**proj, "texto": gasto_cursor.resumo(proj), "por_assunto": _gasto_por(store, "assunto", hoje.replace(day=1)),
                       "por_tipo": _gasto_por(store, "tipo", hoje.replace(day=1))},
         "links": {"total": int(store.one("SELECT COUNT(*) n FROM catalogo_links")["n"]), "graft": lk.graft, "fts": lk.fts,
-                  "recentes": [lk._linha(r) for r in store.q("SELECT * FROM catalogo_links ORDER BY updated_at DESC LIMIT 12")]},
+                  "grupos": _links_por_assunto(store)},
         "contexto": contexto, "gaia": store.get("gaia_mapa") or {"exemplo": False, "etapas": []},
         "pastas": str(pastas.raiz(data_dir)), "notas_pasta": str(Path(data_dir) / daily.PASTA),
     }

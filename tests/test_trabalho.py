@@ -1,6 +1,7 @@
 """Meu trabalho (26/10): a tela que junta assuntos, daily, links, orçamento de IA, contexto para o Cursor e GAIA,
 com a semente de dados de exemplo que deixa o esqueleto inteiro funcionando antes do dado real."""
 import json
+import time
 import urllib.request
 from datetime import datetime
 
@@ -127,3 +128,26 @@ def test_configuracao_pede_o_exemplo_e_o_sre_semeia_uma_vez(circle, monkeypatch)
     trabalho.apagar(s, dados)
     assuntos.criar(s, "Meu assunto", "real")
     assert not trabalho.semear_se_pedido(s, dados)                                   # já tem assunto seu: não mexe
+
+
+def test_card_de_links_agrupa_por_assunto_com_total_e_busca_inline(circle):
+    """Card de links: um grupo colapsável por assunto (sem assunto por último), com o total; a busca inline usa /api/links."""
+    s = circle.store
+    trabalho.semear(s, circle.data_dir)
+    grupos = trabalho.visao(s, circle.data_dir)["links"]["grupos"]
+    assert len(grupos) == 8                     # o exemplo tem links em 7 assuntos e 1 link sem assunto
+    assert [g["assunto"] for g in grupos] == sorted({a for _, _, a in trabalho.LINKS if a}) + [""]
+    assert all(g["total"] == len(g["links"]) == sum(1 for *_, a in trabalho.LINKS if a == g["assunto"]) for g in grupos)
+    srv = serve(s.path, port=0, background=True)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        with urllib.request.urlopen(base + "/trabalho", timeout=5) as r:
+            html = r.read().decode()
+        assert 'id="linksFiltro"' in html and "<details" in html and '"/api/links?q="' in html
+        t0 = time.perf_counter()
+        with urllib.request.urlopen(base + "/api/links?q=runbook&sentido=0", timeout=5) as r:
+            achados = json.loads(r.read())["links"]
+        assert time.perf_counter() - t0 < 1.0
+        assert [h["rotulo"] for h in achados] == ["Runbook de reprocessamento"]
+    finally:
+        srv.shutdown()
