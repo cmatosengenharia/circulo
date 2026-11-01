@@ -1,0 +1,10 @@
+[project]
+name = "{{nome}}"
+version = "0.1.0"
+dependencies = ["fastapi", "uvicorn"]
+
+[tool.circulo]
+testes = "python -m pytest -q"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,9 @@
+{
+"cli": {"descricao": "linha de comando em Python: script, automação, terminal",
+ "palavras": ["cli", "linha de comando", "terminal", "script", "automação", "lote"]},
+"dotnet": {"descricao": "API HTTP em C# com .NET minimal API", "palavras": [".net", "dotnet", "c#", "csharp", "asp.net", "minimal api"]},
+"fastapi": {"descricao": "API HTTP em Python com FastAPI: backend, REST, endpoints",
+ "palavras": ["api", "fastapi", "backend", "rest", "endpoint", "webhook"]},
+"react_vite": {"descricao": "app web com tela em React e Vite: site, painel, página, formulário",
+ "palavras": ["react", "vite", "frontend", "site", "página", "tela", "painel", "interface"]}
+}
