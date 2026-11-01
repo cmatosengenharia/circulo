@@ -243,8 +243,14 @@ class GitHubComConvencoes:
         return getattr(self._gh, nome)
 
     def create_pr(self, head: str, base: str, title: str, body: str) -> int:
+        from . import criterio_aceite
+        from .rastro import PREFIXO_BRANCH
         ev = (self._s.get(CONVENCOES) or {}).get(title)
-        return self._gh.create_pr(head, base, title, f"{body}\n\n{linha_pr(ev)}")
+        m = re.match(rf"{re.escape(PREFIXO_BRANCH)}(\d+)-", head)
+        criterio = criterio_aceite.linha_pr(self._s, int(m.group(1)) if m else None)
+        if criterio.startswith("Critério: ✗"):
+            raise RuntimeError(f"PR não aberto: {criterio}")
+        return self._gh.create_pr(head, base, title, f"{body}\n\n{linha_pr(ev)}\n\n{criterio}")
 
 
 def relatorio_convencoes(s, desde: float = 0.0) -> dict:

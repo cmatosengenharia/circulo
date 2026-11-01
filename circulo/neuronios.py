@@ -144,6 +144,10 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
         store.x("UPDATE portoes SET avaliacoes=avaliacoes+1, bloqueios=bloqueios+?, updated_at=? WHERE id=?",
                 (0 if ok else 1, time.time(), p["id"]))
         res.append(Resultado(f"aprendido#{p['id']}: {p['descricao']}", ok, motivo, p["id"]))
+    if neuronio == ABRIR_PR:
+        from .criterio_aceite import conferir
+        criterio = conferir(store, item_id, wt, adicionadas, env)        # o critério de aceite congelado do item
+        res += [criterio] if criterio else []
     return res
 
 
