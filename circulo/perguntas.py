@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import financeiro, jobs, jtbd, pedido_claro, pedidos_repetidos
+from . import conflitos, financeiro, jobs, jtbd, pedido_claro, pedidos_repetidos
 from .curador_licoes import sem_checagem
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
@@ -448,11 +448,7 @@ def _m_recusas_gasto(s, agora):
 
 def _m_conflitos_pr(s, agora):
     n = _um(s, "SELECT COUNT(*) FROM merges WHERE reason LIKE 'conflito%' AND created_at>=?", (agora - 7 * 86400,))
-    prs: dict[str, set] = {}             # arquivo → PRs que conflitaram nele (git merge-tree, gravado pelo revisor)
-    for r in s.q("SELECT de, detalhe FROM elos WHERE relacao='conflito_main' AND em>=?", (agora - 7 * 86400,)):
-        for a in json.loads(r["detalhe"] or "{}").get("arquivos", []):
-            prs.setdefault(a, set()).add(r["de"])
-    por_arquivo = {a: len(p) for a, p in sorted(prs.items(), key=lambda kv: -len(kv[1]))}
+    por_arquivo = conflitos.por_arquivo(s, agora)    # arquivo → PRs que conflitaram nele (gravado pelo revisor)
     return (min(1.0, n / 3), {"conflitos_7d": n, "arquivos_7d": por_arquivo,
                               "repetidos": [a for a, k in por_arquivo.items() if k >= 2]})
 

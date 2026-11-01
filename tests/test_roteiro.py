@@ -17,7 +17,8 @@ RAIZ = Path(__file__).resolve().parent.parent / "circulo"
 # quem grava no roadmap sem passar por roadmap.gravar_item, e por quê pode: nenhum deles grava origem='loop'
 OUTRAS_ORIGENS = {"medico.py": "erro", "incidents.py": "erro", "licoes.py": "erro", "fatiador.py": "sub_item",
                   "loop.py": "pedido_cassio", "projects.py": "pedido_cassio",
-                  "mercado.py": "referencia", "autonomia.py": "erro", "skills.py": "referencia"}      # 1.72: técnica de repositório de referência; Médico escalado assumido
+                  "mercado.py": "referencia", "autonomia.py": "erro", "skills.py": "referencia",
+                  "absorcao.py": "referencia"}      # 1.72: técnica de repositório de referência; Médico escalado assumido
 
 
 def _sem_lacuna(circle, item_id: int) -> None:

@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.74.0 — 2026-11-01
+
+**Absorção de repositórios: ADR por fonte, técnicas com prova, prioridade para o MVP da esteira e para vender, escudo das skills e varredura diária do ranking.**
+
+- Cássio: "varrer repositórios e absorver as melhores estratégias; classificar em engenharia do loop, criação de
+  produto e venda; extrair técnicas concretas, não copiar cegamente; priorizar o MVP da esteira e o que ajuda a vender;
+  um ADR por repo; validação automática com evidências; repetir a varredura periodicamente".
+- `circulo/absorcao_fontes.py`: catálogo de 9 fontes varridas por clone em 01/11 (ECC, awesome-claude-code,
+  Github-Ranking-AI, Wondel.ai skills, claude-seo, Expo skills, Supabase agent-skills, Remotion skills e o pipeline de
+  vídeo open source: AI-Youtube-Shorts-Generator, auto-editor, whisper.net, postiz) com 26 técnicas (frente, alvo
+  `circulo`/`esteira`, prioridade `mvp` > `venda` > `loop`, origem na fonte, como entra e o teste que prova) e o que foi
+  descartado, com o motivo. `docs/adr/0001…0009` são gerados dele (`python -m circulo.absorcao adr`); o teste falha se
+  um ADR estiver faltando ou desatualizado.
+- `circulo/absorcao.py`: `semear` (técnica do loop → item `referencia`; técnica da esteira → pedido na caixa com
+  `projeto:` do repositório cliente, registrado sozinho quando o clone da esteira está ao lado do loop ou em
+  `CIRCULO_ESTEIRA_DIR`; no máximo 3 pedidos abertos na esteira), `evidencias` (validada só com PR mergeado E o arquivo
+  da prova no repositório, ou pedido da esteira entregue com as etapas verdes; kv `absorcao_evidencias`),
+  `classificar` (Jev `absorcao_frente`, regra local por palavras quando fora do ar ou com confiança < 0,3) e
+  `varrer_ranking` (1×/dia: `Top100/Claude.md` do Github-Ranking-AI e o CSV do awesome-claude-code; quem subiu em
+  estrelas desde ontem; até 5 + 3 repositórios novos por dia vão para a fila do garimpo com a frente).
+- `circulo/escudo.py` (técnica ECC-1, do AgentShield): varre `.claude/` (skills, settings, hooks, agentes) atrás de
+  caractere invisível, ordem de ignorar instruções, `curl | sh`, exfiltração de variável de ambiente, segredo literal e
+  bypass de permissão. Skill com achado crítico sai das opções do Jev em `skills.para_tarefa`; aviso no painel.
+- SRE (`vigia`): com `CIRCULO_REPO_DIR`, `absorcao.rodar` a cada passagem (escudo, semeadura, evidências; ranking 1×/dia).
+- Achado da varredura (PRE-1, prioridade máxima): `repo_cliente.receber` cria o clone e a branch do pedido, mas nenhum
+  agente trabalha os `pedidos_repo` abertos — sem isso, nenhuma técnica da esteira sai do papel. Virou o primeiro item.
+
 ## 1.73.1 — 2026-11-01
 
 - CI da 1.73.0 vermelho por lint (F401, `time` sem uso em tests/test_skills.py): corrigido. Lição: rodar o ruff local com `--no-cache`.

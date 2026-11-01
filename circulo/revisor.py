@@ -30,6 +30,7 @@ import urllib.error
 from pathlib import Path
 from typing import Any
 
+from . import conflitos
 from .decision import Decision, Question, SN
 from .diff_size import parse_numstat
 from .validador import feedback_validador as feedback_validador, revisar_pr as revisar_pr, validar_worktree as validar_worktree  # a porta do Validador (1.70) para a constituição
@@ -126,37 +127,44 @@ def _mudados(repo: Path, intervalo: str) -> set[str]:
     return set(_git(["diff", "--name-only", intervalo], repo).stdout.split())
 
 
-def medir_conflito(repo: Path, branch: str) -> dict | None:
-    """Arquivos em que a branch conflita de fato com origin/main ({arquivos, base}); None = não deu para medir.
-    Git anterior à 2.38 (sem `--write-tree`): reserva pela interseção dos arquivos mudados nos dois lados."""
-    _git(["fetch", "-q", "origin", "main", branch], repo)
-    p = _git(["merge-tree", "--write-tree", "--name-only", "-z", "origin/main", f"origin/{branch}"], repo)
+def medir_conflito(repo: Path, ref: str, sha: str) -> dict | None:
+    """Arquivos em que a versão `sha` do PR conflita de fato com origin/main ({arquivos, base}); None = não deu para
+    medir. Mede o sha que o gate devolveu (o que conflitos_7d conta), não a ponta atual da branch, que pode já ter
+    o conserto. `ref` (a branch, ou `pull/N/head` se o PR não tem branch registrada) só traz o commit. Git anterior
+    à 2.38 (sem `--write-tree`): reserva pela interseção dos arquivos mudados nos dois lados."""
+    _git(["fetch", "-q", "origin", "main", ref], repo)
+    p = _git(["merge-tree", "--write-tree", "--name-only", "-z", "origin/main", sha], repo)
     if p.returncode in (0, 1):
-        return {"arquivos": arquivos_em_conflito(p.stdout) if p.returncode == 1 else [], "base": "merge-tree"}
+        return {"arquivos": (arquivos_em_conflito(p.stdout) or conflitos.arquivos(p.stdout)) if p.returncode == 1 else [],
+                "base": "merge-tree"}
     if p.returncode == 129:
-        comum = _mudados(repo, f"origin/main...origin/{branch}") & _mudados(repo, f"origin/{branch}...origin/main")
+        comum = _mudados(repo, f"origin/main...{sha}") & _mudados(repo, f"{sha}...origin/main")
         return {"arquivos": sorted(comum), "base": "intersecao"}
     return None
 
 
 def gravar_conflitos(store, repo: Path | None, vereditos) -> None:
-    """PR devolvido por conflito com a main: grava na trilha (`elos`, pr:N → conflito:<sha>) os arquivos em conflito,
-    uma vez por versão do PR."""
+    """PR devolvido por conflito com a main: grava os arquivos em conflito em `conflitos` (pr, sha, arquivo, data) e
+    na trilha (`elos`, pr:N → conflito:<sha>), uma vez por versão do PR. Mede as versões devolvidas agora e as que
+    conflitos_7d já conta sem medida (as de antes desta tabela, inclusive com elo antigo vazio)."""
     from . import rastro
-    for v in vereditos:
-        if not (repo and v.details.get("conflito")):
+    if not repo:
+        return
+    agora = [(v.number, v.sha) for v in vereditos if v.details.get("conflito")]
+    medidas: set = set()
+    for pr, sha in [*agora, *conflitos.pendentes(store, time.time())]:
+        if (pr, sha) in medidas or store.one("SELECT 1 FROM conflitos WHERE pr=? AND sha=?", (pr, sha)):
             continue
-        para = f"conflito:{v.sha}"
-        if store.one("SELECT 1 FROM elos WHERE de=? AND para=? AND relacao='conflito_main'", (f"pr:{v.number}", para)):
-            continue
-        row = store.one("SELECT branch FROM prs WHERE number=?", (v.number,))
-        medida = medir_conflito(Path(repo), row["branch"]) if row and row["branch"] else None
+        medidas.add((pr, sha))
+        row = store.one("SELECT branch FROM prs WHERE number=?", (pr,))
+        medida = medir_conflito(Path(repo), row["branch"] if row and row["branch"] else f"pull/{pr}/head", sha)
         if medida is None:
             continue
-        det = {"sha": v.sha, "total": len(medida["arquivos"]), **medida}
+        conflitos.gravar(store, pr, sha, medida["arquivos"])
+        det = {"sha": sha, "total": len(medida["arquivos"]), **medida}
         while len(json.dumps(det, ensure_ascii=False)) > 1000:      # o elo guarda até 1000 caracteres: JSON inteiro
             det["arquivos"] = det["arquivos"][:-1]
-        rastro.elo(store, f"pr:{v.number}", para, "conflito_main", det)
+        rastro.elo(store, f"pr:{pr}", f"conflito:{sha}", "conflito_main", det)
 
 
 def conflitos_do_pr(store, pr: int) -> list[str]:
