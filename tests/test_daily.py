@@ -2,7 +2,7 @@
 import os
 import time
 
-from circulo import daily
+from circulo import assuntos, daily
 
 HOJE_8H = time.mktime((2026, 10, 26, 8, 5, 0, 0, 0, -1))
 ONTEM = time.mktime((2026, 10, 25, 15, 0, 0, 0, 0, -1))
@@ -71,3 +71,36 @@ def test_sem_pasta_de_notas_nao_fala(circle, tmp_path):
     avisos = []
     assert daily.checar(circle.store, tmp_path, lambda m, k="": avisos.append(m), HOJE_8H, lambda t, x: True) is None
     assert not avisos
+
+
+def _anota(store, assunto, tipo, texto, em):
+    assuntos.preparar(store)
+    a = store.one("SELECT id FROM assuntos WHERE nome=?", (assunto,))
+    aid = a["id"] if a else assuntos.criar(store, assunto, agora=em)
+    store.x("INSERT INTO assunto_notas(assunto_id, tipo, texto, origem, confianca, created_at) VALUES(?,?,?,?,?,?)",
+            (aid, tipo, texto, texto, 1.0, em))
+
+
+def test_pendencia_anotada_pela_tela_sem_notas_entra_em_hoje(circle, tmp_path):
+    s = circle.store
+    _anota(s, "svc-sms", "pendencia", "trocar o provedor de SMS", ANTEONTEM)
+    assert not (tmp_path / "notas").exists()
+    assert daily.pauta(tmp_path, HOJE_8H, s)[1:] == ["svc-sms — hoje: trocar o provedor de SMS"]
+    avisos = []
+    assert daily.checar(s, tmp_path, lambda m, k="": avisos.append(m), HOJE_8H, lambda t, x: True)   # fala mesmo sem notas/
+    assert "trocar o provedor de SMS" in avisos[0]
+
+
+def test_pauta_junta_arquivos_de_notas_e_assunto_notas(circle, tmp_path):
+    s = circle.store
+    _notas(tmp_path)
+    _anota(s, "financas", "pendencia", "declarar o IR", ANTEONTEM)      # pendência aberta vale de qualquer dia
+    _anota(s, "financas", "decisao", "cartão só para assinaturas", ONTEM)
+    _anota(s, "financas", "decisao", "decisão antiga", ANTEONTEM)        # decisão de anteontem não é "ontem"
+    _anota(s, "financas", "nota", "nota solta da tela", ONTEM)           # nem pendência nem decisão: fica fora
+    linhas = daily.pauta(tmp_path, HOJE_8H, s)
+    fin = next(ln for ln in linhas if ln.startswith("financas — "))
+    assert "ontem: Revisei o orçamento de outubro; conciliei o cartão; decisão: cartão só para assinaturas" in fin
+    assert "hoje: pagar o IPTU; renegociar o seguro; declarar o IR" in fin
+    assert "decisão antiga" not in fin and "nota solta" not in fin
+    assert {ln.split(" — ")[0] for ln in linhas[1:]} == {"circulo", "connect", "financas"}
