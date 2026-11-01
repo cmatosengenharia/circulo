@@ -208,12 +208,35 @@ def _doc_licoes(store: Store) -> tuple[str, int]:
     return "\n".join(linhas) + "\n", len(lic)
 
 
+def _doc_instalacao(versao: str) -> str:
+    """Instalação em 5 minutos; as verificações e correções vêm do próprio `circulo doctor`."""
+    from . import doctor
+    linhas = ["# Instalação em 5 minutos", "", f"Versão: **{versao}**. Precisa de Python 3.11+, git e, para o loop corrigir código, o Claude Code.", "",
+              "## 1. Instalar", "", "```bash", "git clone https://github.com/cmatosengenharia/circulo && cd circulo",
+              "python3 -m venv .venv && source .venv/bin/activate", 'pip install -e ".[llm]"', "circulo --version", "```", "",
+              "## 2. Conferir a máquina", "", "```bash", "circulo doctor", "```", "",
+              "O `doctor` não gasta nada: confere cada peça e, para o que falta, diz o comando que corrige. Sai com código 1 enquanto faltar algo.", "",
+              "| Verificação | Se faltar |", "|---|---|"]
+    for f in doctor.VERIFICACOES:
+        v = f(doctor.Ambiente(env={}, which=lambda _b: None, rodar=lambda _c: "", versao=(3, 0, 0)))
+        linhas.append(f"| {v.nome} | {v.correcao.replace('|', '/')} |")
+    linhas += ["", "## 3. Chaves", "", "```bash", "circulo configurar     # cria ~/.config/circulo/env (permissão 600): preencha e salve",
+               "circulo doctor         # de novo, até tudo ✓", "```", "",
+               "## 4. Repositório (opcional)", "", "```bash", 'circulo init ~/Projects/meu-repo --pedido "o que o loop deve fazer primeiro"', "```", "",
+               "Prepara qualquer clone com remoto no GitHub para o loop cuidar dele (constituição, testes, CI).", "",
+               "## 5. Painel e primeiro pedido", "", "```bash", "circulo painel         # http://127.0.0.1:8765 (o loop roda com `circulo run`)",
+               'circulo pedir "mostrar o gasto do mês por categoria"', "circulo caminho        # o caminho do pedido até o merge", "```", "",
+               "Para rodar 24/7: `circulo instalar`. Para ver sem chave nenhuma: `circulo demo`."]
+    return "\n".join(linhas) + "\n"
+
+
 def gerar(ctx, repo: Path) -> dict[str, str]:
     """Todos os arquivos de docs/ como {caminho: texto}. Determinístico dado o estado (fora a classificação do Jev)."""
     pacote = Path(__file__).parent
     m = re.search(r'^version = "([^"]+)"', (repo / "pyproject.toml").read_text(encoding="utf-8"), flags=re.M)
     versao = m.group(1) if m else "?"
-    docs: dict[str, str] = {"docs/agentes.md": _doc_agentes(pacote), "docs/arquitetura.md": _doc_arquitetura(pacote, versao), "docs/decisoes.md": _doc_decisoes(pacote)}
+    docs: dict[str, str] = {"docs/agentes.md": _doc_agentes(pacote), "docs/arquitetura.md": _doc_arquitetura(pacote, versao), "docs/decisoes.md": _doc_decisoes(pacote),
+                            "docs/instalacao.md": _doc_instalacao(versao)}
     docs["docs/evolucao.md"], n_ent = _doc_evolucao(ctx, repo)
     docs["docs/licoes.md"], n_lic = _doc_licoes(ctx.store)
     docs["docs/README.md"] = "\n".join([
@@ -221,6 +244,7 @@ def gerar(ctx, repo: Path) -> dict[str, str]:
         f"Gerada pelo **Redator técnico** do loop em {_data(time.time())} (versão {versao}) a partir do código, do banco e do CHANGELOG —",
         "nenhum número aqui é estimado. O agente roda quando há entrega nova e abre um PR só com esta pasta.", "",
         "| Documento | O que tem |", "|---|---|",
+        "| [Instalação em 5 minutos](instalacao.md) | instalar, `circulo doctor`, chaves, init, painel e o primeiro pedido |",
         "| [Agentes](agentes.md) | o time: papéis, o que cada um faz, as tarefas do giro |",
         "| [Arquitetura](arquitetura.md) | constituição, módulos, telas e APIs |",
         "| [Decisões Jev First](decisoes.md) | o catálogo de perguntas que o código faz ao Jev |",

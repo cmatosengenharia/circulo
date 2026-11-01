@@ -6,6 +6,9 @@ pelo **Jev** (TypeSafe); LLM só entra quando o Jev autoriza.
 
 ## Começar (configuração única)
 
+Guia de 5 minutos (instalar, `circulo doctor`, chaves, init, painel, primeiro pedido): [docs/instalacao.md](docs/instalacao.md),
+gerado pelo Redator técnico. `circulo doctor` confere Python, git, Claude Code, Jev e GitHub e diz o comando que corrige o que falta.
+
 ```bash
 git clone https://github.com/cmatosengenharia/circulo ~/Projects/circulo
 cd ~/Projects/circulo

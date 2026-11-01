@@ -41,7 +41,7 @@ def test_gera_documentacao_profissional_do_codigo_do_banco_e_do_changelog(circle
     repo = _clone(tmp_path)
     _semear(circle.store)
     docs = documentador.gerar(circle.ctx, repo)
-    assert set(docs) == {"docs/README.md", "docs/agentes.md", "docs/arquitetura.md", "docs/decisoes.md", "docs/evolucao.md", "docs/licoes.md"}
+    assert set(docs) == {"docs/README.md", "docs/agentes.md", "docs/arquitetura.md", "docs/decisoes.md", "docs/evolucao.md", "docs/licoes.md", "docs/instalacao.md"}
     ag = docs["docs/agentes.md"]
     assert "**Redator técnico**" in ag and "**Product owner**" in ag and "`indagar` (Indagador)" in ag and "| `documentar`" in ag
     arq = docs["docs/arquitetura.md"]
