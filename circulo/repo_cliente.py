@@ -169,11 +169,13 @@ def fichas(store, pid: int) -> list[dict]:
              "etapas": evidencias(store, p["id"])} for p in reversed(pedidos(store, pid))]
 
 
-def _testes(clone: Path, cmd: str) -> bool:
+def _testes(clone: Path, cmd: str) -> tuple[bool, str]:
+    """(passou, saída): a saída é o que volta ao agente quando o teste do cliente fica vermelho."""
     try:
-        return subprocess.run(kits.argv(cmd), cwd=str(clone), capture_output=True, timeout=900).returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+        p = subprocess.run(kits.argv(cmd), cwd=str(clone), capture_output=True, text=True, timeout=900)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)
+    return p.returncode == 0, (p.stdout + p.stderr).strip()[-2000:]
 
 
 def entregar(store, pedido_id: int, mensagem: str) -> dict:
@@ -189,10 +191,13 @@ def entregar(store, pedido_id: int, mensagem: str) -> dict:
         raise ValueError(f"pedido {pedido_id}: nada mudou no clone")
     _git(clone, "add", "-A")
     _git(clone, *AUTOR, "commit", "-q", "-m", mensagem)
+    antes = len(evidencias(store, pedido_id))
     pedido_ok = all(e["ok"] for e in evidencias(store, pedido_id) if e["etapa"] == "pedido")
     dev = _etapa(store, pedido_id, r["caminho"], clone, "desenvolvimento")
-    testes_ok = _testes(clone, r["testes"])
+    testes_ok, testes_saida = _testes(clone, r["testes"])
     pr = _etapa(store, pedido_id, r["caminho"], clone, "pr")
+    _git(clone, "checkout", "-q", "--", ".")
+    _git(clone, "clean", "-qfd")                    # o resíduo dos portões (caches, saídas) não entra na rodada seguinte
     bloqueado = [e for e, passou in (("pedido", pedido_ok), ("desenvolvimento", dev), ("pr", pr)) if not passou]
     ok = testes_ok and not bloqueado
     sha = _git(clone, "rev-parse", "HEAD")
@@ -200,8 +205,15 @@ def entregar(store, pedido_id: int, mensagem: str) -> dict:
         _git(clone, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=600)
     store.x("UPDATE pedidos_repo SET status=?, commit_sha=?, updated_at=? WHERE id=?",
             ("entregue" if ok else "vermelho", sha, time.time(), pedido_id))
-    return {"branch": branch, "base": r["base"], "commit": sha, "testes_ok": testes_ok, "bloqueado_por": bloqueado,
+    return {"branch": branch, "base": r["base"], "commit": sha, "testes_ok": testes_ok, "bloqueado_por": bloqueado, "ok": ok,
+            "testes_saida": testes_saida, "vermelhas": [e for e in evidencias(store, pedido_id)[antes:] if not e["ok"]],
             "diff": _git(clone, "diff", "--stat", f"origin/{r['base']}...HEAD")}
 
 
-__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar", "evidencias", "fichas"]
+def vermelho(store, pedido_id: int) -> None:
+    """Fecha o pedido como vermelho sem entrega (o agente esgotou as rodadas sem mudança que passasse)."""
+    _pedido(store, pedido_id)
+    store.x("UPDATE pedidos_repo SET status='vermelho', updated_at=? WHERE id=?", (time.time(), pedido_id))
+
+
+__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar", "vermelho", "evidencias", "fichas"]
