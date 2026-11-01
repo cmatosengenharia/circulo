@@ -27,7 +27,9 @@ from typing import Any
 
 import re
 
+from . import persona_cliente
 from .decision import Decision, SN, Question, norm
+from .perguntas import NORTE_PERSONAS
 
 EIXOS = {
     "arquitetura": "muda como o loop/missão é construído: módulos, fronteiras, portões, testes, estrutura do código ou da entrega",
@@ -152,6 +154,8 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
                "`candidatas.%d.item_parecido_em_andamento` é true; ou `candidatas.%d.base_medida` é false (a evidência é chute)" % (i, i, i)))
         qs[f"indaga_eixo_{i}"] = Question("choice", f"O que a pergunta `candidatas.{i}.texto` faz evoluir, se respondida?", dict(EIXOS))
         qs[f"indaga_acao_{i}"] = Question("score", f"Quão acionável é a pergunta `candidatas.{i}.texto`?", ACAO)
+        if cands[i].get("persona") == persona_cliente.PERSONA:
+            qs[f"indaga_{persona_cliente.NOUL}_{i}"] = persona_cliente.questao(i)
     from .memoria import RECEITA, do_ctx
     mem = do_ctx(ctx)
 
@@ -173,13 +177,15 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
         p, e, a = out[f"indaga_pert_{i}"], out[f"indaga_eixo_{i}"], out[f"indaga_acao_{i}"]
         inconclusa = any(d.source == "local" for d in (p, e, a)) and getattr(ctx.dl.jev, "source", "") == "jev"
         pert, eixo, acao = float(p.value), str(e.value), int(float(a.value))
-        de_produto = c.get("persona") in ("tech_lead", "pm", "mercado") or c.get("eixo") == "produto"   # perguntas.NORTE_PERSONAS
+        de_produto = c.get("persona") in NORTE_PERSONAS or c.get("eixo") == "produto"
+        mom = out.get(f"indaga_{persona_cliente.NOUL}_{i}")
         if de_produto:
             eixo = "produto"                  # a pergunta é de produto por construção: o Jev decide se passa, não o eixo
         if inconclusa and not de_produto:
             veredito = "inconclusa"           # o Jev ficou em dúvida e a regra decidiu: não passa, volta depois
         elif de_produto:
-            veredito = "valida" if pert >= PERTINENTE_VETO else "descartada"      # veto, não porteiro
+            mom_ok = mom is None or float(mom.value) >= 0.5                       # Mom Test: opinião sobre a ideia, o Jev veta
+            veredito = "valida" if pert >= PERTINENTE_VETO and mom_ok else "descartada"      # veto, não porteiro
         elif pert >= PERTINENTE_MIN and eixo != "nenhum" and acao >= ACAO_MIN:
             veredito = "valida"
         else:
@@ -187,7 +193,9 @@ def classificar(ctx, cands: list[dict], ctxt: dict) -> list[dict]:
         res.append({**c, "pertinencia": round(pert, 3), "eixo": eixo, "acionavel": acao, "veredito": veredito,
                     "classificacao": {"pertinente": {"p": round(pert, 3), "conf": round(p.confidence, 3), "fonte": p.source},
                                       "eixo": {"valor": eixo, "conf": round(e.confidence, 3), "probs": dict(e.probabilities or {})},
-                                      "acao": {"nivel": acao, "conf": round(a.confidence, 3)}}})
+                                      "acao": {"nivel": acao, "conf": round(a.confidence, 3)},
+                                      **({"mom_test": {"p": round(float(mom.value), 3), "conf": round(mom.confidence, 3), "fonte": mom.source}}
+                                         if mom is not None else {})}})
     return res
 
 
@@ -530,6 +538,8 @@ def resumo(store, limite: int = 12) -> dict:
 def regra(jev, qid: str, q: Question, state) -> Decision:
     tipo, i = qid.split("_")[1], int(qid.rsplit("_", 1)[1])
     cands = state.get("candidatas") or []
+    if qid.startswith(f"indaga_{persona_cliente.NOUL}_"):
+        return jev._noul(qid, persona_cliente.regra(str(cands[i].get("texto") or "")) if i < len(cands) else 0.5)
     txt = norm(str(cands[i].get("texto") or "")) if i < len(cands) else ""
     generica = bool(re.search(r"\b(como melhorar o sistema|tudo|em geral|qualquer coisa)\b", txt)) or len(txt) < 40
     concreta = bool(re.search(r"\d|“|\"|\b(nota|criterio|verificacao|tokens|ciclo|licao|falh\w*|regua|modulo|teste)\b", txt))
