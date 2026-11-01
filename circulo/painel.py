@@ -27,7 +27,7 @@ from .orcamento_dia import limite_hoje, tokens_dia
 from .pedido_estado import pedidos, secao
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
 from .status import loop_status
-from .silencio import card_incidentes, sinais_7d
+from .silencio import card_incidentes, reincidentes, sinais_7d
 from .state import Store
 from .uso_entregas import classificar, nome_uso, registrar_uso, resumo_7d
 
@@ -283,7 +283,7 @@ def saude(conn) -> dict:
     estag, estrut = sinais_7d(conn, agora)
     out = {"giros": int(json.loads(tick[0])) if tick else 0, "jev_duvida_pct": _pct(jev), "incidentes_abertos": len(abertos),
            "estagnacoes_7d": estag, "licoes_de_estrutura_7d": estrut,
-           "incidentes_card": card_incidentes(len(abertos), estag, estrut),
+           "incidentes_card": card_incidentes(len(abertos), estag, estrut, reincidentes(conn)),
            "llm_falhas_7d_pct": _pct(llm), "llm_chamadas_7d": llm[0],
            "falhas_24h": falhas_por_causa(f24 := conn.execute(
                "SELECT ponto, assinatura, causa FROM verificacoes WHERE ponto LIKE 'painel:%' AND ok=0 AND created_at >= ?",
