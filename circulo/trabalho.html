@@ -108,6 +108,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <form class="ask" id="anotar"><input id="frase" autocomplete="off" placeholder="decidimos X no svc-sms · pendência: Y · link https://… · nota: comando: make test"><button type="submit" class="primaria">Anotar</button></form>
       <form class="ask" id="perguntar"><input id="pergunta" autocomplete="off" placeholder="o que decidimos sobre SMS? · pendências da migração?"><button type="submit">Perguntar</button></form>
       <div class="resp" id="resposta"></div>
+      <div class="ask" id="decidir" role="group" aria-label="Em que assunto arquivar esta nota?" hidden></div>
     </section>
     <section class="card" aria-label="Assuntos">
       <h2>Assuntos <span class="muted" id="pastas"></span></h2>
@@ -191,9 +192,18 @@ function mostrarContexto(c) {
   $("#contexto").innerHTML = c ? Object.entries(c.arquivos).map(([k, v]) => `<div class="muted" style="margin-top:6px">${esc(k)}</div><pre>${esc(v)}</pre>`).join("") : `<p class="muted">sem assunto com notas ainda</p>`;
 }
 $("#anotar").addEventListener("submit", async e => {
-  e.preventDefault(); const j = await POST("/api/trabalho/anotar", {texto: $("#frase").value});
-  $("#resposta").textContent = j.erro ? j.erro : `✓ ${j.nota.tipo} arquivada em ${j.nota.assunto}: ${j.nota.texto}`; if (!j.erro) { $("#frase").value = ""; carregar(); }
+  e.preventDefault(); const texto = $("#frase").value; arquivada(await POST("/api/trabalho/anotar", {texto}), texto);
 });
+function arquivada(j, texto) {
+  const box = $("#decidir"); box.textContent = ""; box.hidden = !j.decidir;
+  if (j.decidir) {
+    $("#resposta").textContent = `Não sei em que assunto arquivar «${j.decidir.trecho}». Leia a nota e escolha; a escolha vira regra para a próxima.`;
+    j.decidir.opcoes.forEach(o => { const b = document.createElement("button"); b.type = "button"; b.textContent = o.nome; b.title = o.descricao;
+      b.addEventListener("click", async () => arquivada(await POST("/api/trabalho/arquivar", {texto, assunto: o.id}), texto)); box.appendChild(b); });
+    return;
+  }
+  $("#resposta").textContent = j.erro ? j.erro : `✓ ${j.nota.tipo} arquivada em ${j.nota.assunto}: ${j.nota.texto}`; if (!j.erro) { $("#frase").value = ""; carregar(); }
+}
 $("#perguntar").addEventListener("submit", async e => {
   e.preventDefault(); const j = await (await fetch("/api/trabalho/perguntar?q=" + encodeURIComponent($("#pergunta").value))).json();
   $("#resposta").textContent = j.texto;

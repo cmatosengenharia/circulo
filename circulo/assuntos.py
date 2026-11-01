@@ -39,9 +39,18 @@ CREATE TABLE IF NOT EXISTS assunto_notas (
   created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS assunto_notas_assunto ON assunto_notas(assunto_id, tipo, created_at);
+CREATE TABLE IF NOT EXISTS assunto_regras (    -- a escolha do clique na tela: estes termos vão para este assunto
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  termos TEXT NOT NULL UNIQUE,             -- termos da nota, ordenados, separados por espaço
+  assunto_id INTEGER NOT NULL REFERENCES assuntos(id),
+  created_at REAL NOT NULL
+);
 """
 PERGUNTA = "assunto_arquivo"
 CONFIANCA_MIN = 0.3
+COBERTURA_REGRA = 0.5                    # fração dos termos de uma regra aprendida que a nota precisa ter
+OPCOES = 3
+TRECHO = 200
 URL = re.compile(r"https?://\S+")
 PROIBIDO = re.compile(
     r"(?i)\b(senha|password|passwd|secret|segredo|token|api[_-]?key|client[_-]?secret)\b[^.\n]{0,40}[:=]\s*\S"
@@ -84,6 +93,14 @@ def classificar(frase: str) -> tuple[str, str]:
     return ("link" if URL.search(frase) else "nota"), frase.strip()
 
 
+class SemAssunto(ValueError):
+    """O Jev e as regras não sabem onde arquivar: a tela mostra o trecho e as opções para um clique."""
+
+    def __init__(self, msg: str, trecho: str, opcoes: list[dict]):
+        super().__init__(msg)
+        self.trecho, self.opcoes = trecho, opcoes
+
+
 def _rotulo(a) -> str:
     return f"{a['nome']}: {a['descricao']}" if a["descricao"] else a["nome"]
 
@@ -100,7 +117,8 @@ def regra(jev, qid: str, q: Question, state) -> Decision:
 
 
 def anotar(store: Store, dl, frase: str, agora: float | None = None) -> dict:
-    """Arquiva a frase no assunto que o Jev escolher e indexa no Graft. Levanta ValueError se não souber onde."""
+    """Arquiva a frase no assunto que o Jev escolher e indexa no Graft. Se ele não decide, vale a regra aprendida
+    no clique; sem ela, levanta SemAssunto com as opções para a tela."""
     preparar(store)
     frase = (frase or "").strip()
     _sem_segredo(frase)
@@ -115,18 +133,70 @@ def anotar(store: Store, dl, frase: str, agora: float | None = None) -> dict:
         "choice", "Which subject of the user's workspace does this `note` belong to? Pick the subject the note is "
                   "about (a team, a service by name, a migration), not the one it merely mentions in passing.", opcoes),
         {"note": frase, "subjects": opcoes})
-    if d.value not in opcoes or d.confidence < CONFIANCA_MIN:
-        raise ValueError("não sei em que assunto arquivar; diga o nome dele na frase. Assuntos: "
-                         + ", ".join(a["nome"] for a in todos))
-    a = next(x for x in todos if f"a{x['id']}" == d.value)
+    if d.value in opcoes and d.confidence >= CONFIANCA_MIN:
+        return _gravar(store, next(x for x in todos if f"a{x['id']}" == d.value), tipo, texto, frase, d.confidence, agora)
+    aprendida = _regra_aprendida(store, texto)
+    if aprendida:
+        return _gravar(store, aprendida[0], tipo, texto, frase, aprendida[1], agora)
+    raise SemAssunto("não sei em que assunto arquivar; escolha um abaixo ou diga o nome dele na frase. Assuntos: "
+                     + ", ".join(a["nome"] for a in todos), frase[:TRECHO], _opcoes(store, todos, texto))
+
+
+def arquivar(store: Store, frase: str, assunto_id: int, agora: float | None = None) -> dict:
+    """O clique da tela: arquiva no assunto escolhido e grava (termos da nota → assunto) como regra local."""
+    preparar(store)
+    frase = (frase or "").strip()
+    _sem_segredo(frase)
+    tipo, texto = classificar(frase)
+    if len(texto) < 3:
+        raise ValueError("nota vazia")
+    a = store.one("SELECT * FROM assuntos WHERE id=?", (assunto_id,))
+    if not a:
+        raise ValueError("assunto não existe")
+    agora = agora or time.time()
+    chave = " ".join(sorted(_termos(texto)))
+    if chave:
+        store.x("INSERT INTO assunto_regras(termos, assunto_id, created_at) VALUES(?,?,?) "
+                "ON CONFLICT(termos) DO UPDATE SET assunto_id=excluded.assunto_id, created_at=excluded.created_at",
+                (chave, a["id"], agora))
+    return _gravar(store, a, tipo, texto, frase, 1.0, agora)
+
+
+def _termos(texto: str) -> set[str]:
+    return set(termos(URL.sub(" ", texto), 30))
+
+
+def _regra_aprendida(store: Store, texto: str):
+    """(assunto, cobertura) da regra do clique que a nota mais cobre, se cobrir o bastante e sem empate entre assuntos."""
+    nota = _termos(texto)
+    melhor: dict[int, tuple[float, Any]] = {}
+    for r in store.q("SELECT r.termos, a.* FROM assunto_regras r JOIN assuntos a ON a.id = r.assunto_id") if nota else ():
+        regra_termos = set(r["termos"].split())
+        c = len(nota & regra_termos) / len(regra_termos)
+        if c >= COBERTURA_REGRA and c > melhor.get(r["id"], (0.0,))[0]:
+            melhor[r["id"]] = (c, r)
+    topo = max((c for c, _ in melhor.values()), default=0.0)
+    lideres = [r for c, r in melhor.values() if c == topo]
+    return (lideres[0], topo) if len(lideres) == 1 else None
+
+
+def _opcoes(store: Store, todos, texto: str) -> list[dict]:
+    """As OPCOES mais prováveis: mais palavras em comum, depois o assunto mais usado."""
+    nota = _termos(texto)
+    uso = {r["assunto_id"]: r["n"] for r in store.q("SELECT assunto_id, COUNT(*) n FROM assunto_notas GROUP BY assunto_id")}
+    ordem = sorted(todos, key=lambda a: (-len(nota & _termos(_rotulo(a))), -uso.get(a["id"], 0), a["id"]))
+    return [{"id": a["id"], "nome": a["nome"], "descricao": a["descricao"]} for a in ordem[:OPCOES]]
+
+
+def _gravar(store: Store, a, tipo: str, texto: str, frase: str, confianca: float, agora: float | None) -> dict:
     agora = agora or time.time()
     nid = store.x("INSERT INTO assunto_notas(assunto_id, tipo, texto, origem, confianca, created_at) VALUES(?,?,?,?,?,?)",
-                  (a["id"], tipo, texto, frase, round(float(d.confidence), 3), agora))
+                  (a["id"], tipo, texto, frase, round(float(confianca), 3), agora))
     gid = graft.inserir("assunto_nota", nid, f"{tipo} em {a['nome']}: {texto}", f"{_data(agora)} · nota de origem: {frase}",
                         extras=[f"assunto:{a['id']}"])
     if gid:
         store.x("UPDATE assunto_notas SET graft_id=? WHERE id=?", (gid, nid))
-    return {"id": nid, "assunto": a["nome"], "tipo": tipo, "texto": texto, "confianca": float(d.confidence)}
+    return {"id": nid, "assunto": a["nome"], "tipo": tipo, "texto": texto, "confianca": float(confianca)}
 
 
 def _data(em: float) -> str:
