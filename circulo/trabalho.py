@@ -15,7 +15,7 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import assuntos, contexto_cursor, daily, gasto_cursor, pastas
+from . import assuntos, contexto_cursor, daily, digest_semanal, gasto_cursor, pastas
 from .budget import TZ
 from .links import Links
 
@@ -235,14 +235,17 @@ def visao(store, data_dir: Path, agora: float | None = None) -> dict:
     }
 
 
-def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | None:
-    """As rotas GET da tela (None = não é daqui)."""
+def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | str | None:
+    """As rotas GET da tela (None = não é daqui; str = markdown)."""
     def um(k):
         return (q.get(k) or [""])[0]
     if caminho == "/api/trabalho":
         return visao(store, data_dir)
     if caminho == "/api/trabalho/daily":
         return daily.estado(store, data_dir)
+    if caminho == "/api/digest":
+        return digest_semanal.ler(store, formato=digest_semanal.markdown) if um("formato") == "md" else \
+            {"prs": digest_semanal.prs_da_semana(store)}
     if caminho == "/api/trabalho/perguntar":
         notas = assuntos.perguntar(store, um("q")[:300])
         return {"notas": notas, "texto": assuntos.responder(notas)}

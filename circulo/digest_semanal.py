@@ -2,7 +2,8 @@
 origem e o antes/depois da métrica que a motivou. PR de produto sem origem sai marcado 'sem pedido', nunca omitido:
 o buraco no rastro é o que o time precisa ver. Cada leitura (`circulo digest`) fica em `digest_leituras`. O idle publica
 o digest uma vez por semana (`publicar`); com a fração de produto abaixo da meta, o próximo roteiro parte de uma
-pergunta de produto (`prioriza_produto`, lido pelo Indagador)."""
+pergunta de produto (`prioriza_produto`, lido pelo Indagador). `markdown` é a versão 'para o time' (o que entrou, quem
+pediu, tempo pedido→merge), servida em /api/digest?formato=md e copiada pelo botão de Meu trabalho."""
 from __future__ import annotations
 
 import json
@@ -50,16 +51,37 @@ def _valor(v) -> str:
     return "—" if v is None else str(v)
 
 
-def _origem(store: Store, item: dict) -> tuple[str | None, dict]:
-    """(pedido ou pergunta de origem, evidência da pergunta) do item do roteiro."""
-    perg = store.one("SELECT id, persona, texto, evidencia FROM perguntas WHERE id=? OR item_id=? ORDER BY id LIMIT 1",
+def markdown(prs: list[dict]) -> str:
+    """O digest para colar no canal do time: cada PR mergeado na semana, quem pediu e o tempo do pedido ao merge. Pura."""
+    produto = sum(1 for p in prs if p["produto"])
+    linhas = [f"## Digest da semana: {len(prs)} PRs mergeados, {produto} de produto", ""]
+    for p in sorted(prs, key=lambda p: p["number"]):
+        partes = [f"**#{p['number']} {p['titulo']}**", f"pedido por {p['por']}" if p["por"] else SEM_PEDIDO,
+                  f"pedido→merge {_duracao(p['merge_em'] - p['pedido_em']) if p['pedido_em'] else '—'}"]
+        linhas.append("- " + " · ".join(partes))
+    if not prs:
+        linhas.append("Nenhum PR mergeado na semana.")
+    return "\n".join(linhas)
+
+
+def _duracao(segundos: float) -> str:
+    if segundos < 3600:
+        return f"{max(0, round(segundos / 60))} min"
+    if segundos < 2 * 86400:
+        return f"{segundos / 3600:.1f} h".replace(".", ",")
+    return f"{segundos / 86400:.1f} d".replace(".", ",")
+
+
+def _origem(store: Store, item: dict) -> tuple[str | None, dict, str | None, float | None]:
+    """(pedido ou pergunta de origem, evidência da pergunta, quem pediu, quando pediu) do item do roteiro."""
+    perg = store.one("SELECT id, persona, texto, evidencia, created_at FROM perguntas WHERE id=? OR item_id=? ORDER BY id LIMIT 1",
                      (item.get("pergunta_id") or -1, item["id"])) if item else None
     ev = json.loads(perg["evidencia"]) if perg and perg["evidencia"] else {}
     if item and item.get("origem") == "pedido_cassio":
-        return f"pedido: {(item['detalhe'] or item['titulo'])[:160]}", ev
+        return f"pedido: {(item['detalhe'] or item['titulo'])[:160]}", ev, "cassio", item["created_at"]
     if perg:
-        return f"pergunta #{perg['id']} ({perg['persona']}): {perg['texto'][:160]}", ev
-    return None, ev
+        return f"pergunta #{perg['id']} ({perg['persona']}): {perg['texto'][:160]}", ev, perg["persona"], perg["created_at"]
+    return None, ev, None, None
 
 
 def prs_da_semana(store: Store, agora: float | None = None) -> list[dict]:
@@ -67,31 +89,32 @@ def prs_da_semana(store: Store, agora: float | None = None) -> list[dict]:
     agora = time.time() if agora is None else agora
     medido = norte.medir(store, agora)
     out = []
-    for pr in store.q("SELECT number, titulo, item_id FROM prs WHERE status='mergeado' AND updated_at>=?",
+    for pr in store.q("SELECT number, titulo, item_id, updated_at FROM prs WHERE status='mergeado' AND updated_at>=?",
                       (agora - norte.SEMANA,)):
-        r = store.one("SELECT id, titulo, detalhe, origem, pergunta_id FROM roadmap WHERE id=?", (pr["item_id"],)) \
+        r = store.one("SELECT id, titulo, detalhe, origem, pergunta_id, created_at FROM roadmap WHERE id=?", (pr["item_id"],)) \
             if pr["item_id"] else None
         item = dict(r) if r else {}
-        pedido, ev = _origem(store, item)
+        pedido, ev, por, pedido_em = _origem(store, item)
         metrica = ev.get("norte") or ev.get("metrica")
         out.append({"number": pr["number"], "titulo": pr["titulo"], "produto": norte.e_produto(store, item),
                     "pedido": pedido, "metrica": metrica, "antes": ev.get("valor") if metrica else None,
-                    "depois": (medido.get(metrica) or {}).get("valor") if metrica else None})
+                    "depois": (medido.get(metrica) or {}).get("valor") if metrica else None,
+                    "por": por, "pedido_em": pedido_em, "merge_em": pr["updated_at"]})
     return out
 
 
-def ler(store: Store, agora: float | None = None) -> str:
-    """Monta o digest da semana e registra a leitura."""
+def ler(store: Store, agora: float | None = None, formato=texto) -> str:
+    """Monta o digest da semana (texto, ou `markdown` para o time) e registra a leitura."""
     agora = time.time() if agora is None else agora
-    return _ler(store, prs_da_semana(store, agora), agora)
+    return _ler(store, prs_da_semana(store, agora), agora, formato)
 
 
-def _ler(store: Store, prs: list[dict], agora: float) -> str:
+def _ler(store: Store, prs: list[dict], agora: float, formato=texto) -> str:
     produto = [p for p in prs if p["produto"]]
     store.x(ESQUEMA)
     store.x("INSERT INTO digest_leituras(prs, produto, sem_pedido, created_at) VALUES(?,?,?,?)",
             (len(prs), len(produto), sum(1 for p in produto if not p["pedido"]), agora))
-    return texto(prs)
+    return formato(prs)
 
 
 def publicar(store: Store, reply, agora: float | None = None) -> str | None:
