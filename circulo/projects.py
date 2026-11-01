@@ -251,6 +251,9 @@ def metricas(store: Store, p) -> dict:
         m["commits"] = repo_stats()
         m["principal"] = {"rotulo": "Roteiro concluído", "valor": rot.get("feito", 0) / total, "formato": "pct", "historico": [],
                           "ajuda": "Pedidos seus e correções que o próprio loop registrou, já entregues."}
+    elif kit == "repo":
+        from .repo_cliente import fichas
+        m["pedidos"] = fichas(store, pid)
     return m
 
 

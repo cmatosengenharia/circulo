@@ -603,6 +603,11 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <p class="sub" style="margin:-6px 0 8px">Como o loop sabe que acertou antes de seguir: medição antes e depois (inclusive nos critérios ocultos), verificação, o Jev a favor e a contraprova do Jev contra a piora.</p>
       <ul class="list" id="evidencias"></ul>
     </section>
+    <section class="panel c7 repo-only" hidden>
+      <h2>Pedidos no repositório</h2>
+      <p class="sub" style="margin:-6px 0 8px">Cada pedido com o resultado dos comandos de <code>[tool.circulo.etapas]</code> do repositório, etapa por etapa. Uma etapa que falha barra o PR.</p>
+      <ul class="list" id="pedidosRepo"></ul>
+    </section>
     <section class="panel c5 missao-only" hidden>
       <h2>Conexões</h2>
       <p class="sub" style="margin:-6px 0 8px">Missões que se conhecem: compartilham memória, contexto e lições; quando se complementam, a integração entra na régua. O Jev liga sozinho; o que você ligar ou separar vale acima dele.</p>
@@ -964,6 +969,16 @@ function render(s) {
     const DEC = {base:"primeira versão", avancar:"avançou", refazer:"refazer", descartar:"descartada", cumprida:"missão cumprida"};
     $("#evidencias").innerHTML = s.evidencias.length ? s.evidencias.map(e => `<li><span>${e.versao ? "v" + e.versao + " · " : ""}giro ${e.tick}<span class="meta">${esc(e.motivo)}</span></span><span class="chip ${esc(e.decisao)}">${DEC[e.decisao] || esc(e.decisao)}</span></li>`).join("")
       : `<li class="empty">Nenhum ciclo avaliado ainda.</li>`;
+  }
+  const pedidosRepo = Array.isArray(M.pedidos) ? M.pedidos : null;
+  document.querySelectorAll(".repo-only").forEach(e => e.hidden = !pedidosRepo);
+  if (pedidosRepo) {
+    const ST = {aberto: "aberto", entregue: "PR enviado", vermelho: "barrado"};
+    $("#pedidosRepo").innerHTML = pedidosRepo.length ? pedidosRepo.map(p => `<li><span>#${p.id} ${esc(p.texto)}<span class="meta">${esc(p.branch || "")}</span>` +
+      (p.etapas.length ? p.etapas.map(e => `<span class="meta"><span class="chip ${e.ok ? "applied" : "rejected"}">${e.ok ? "passou" : "falhou"}</span> ${esc(e.etapa)} · <code>${esc(e.comando)}</code>${e.ok ? "" : ` · código ${e.codigo ?? "—"}${e.saida ? " · " + esc(e.saida.slice(-160)) : ""}`}</span>`).join("")
+        : `<span class="meta">nenhum comando em [tool.circulo.etapas]</span>`) +
+      `</span><span class="chip ${p.status === "entregue" ? "applied" : p.status === "vermelho" ? "rejected" : ""}">${ST[p.status] || esc(p.status)}</span></li>`).join("")
+      : `<li class="empty">Nenhum pedido neste repositório ainda.</li>`;
   }
   $("#versions").innerHTML = s.versoes.map(v =>
     `<li><span>v${v.version} · ${esc(v.reason)}</span><span class="chip ${v.status === "active" ? "applied" : esc(v.status)}">${{active:"ativa",retired:"anterior",shadow:"shadow",rolled_back:"revertida",rejected:"rejeitada"}[v.status] || esc(v.status)}</span></li>`).join("");
