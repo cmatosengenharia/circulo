@@ -40,7 +40,7 @@ def manter(store: Store, pasta: Path) -> list[Path]:
     assuntos.preparar(store)
     linhas, feitas = [], []
     for a in store.q("SELECT a.nome, a.descricao, (SELECT COUNT(*) FROM assunto_notas n WHERE n.assunto_id=a.id "
-                     "AND n.tipo='pendencia') pendencias FROM assuntos a ORDER BY a.nome"):
+                     "AND n.tipo='pendencia' AND n.feita_em IS NULL) pendencias FROM assuntos a ORDER BY a.nome"):
         dest = Path(pasta) / nome_da_pasta(a["nome"])
         for sub in SUBPASTAS:
             (dest / sub).mkdir(parents=True, exist_ok=True)

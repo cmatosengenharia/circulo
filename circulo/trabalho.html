@@ -200,7 +200,7 @@ async function carregar() {
     $("#assuntos").innerHTML = V.assuntos.map(a => `<tr><td><a href="/trabalho/assunto/${encodeURIComponent(a.nome)}"><b>${esc(a.nome)}</b></a><div class="muted">${esc(a.descricao)}</div></td><td class="n">${a.decisoes}</td><td class="n">${a.pendencias ? `<span class="k bad">${a.pendencias}</span>` : 0}</td><td class="n">${a.notas}</td><td class="n">${a.links}</td><td class="n">${esc(a.ultima || "—")}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">nenhum assunto ainda</td></tr>`;
     $("#contextoAssunto").innerHTML = V.assuntos.map(a => `<option ${V.contexto && V.contexto.assunto === a.nome ? "selected" : ""}>${esc(a.nome)}</option>`).join("");
     lista("#daily", V.daily.slice(1), l => `<li>${esc(l)}</li>`, V.daily[0] ? esc(V.daily[0]) : "sem pasta de notas ainda");
-    lista("#pendencias", V.pendencias, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span></li>`, "nenhuma pendência aberta");
+    lista("#pendencias", V.pendencias, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span> <button type="button" data-feita="${n.id}" aria-label="Marcar como feita: ${esc(n.texto)}">Feita</button></li>`, "nenhuma pendência aberta");
     lista("#decisoes", V.decisoes, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span></li>`, "nenhuma decisão anotada");
     const o = V.orcamento, pct = Math.min(100, Math.round(100 * o.gasto_mes / Math.max(1, o.limite)));
     $("#orcTexto").textContent = o.texto; $("#orcBarra").style.width = pct + "%"; $("#orcBarra").className = o.antes_do_fim ? "bad" : "";
@@ -217,6 +217,11 @@ async function carregar() {
 function mostrarContexto(c) {
   $("#contexto").innerHTML = c ? Object.entries(c.arquivos).map(([k, v]) => `<div class="muted" style="margin-top:6px">${esc(k)}</div><pre>${esc(v)}</pre>`).join("") : `<p class="muted">sem assunto com notas ainda</p>`;
 }
+$("#pendencias").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-feita]"); if (!b) return;
+  const j = await POST("/api/trabalho/pendencia", {id: Number(b.dataset.feita), feita: true});
+  $("#msg").textContent = j.erro || `feita em ${j.nota.feita}: ${j.nota.texto}`; carregar();
+});
 $("#anotar").addEventListener("submit", async e => {
   e.preventDefault(); const texto = $("#frase").value; arquivada(await POST("/api/trabalho/anotar", {texto}), texto);
 });

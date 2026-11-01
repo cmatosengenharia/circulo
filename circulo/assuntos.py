@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS assunto_notas (
   origem TEXT NOT NULL,                    -- a frase como foi dita
   confianca REAL,
   graft_id TEXT,
-  created_at REAL NOT NULL
+  created_at REAL NOT NULL,
+  feita_em REAL                            -- pendência marcada como feita pela tela
 );
 CREATE INDEX IF NOT EXISTS assunto_notas_assunto ON assunto_notas(assunto_id, tipo, created_at);
 CREATE TABLE IF NOT EXISTS assunto_regras (    -- a escolha do clique na tela: estes termos vão para este assunto
@@ -69,6 +70,8 @@ def preparar(store: Store) -> None:
     for sql in ESQUEMA.strip().split(";"):
         if sql.strip():
             store.x(sql)
+    if "feita_em" not in {r["name"] for r in store.q("PRAGMA table_info(assunto_notas)")}:
+        store.x("ALTER TABLE assunto_notas ADD COLUMN feita_em REAL")
     store._assuntos_pronto = True
 
 
@@ -205,10 +208,21 @@ def _data(em: float) -> str:
 
 def _nota(r) -> dict[str, Any]:
     return {"id": r["id"], "assunto": r["nome"], "tipo": r["tipo"], "texto": r["texto"], "origem": r["origem"],
-            "data": _data(r["created_at"]), "em": r["created_at"]}
+            "data": _data(r["created_at"]), "em": r["created_at"], "feita_em": r["feita_em"],
+            "feita": _data(r["feita_em"]) if r["feita_em"] else None}
 
 
 _SELECT = "SELECT n.*, a.nome FROM assunto_notas n JOIN assuntos a ON a.id = n.assunto_id"
+
+
+def marcar_feita(store: Store, nota_id: int, feita: bool, agora: float | None = None) -> dict:
+    """Marca (ou reabre) uma pendência: `feita_em` guarda quando; a daily deixa de listá-la e a ficha mostra a data."""
+    preparar(store)
+    r = store.one(_SELECT + " WHERE n.id=?", (nota_id,))
+    if not r or r["tipo"] != "pendencia":
+        raise ValueError("pendência não existe")
+    store.x("UPDATE assunto_notas SET feita_em=? WHERE id=?", ((agora or time.time()) if feita else None, nota_id))
+    return _nota(store.one(_SELECT + " WHERE n.id=?", (nota_id,)))
 
 
 def ver(store: Store, nome: str) -> dict | None:

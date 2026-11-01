@@ -187,7 +187,7 @@ def anotar(store, frase: str, dl=None, agora: float | None = None) -> dict:
 
 
 def _ultimos(store, tipo: str, n: int) -> list[dict]:
-    return [assuntos._nota(r) for r in store.q(assuntos._SELECT + " WHERE n.tipo=? ORDER BY n.created_at DESC, n.id DESC LIMIT ?", (tipo, n))]
+    return [assuntos._nota(r) for r in store.q(assuntos._SELECT + " WHERE n.tipo=? AND n.feita_em IS NULL ORDER BY n.created_at DESC, n.id DESC LIMIT ?", (tipo, n))]
 
 
 def _gasto_por(store, coluna: str, desde: date) -> list[dict]:
@@ -210,7 +210,7 @@ def visao(store, data_dir: Path, agora: float | None = None) -> dict:
     assuntos.preparar(store)
     lista = [dict(r) for r in store.q(
         "SELECT a.id, a.nome, a.descricao, "
-        "COALESCE(SUM(n.tipo='decisao'),0) decisoes, COALESCE(SUM(n.tipo='pendencia'),0) pendencias, "
+        "COALESCE(SUM(n.tipo='decisao'),0) decisoes, COALESCE(SUM(n.tipo='pendencia' AND n.feita_em IS NULL),0) pendencias, "
         "COALESCE(SUM(n.tipo IN ('nota','link')),0) notas, MAX(n.created_at) ultima "
         "FROM assuntos a LEFT JOIN assunto_notas n ON n.assunto_id=a.id GROUP BY a.id ORDER BY a.nome")]
     lk = Links(store)
@@ -273,6 +273,11 @@ def api_post(store, data_dir: Path, caminho: str, data: dict, dl=None) -> tuple[
             if not isinstance(aid, int) or isinstance(aid, bool):
                 return {"erro": "falta o assunto escolhido"}, 400
             return {"ok": True, "nota": assuntos.arquivar(store, str(data.get("texto", ""))[:MAX_FRASE], aid)}, 200
+        if caminho == "/api/trabalho/pendencia":
+            nid, feita = data.get("id"), data.get("feita")
+            if not isinstance(nid, int) or isinstance(nid, bool) or not isinstance(feita, bool):
+                return {"erro": "falta {id, feita}"}, 400
+            return {"ok": True, "nota": assuntos.marcar_feita(store, nid, feita)}, 200
         if caminho == "/api/trabalho/assunto":
             nome = " ".join(str(data.get("nome", "")).split())[:80]
             if len(nome) < 2:
