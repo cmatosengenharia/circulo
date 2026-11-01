@@ -19,6 +19,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -119,19 +120,32 @@ def carregar(pasta: str | Path, pedido: str | None = None, nome: str | None = No
     return k
 
 
-def checar(k: Kit, etapa: str, timeout: int = 600) -> list[str]:
-    """O portão da etapa: roda na pasta do repositório cada comando declarado e devolve os que falharam (vazio = passa)."""
+def argv(cmd: str) -> list[str]:
+    """O comando declarado como argv; `python` vira o intérprete do loop (`python` pode nem existir no PATH)."""
+    a = shlex.split(cmd)
+    if a and a[0] in ("python", "python3"):
+        a[0] = sys.executable
+    return a
+
+
+def rodar(k: Kit, etapa: str, cwd: str | Path | None = None, timeout: int = 600) -> list[dict]:
+    """Roda em `cwd` (padrão: a pasta do repositório) cada comando declarado da etapa: {comando, ok, codigo, saida}."""
     if etapa not in k.etapas:
         raise ValueError(f"etapa {etapa!r} não é da esteira: {', '.join(ETAPAS)}")
-    falhos = []
+    out = []
     for cmd in k.etapas[etapa]:
         try:
-            ok = subprocess.run(shlex.split(cmd), cwd=k.pasta, capture_output=True, timeout=timeout).returncode == 0
-        except (OSError, subprocess.SubprocessError):
-            ok = False
-        if not ok:
-            falhos.append(cmd)
-    return falhos
+            p = subprocess.run(argv(cmd), cwd=str(cwd or k.pasta), capture_output=True, text=True, timeout=timeout)
+            codigo, saida = p.returncode, (p.stdout + p.stderr).strip()
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            codigo, saida = None, str(exc)
+        out.append({"comando": cmd, "ok": codigo == 0, "codigo": codigo, "saida": saida[-500:]})
+    return out
+
+
+def checar(k: Kit, etapa: str, cwd: str | Path | None = None, timeout: int = 600) -> list[str]:
+    """O portão da etapa: os comandos declarados que falharam (vazio = passa)."""
+    return [r["comando"] for r in rodar(k, etapa, cwd, timeout) if not r["ok"]]
 
 
 def preparar_repositorio(k: Kit, escrever_ci: bool = True) -> list[str]:
@@ -193,4 +207,4 @@ def resumo_json(r: dict) -> str:
     return json.dumps(r, ensure_ascii=False, indent=1)
 
 
-__all__ = ["ETAPAS", "Kit", "carregar", "checar", "preparar_repositorio", "gravar_env", "init"]
+__all__ = ["ETAPAS", "Kit", "carregar", "argv", "rodar", "checar", "preparar_repositorio", "gravar_env", "init"]
