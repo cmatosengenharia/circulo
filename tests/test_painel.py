@@ -243,6 +243,29 @@ def test_incidentes_zero_com_estagnacoes_e_licoes_de_estrutura_e_silencio_suspei
     assert "sem incidente, mas 29 estagnações e 13 lições de estrutura" in html and "var(--llm)" in html
 
 
+def test_incidentes_zero_com_licao_de_estrutura_reincidente_e_suspeito_e_nao_ok(tmp_path):
+    """Pergunta #184 (cetico): incidentes_abertos=[] com a lição #15 reincidindo 7x (parada há 30 dias, fora da
+    janela de 7 d) não pode sair 'ok'; o card vira 'suspeito' e lista os ids. Fechada/obsoleta ou <3x não contam."""
+    import time
+
+    from circulo.painel import card_incidentes, saude
+    from circulo.state import Store
+    assert card_incidentes(0, 0, 0, [(15, 7), (59, 4)]) == {
+        "tom": "llm", "glifo": "!", "valor": "0", "suspeito": [15, 59],
+        "texto": "suspeito: sem incidente, mas lições de estrutura reincidentes abertas: #15 (7x), #59 (4x)"}
+    st = Store(tmp_path / "s.db")
+    velho = time.time() - 30 * 86400
+    for lid, status, n in ((15, "validada", 7), (16, "obsoleta", 8), (17, "fechada", 5), (18, "aberta", 2)):
+        st.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,created_at,updated_at) "
+             "VALUES(?,?,'rastro:lacuna','estrutural','x',?,1,?,?,?)", (lid, f"s{lid}", status, n, velho, velho))
+    st.x("INSERT INTO licoes(id,assinatura,ponto,classe,descricao,status,ocorrencias,reincidencias,created_at,updated_at) "
+         "VALUES(19,'t','x','trabalho','x','reincidente',1,9,?,?)", (velho, velho))
+    h = saude(st.db)
+    assert h["incidentes_abertos"] == 0 and h["licoes_de_estrutura_7d"] == 0
+    assert h["incidentes_card"]["tom"] != "ok" and h["incidentes_card"]["suspeito"] == [15]
+    assert "#15 (7x)" in pagina_saude_html(h)
+
+
 def test_falhas_do_painel_agrupadas_por_causa_somam_o_total_e_aparecem_no_topo(tmp_path):
     """Pergunta #302: as falhas painel:% das últimas 24 h viram top 5 causas + 'outras', sem falha sem causa."""
     import time
