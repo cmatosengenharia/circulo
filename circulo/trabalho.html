@@ -42,6 +42,9 @@ pre{margin:6px 0 0;padding:8px 10px;background:var(--bg);border:1.5px solid var(
 .msg{min-height:22px;color:var(--muted);font-size:13.5px;margin:6px 0}
 .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;border:1.5px solid currentColor;margin-right:6px;color:var(--muted)}
 a{color:var(--accent)}
+.grupo{border-bottom:1px solid var(--line);padding:4px 0}
+.grupo summary{cursor:pointer;font-size:13.5px;font-weight:600;padding:3px 0}
+.grupo summary .k{color:var(--muted)}
 /*TEMA:ini*/
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:14px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -142,7 +145,9 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
     <section class="card" aria-label="Links da empresa">
       <h2>Links da empresa <span class="muted" id="linksInfo"></span></h2>
       <p class="muted">Busque com a tecla <b>/</b> em qualquer tela; cole <i>link rótulo #assunto</i> e Enter para guardar.</p>
-      <ul id="links"></ul>
+      <form class="ask" role="search" id="linksBusca"><input id="linksFiltro" type="search" autocomplete="off" placeholder="filtrar os links: runbook, dashboard, svc-sms…" aria-label="Filtrar os links da empresa por palavra ou significado"></form>
+      <p class="muted" id="linksFiltroInfo" aria-live="polite"></p>
+      <div id="links"></div>
     </section>
     <section class="card" aria-label="Contexto para o Cursor">
       <h2>Contexto para o Cursor</h2>
@@ -165,6 +170,27 @@ const dia = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) : "";
 const POST = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/json", "X-Circulo": "1"}, body: JSON.stringify(body)}).then(r => r.json());
 let V = null;
 function lista(sel, itens, f, vazio) { $(sel).innerHTML = itens.length ? itens.map(f).join("") : `<li class="muted">${vazio}</li>`; }
+function grupos(gs, abertos) {
+  $("#links").innerHTML = gs.map(g => `<details class="grupo"${abertos ? " open" : ""}><summary>${esc(g.assunto || "sem assunto")} <span class="k" aria-label="${g.total} link(s)">${g.total}</span></summary><ul>${g.links.map(l => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.rotulo)}</a></li>`).join("")}</ul></details>`).join("") || `<p class="muted">nenhum link guardado</p>`;
+}
+function agrupar(ls) {
+  const m = new Map();
+  ls.forEach(l => { if (!m.has(l.assunto)) m.set(l.assunto, []); m.get(l.assunto).push(l); });
+  return [...m].map(([assunto, links]) => ({assunto, total: links.length, links}));
+}
+let filtroN = 0, filtroT = 0;
+function filtrar(sentido) {
+  const q = $("#linksFiltro").value.trim(), n = ++filtroN, t0 = performance.now();
+  if (!q) { $("#linksFiltroInfo").textContent = ""; if (V) grupos(V.links.grupos, false); return; }
+  fetch("/api/links?q=" + encodeURIComponent(q) + (sentido ? "" : "&sentido=0")).then(r => r.json()).then(j => {
+    if (n !== filtroN) return;
+    const ls = j.links || [];
+    grupos(agrupar(ls), true);
+    $("#linksFiltroInfo").textContent = ls.length ? `${ls.length} achado(s) em ${Math.round(performance.now() - t0)} ms` : `nada achado para “${q}”`;
+  }).catch(() => {});
+}
+$("#linksFiltro").addEventListener("input", () => { clearTimeout(filtroT); filtrar(false); filtroT = setTimeout(() => filtrar(true), 600); });
+$("#linksBusca").addEventListener("submit", e => e.preventDefault());
 async function carregar() {
   try {
     V = await (await fetch("/api/trabalho")).json();
@@ -182,7 +208,7 @@ async function carregar() {
     $("#orcAssunto").innerHTML = o.por_assunto.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">sem gasto lançado no mês</td></tr>`;
     $("#orcTipo").innerHTML = o.por_tipo.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("");
     $("#linksInfo").textContent = `· ${V.links.total} guardado(s) · palavra${V.links.fts ? " (FTS5)" : ""}${V.links.graft ? " + significado (Graft)" : ""}`;
-    lista("#links", V.links.recentes, l => `<li>${l.assunto ? `<span class="pill">${esc(l.assunto)}</span>` : ""}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.rotulo)}</a></li>`, "nenhum link guardado");
+    if (!$("#linksFiltro").value.trim()) grupos(V.links.grupos, false);
     mostrarContexto(V.contexto);
     $("#gaiaPill").hidden = !V.gaia.exemplo;
     $("#gaia").innerHTML = V.gaia.etapas.map(e => `<tr><td><b>${esc(e.etapa)}</b></td><td>${esc(e.exige)}</td><td>${esc(e.portao)}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">sem mapa do GAIA ainda: forneça a parte compartilhável e o loop monta os portões</td></tr>`;
