@@ -139,7 +139,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div class="barra"><i id="orcBarra" style="width:0"></i></div>
       <div class="muted" id="orcLegenda"></div>
       <table style="margin-top:8px"><thead><tr><th>Por assunto (mês)</th><th class="n">US$</th></tr></thead><tbody id="orcAssunto"></tbody></table>
-      <table style="margin-top:8px"><thead><tr><th>Por tipo de tarefa</th><th class="n">US$</th></tr></thead><tbody id="orcTipo"></tbody></table>
+      <table style="margin-top:8px"><thead><tr><th>Por tipo de tarefa</th><th>Modelo mais usado</th><th class="n">Média/lançamento</th><th class="n">US$</th></tr></thead><tbody id="orcTipo"></tbody></table>
       <form class="ask" id="gastoCsv"><input id="gastoAssunto" autocomplete="off" placeholder="assunto (opcional)" aria-label="Assunto do gasto importado (opcional)"><input id="gastoTipo" autocomplete="off" placeholder="tipo (opcional)" aria-label="Tipo de tarefa do gasto importado (opcional)"><input type="file" id="gastoArquivo" accept=".csv,text/csv" hidden><button type="button" id="gastoBotao">Importar CSV do Cursor</button></form>
       <div class="resp" id="gastoMsg" aria-live="polite"></div>
       <p class="muted">Exporte o CSV de uso no dashboard do Cursor; reimportar o mesmo arquivo não duplica. Pelo terminal: <code>python -m circulo.gasto_cursor 3,20 --assunto svc-sms --tipo bugfix</code> ou <code>--csv</code>.</p>
@@ -208,7 +208,7 @@ async function carregar() {
     $("#orcTexto").textContent = o.texto; $("#orcBarra").style.width = pct + "%"; $("#orcBarra").className = o.antes_do_fim ? "bad" : "";
     $("#orcLegenda").textContent = `${usd(o.gasto_mes)} de ${usd(o.limite)} (${pct} %)` + (o.esgota_em ? ` · esgota em ${dia(o.esgota_em)}${o.antes_do_fim ? ", ANTES do fim do mês" : ""}` : "");
     $("#orcAssunto").innerHTML = o.por_assunto.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("") || `<tr><td colspan="2" class="muted">sem gasto lançado no mês</td></tr>`;
-    $("#orcTipo").innerHTML = o.por_tipo.map(x => `<tr><td>${esc(x.nome)}</td><td class="n">${usd(x.centavos)}</td></tr>`).join("");
+    $("#orcTipo").innerHTML = o.por_tipo.map(x => `<tr><td>${esc(x.nome)}${x.sugestao ? `<div class="muted">dica: ${esc(x.sugestao)}</div>` : ""}</td><td>${esc(x.modelo || "—")}</td><td class="n">${usd(x.media)} <span class="muted">(${x.lancamentos})</span></td><td class="n">${usd(x.centavos)}</td></tr>`).join("");
     $("#linksInfo").textContent = `· ${V.links.total} guardado(s) · palavra${V.links.fts ? " (FTS5)" : ""}${V.links.graft ? " + significado (Graft)" : ""}`;
     if (!$("#linksFiltro").value.trim()) grupos(V.links.grupos, false);
     mostrarContexto(V.contexto);

@@ -15,7 +15,7 @@ import math
 import os
 import time
 from datetime import date, datetime, timedelta
-from typing import Callable
+from typing import Callable, Iterable, Mapping
 
 from .budget import TZ
 from .money import parse_brl
@@ -121,6 +121,47 @@ def avisar(store: Store, reply: Callable[[str, str], None], hoje: date | None = 
           f"{esgota:%d/%m}, antes do fim do mês ({date.fromisoformat(p['fim_mes']):%d/%m}). "
           f"Gasto no mês: {fmt_usd(p['gasto_mes'])}.", "orcamento")
     return True
+
+
+PEQUENOS = ("mini", "nano", "haiku", "flash", "small", "lite")
+TIPOS_MENOR = ("bugfix", "refactor")       # tarefa pequena: modelo menor resolve
+TIPOS_GRANDE = ("estudo",)                 # estudo: modelo grande compensa
+
+
+def _pequeno(modelo: str) -> bool:
+    return any(p in modelo.lower() for p in PEQUENOS)
+
+
+def sugestao(tipo: str | None, modelo: str | None) -> str | None:
+    """Dica por regra fixa (sem LLM); nunca troca o modelo sozinha."""
+    if not tipo or not modelo:
+        return None
+    if tipo.lower() in TIPOS_MENOR and not _pequeno(modelo):
+        return f"{tipo} costuma caber num modelo menor (ex.: um *-mini ou haiku) em vez de {modelo}"
+    if tipo.lower() in TIPOS_GRANDE and _pequeno(modelo):
+        return f"{tipo} rende mais num modelo grande (ex.: opus ou gpt-5) em vez de {modelo}"
+    return None
+
+
+def uso_por_tipo(linhas: Iterable[Mapping], limite: int = 8) -> list[dict]:
+    """Por tipo de tarefa (maior gasto primeiro): total, lançamentos, custo médio por lançamento (centavos), o modelo
+    mais usado (em lançamentos; empate, o de maior gasto) e a sugestão da regra."""
+    grupos: dict[str | None, list[Mapping]] = {}
+    for x in linhas:
+        grupos.setdefault(x["tipo"] or None, []).append(x)
+    saida = []
+    for tipo, ls in grupos.items():
+        modelos: dict[str, list[int]] = {}
+        for x in ls:
+            if x["modelo"]:
+                m = modelos.setdefault(x["modelo"], [0, 0])
+                m[0] += 1
+                m[1] += int(x["centavos"])
+        modelo = max(sorted(modelos), key=lambda k: modelos[k], default=None)
+        total = sum(int(x["centavos"]) for x in ls)
+        saida.append({"nome": tipo or "sem etiqueta", "centavos": total, "lancamentos": len(ls),
+                      "media": round(total / len(ls)), "modelo": modelo, "sugestao": sugestao(tipo, modelo)})
+    return sorted(saida, key=lambda x: (-x["centavos"], x["nome"]))[:limite]
 
 
 def resumo(p: dict) -> str:

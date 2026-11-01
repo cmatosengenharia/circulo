@@ -25,6 +25,8 @@ def test_semente_preenche_todas_as_partes_e_e_idempotente(circle):
     assert (sms["decisoes"], sms["pendencias"], sms["notas"], sms["links"]) == (1, 1, 2, 2) and sms["ultima"]
     assert any("svc-sms" in linha and "hoje:" in linha for linha in v["daily"]) and "bloqueia:" in " ".join(v["daily"])
     assert v["orcamento"]["gasto_mes"] > 0 and v["orcamento"]["esgota_em"] and v["orcamento"]["por_assunto"][0]["centavos"] > 0
+    tipos = {x["nome"]: x for x in v["orcamento"]["por_tipo"]}
+    assert tipos["bugfix"]["modelo"] == "claude-sonnet" and tipos["bugfix"]["media"] == 310 and tipos["bugfix"]["sugestao"]
     assert v["links"]["total"] == len(trabalho.LINKS) and v["contexto"]["assunto"] == "svc-sms"
     assert "make test" in v["contexto"]["arquivos"]["AGENTS.md"] and any(k.startswith(".cursor/rules/") for k in v["contexto"]["arquivos"])
     assert v["gaia"]["exemplo"] and [e["etapa"] for e in v["gaia"]["etapas"]] == ["pedido", "estudo", "desenvolvimento", "pr", "merge"]
