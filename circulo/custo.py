@@ -82,3 +82,65 @@ def tokens_com_e_sem_pr(chamadas, itens) -> dict:
         por_desfecho["falha" if not c["ok"] else DESFECHO_SEM_PR.get(it["status"], "pendente") if it else "pendente"] += tokens
     return {"com_pr_por_veredito": dict(com_pr),
             "sem_pr": {"tokens": sum(por_papel.values()), "por_papel": dict(por_papel), "por_desfecho": dict(por_desfecho)}}
+
+
+PAPEIS = ("planejador", "developer", "validador", "estudo")
+SEMANA = 7 * 86400
+
+
+def papel_de(papel: str) -> str | None:
+    """O papel dos quatro que a chamada serve: 'estudo_duvida' é estudo; 'mercado' não entra."""
+    return next((p for p in PAPEIS if papel == p or papel.startswith(p + "_")), None)
+
+
+def tokens_por_papel(chamadas, itens, prs_mergeados: int) -> dict:
+    """{por_papel: {papel: {entrada, saida, cache_lido, tokens, por_pr}}, por_item: {título: {papel: tokens}},
+    tokens_por_pr}: a mesma ligação chamada → item pelo título de `tokens_com_e_sem_pr`, estendida aos quatro papéis."""
+    titulos = {it["titulo"] for it in itens}
+    por_papel = {p: Counter() for p in PAPEIS}
+    por_item: dict[str, Counter] = {}
+    for c in chamadas:
+        p = papel_de(c["papel"] or "")
+        if not p:
+            continue
+        tokens = int(c["tokens"] or 0)
+        por_papel[p].update(entrada=int(c["tokens_entrada"] or 0), saida=int(c["tokens_saida"] or 0),
+                            cache_lido=int(c["cache_lido"] or 0), tokens=tokens)
+        titulo = PREFIXO_ESTUDO.sub("", PREFIXO_TITULO.sub("", c["entrada"] or ""))
+        if titulo in titulos:
+            por_item.setdefault(titulo, Counter())[p] += tokens
+    total = sum(v["tokens"] for v in por_papel.values())
+    return {"por_papel": {p: {k: v[k] for k in ("entrada", "saida", "cache_lido", "tokens")}
+                          | {"por_pr": v["tokens"] // prs_mergeados if prs_mergeados else None} for p, v in por_papel.items()},
+            "por_item": {t: dict(v) for t, v in por_item.items()},
+            "tokens_por_pr": total // prs_mergeados if prs_mergeados and total else None}
+
+
+def serie_semanal(chamadas, merges, agora: float, semanas: int = 5) -> list[dict]:
+    """Uma linha por semana (a mais antiga primeiro, a última termina em `agora`): PRs mergeados, custo por PR (todas as
+    chamadas) e tokens por PR de cada papel. `merges` são os instantes de merge."""
+    serie = []
+    for k in range(semanas):
+        a, b = agora - (semanas - k) * SEMANA, agora - (semanas - k - 1) * SEMANA
+        prs = sum(a <= m < b for m in merges)
+        tokens, papeis = 0, Counter()
+        for c in chamadas:
+            if a <= c["created_at"] < b:
+                tokens += int(c["tokens"] or 0)
+                if p := papel_de(c["papel"] or ""):
+                    papeis[p] += int(c["tokens"] or 0)
+        serie.append({"inicio": a, "prs": prs, "tokens": tokens, "custo_por_pr": tokens // prs if prs else None,
+                      "por_papel": {p: t // prs for p, t in papeis.items()} if prs else {}})
+    return serie
+
+
+def tendencia(serie: list[dict]) -> dict:
+    """A meta: o custo por PR da última semana abaixo da média móvel das 4 anteriores (meta_10pct: queda ≥ 10%).
+    Sem 4 semanas com PR antes da última, não há veredito (None)."""
+    atual = serie[-1]["custo_por_pr"] if serie else None
+    base = [p["custo_por_pr"] for p in serie[-5:-1] if p["custo_por_pr"] is not None]
+    if atual is None or len(base) < 4:
+        return {"atual": atual, "media_4s": None, "queda_pct": None, "em_queda": None, "meta_10pct": None}
+    media = sum(base) / 4
+    queda = round(100 * (1 - atual / media), 1)
+    return {"atual": atual, "media_4s": media, "queda_pct": queda, "em_queda": atual < media, "meta_10pct": queda >= 10}

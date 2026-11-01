@@ -29,7 +29,7 @@ import sqlite3
 import time
 import urllib.error
 
-from . import experimentos, limite_uso, pedidos, planejador_cache, praticas, rastro, rodadas_revisao
+from . import alavancas, experimentos, limite_uso, pedidos, planejador_cache, praticas, rastro, rodadas_revisao
 from .agents import Ctx
 from .decision import Question, norm
 from .experimentos import METRICAS, Experimento, ExperimentoIncompleto
@@ -247,11 +247,12 @@ class Planejador:
     def _llm(self, system: str, prompt: str, modelo: str) -> tuple[str, int]:
         """Toda chamada do Planejador à LLM passa aqui: o limite de uso vira LimiteDeUso, com a hora do reset gravada."""
         llm = self.ctx.dl.llm
+        modelo, teto = alavancas.aplicar(self.s, "planejador", modelo, MAX_TOKENS)
         try:
             if hasattr(llm, "generate"):
-                out = llm.generate(system=system, prompt=prompt, model=modelo, max_tokens=MAX_TOKENS)
+                out = llm.generate(system=system, prompt=prompt, model=modelo, max_tokens=teto)
                 return out.text, out.tokens
-            return llm.complete(system, prompt, MAX_TOKENS)
+            return llm.complete(system, prompt, teto)
         except Exception as exc:
             ate = limite_uso.parse_reset_limite(str(exc), time.time())
             if ate is None:

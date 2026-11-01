@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import __version__, finance
 from . import atividade as atv
-from . import modelo_menor, planos, registro, repo_stats
+from . import alavancas, modelo_menor, planos, registro, repo_stats
 from .budget import TZ
 from .falhas_painel import (_falhas_antes, agrupar_por_causa, causas_vs_antes, falhas_por_causa, falhas_por_componente,
                             variacao)
@@ -297,7 +297,7 @@ def saude(conn) -> dict:
                (agora - 2 * 86400,)), agora),
            "entregas_sem_uso": (uso := classificar(conn, agora))["sem_uso"], "entregas_sem_uso_7d": resumo_7d(uso),
            "contestados": (cont := contestados(conn)), "contestados_sem_fonte": sum(not c["fontes"] for c in cont),
-           "planos": planos.ler(conn, agora), "modelos_menores": modelo_menor.modelos_menores(conn, agora),
+           "planos": planos.ler(conn, agora), "modelos_menores": modelo_menor.modelos_menores(conn, agora), "tokens_papel": alavancas.painel(conn, agora),
            "gate": {"ponto": g[0], "ok": bool(g[1]), "sujeito": g[2], "motivo": (g[3] or "")[:200], "em": g[4]} if g else None}
     nivel = {"amarelo": [], "vermelho": []}
     if abertos:
@@ -372,7 +372,7 @@ def pagina_saude(h: dict) -> bytes:
             ".delta{font-style:normal;font-weight:600;font-size:13px}.delta.ruim{color:var(--bad)}.delta.bom{color:var(--ok)}"
             ".delta.neutro{color:var(--muted)}"
             f".sem{{border-left:5px solid var(--{tom});color:var(--{tom})}}.causa{{margin:14px 0 0}}{COMPONENTES}</style></head><body>"
-            f'<main>{componentes}{pedido}{falhas}{sem_uso}{contest}{plano}{modelo_menor.card(h["modelos_menores"])}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
+            f'<main>{componentes}{pedido}{falhas}{sem_uso}{contest}{plano}{modelo_menor.card(h["modelos_menores"])}{alavancas.card(h["tokens_papel"])}<div class="faixa" role="region" aria-label="Saúde do loop"><div class="card sem"><span>Semáforo</span>'
             f'<b>{glifo} {h["semaforo"]}</b></div>{incid}'
             + "".join(f'<div class="card"><span>{escape(n)}</span><b>{escape(v)}</b></div>' for n, v in nums)
             + f"</div>{causa}</main></body></html>").encode()
