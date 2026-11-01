@@ -29,7 +29,7 @@ import sqlite3
 import time
 import urllib.error
 
-from . import experimentos, limite_uso, pedidos, planejador_cache, rastro, rodadas_revisao
+from . import experimentos, limite_uso, pedidos, planejador_cache, praticas, rastro, rodadas_revisao
 from .agents import Ctx
 from .decision import Question, norm
 from .experimentos import METRICAS, Experimento, ExperimentoIncompleto
@@ -422,6 +422,7 @@ class Planejador:
         rid = gravar_item(self.s, pid, titulo_curto(item["titulo"]), detalhe, f"pergunta do conselho #{pid}: {pergunta.persona}",
                           modulo_de(item))
         experimentos.gravar(self.s, rid, exp)
+        praticas.registrar_uso(self.s, rid)      # o item nasceu com as práticas ativas no prompt
         conselho.marcar(pid, "virou_item", rid)
         marcar_etapa(self.s, pid, "item_gravado", {"item": rid})
         self.ctx.reply(f"Conselho ({pergunta.persona}) perguntou: “{pergunta.texto[:140]}” → item #{rid}: {item['titulo'][:120]}", "roteiro")
