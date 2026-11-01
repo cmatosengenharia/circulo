@@ -520,6 +520,10 @@ class Vigia:
                 skills.pedir_instalacao(self.s, repo_dir, now)
             with contextlib.suppress(Exception):
                 garimpo.garimpar(self.s, now, reply=self.ctx.reply, dl=self.ctx.dl)
+        if os.environ.get("CIRCULO_REPO_DIR"):                       # 01/11: absorção (ADR por repo), escudo das skills, ranking diário
+            from . import absorcao
+            with contextlib.suppress(Exception):
+                absorcao.rodar(self.s, now, data_dir=self.ctx.data_dir, repo_dir=os.environ["CIRCULO_REPO_DIR"], dl=self.ctx.dl, reply=self.ctx.reply)
         from . import alavancas, experimentos, praticas
         experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
         alavancas.girar(self.s, self.ctx.reply, now)                # uma alavanca de economia por vez, com guarda de qualidade

@@ -148,7 +148,9 @@ def regra(jev, qid: str, q: Question, state) -> Decision:
 
 def para_tarefa(dl, item: dict, repo_dir: Path | str) -> list[dict]:
     """As skills instaladas que o Jev escolhe para esta tarefa (até MAX_POR_TAREFA; a regra local escolhe uma)."""
-    inst = instaladas(repo_dir)
+    from .escudo import auditar
+    fora = set(auditar(repo_dir)["bloqueadas"])                      # achado crítico no SKILL.md: nunca entra no prompt (ECC-1)
+    inst = [s for s in instaladas(repo_dir) if s["nome"] not in fora]
     if not inst or dl is None:
         return []
     opcoes = {s["nome"]: f"{s['nome']}: {s['descricao']}" for s in inst}
