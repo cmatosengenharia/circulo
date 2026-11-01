@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.72.1 — 2026-10-31
+
+**Garimpo: a camada que varre o GitHub pelo que o loop precisa agora.**
+
+- Cássio: "uma camada a mais para varrer o GitHub e pegar código já criado como melhoria no próprio loop; o repo de
+  engenharia reversa pode fazer sentido também".
+- `circulo/garimpo.py` (SRE, 1×/dia): as necessidades do loop (itens de produto pendentes, lições estruturais abertas,
+  o resultado do Norte mais longe da meta) e temas fixos (engenharia reversa de código, economia de tokens por grafo,
+  validação de agentes, fábrica com agentes) viram consultas na busca de repositórios do GitHub; passa quem tem ≥ 50
+  estrelas, atividade em 12 meses e ainda não foi visto; a fila `repos_garimpo` guarda url, motivo, licença.
+- `mercado.estudar_repositorio` consome a fila do garimpo antes da lista fixa; licença não permissiva vai no prompt
+  ("reimplementar a técnica, não copiar código"). Erro na API não derruba nem apaga a fila.
+- Testes: `tests/test_garimpo.py`.
+
 ## 1.72.0 — 2026-10-31
 
 **Autonomia: nada espera humano; repositórios de referência viram código no loop.**

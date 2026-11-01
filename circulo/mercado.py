@@ -155,16 +155,25 @@ def estudar_repositorio(ctx) -> dict | None:
     lista = repos(s)
     if llm is None or not lista:
         return None
-    i = (int((s.get(KV_REPOS) or {}).get("indice", -1)) + 1) % len(lista)
-    repo = lista[i]
+    from . import garimpo
+    achado = garimpo.proximo(s)                         # o garimpo (dirigido pela necessidade) vem antes da lista fixa
+    i = int((s.get(KV_REPOS) or {}).get("indice", -1))
+    if achado:
+        repo, extra = achado["url"], (f"\nmotivo do garimpo: {achado.get('motivo', '')}\nlicenca: {achado.get('licenca', 'desconhecida')}"
+                                      + ("" if achado.get("permissiva") else " (NÃO permissiva: descreva a técnica para reimplementar; não copie código)"))
+    else:
+        i = (i + 1) % len(lista)
+        repo, extra = lista[i], ""
     escolha = ctx.dl.pick_model_detalhe("researcher", {"tarefa": "estudo de repositório de referência", "tipo": "mercado"})
     t0 = time.time()
     try:
-        out = llm.generate(system=SYSTEM_REPO, prompt=capacidades(s) + f"\n\nrepositorio: {repo}", model=escolha["modelo"], max_tokens=MAX_TOKENS,
+        out = llm.generate(system=SYSTEM_REPO, prompt=capacidades(s) + f"\n\nrepositorio: {repo}{extra}", model=escolha["modelo"], max_tokens=MAX_TOKENS,
                            web_search=4 if getattr(llm, "busca_web", False) else 0)
     except Exception as exc:
         monitorar(ctx, "mercado:repositorio", False, sujeito=repo, motivo=f"{type(exc).__name__}: {exc}")
         s.set(KV_REPOS, {"em": time.time(), "repo": repo, "indice": i, "perguntas": [], "erro": str(exc)[:200]})
+        if achado:
+            garimpo.consumir(s, repo)
         raise
     ctx.budget.charge(out.tokens, "llm")
     perguntas = objeto_ou_corte(out.text, lambda d, c: _aceita(d, c, minimo=1)) or []     # do repositório, 1 pergunta já vale
@@ -179,7 +188,9 @@ def estudar_repositorio(ctx) -> dict | None:
                   entrada=f"estudo do repositório {repo}", saida=out.text)
     except (sqlite3.Error, TypeError, ValueError):
         pass
-    res = {"em": time.time(), "repo": repo, "indice": i, "perguntas": perguntas, "itens": itens,
+    if achado:
+        garimpo.consumir(s, repo)
+    res = {"em": time.time(), "repo": repo, "indice": i, "perguntas": perguntas, "itens": itens, "garimpo": bool(achado),
            "fontes": sorted({f for p in perguntas for f in p["fontes"]}), "erro": None if perguntas or itens else "resposta sem JSON válido"}
     s.set(KV_REPOS, res)
     monitorar(ctx, "mercado:repositorio", bool(perguntas or itens), sujeito=repo, motivo="" if perguntas or itens else "resposta sem JSON válido")
