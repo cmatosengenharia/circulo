@@ -392,6 +392,18 @@ def rodar(store, agora: float | None = None, data_dir=None, repo_dir=None, dl=No
     return out
 
 
+def rodar_sre(store, agora: float, ctx) -> dict | None:
+    """Chamada do SRE: só com o clone do loop configurado (CIRCULO_REPO_DIR); erro aqui nunca derruba a passagem."""
+    repo_dir = os.environ.get("CIRCULO_REPO_DIR")
+    if not repo_dir:
+        return None
+    try:
+        return rodar(store, agora, data_dir=ctx.data_dir, repo_dir=repo_dir, dl=ctx.dl, reply=ctx.reply)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        store.set("absorcao_erro", {"em": agora, "erro": f"{type(exc).__name__}: {exc}"[:200]})
+        return None
+
+
 def resumo(store) -> dict:
     ev = store.get(KV_EVIDENCIAS) or {}
     return {"fontes": [{"slug": f["slug"], "nome": f["nome"], "adr": adr_caminho(f).as_posix(), "frentes": f["frentes"],

@@ -471,8 +471,7 @@ class Vigia:
                 self._agir(c, now)
                 agiu.append(c["chave"])
                 marcas[c["chave"]] = now
-        # trava que segue aberta REAGIR depois da ação, sem item em andamento: age de novo com a evidência de agora
-        # (no Mac uma trava ficou 13 h aberta, 777 passagens, sem nova ação: o item que abrira já estava feito)
+        # trava que segue aberta REAGIR depois da ação, sem item em andamento: age de novo com a evidência de agora (no Mac uma trava ficou 13 h aberta, 777 passagens, sem nova ação: o item que abrira já estava feito)
         por_chave = {a["chave"]: a for a in achados}
         for chave, r in abertas.items():
             if chave in agiu or chave not in por_chave or r["acao"] not in ("abrir_item", "alertar"):
@@ -507,7 +506,8 @@ class Vigia:
         if mem is not None and mem.graft:
             mem.espelhar_pendentes()                                 # linhas antigas ganham nó no Graft, 50 por passagem
             graft.manter(self.s, now)                                # apply-safe a cada 6 h; duplicata do mesmo registro resolvida
-        from . import autonomia, daily, garimpo, gasto_cursor, norte, pastas, sentinela, skills, trabalho
+        from . import absorcao, autonomia, daily, garimpo, gasto_cursor, norte, pastas, sentinela, skills, trabalho
+        absorcao.rodar_sre(self.s, now, self.ctx)                    # 01/11: escudo das skills, absorção com ADR e evidência, ranking diário
         sentinela.checar(self.s, self.ctx.reply, now)                # fila pronta e nada entrou na main há 4 h: avisa você
         daily.checar(self.s, self.ctx.data_dir, self.ctx.reply, now)  # 8 h: pauta da daily por assunto, das suas notas
         gasto_cursor.avisar(self.s, self.ctx.reply)                  # uma vez por dia: os US$ do Cursor acabam antes do fim do mês?
@@ -520,10 +520,6 @@ class Vigia:
                 skills.pedir_instalacao(self.s, repo_dir, now)
             with contextlib.suppress(Exception):
                 garimpo.garimpar(self.s, now, reply=self.ctx.reply, dl=self.ctx.dl)
-        if os.environ.get("CIRCULO_REPO_DIR"):                       # 01/11: absorção (ADR por repo), escudo das skills, ranking diário
-            from . import absorcao
-            with contextlib.suppress(Exception):
-                absorcao.rodar(self.s, now, data_dir=self.ctx.data_dir, repo_dir=os.environ["CIRCULO_REPO_DIR"], dl=self.ctx.dl, reply=self.ctx.reply)
         from . import alavancas, experimentos, praticas
         experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
         alavancas.girar(self.s, self.ctx.reply, now)                # uma alavanca de economia por vez, com guarda de qualidade
