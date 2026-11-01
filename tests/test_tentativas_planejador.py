@@ -8,6 +8,7 @@ import pytest
 from circulo import planejador as pl
 from circulo import vigia
 from circulo.planejador import Planejador
+from test_planejador import EXPERIMENTO
 
 
 class LLMFalha:
@@ -20,7 +21,8 @@ class LLMFalha:
 
 class LLMItem:
     def complete(self, system, prompt, max_tokens):
-        return json.dumps({"titulo": "Item novo da pergunta antiga", "detalhe": "mudar x", "sucesso": "y"}), 400
+        return json.dumps({"titulo": "Item novo da pergunta antiga", "detalhe": "mudar x", "sucesso": "y",
+                           "experimento": EXPERIMENTO}), 400
 
 
 def _pergunta(circle, ha_s):

@@ -5,6 +5,7 @@ import time
 
 from circulo import vigia
 from circulo.planejador import SYSTEM, Planejador
+from test_planejador import EXPERIMENTO
 
 
 class LLMItem:
@@ -15,7 +16,7 @@ class LLMItem:
         if system != SYSTEM:                                                 # o Questionador também chama a LLM
             return "{}", 10
         self.n += 1
-        return json.dumps({"titulo": f"Item novo {self.n}", "detalhe": "mudar x", "sucesso": "y"}), 400
+        return json.dumps({"titulo": f"Item novo {self.n}", "detalhe": "mudar x", "sucesso": "y", "experimento": EXPERIMENTO}), 400
 
 
 class LLMFalha:

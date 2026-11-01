@@ -3,6 +3,7 @@ import json
 import time
 
 from circulo.perguntas import Conselho
+from test_planejador import EXPERIMENTO
 
 
 class PlanLLM:
@@ -50,7 +51,7 @@ def test_planejador_responde_a_pergunta_e_liga_o_item(circle, tmp_path):
     from circulo.self_dev import SelfDeveloper
     circle.store.x("UPDATE roadmap SET status='feito'")
     pedido_painel(circle)
-    llm = PlanLLM({"titulo": "Gráfico de tendência no topo do dash", "detalhe": "x", "sucesso": "y"})
+    llm = PlanLLM({"titulo": "Gráfico de tendência no topo do dash", "detalhe": "x", "sucesso": "y", "experimento": EXPERIMENTO})
     circle.ctx.dl.llm = llm
     plan = Planejador(circle.ctx, SelfDeveloper(circle.ctx, tmp_path, agent=None, github=None))
     r = plan.run(autorizado=True)
