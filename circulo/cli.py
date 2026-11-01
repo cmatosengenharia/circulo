@@ -1,4 +1,4 @@
-"""circulo run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas"""
+"""circulo doctor | run [--painel] | painel | demo | tick [-n N] | add "38,90 ifood almoço" | pedir "<frase>" | caminho [ref] | latencia | status | resumo | respostas"""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,8 @@ from .configuracao import carregar_env
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="circulo")
+    from . import __version__
+    ap.add_argument("--version", action="version", version=f"circulo {__version__}")
     ap.add_argument("--data", default=os.environ.get("CIRCULO_DATA", "data"))
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="loop infinito (pausa só por orçamento ou por você)")
@@ -39,6 +41,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
     sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
+    sub.add_parser("doctor", help="confere Python, git, Claude Code, Jev e GitHub e diz exatamente o que falta")
     sub.add_parser("configurar", help="cria o arquivo de configuração única (chaves) com permissão 600")
     ini = sub.add_parser("init", help="prepara QUALQUER repositório para o loop cuidar dele (kit: constituição, testes, CI, pedido)")
     ini.add_argument("pasta", help="clone local do repositório (com remoto no GitHub)")
@@ -90,6 +93,11 @@ def main(argv: list[str] | None = None) -> None:
         pass
     from .loop import Circle
 
+    if args.cmd == "doctor":
+        from . import doctor
+        vs = doctor.verificar(doctor.Ambiente())
+        print(doctor.texto(vs))
+        raise SystemExit(doctor.codigo_saida(vs))
     if args.cmd == "verificar":
         from .verificacao import main as verificar_main
         raise SystemExit(verificar_main())
