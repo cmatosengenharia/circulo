@@ -8,6 +8,7 @@ Dentro de cada nota:
     bloqueio: texto  (ou `- [ ] bloqueio: texto`)   entra em "bloqueia"
     qualquer outra linha (ou `- [x] texto`)         entra em "ontem" se a nota é de ontem
 A data da nota é a do nome (`2026-10-25-...md`) ou, sem ela, a da última modificação.
+O que você anotou pela tela (assunto_notas) entra junto: toda pendência em "hoje", a decisão de ontem em "ontem".
 
 A partir das HORA h, uma vez por dia, a pauta (até MAX_LINHAS linhas) vai ao console e à notificação do macOS.
 """
@@ -17,6 +18,7 @@ import re
 import time
 from pathlib import Path
 
+from . import assuntos
 from .caixa import _cabecalho
 from .sentinela import notificar_mac
 
@@ -51,16 +53,31 @@ def _ler_notas(pasta: Path) -> list[tuple[str, str, str]]:
     return out
 
 
+def _ler_assunto_notas(store) -> list[tuple[str, str, str]]:
+    """As pendências e decisões anotadas pela tela, no mesmo formato das notas em arquivo."""
+    if store is None:
+        return []
+    assuntos.preparar(store)
+    return [(r["nome"], _dia(r["created_at"]), f"- [ ] {r['texto']}" if r["tipo"] == "pendencia" else f"decisão: {r['texto']}")
+            for r in store.q("SELECT n.tipo, n.texto, n.created_at, a.nome FROM assunto_notas n JOIN assuntos a ON a.id=n.assunto_id "
+                             "WHERE n.tipo IN ('pendencia','decisao') ORDER BY n.created_at, n.id")]
+
+
+def tem_fonte(store, data_dir: Path) -> bool:
+    """Há de onde tirar a pauta: a pasta de notas ou algo anotado pela tela."""
+    return (Path(data_dir) / PASTA).is_dir() or bool(_ler_assunto_notas(store))
+
+
 def _corta(texto: str, n: int = MAX_CHARS) -> str:
     return texto if len(texto) <= n else texto[:n - 1] + "…"
 
 
-def pauta(data_dir: Path, agora: float | None = None) -> list[str]:
+def pauta(data_dir: Path, agora: float | None = None, store=None) -> list[str]:
     """As linhas da pauta: cabeçalho e uma linha por assunto, no máximo MAX_LINHAS."""
     agora = agora or time.time()
     ontem = _dia(agora - 86400)
     por: dict[str, dict[str, list[str]]] = {}
-    for assunto, dia, corpo in _ler_notas(Path(data_dir) / PASTA):
+    for assunto, dia, corpo in _ler_notas(Path(data_dir) / PASTA) + _ler_assunto_notas(store):
         a = por.setdefault(assunto, {"ontem": [], "hoje": [], "bloqueia": []})
         for linha in corpo.splitlines():
             linha = linha.strip().lstrip("#").strip()
@@ -94,9 +111,9 @@ def checar(store, data_dir: Path, reply, agora: float | None = None, notificar=n
     """Uma passagem (o SRE chama a cada minuto): a partir das HORA h, emite a pauta uma vez por dia."""
     agora = agora or time.time()
     hoje = _dia(agora)
-    if time.localtime(agora).tm_hour < HORA or store.get(CHAVE) == hoje or not (Path(data_dir) / PASTA).is_dir():
+    if time.localtime(agora).tm_hour < HORA or store.get(CHAVE) == hoje or not tem_fonte(store, data_dir):
         return None
-    linhas = pauta(data_dir, agora)
+    linhas = pauta(data_dir, agora, store)
     store.set(CHAVE, hoje)
     reply("\n".join(linhas), "resposta")
     notificar(linhas[0], " | ".join(linhas[1:]))

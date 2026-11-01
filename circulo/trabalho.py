@@ -216,7 +216,7 @@ def visao(store, data_dir: Path, agora: float | None = None) -> dict:
     return {
         "exemplo": bool(store.get(KV)), "assuntos": lista,
         "pendencias": _ultimos(store, "pendencia", 12), "decisoes": _ultimos(store, "decisao", 8),
-        "daily": daily.pauta(data_dir, agora) if (Path(data_dir) / daily.PASTA).is_dir() else [],
+        "daily": daily.pauta(data_dir, agora, store) if daily.tem_fonte(store, data_dir) else [],
         "orcamento": {**proj, "texto": gasto_cursor.resumo(proj), "por_assunto": _gasto_por(store, "assunto", hoje.replace(day=1)),
                       "por_tipo": _gasto_por(store, "tipo", hoje.replace(day=1))},
         "links": {"total": int(store.one("SELECT COUNT(*) n FROM catalogo_links")["n"]), "graft": lk.graft, "fts": lk.fts,
