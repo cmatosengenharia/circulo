@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.73.1 — 2026-11-01
+
+- CI da 1.73.0 vermelho por lint (F401, `time` sem uso em tests/test_skills.py): corrigido. Lição: rodar o ruff local com `--no-cache`.
+
 ## 1.73.0 — 2026-10-31
 
 **Skills reutilizadas: catálogo de 38 skills prontas, instalação por PR, o Jev escolhe a skill de cada tarefa.**

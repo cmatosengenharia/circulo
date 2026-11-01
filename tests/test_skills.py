@@ -1,5 +1,4 @@
 """31/10: skills prontas de repositórios públicos entram no ecossistema por PR e o Jev escolhe a da tarefa."""
-import time
 
 from circulo import skills
 from circulo.decision import Question
