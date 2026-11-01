@@ -10,6 +10,7 @@ Dois validadores, nenhum deles bloqueia por palpite — cada um mede e deixa ras
    JSON {aprovado, problemas[], risco}. Só reprova com um PROBLEMA CONCRETO (teste que não prova o item, mudança fora
    do escopo, regressão visível no diff); reprovado vira UMA rodada de correção local do Developer, nunca descarte.
    Sem LLM, JSON inválido ou timeout = aprovado (o validador nunca para a entrega: CI e gate continuam depois dele).
+   Dentro dela, `validador_telas.verificar` confere as telas que o diff toca (id quebrado, erro de JS) contra a base.
 """
 from __future__ import annotations
 
@@ -124,7 +125,7 @@ def _chamar_llm(ctx, item: dict):
 def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
     """Agente 2: revisão independente do diff. Devolve {aprovado, problemas, risco, fonte}. `chamar(system, prompt)`
     -> texto; por padrão a LLM do ctx. Qualquer falha = aprovado (fonte 'indisponivel')."""
-    from . import criterio_aceite
+    from . import criterio_aceite, validador_telas
     from .neuronios import diff_do_worktree
     stat, diff = _diff(wt, base)
     criterio = criterio_aceite.congelado(ctx.store, item.get("id"))
@@ -145,6 +146,8 @@ def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
         criterio_aceite.julgar(ctx.store, item.get("id"), *cr, diff_do_worktree(wt, base, _git_saida)[1])
         if not cr[0]:
             v["aprovado"], v["problemas"] = False, [*v["problemas"], f"Critério ✗ ({frase}): {cr[1]}"[:300]]
+    if telas := validador_telas.verificar(wt, base):
+        v["aprovado"], v["problemas"] = False, [*v["problemas"], *telas]
     with contextlib.suppress(Exception):
         from .licoes import registrar as monitorar
         monitorar(ctx, PONTO_REVISAO, v["aprovado"], sujeito=f"roteiro #{item.get('id')}", licao=False,
