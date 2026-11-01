@@ -90,8 +90,8 @@ def test_console_anota_e_pergunta(tmp_path):
 
 def test_codigo_e_credencial_nao_entram(ws):
     s, dl = ws.store, ws.ctx.dl
-    for frase in ("senha do banco de homologação: hunter2", "token: ghp_abcdefghijklmnopqrstuvwxyz0123456789",
-                  "AKIAABCDEFGHIJKLMNOP no serviço de SMS", "```python\nimport boto3\n```"):
+    for frase in ("senha do banco de homologação: hunter2", "token: ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789",
+                  "AKIA" + "ABCDEFGHIJKLMNOP no serviço de SMS", "```python\nimport boto3\n```"):
         with pytest.raises(ValueError):
             assuntos.anotar(s, dl, frase)
     assert s.one("SELECT COUNT(*) n FROM assunto_notas")["n"] == 0
