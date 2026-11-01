@@ -656,7 +656,7 @@ class Store:
                   ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"),
                   ("frescor", "versao", "TEXT"),
                   ("vigia_disparos", "giro", "INTEGER"), ("vigia_disparos", "resultado", "TEXT"),
-                  ("vigia_disparos", "giros_ate_destravar", "INTEGER"))
+                  ("vigia_disparos", "giros_ate_destravar", "INTEGER"), ("vigia_disparos", "padrao", "TEXT"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
