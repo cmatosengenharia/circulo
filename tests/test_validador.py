@@ -53,6 +53,22 @@ def test_validar_worktree_registra_a_verificacao_sem_parar_o_item(circle, tmp_pa
     assert circle.store.one("SELECT COUNT(*) n FROM roadmap WHERE origem='erro'")["n"] == 0   # não vira lição nem item
 
 
+def test_agente_que_escreve_no_repositorio_principal_e_nao_no_worktree_vira_falha(circle, repo):  # noqa: F811
+    wt = repo.parent / "wt-item"
+    subprocess.run(["git", "worktree", "add", "-q", "-b", "circulo/fix-x", str(wt)], cwd=repo, check=True)
+    (wt / "certo.py").write_text("x = 1\n")
+    assert validador.escritas_fora(wt) == []
+    validador.validar_worktree(circle.ctx, wt, item_id=7)
+    assert circle.store.one("SELECT ok FROM verificacoes WHERE ponto=? ORDER BY id DESC", (validador.PONTO_FORA,))["ok"] == 1
+    (repo / "app.py").write_text("def soma(a, b):\n    return a + b\n")                   # o agente gravou na árvore principal
+    (repo / "novo.py").write_text("y = 2\n")
+    assert validador.escritas_fora(wt) == ["app.py", "novo.py"]
+    validador.validar_worktree(circle.ctx, wt, item_id=7)
+    r = circle.store.one("SELECT ok, motivo FROM verificacoes WHERE ponto=? ORDER BY id DESC", (validador.PONTO_FORA,))
+    assert r["ok"] == 0 and "app.py" in r["motivo"] and "novo.py" in r["motivo"]
+    assert validador.escritas_fora(repo) == []                                          # o principal não é worktree de ninguém
+
+
 def test_veredito_tolerante_e_reprova_so_com_problema_concreto():
     assert validador.veredito_de('```json\n{"aprovado": false, "problemas": ["o teste não chama soma()"], "risco": "alto"}\n```') == \
         {"aprovado": False, "problemas": ["o teste não chama soma()"], "risco": "alto"}
