@@ -9,6 +9,7 @@ Formato do arquivo (texto puro, UTF-8):
     ---            (cabeçalho opcional, uma chave por linha)
     tipo: pedido | missao          (padrão: pedido — vai para o roteiro do loop; missao cria uma missão nova)
     projeto: 2                     (padrão: a missão do loop; um repositório cliente vira branch circulo/<pedido> nele)
+    de: Ana                        (quem pediu; padrão: cassio — a Equipe ao vivo e o digest agrupam por ele)
     ---
     o texto do pedido, em uma ou várias linhas
 
@@ -84,10 +85,28 @@ def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
             continue
         else:
             payload = {"text": texto, "at": agora, "origem": "caixa", "arquivo": arq.name,
-                       "projeto": int(projeto) if projeto.isdigit() else loop_pid}
+                       "projeto": int(projeto) if projeto.isdigit() else loop_pid, "de": cab.get("de", "")[:60] or None}
             eid = store.enqueue("mensagem", payload)
         ids.append(eid)
         shutil.move(str(arq), str(pasta / "lidos" / f"{time.strftime('%Y-%m-%d_%H%M%S', time.localtime(agora))}-ev{eid}-{arq.name}"))
     if ids:
         store.set("caixa_ultima", {"em": agora, "eventos": ids})
     return ids
+
+
+QUEM_PADRAO = "cassio"
+
+
+def quem_pediu(store, itens: list[int]) -> dict[int, str]:
+    """Quem pediu cada item do roteiro: o `de:` do arquivo da caixa, achado pelo elo pedido:<evento> → item:<id>;
+    pedido sem remetente é do dono (cassio). Só itens que vieram de pedido entram."""
+    if not itens:
+        return {}
+    marcas = ",".join("?" * len(itens))
+    out = {r["id"]: QUEM_PADRAO for r in store.q(f"SELECT id FROM roadmap WHERE origem='pedido_cassio' AND id IN ({marcas})", itens)}
+    for r in store.q("SELECT CAST(substr(l.para, 6) AS INTEGER) item, json_extract(e.payload, '$.de') de FROM elos l "
+                     "JOIN events e ON l.de = 'pedido:' || e.id WHERE l.relacao='virou_item' AND l.para IN "
+                     f"({marcas})", [f"item:{i}" for i in itens]):
+        if r["de"] and r["item"] in out:
+            out[r["item"]] = r["de"]
+    return out

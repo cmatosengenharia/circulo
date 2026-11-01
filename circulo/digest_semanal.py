@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import time
 
-from . import norte
+from . import caixa, norte
 from .state import Store
 
 ESQUEMA = """
@@ -52,15 +52,21 @@ def _valor(v) -> str:
 
 
 def markdown(prs: list[dict]) -> str:
-    """O digest para colar no canal do time: cada PR mergeado na semana, quem pediu e o tempo do pedido ao merge. Pura."""
+    """O digest para colar no canal do time: os PRs mergeados na semana agrupados por quem pediu (mais entregas primeiro,
+    'sem pedido' por último), com o tempo do pedido ao merge. Pura."""
     produto = sum(1 for p in prs if p["produto"])
-    linhas = [f"## Digest da semana: {len(prs)} PRs mergeados, {produto} de produto", ""]
+    linhas = [f"## Digest da semana: {len(prs)} PRs mergeados, {produto} de produto"]
+    grupos: dict[str | None, list[dict]] = {}
     for p in sorted(prs, key=lambda p: p["number"]):
-        partes = [f"**#{p['number']} {p['titulo']}**", f"pedido por {p['por']}" if p["por"] else SEM_PEDIDO,
-                  f"pedido→merge {_duracao(p['merge_em'] - p['pedido_em']) if p['pedido_em'] else '—'}"]
-        linhas.append("- " + " · ".join(partes))
+        grupos.setdefault(p["por"], []).append(p)
+    for por, entregas in sorted(grupos.items(), key=lambda g: (g[0] is None, -len(g[1]), g[0] or "")):
+        linhas += ["", f"### {por or SEM_PEDIDO} ({len(entregas)})"]
+        for p in entregas:
+            partes = [f"**#{p['number']} {p['titulo']}**", f"pedido por {por}" if por else SEM_PEDIDO,
+                      f"pedido→merge {_duracao(p['merge_em'] - p['pedido_em']) if p['pedido_em'] else '—'}"]
+            linhas.append("- " + " · ".join(partes))
     if not prs:
-        linhas.append("Nenhum PR mergeado na semana.")
+        linhas += ["", "Nenhum PR mergeado na semana."]
     return "\n".join(linhas)
 
 
@@ -78,7 +84,8 @@ def _origem(store: Store, item: dict) -> tuple[str | None, dict, str | None, flo
                      (item.get("pergunta_id") or -1, item["id"])) if item else None
     ev = json.loads(perg["evidencia"]) if perg and perg["evidencia"] else {}
     if item and item.get("origem") == "pedido_cassio":
-        return f"pedido: {(item['detalhe'] or item['titulo'])[:160]}", ev, "cassio", item["created_at"]
+        por = caixa.quem_pediu(store, [item["id"]]).get(item["id"], caixa.QUEM_PADRAO)
+        return f"pedido: {(item['detalhe'] or item['titulo'])[:160]}", ev, por, item["created_at"]
     if perg:
         return f"pergunta #{perg['id']} ({perg['persona']}): {perg['texto'][:160]}", ev, perg["persona"], perg["created_at"]
     return None, ev, None, None
