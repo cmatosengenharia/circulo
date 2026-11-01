@@ -7,3 +7,4 @@ circulo.env
 .shim*/
 .pytest_cache/
 .ruff_cache/
+*.mp4
