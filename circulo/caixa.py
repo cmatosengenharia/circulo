@@ -8,7 +8,7 @@ atalho do macOS, uma pasta sincronizada).
 Formato do arquivo (texto puro, UTF-8):
     ---            (cabeçalho opcional, uma chave por linha)
     tipo: pedido | missao          (padrão: pedido — vai para o roteiro do loop; missao cria uma missão nova)
-    projeto: 2                     (padrão: a missão do loop)
+    projeto: 2                     (padrão: a missão do loop; um repositório cliente vira branch circulo/<pedido> nele)
     ---
     o texto do pedido, em uma ou várias linhas
 
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import subprocess
 import time
 from pathlib import Path
 
@@ -37,6 +38,10 @@ def _cabecalho(texto: str) -> tuple[dict, str]:
             k, v = linha.split(":", 1)
             cab[k.strip().lower()] = v.strip()
     return cab, m.group(2)
+
+
+def _repo_cliente(store, projeto: str) -> bool:
+    return projeto.isdigit() and bool(store.one("SELECT 1 FROM projects WHERE id=? AND kit='repo'", (int(projeto),)))
 
 
 def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
@@ -68,8 +73,16 @@ def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
             continue
         if tipo == "missao":
             eid = store.enqueue("novo_projeto", {"pedido": texto, "at": agora, "origem": "caixa", "arquivo": arq.name})
+        elif _repo_cliente(store, projeto := cab.get("projeto", "").strip()):
+            from . import repo_cliente                 # repositório cliente: clone isolado numa branch circulo/<pedido>
+            try:
+                pedido = repo_cliente.receber(store, int(projeto), texto, Path(data_dir) / "fabrica")
+            except (OSError, ValueError, subprocess.SubprocessError):
+                shutil.move(str(arq), str(pasta / "invalidos" / arq.name))
+                continue
+            shutil.move(str(arq), str(pasta / "lidos" / f"{time.strftime('%Y-%m-%d_%H%M%S', time.localtime(agora))}-repo{pedido['id']}-{arq.name}"))
+            continue
         else:
-            projeto = cab.get("projeto", "").strip()
             payload = {"text": texto, "at": agora, "origem": "caixa", "arquivo": arq.name,
                        "projeto": int(projeto) if projeto.isdigit() else loop_pid}
             eid = store.enqueue("mensagem", payload)
