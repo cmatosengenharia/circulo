@@ -11,6 +11,7 @@ evidência de item ou num alerta já rolado. Fontes (cada uma com a ação que r
 - etapas em quarentena (incidente repetido isolou a etapa): o incidente a tratar;
 - pasta de extratos inexistente ou vazia há giros (`ingestao`): soltar o extrato e o pedido fecha sozinho;
 - lançamentos de finanças esperando revisão: o comando `ok`;
+- ações do Developer com risco HIGH ou UNKNOWN (`risco.portao`): aprovar ou rejeitar com motivo;
 - avisos ainda não lidos (merge, saúde, orçamento, controle): marcar como visto.
 """
 from __future__ import annotations
@@ -50,6 +51,11 @@ def pendentes(store: Store, agora: float | None = None, diagnostico: bool = True
     for r in store.q("SELECT id, titulo, evidencia, updated_at FROM roadmap WHERE status='contestado' ORDER BY updated_at DESC"):
         out.append(_item("item_contestado", f"Item #{r['id']} contestado pelo estudo: {r['titulo']}", r["evidencia"], r["updated_at"],
                          [{"acao": "reafirmar_item", "rotulo": "Executar mesmo assim"}, {"acao": "desativar_item", "rotulo": "Deixar de lado"}], 1, ref=r["id"], link="/loop#evolucao"))
+    from . import risco
+    for ref, d in risco.pendentes(store):
+        out.append(_item("acao_risco", f"Ação {d['risco']} do Developer espera você: {d['titulo']}", "; ".join(d.get("acoes", [])), d.get("em"),
+                         [{"acao": "aprovar_acao", "rotulo": "Aprovar"}, {"acao": "rejeitar_acao", "rotulo": "Rejeitar com motivo", "motivo": True}],
+                         0, ref=ref))
     nm = store.get("norte_marco") or {}
     if nm.get("cobrado") and not nm.get("evoluiu"):
         d = nm.get("depois") or {}
@@ -107,7 +113,7 @@ def resumo(store: Store) -> dict:
             "por_tipo": {t: sum(1 for i in itens if i["tipo"] == t) for t in {i["tipo"] for i in itens}}}
 
 
-def agir(store: Store, acao: str, ref: Any, ctx=None) -> dict:
+def agir(store: Store, acao: str, ref: Any, ctx=None, motivo: str = "") -> dict:
     """Executa a ação de um item; cada uma passa pelo mesmo caminho que o botão correspondente já usava."""
     agora = time.time()
     if acao == "retomar":
@@ -131,6 +137,9 @@ def agir(store: Store, acao: str, ref: Any, ctx=None) -> dict:
             store.x("UPDATE roadmap SET status='pendente', evidencia='contestado pelo estudo; você reafirmou', updated_at=? WHERE id=? AND status='contestado'", (agora, int(ref)))
             return {"ok": True, "feito": f"item #{ref} reafirmado"}
         return {"ok": bool(ctx.estudo.reafirmar(int(ref))), "feito": f"item #{ref} reafirmado"}
+    if acao in ("aprovar_acao", "rejeitar_acao"):
+        from . import risco
+        return risco.decidir(store, str(ref), acao == "aprovar_acao", motivo)
     if acao == "ok_lancamento":
         store.x("UPDATE ledger SET status='confirmed' WHERE id=? AND status='open'", (int(ref),))
         return {"ok": True, "feito": f"lançamento #{ref} confirmado"}

@@ -791,7 +791,7 @@ def make_handler(db_path: str):
                 return
             if u.path == "/api/aprovacoes/acao":
                 from .aprovacoes import agir
-                r = agir(store, str(data.get("acao", "")), data.get("ref"), getattr(self.server, "circle", None))
+                r = agir(store, str(data.get("acao", "")), data.get("ref"), getattr(self.server, "circle", None), str(data.get("motivo") or ""))
                 if r.get("ok"):
                     store.x("INSERT INTO alerts(kind,message,created_at,delivered) VALUES('controle',?,?,1)", (f"Você decidiu em “Precisa de você”: {r['feito']}", time.time()))
                 return self._json(r, 200 if r.get("ok") else 400)
