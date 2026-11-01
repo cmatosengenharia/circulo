@@ -8,7 +8,8 @@ import tomllib
 from pathlib import Path
 
 from circulo import self_dev
-from circulo.neuronios import ABRIR_PR, avaliar_aprendidos, criar_portao
+from circulo.neuronios import ABRIR_PR, avaliar_aprendidos, criar_portao, neurogenese, portoes
+from circulo.state import Store
 
 IGNORADOS_NO_CI = self_dev.LINT_CMD[self_dev.LINT_CMD.index("--ignore") + 1].split(",")
 
@@ -28,3 +29,13 @@ def test_portao_de_lint_aprendido_ignora_o_que_o_ci_ignora(circle, tmp_path, mon
                         subprocess.CompletedProcess(argv, 0, "", ""))
     [r] = avaliar_aprendidos(circle.store, ABRIR_PR, tmp_path, {}, {})
     assert r.ok and rodados[0][rodados[0].index("--ignore") + 1].split(",") == IGNORADOS_NO_CI
+
+
+def test_licao_72_portao_nasce_sem_o_codigo_que_o_ci_ignora():
+    """Lição #72 (developer:abrir_pr:lint:B905,E501,F541): o E501 da assinatura não entra no portão gravado."""
+    s = Store(":memory:")
+    neurogenese(s, {"id": 72, "assinatura": "developer:abrir_pr:lint:B905,E501,F541", "item_id": None})
+    neurogenese(s, {"id": 73, "assinatura": "developer:abrir_pr:lint:E501", "item_id": None})
+    [p] = portoes(s, ABRIR_PR)
+    argv = p["spec"]["argv"]
+    assert argv[argv.index("--select") + 1].split(",") == ["B905", "F541"] and p["licao_id"] == 72
