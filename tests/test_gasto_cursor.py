@@ -2,8 +2,9 @@
 projeção do dia em que os US$ 250 do mês acabam (média móvel de 7 dias) e alerta quando ela cai antes do fim do mês."""
 from datetime import date
 
-from circulo.gasto_cursor import avisar, etiquetados_pct, importar_csv, lancar, main, projecao
+from circulo.gasto_cursor import avisar, etiquetados_pct, importar_csv, lancar, main, projecao, uso_por_tipo
 from circulo.state import Store
+from circulo.trabalho import GASTO_DIA
 
 CSV = """Date,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
 "2026-10-20T14:03:11.000Z","Included","claude-4.5-sonnet","No","0","1200","30000","800","32000","$1.25"
@@ -65,3 +66,23 @@ def test_comando_lanca_importa_e_mostra_a_projecao(tmp_path, capsys):
     assert "US$ 4.50" in out and "2 linhas importadas" in out and "esgota" in out
     s = Store(tmp_path / "circulo.db")
     assert s.one("SELECT COUNT(*) n FROM gasto_cursor")["n"] == 3
+
+
+def test_por_tipo_modelo_mais_usado_custo_medio_e_sugestao_por_regra_com_os_dados_de_exemplo():
+    exemplo = [{"tipo": t, "modelo": m, "centavos": c} for _ in range(3) for _a, t, m, c in GASTO_DIA]
+    so_exemplo = {x["nome"]: x for x in uso_por_tipo(exemplo)}
+    assert so_exemplo["bugfix"]["modelo"] == "claude-sonnet" and "menor" in so_exemplo["bugfix"]["sugestao"]
+    assert so_exemplo["refactor"]["modelo"] == "gpt-5-mini" and so_exemplo["refactor"]["sugestao"] is None
+    assert so_exemplo["estudo"]["modelo"] == "gpt-5" and so_exemplo["estudo"]["sugestao"] is None    # já no grande
+    assert so_exemplo["feature"]["sugestao"] is None                                                   # sem regra
+    linhas = exemplo + [{"tipo": "bugfix", "modelo": "claude-opus", "centavos": 900},                 # 1 opus x 3 sonnet
+                        {"tipo": None, "modelo": "gpt-5", "centavos": 50}]
+    linhas += [{"tipo": "estudo", "modelo": "gpt-5-mini", "centavos": 30}] * 4                         # 4 mini x 3 gpt-5
+    r = uso_por_tipo(linhas)
+    assert [x["nome"] for x in r] == ["bugfix", "estudo", "feature", "refactor", "sem etiqueta"]       # pelo total
+    por = {x["nome"]: x for x in r}
+    assert (por["bugfix"]["modelo"], por["bugfix"]["lancamentos"], por["bugfix"]["centavos"], por["bugfix"]["media"]) == \
+        ("claude-sonnet", 4, 1830, 458)
+    assert por["estudo"]["modelo"] == "gpt-5-mini" and "grande" in por["estudo"]["sugestao"]
+    assert por["sem etiqueta"]["sugestao"] is None and por["sem etiqueta"]["media"] == 50
+    assert uso_por_tipo([]) == []
