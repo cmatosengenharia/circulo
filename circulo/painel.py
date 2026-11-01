@@ -394,9 +394,9 @@ def make_handler(db_path: str):
             return Store(db_path)
 
         def _json(self, obj, code=200):
-            body = json.dumps(obj, ensure_ascii=False, default=str).encode()
+            body = (obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, default=str)).encode()
             self.send_response(code)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Type", "text/markdown; charset=utf-8" if isinstance(obj, str) else "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -569,7 +569,7 @@ def make_handler(db_path: str):
             elif u.path == "/api/links":
                 from .links import Links
                 self._json({"links": Links(self._store()).buscar(q.get("q", [""])[0][:300], sentido=q.get("sentido") != ["0"])})
-            elif u.path.startswith("/api/trabalho"):
+            elif u.path.startswith(("/api/trabalho", "/api/digest")):
                 from .trabalho import api_get
                 r = api_get(self._store(), Path(db_path).parent, u.path, q)
                 self._json(r if r is not None else {"erro": "rota desconhecida"}, 200 if r is not None else 404)
