@@ -74,6 +74,8 @@ def registrar(store: Store, item: dict, agora: float | None = None) -> Veredito:
             "ON CONFLICT(item) DO UPDATE SET completo=excluded.completo, faltando=excluded.faltando, "
             "pergunta=excluded.pergunta",
             (item["id"], int(v.completo), ",".join(v.faltando), v.pergunta, time.time() if agora is None else agora))
+    from .criterio_aceite import congelar
+    congelar(store, item)                 # o critério de aceite congela ao entrar no item: reescritas não o mudam
     return v
 
 
