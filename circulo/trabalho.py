@@ -240,6 +240,8 @@ def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | None:
         return (q.get(k) or [""])[0]
     if caminho == "/api/trabalho":
         return visao(store, data_dir)
+    if caminho == "/api/trabalho/daily":
+        return daily.estado(store, data_dir)
     if caminho == "/api/trabalho/perguntar":
         notas = assuntos.perguntar(store, um("q")[:300])
         return {"notas": notas, "texto": assuntos.responder(notas)}
@@ -263,6 +265,9 @@ def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | None:
 def api_post(store, data_dir: Path, caminho: str, data: dict, dl=None) -> tuple[dict, int] | None:
     """As rotas POST da tela: (resposta, status); None = não é daqui."""
     try:
+        if caminho == "/api/trabalho/daily":
+            daily.emitir(store, data_dir)
+            return {"ok": True, **daily.estado(store, data_dir)}, 200
         if caminho == "/api/trabalho/anotar":
             try:
                 return {"ok": True, "nota": anotar(store, str(data.get("texto", ""))[:MAX_FRASE], dl)}, 200

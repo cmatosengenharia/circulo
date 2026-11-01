@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from circulo import assuntos, gasto_cursor, tema, trabalho
+from circulo import assuntos, daily, gasto_cursor, tema, trabalho
 from circulo.budget import TZ
 from circulo.links import Links
 from circulo.painel import serve
@@ -175,3 +175,36 @@ def test_ficha_do_assunto_tem_pagina_propria_e_o_nome_na_tabela_e_link(circle):
         assert "erro" in json.loads(get("/api/trabalho/ficha?nome=n%C3%A3o%20existe"))
     finally:
         srv.shutdown()
+
+
+def test_endpoint_da_daily_mostra_a_hora_de_emissao_gera_agora_e_copia_texto_puro(circle):
+    """GET /api/trabalho/daily: a pauta em texto puro (até 10 linhas, para o botão 'Copiar') e a hora em que foi emitida;
+    antes de emitir hoje, emitida_em é None e a tela oferece 'Gerar agora', que é POST /api/trabalho/daily (daily.pauta)."""
+    for i in range(15):
+        nota = circle.data_dir / daily.PASTA / f"assunto{i:02d}" / "n.md"
+        nota.parent.mkdir(parents=True, exist_ok=True)
+        nota.write_text("- [ ] revisar <b>o PR</b>\n", encoding="utf-8")
+    srv = serve(circle.store.path, port=0, background=True)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+
+    def get(caminho):
+        with urllib.request.urlopen(base + caminho, timeout=5) as r:
+            return r.read().decode()
+    try:
+        html = get("/trabalho")
+        assert "Copiar" in html and "Gerar agora" in html and "/api/trabalho/daily" in html and "clipboard" in html
+        antes = json.loads(get("/api/trabalho/daily"))
+        assert antes["emitida_em"] is None and antes["linhas"][0].startswith("Daily ")
+        req = urllib.request.Request(base + "/api/trabalho/daily", data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json", "X-Circulo": "1"})
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=5) as r:
+            gerada = json.loads(r.read())
+        depois = json.loads(get("/api/trabalho/daily"))
+    finally:
+        srv.shutdown()
+    assert gerada["ok"] and depois["emitida_em"] == gerada["emitida_em"]
+    assert gerada["emitida_em"] in {time.strftime("%H:%M", time.localtime(t)) for t in (t0, time.time())}
+    texto = depois["texto"].split("\n")
+    assert texto == depois["linhas"] and len(texto) == daily.MAX_LINHAS and "<b>o PR</b>" in depois["texto"]
+    assert circle.store.get(daily.CHAVE) == time.strftime("%Y-%m-%d")       # às 8 h o SRE não emite de novo
