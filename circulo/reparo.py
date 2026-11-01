@@ -55,7 +55,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import disjuntor, pedido_claro
+from . import disjuntor, falhas, pedido_claro
 from .developer import (LIMITE_PASSOS, REPARO, GitHubComConvencoes, convencoes, passos_usados, registrar_convencoes,
                         registrar_passos_usados)
 from .fatiador import CORTES
@@ -265,6 +265,9 @@ class DeveloperComReparo(SelfDeveloper):
         self._reabrir()
         self._reabrir_base()
         self._reabrir_teto()
+        pausa = self._pausa_configuracao()
+        if pausa:
+            return DevResult(item_id, falhas.PAUSA, pausa)
         bloqueado = self.s.one("SELECT status, evidencia FROM roadmap WHERE id=? AND status IN (?,?,?)",
                                (item_id, BLOQUEADO, BLOQUEADO_BASE, ESCALADA))
         if bloqueado:
@@ -284,6 +287,8 @@ class DeveloperComReparo(SelfDeveloper):
         r = super().run_once(item_id=item_id, autorizado=autorizado)
         if item:
             disjuntor.passo(self.s, disjuntor.evento_do_developer(r.status, r.detalhe))
+        if r.status == "agente_falhou" and (pausa := self._pausa_configuracao()):
+            return DevResult(r.item_id, falhas.PAUSA, pausa)
         if self._teto_bloqueado:                 # o SelfDeveloper devolveu o item à fila depois do corte: bloqueia de novo
             bloquear_arvore(self.s, *self._teto_bloqueado)
             return DevResult(r.item_id, BLOQUEADO, self._teto_bloqueado[1])
@@ -340,6 +345,29 @@ class DeveloperComReparo(SelfDeveloper):
                      "UPDATE roadmap SET status='pendente', desativado=0, evidencia=?, updated_at=? WHERE id IN (SELECT id FROM arvore) "
                      "AND status=?", (r["id"], f"disjuntor do teto fechado: o teto de hoje ({teto}) comporta os {gastos} tokens gastos",
                                       time.time(), BLOQUEADO))
+
+    def _pausa_configuracao(self) -> str:
+        """O disjuntor da configuração, no estado do disjuntor do teto: aberto enquanto a impressão digital da
+        configuração for a mesma da abertura; mudou (`circulo configurar`), fecha."""
+        todos = self.s.get(TETO_RAIZ) or {}
+        d = todos.get(falhas.CONFIGURACAO)
+        if d is None:
+            return ""
+        if d["digital"] == falhas.digital_configuracao():
+            return d["texto"]
+        todos.pop(falhas.CONFIGURACAO)
+        self.s.set(TETO_RAIZ, todos)
+        return ""
+
+    def _abrir_configuracao(self, log: str) -> None:
+        nome = falhas.assinatura_nao_repetivel(log)
+        texto = (f"depende de você: o agente caiu por configuração ({nome}); nenhuma nova tentativa nem PR até a "
+                 "configuração mudar (`circulo configurar`)")
+        todos = self.s.get(TETO_RAIZ) or {}
+        self.s.set(TETO_RAIZ, {**todos, falhas.CONFIGURACAO: {"digital": falhas.digital_configuracao(), "assinatura": nome,
+                                                              "texto": texto, "em": time.time()}})
+        if callable(getattr(self.ctx, "reply", None)):
+            self.ctx.reply(f"Developer em pausa: {texto}.", "saude")
 
     def _reabrir_base(self) -> None:
         """O item de base vermelha volta à fila quando a main muda: o pré-voo roda de novo (verde segue; a mesma falha
@@ -541,6 +569,9 @@ class DeveloperComReparo(SelfDeveloper):
         return self._base_quebrada
 
     def _agente(self, task: str, wt: Path, titulo: str, papel: str = "developer", item_id: int | None = None) -> dict:
+        pausa = self._pausa_configuracao()
+        if pausa:
+            return {"ok": False, "tokens": 0, "log": pausa}
         if self._rodada == 0 and papel == "developer" and not self._consertando and not PREFIXO_TITULO.match(titulo):
             quebrada = self._preflight(wt, titulo)
             if quebrada:
@@ -553,6 +584,8 @@ class DeveloperComReparo(SelfDeveloper):
         modos = self._travar(wt)
         try:
             out = super()._agente(task, wt, titulo, papel, item_id=item_id)
+            if not out.get("ok") and falhas.classificar_saida_agente(str(out.get("log", ""))) == falhas.CONFIGURACAO:
+                self._abrir_configuracao(str(out["log"]))
             if (usados := passos_usados(out)) is not None:
                 registrar_passos_usados(self.s, titulo, usados, getattr(self.agent, "max_turns", LIMITE_PASSOS))
             return out
