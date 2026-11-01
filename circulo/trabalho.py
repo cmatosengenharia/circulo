@@ -254,6 +254,14 @@ def api_post(store, data_dir: Path, caminho: str, data: dict, dl=None) -> tuple[
                 return {"erro": "falta o nome do assunto"}, 400
             aid = assuntos.criar(store, nome, str(data.get("descricao", ""))[:300])
             return {"ok": True, "id": aid}, 200
+        if caminho == "/api/trabalho/gasto":
+            texto = str(data.get("texto", ""))
+            if not texto.strip():
+                return {"erro": "falta o CSV exportado do Cursor"}, 400
+            novas = gasto_cursor.importar_csv(store, texto, str(data.get("assunto") or "")[:80] or None,
+                                              str(data.get("tipo") or "")[:40] or None)
+            proj = gasto_cursor.projecao(store)
+            return {"ok": True, "novas": novas, "orcamento": {**proj, "texto": gasto_cursor.resumo(proj)}}, 200
         if caminho == "/api/trabalho/exemplo":
             acao = data.get("acao")
             if acao == "semear":
