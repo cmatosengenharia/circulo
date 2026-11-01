@@ -11,6 +11,7 @@ Seleção do item para o Developer (`fora_da_fila`, chamado pelo `fatiador.proxi
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -22,6 +23,10 @@ PONTO = "developer:disjuntor"
 DISJUNTOR = "roadmap_disjuntor"          # {item: {"sig", "n", "node", "em", "vezes", "base", "desde"?}}; "desde" = meio-aberto
 VERMELHA = "roadmap_licao_vermelha"      # {item: quando o node id da lição fechada falhou no main}
 FECHADAS = ("validada", "evidenciada")
+META_MENSURAVEL = 0.9                    # pergunta #186: ≥90% dos PRs mergeados em 7 dias com critério mensurável
+SERIE = "roadmap_criterios_serie"        # [{"dia", "proporcao", "prs_7d"}], uma amostra por dia
+JUSTIFICADOS = "roadmap_orfaos_justificados"   # {pr: motivo}: PR mergeado sem critério que não precisa de um
+_ALVO_NUMERICO =re.compile(r"\d+(?:[.,]\d+)?\s*(?:%|[^\W\d_]+)")   # número e unidade: "60%", "≤60 min", "0 falhas"
 
 
 class SemPerguntaOrigem(ValueError):
@@ -187,6 +192,55 @@ def cobertura_sem_uso(s, agora: float | None = None) -> dict:
     um = n.count(1)
     return {"sem_uso": len(n), "com_1_item": um, "duplicadas": sum(1 for k in n if k > 1),
             "cobertura": um / len(n) if n else 1.0}
+
+
+def criterios_dos_mergeados(prs: list[dict], itens: dict[int, str], agora: float,
+                            justificados: dict[int, str] | None = None) -> dict:
+    """Pergunta #186, pura: cruza os PRs mergeados nos últimos 7 dias (`{"pr", "item", "mergeado_em"}`) com o detalhe
+    dos itens. Devolve os PRs sem critério de sucesso (inclui os sem item; os de `justificados` saem da lista com o
+    motivo), os critérios sem alvo numérico (número e unidade) e a proporção mensurável. Mede só a forma do critério;
+    se a meta foi atingida é a `prova` (item #113)."""
+    from .prova import JANELA_S, criterio
+    justificados = justificados or {}
+    sem_criterio, sem_metrica, orfaos_ok = [], [], []
+    janela = [p for p in prs if agora - JANELA_S <= p["mergeado_em"] <= agora]
+    for p in janela:
+        c = criterio(itens.get(p["item"], "")) if p["item"] is not None else None
+        if not c and p["pr"] in justificados:
+            orfaos_ok.append({"pr": p["pr"], "motivo": justificados[p["pr"]]})
+        elif not c:
+            sem_criterio.append(p["pr"])
+        elif not _ALVO_NUMERICO.search(c):
+            sem_metrica.append({"pr": p["pr"], "item": p["item"], "criterio": c})
+    mensuraveis = len(janela) - len(sem_criterio) - len(sem_metrica) - len(orfaos_ok)
+    proporcao = mensuraveis / len(janela) if janela else 1.0
+    return {"prs_7d": len(janela), "mensuraveis": mensuraveis, "proporcao": proporcao, "meta": META_MENSURAVEL,
+            "atingiu": proporcao >= META_MENSURAVEL and not sem_criterio,
+            "sem_criterio": sem_criterio, "sem_metrica": sem_metrica, "justificados": orfaos_ok}
+
+
+def ler_criterios(s, agora: float | None = None) -> dict:
+    """`criterios_dos_mergeados` sobre o DB: PR → item pela branch `circulo/fix-<item>-…`; justificativas dos órfãos
+    em kv JUSTIFICADOS ({pr: motivo}); mais a série diária de `amostrar_criterios`."""
+    from .rastro import PREFIXO_BRANCH
+    agora = time.time() if agora is None else agora
+    prs = [{"pr": r["number"], "mergeado_em": r["em"],
+            "item": int(m.group(1)) if (m := re.match(re.escape(PREFIXO_BRANCH) + r"(\d+)-", r["branch"] or "")) else None}
+           for r in s.q("SELECT p.number, p.branch, MIN(m.created_at) em FROM prs p "
+                        "JOIN merges m ON m.pr=p.number AND m.merged=1 GROUP BY p.number")]
+    itens = {r["id"]: r["detalhe"] for r in s.q("SELECT id, detalhe FROM roadmap")}
+    justificados = {int(k): v for k, v in (s.get(JUSTIFICADOS) or {}).items()}
+    return {**criterios_dos_mergeados(prs, itens, agora, justificados), "serie": s.get(SERIE) or []}
+
+
+def amostrar_criterios(s, agora: float | None = None) -> dict:
+    """Grava na série (uma amostra por dia, as últimas 30) a proporção mensurável lida agora; chamada no giro."""
+    agora = time.time() if agora is None else agora
+    r = ler_criterios(s, agora)
+    dia = time.strftime("%Y-%m-%d", time.localtime(agora))
+    serie = [a for a in r["serie"] if a["dia"] != dia] + [{"dia": dia, "proporcao": r["proporcao"], "prs_7d": r["prs_7d"]}]
+    s.set(SERIE, serie[-30:])
+    return {**r, "serie": serie[-30:]}
 
 
 def fora_da_fila(ctx, item: dict, repo=None, agora: float | None = None) -> bool:

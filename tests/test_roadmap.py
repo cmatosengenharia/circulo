@@ -199,3 +199,56 @@ def test_cobertura_conta_cada_entrega_sem_uso_com_exatamente_um_item_e_aponta_a_
 
     gravar_item(s, pm, titulo(41, "changelog_aberto"), "repetido", "repetido")
     assert roadmap.cobertura_sem_uso(s, agora) == {"sem_uso": 2, "com_1_item": 1, "duplicadas": 1, "cobertura": 0.5}
+
+
+def test_mergeados_7d_sem_criterio_e_criterio_sem_numero_e_unidade_sao_listados_com_a_proporcao_mensuravel():
+    """Pergunta #186: dos PRs mergeados em 7 dias, quais não têm critério de sucesso e quais têm critério sem métrica
+    com alvo numérico (número + unidade). PR fora da janela não conta; PR sem item é órfão."""
+    dia, agora = 86400, 100 * 86400
+    itens = {1: "Faz X.\nSucesso: lead time mediano cai de 120 min para ≤60 min",
+             2: "Faz Y.\nSucesso: painel mais claro para o usuário",
+             3: "Faz Z, sem linha de sucesso",
+             4: "Sucesso: proporção de PRs com critério de 60% para ≥90%",
+             5: "Sucesso: 0 falhas em 7 dias"}
+    prs = [{"pr": 10, "item": 1, "mergeado_em": agora - dia},
+           {"pr": 11, "item": 2, "mergeado_em": agora - 2 * dia},
+           {"pr": 12, "item": 3, "mergeado_em": agora - 3 * dia},
+           {"pr": 13, "item": None, "mergeado_em": agora - 4 * dia},
+           {"pr": 14, "item": 4, "mergeado_em": agora - 5 * dia},
+           {"pr": 15, "item": 5, "mergeado_em": agora - 8 * dia}]
+    r = roadmap.criterios_dos_mergeados(prs, itens, agora)
+    assert r["prs_7d"] == 5
+    assert r["sem_criterio"] == [12, 13]
+    assert r["sem_metrica"] == [{"pr": 11, "item": 2, "criterio": "painel mais claro para o usuário"}]
+    assert r["mensuraveis"] == 2 and r["proporcao"] == 0.4 and not r["atingiu"]
+    assert roadmap.criterios_dos_mergeados([], itens, agora)["proporcao"] == 1.0
+
+    j = roadmap.criterios_dos_mergeados(prs, itens, agora, justificados={13: "PR humano de versão, sem item"})
+    assert j["sem_criterio"] == [12] and j["justificados"] == [{"pr": 13, "motivo": "PR humano de versão, sem item"}]
+
+
+def test_proporcao_mensuravel_e_lida_do_db_amostrada_no_giro_e_exposta_na_tela(circle):
+    """Pergunta #186: a proporção sai dos PRs mergeados (branch circulo/fix-<item>-…) no DB, cada amostra fica na série
+    (uma por dia) para medir a meta de ≥90% em duas semanas, e GET /api/trabalho/criterios a mostra com os órfãos."""
+    from circulo import trabalho
+    s, agora = circle.store, time.time()
+    mensuravel = _item(s, "a", 1)
+    vago = _item(s, "b", 2)
+    s.x("UPDATE roadmap SET detalhe='Sucesso: p99 abaixo de 2 s' WHERE id=?", (mensuravel,))
+    s.x("UPDATE roadmap SET detalhe='Sucesso: tela melhor' WHERE id=?", (vago,))
+    for pr, branch, em in ((1, f"circulo/fix-{mensuravel}-1", agora - 86400), (2, f"circulo/fix-{vago}-1", agora - 86400),
+                           (3, "humano/versao", agora - 2 * 86400), (4, f"circulo/fix-{mensuravel}-2", agora - 9 * 86400)):
+        s.x("INSERT INTO prs(number,titulo,branch,status,created_at,updated_at) VALUES(?,'t',?,'mergeado',?,?)",
+            (pr, branch, em, em))
+        s.x("INSERT INTO merges(pr,sha,merged,reason,details,created_at) VALUES(?,'x',1,'ok','',?)", (pr, em))
+
+    r = roadmap.amostrar_criterios(s, agora)
+    assert (r["prs_7d"], r["mensuraveis"], r["sem_criterio"]) == (3, 1, [3])
+    assert r["sem_metrica"] == [{"pr": 2, "item": vago, "criterio": "tela melhor"}]
+    roadmap.amostrar_criterios(s, agora + 60)                               # mesmo dia: a série não duplica
+    roadmap.amostrar_criterios(s, agora + 86400)
+    assert [a["proporcao"] for a in roadmap.ler_criterios(s, agora)["serie"]] == [1 / 3, 1 / 3]
+
+    s.set(roadmap.JUSTIFICADOS, {"3": "PR humano de versão"})
+    tela = trabalho.api_get(s, circle.data_dir, "/api/trabalho/criterios", {})
+    assert tela["sem_criterio"] == [] and tela["justificados"][0]["pr"] == 3 and tela["meta"] == 0.9
