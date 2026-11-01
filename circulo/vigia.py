@@ -489,7 +489,7 @@ class Vigia:
             if repo_dir:                                               # … e pede a instalação de até 3 skills do catálogo
                 skills.pedir_instalacao(self.s, repo_dir, now)
             with contextlib.suppress(Exception):
-                garimpo.garimpar(self.s, now, reply=self.ctx.reply)
+                garimpo.garimpar(self.s, now, reply=self.ctx.reply, dl=self.ctx.dl)
         from . import experimentos, praticas
         experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
         praticas.retrospectivo(self.s, now, os.environ.get("CIRCULO_REPO_DIR"), self.ctx.reply)   # 1×/dia: até 3 práticas
