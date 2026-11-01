@@ -45,6 +45,8 @@ def main(argv: list[str] | None = None) -> None:
     ini.add_argument("--pedido", default=None, help="o pedido inicial do loop para esse repositório")
     ini.add_argument("--nome", default=None)
     ini.add_argument("--sem-ci", action="store_true", help="não escreve o workflow de CI no repositório")
+    ini.add_argument("--cliente", action="store_true",
+                     help="registra como repositório cliente (kit 'repo'): pedido na caixa com `projeto: <id>` vira branch circulo/<pedido> nele")
     ini.add_argument("--json", action="store_true")
     dg = sub.add_parser("diagnostico", help="mostra o que está ligado, o que está parado e por quê")
     dg.add_argument("--testar", action="store_true", help="chama as APIs de verdade (gasta um pouquinho)")
@@ -88,6 +90,13 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "configurar":
         path = cfg.configurar()
         print(f"Arquivo criado: {path}\nAbra, preencha as chaves e salve. Depois: circulo diagnostico && circulo instalar")
+        return
+    if args.cmd == "init" and args.cliente:
+        from . import kit, repo_cliente
+        r = repo_cliente.registrar(Store(os.path.join(args.data, "circulo.db")), args.pasta, nome=args.nome)
+        print(kit.resumo_json(r) if args.json else
+              f"Repositório cliente #{r['id']} ({r['nome']}): {r['remoto']}, base {r['base']}\n"
+              f"  Pedido: um arquivo em {os.path.join(args.data, 'caixa')}/ com o cabeçalho `projeto: {r['id']}`")
         return
     if args.cmd == "init":
         from . import kit
