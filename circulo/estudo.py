@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import time
 
+from . import alavancas
 from .agents import Ctx
 from .decision import Question, SN
 from .saida_json import Saida, ler
@@ -159,16 +160,17 @@ class Estudo:
             prompt += "\n\n" + lic.contexto()
         cfg = self.ctx.policy["harness"]["roles"].get("researcher", {})
         escolha = self.ctx.dl.pick_model_detalhe("researcher", {"tarefa": prompt, "tipo": "estudo"})
+        modelo, teto = alavancas.aplicar(self.s, "estudo", escolha["modelo"], MODOS[modo]["max_tokens"])
         t0 = time.time()
         try:
-            out = llm.generate(system=SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=MODOS[modo]["max_tokens"],
+            out = llm.generate(system=SYSTEM, prompt=prompt, model=modelo, max_tokens=teto,
                                web_search=min(int(cfg.get("web_search", 4)), MODOS[modo]["buscas"]))
         except Exception as exc:  # noqa: BLE001
             monitorar(self.ctx, "estudo:pedido", False, sujeito=item["titulo"], motivo=f"{type(exc).__name__}: {exc}")
             raise
         self.ctx.budget.charge(out.tokens, "llm")
         if not out.text.strip() and MODOS[modo]["buscas"]:        # a busca comeu a resposta: uma vez sem busca, mesmo teto
-            out = llm.generate(system=SYSTEM, prompt=prompt, model=escolha["modelo"], max_tokens=MODOS[modo]["max_tokens"], web_search=0)
+            out = llm.generate(system=SYSTEM, prompt=prompt, model=modelo, max_tokens=teto, web_search=0)
             self.ctx.budget.charge(out.tokens, "llm")
         saida = _parse(out.text)
         r = saida.dados
@@ -176,7 +178,7 @@ class Estudo:
             r["modo"] = modo
         try:
             from .registro import registrar
-            registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="estudo", modelo=escolha["modelo"],
+            registrar(self.s, tick=self.s.tick, project_id=self.ctx.dl.project_id, papel="estudo", modelo=modelo,
                       escolha=escolha, uso=out, duracao_ms=int((time.time() - t0) * 1000), ok=r is not None,
                       erro=None if r else f"resposta sem JSON válido: {saida}", entrada=f"[{modo}] {item['titulo']}", saida=out.text)
         except Exception:  # noqa: BLE001
