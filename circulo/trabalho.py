@@ -247,7 +247,15 @@ def api_post(store, data_dir: Path, caminho: str, data: dict, dl=None) -> tuple[
     """As rotas POST da tela: (resposta, status); None = não é daqui."""
     try:
         if caminho == "/api/trabalho/anotar":
-            return {"ok": True, "nota": anotar(store, str(data.get("texto", ""))[:MAX_FRASE], dl)}, 200
+            try:
+                return {"ok": True, "nota": anotar(store, str(data.get("texto", ""))[:MAX_FRASE], dl)}, 200
+            except assuntos.SemAssunto as e:
+                return {"erro": str(e), "decidir": {"trecho": e.trecho, "opcoes": e.opcoes}}, 200
+        if caminho == "/api/trabalho/arquivar":
+            aid = data.get("assunto")
+            if not isinstance(aid, int) or isinstance(aid, bool):
+                return {"erro": "falta o assunto escolhido"}, 400
+            return {"ok": True, "nota": assuntos.arquivar(store, str(data.get("texto", ""))[:MAX_FRASE], aid)}, 200
         if caminho == "/api/trabalho/assunto":
             nome = " ".join(str(data.get("nome", "")).split())[:80]
             if len(nome) < 2:
