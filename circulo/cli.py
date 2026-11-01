@@ -71,6 +71,12 @@ def main(argv: list[str] | None = None) -> None:
     asu.add_argument("texto", nargs="+")
     asu.add_argument("--descricao", default="")
     asu.add_argument("--link", action="append", default=[])
+    pn = sub.add_parser("produto", help="produto novo de um modelo, com o pedido na fila dele (--github: token CIRCULO_TOKEN_PRODUTOS)")
+    pn.add_argument("pedido", nargs="+")
+    pn.add_argument("--nome")
+    pn.add_argument("--tipo", help="sem isso o Jev escolhe")
+    pn.add_argument("--pasta", default=".")
+    pn.add_argument("--github", action="store_true")
     args = ap.parse_args(argv)
     carregar_env()                        # configuração única: o loop lê as chaves sozinho
     from .graft import PASTAS_PADRAO      # serviço com PATH antigo: ferramentas instaladas depois (graft, claude) ficam visíveis
@@ -255,6 +261,17 @@ def main(argv: list[str] | None = None) -> None:
                 print(json.dumps(assuntos.ver(c.store, texto), ensure_ascii=False, indent=2))
         except ValueError as exc:
             raise SystemExit(str(exc)) from None
+    elif args.cmd == "produto":
+        from . import produto_novo
+        token = os.environ.get("CIRCULO_TOKEN_PRODUTOS") if args.github else None
+        if args.github and not token:
+            raise SystemExit("--github precisa de CIRCULO_TOKEN_PRODUTOS")
+        try:
+            r = produto_novo.criar(c.store, " ".join(args.pedido), args.pasta, c.data_dir, nome=args.nome,
+                                   tipo=args.tipo, dl=c.ctx.dl, token=token)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(r, ensure_ascii=False, indent=1))
     elif args.cmd == "add":
         print(f"enfileirado #{c.submit(' '.join(args.texto))}")
     elif args.cmd == "status":

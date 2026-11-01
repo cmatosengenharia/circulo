@@ -1,0 +1,6 @@
+[project]
+name = "{{nome}}"
+version = "0.1.0"
+
+[tool.circulo]
+testes = "python -m unittest discover -s tests"
