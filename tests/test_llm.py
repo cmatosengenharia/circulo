@@ -16,6 +16,7 @@ from circulo.self_dev import SelfDeveloper
 from circulo.state import Store
 
 from test_self_dev import TEST_CMD, FakeGH, FixAgent, repo  # noqa: F401 — fixture do repositório
+from test_planejador import EXPERIMENTO
 
 
 class LLMQueFalha:
@@ -131,7 +132,8 @@ class PlanGen:
             self.modelos.append(model)
         return LLMResult(json.dumps({"titulo": "Pergunta do worth_spending com estado mais rico",
                                      "detalhe": "incluir histórico de aceitação no estado",
-                                     "sucesso": "menos de 50% das decisões abaixo de jev_incerto"}), 400, model)
+                                     "sucesso": "menos de 50% das decisões abaixo de jev_incerto",
+                                     "experimento": EXPERIMENTO}), 400, model)
 
 
 def _planejar(circle, repo):  # noqa: F811

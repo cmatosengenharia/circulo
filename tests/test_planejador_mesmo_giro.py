@@ -10,6 +10,7 @@ import pytest
 from circulo import indagador
 from circulo import planejador as pl
 from circulo.planejador import Planejador
+from test_planejador import EXPERIMENTO
 
 
 class Dev:
@@ -34,7 +35,7 @@ class LLMSeq:
         self.chamadas += 1
         if self.falhas:
             raise self.falhas.pop(0)
-        return json.dumps({"titulo": self.titulo, "detalhe": "mudar x", "sucesso": "y"}), 400
+        return json.dumps({"titulo": self.titulo, "detalhe": "mudar x", "sucesso": "y", "experimento": EXPERIMENTO}), 400
 
 
 @pytest.fixture

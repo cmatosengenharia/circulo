@@ -256,6 +256,28 @@ CREATE TABLE IF NOT EXISTS roadmap (
   updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS experimentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL UNIQUE,
+  hipotese TEXT NOT NULL,
+  metrica TEXT NOT NULL,
+  guarda INTEGER NOT NULL,
+  baseline REAL NOT NULL,
+  alvo REAL NOT NULL,
+  margem_nao_inferioridade REAL NOT NULL,
+  janela_s REAL NOT NULL,
+  n_min INTEGER NOT NULL,
+  inicio REAL,
+  fim REAL,
+  estendida INTEGER NOT NULL DEFAULT 0,
+  medido REAL,
+  n INTEGER,
+  veredito TEXT,                 -- melhorou | neutro | piorou | inconclusivo
+  decidido_em REAL,
+  reversao_item INTEGER,
+  created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS memory (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,             -- achado | licao | feedback | entrega
