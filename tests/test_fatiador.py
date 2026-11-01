@@ -179,3 +179,79 @@ def test_sub_item_pre_dividido_que_estoura_o_teto_e_redividido_sozinho(circle, r
     circle.store.x("UPDATE roadmap SET status='feito' WHERE pai=? AND status!='dividido'", (item,))
     fatiador.proximo(circle.ctx, dev, circle.planejador)
     assert circle.store.one("SELECT status FROM roadmap WHERE id=?", (item,))["status"] == "feito"
+
+
+# ------------------------------------------------------------ limite de divisão calibrado (pergunta #182)
+
+PEQUENO = ("Ligar o resumo de gastos ao painel",
+           "Em circulo/gastos.py, criar resumo_do_dia(); em circulo/painel_gastos.py, mostrar o resumo.")
+
+
+def historico(circle, linhas_e_tokens):
+    """Itens já executados: a estimativa por regra gravada e os tokens reais do Developer em cada um."""
+    s, est = circle.store, {}
+    for i, (linhas, tokens) in enumerate(linhas_e_tokens):
+        titulo = f"Item antigo {i}"
+        iid = s.x("INSERT INTO roadmap(titulo,detalhe,origem,status,evidencia,ordem,created_at,updated_at) "
+                  "VALUES(?,'d','loop','feito','x',1,0,0)", (titulo,))
+        s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) "
+            "VALUES(1,'developer','claude','fixo',?,1,?,0)", (tokens, titulo))
+        est[str(iid)] = {"modulos": 1, "simbolos": 1, "linhas": linhas}
+    s.set(fatiador.ESTIMATIVAS, {**(s.get(fatiador.ESTIMATIVAS) or {}), **est})
+
+
+def test_item_estimado_pequeno_que_gastou_mais_de_90k_baixa_o_limite_e_e_dividido_antes_da_llm(circle, repo):  # noqa: F811
+    """Pergunta #182: o limite de divisão sai do percentil dos itens que ficaram abaixo do teto, não de uma constante;
+    um item estimado pequeno que gastou 94705 tokens baixa o limite e o item igual a ele é dividido por regra."""
+    item, dev, agent, llm = preparar(circle, repo)
+    circle.store.x("UPDATE roadmap SET titulo=?, detalhe=? WHERE id=?", (*PEQUENO, item))
+    est = fatiador.estimar_tamanho(*PEQUENO)
+    assert fatiador.limite_de_divisao(circle.store) == fatiador.LIMITE_LINHAS
+    assert not fatiador.grande_demais(est, fatiador.LIMITE_LINHAS)                # pelo palpite fixo, é pequeno
+    historico(circle, [(40, 20000), (55, 30000), (55, 25000), (60, 40000), (est["linhas"], 94705)])
+    limite = fatiador.limite_de_divisao(circle.store)
+    assert limite < fatiador.LIMITE_LINHAS and limite < est["linhas"]
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    partes = subs(circle, item)
+    assert len(partes) == 2 and alvo == partes[0]["id"] and llm.prompts == []      # dividido antes de qualquer LLM
+
+
+def test_tamanho_que_ja_estourou_fica_acima_do_limite_mesmo_empatado_com_o_p90(circle, repo):  # noqa: F811
+    """O P90 dos que ficaram abaixo é 60 e o que estourou também tinha 60 linhas: o limite fica abaixo dele."""
+    item, dev, agent, llm = preparar(circle, repo)
+    texto = ("Ajustar o resumo", "Em circulo/gastos.py e circulo/painel_gastos.py, cerca de 60 linhas.")
+    circle.store.x("UPDATE roadmap SET titulo=?, detalhe=? WHERE id=?", (*texto, item))
+    historico(circle, [(40, 20000), (55, 30000), (55, 25000), (60, 40000), (60, 94705)])
+    assert fatiador.limite_de_divisao(circle.store) == 59
+    alvo = fatiador.proximo(circle.ctx, dev, circle.planejador)
+    assert len(subs(circle, item)) == 2 and alvo == subs(circle, item)[0]["id"] and llm.prompts == []
+
+
+def test_tres_modulos_sem_simbolos_seguem_divididos_pelo_palpite_inicial():
+    est = fatiador.estimar_tamanho("Mexer em três", "em circulo/a.py, circulo/b.py e circulo/c.py")
+    assert est["linhas"] == 120 < fatiador.LIMITE_LINHAS and fatiador.grande_demais(est, fatiador.LIMITE_LINHAS)
+
+
+def test_criterio_conta_sub_itens_parados_no_teto_em_7_dias_e_tokens_por_pr(circle, repo):  # noqa: F811
+    item, dev, agent, llm = preparar_60(circle, repo)
+    fatiador.proximo(circle.ctx, dev, circle.planejador)
+    a = subs(circle, item)[0]
+    s, agora = circle.store, time.time()
+    s.x("INSERT INTO prs(number,project_id,titulo,branch,status,item_id,consertos,created_at,updated_at) "
+        "VALUES(77,2,'A','circulo/fix-a','mergeado',?,0,?,?)", (a["id"], agora - 60, agora - 60))
+    s.x("INSERT INTO llm_calls(tick,papel,modelo,decidido_por,tokens,ok,entrada,created_at) "
+        "VALUES(1,'developer','claude','fixo',50000,1,'x',?)", (agora - 60,))
+    assert fatiador.criterio(s, agora) == {"parados_por_teto_7d": 0, "tokens_por_pr_24h": 50000, "atingido": True}
+    circle.licoes.verificar("developer:teto", False, sujeito=f".circulo-wt-{a['id']}", licao=False,
+                            motivo="teto de tokens do item: 94705 gastos + ~5919 da próxima chamada > 100000")
+    c = fatiador.criterio(s, time.time())
+    assert c["parados_por_teto_7d"] == 1 and not c["atingido"]
+
+
+def test_item_executado_inteiro_tambem_grava_a_estimativa(circle, repo):  # noqa: F811
+    """Cada item executado guarda a estimativa por regra (arquivos, linhas, funções) para medir contra os tokens."""
+    item, dev, agent, llm = preparar(circle, repo)
+    circle.store.x("UPDATE roadmap SET detalhe=? WHERE id=?", ("em circulo/loop.py, mudar giro()", item))
+    assert fatiador.proximo(circle.ctx, dev, circle.planejador) == item
+    m = {x["id"]: x for x in fatiador.medicoes(circle.store)}
+    assert m[item]["modulos"] == 1 and m[item]["simbolos"] == 1 and m[item]["linhas"] == 55 and m[item]["tokens"] == 0

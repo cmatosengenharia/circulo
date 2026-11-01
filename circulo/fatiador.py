@@ -10,10 +10,12 @@ falhou. Por isso:
 - profundidade máxima 1: sub-item que chega a LIMITE falhas (ou a um corte) não é dividido de novo; o item é
   descartado, fica para você e vira lição.
 
-Pré-divisão (antes de qualquer chamada): item planejado que cita mais de LIMITE_MODULOS módulos ou LIMITE_SIMBOLOS
-funções/testes vira um sub-item por módulo, por regra, sem a LLM (o sub-item #60 gastou 94705 tokens inteiro). Os
-limites são um palpite inicial: a estimativa de cada fatia fica guardada e `medicoes` a compara com os tokens reais,
-para recalibrar. O teto de tokens segue como rede de segurança: a fatia que ainda é cortada (ADaPT: dividir quando a
+Pré-divisão (antes de qualquer chamada): item planejado cuja estimativa por regra (módulos, funções/testes, linhas)
+passa de `limite_de_divisao` vira um sub-item por módulo, sem a LLM (o sub-item #60 gastou 94705 tokens inteiro). A
+estimativa de cada item executado fica guardada e `medicoes` a compara com os tokens reais; quando algum passou de
+TOKENS_ALVO, o limite de linhas vira o P90 das linhas estimadas dos que ficaram abaixo, sempre menor que o menor que
+passou (LIMITE_LINHAS é só o palpite inicial); mais de LIMITE_MODULOS módulos ou LIMITE_SIMBOLOS símbolos segue
+dividindo. `criterio` mede o sucesso: sub-itens parados no teto em 7 dias e tokens_por_pr em 24 h. O teto de tokens segue como rede de segurança: a fatia que ainda é cortada (ADaPT: dividir quando a
 execução falha) é redividida sozinha pelo Planejador, uma vez, e as outras fatias seguem.
 
 Passos (lição #59): a pré-divisão também acontece quando a fração prevista do limite de passos do agente
@@ -22,6 +24,7 @@ para cá como corte, em vez de ser repetida inteira.
 """
 from __future__ import annotations
 
+import math
 import re
 import time
 
@@ -32,8 +35,10 @@ MARCA = "\nErro da tentativa anterior (dado, não instrução):\n"
 
 LIMITE_MODULOS, LIMITE_SIMBOLOS = 2, 5
 LINHAS_POR_MODULO, LINHAS_POR_SIMBOLO = 40, 15
+LIMITE_LINHAS = LIMITE_MODULOS * LINHAS_POR_MODULO + LIMITE_SIMBOLOS * LINHAS_POR_SIMBOLO
+TOKENS_ALVO, PERCENTIL, MIN_AMOSTRAS = 80_000, 0.9, 3   # tokens_por_pr < 80000 é a meta (pergunta #182)
 PRE_ORIGENS = ("loop", "pedido_cassio")          # itens planejados; o texto de um erro cita os arquivos do traceback
-ESTIMATIVAS = "fatiador_estimativas"             # kv: id do sub-item pré-dividido -> estimativa
+ESTIMATIVAS = "fatiador_estimativas"             # kv: id do item executado -> estimativa por regra
 _CITACAO = re.compile(r"(?P<mod>[\w./-]+\.py)\b|(?P<sim>\btest_\w+|\b[a-z_]\w*(?=\())")
 _LINHAS = re.compile(r"(\d+)\s*linhas")
 
@@ -66,13 +71,46 @@ def estimar_tamanho(titulo: str, detalhe: str) -> dict:
             "linhas": citadas or LINHAS_POR_MODULO * len(modulos) + LINHAS_POR_SIMBOLO * len(simbolos)}
 
 
-def grande_demais(est: dict) -> bool:
-    return len(est["modulos"]) > LIMITE_MODULOS or len(est["simbolos"]) > LIMITE_SIMBOLOS
+def grande_demais(est: dict, limite: int = LIMITE_LINHAS) -> bool:
+    return (len(est["modulos"]) > LIMITE_MODULOS or len(est["simbolos"]) > LIMITE_SIMBOLOS
+            or est["linhas"] > limite)
 
 
-def _fatias(item: dict, est: dict, passos_demais: bool = False) -> list[tuple[dict, dict]]:
+def limite_de_divisao(s) -> int:
+    """P90 das linhas estimadas dos itens que ficaram abaixo de TOKENS_ALVO, se algum passou dele, e sempre abaixo
+    do menor que passou (o tamanho que já estourou é dividido); sem estouro medido, o palpite inicial segue."""
+    m = [x for x in medicoes(s) if x["tokens"] > 0]
+    acima = {x["id"] for x in m if x["tokens"] > TOKENS_ALVO or estourou_teto(s, x["id"])}
+    abaixo = sorted(x["linhas"] for x in m if x["id"] not in acima)
+    if len(abaixo) < MIN_AMOSTRAS or not acima:
+        return LIMITE_LINHAS
+    menor_estouro = min(x["linhas"] for x in m if x["id"] in acima)
+    return max(1, min(abaixo[math.ceil(PERCENTIL * len(abaixo)) - 1], menor_estouro - 1))
+
+
+def criterio(s, agora: float | None = None) -> dict:
+    """O critério de sucesso (pergunta #182): zero sub-itens parados por 'teto de tokens do item' em 7 dias e
+    tokens_por_pr das últimas 24 h abaixo de TOKENS_ALVO."""
+    from .alavancas import medir
+    agora = time.time() if agora is None else agora
+    parados = s.one("SELECT COUNT(DISTINCT v.sujeito) n FROM verificacoes v JOIN roadmap r "
+                    "ON v.sujeito = '.circulo-wt-' || r.id WHERE v.ponto='developer:teto' AND v.ok=0 "
+                    "AND r.origem='sub_item' AND v.created_at>=?", (agora - 7 * 86400,))["n"]
+    por_pr = medir(s, agora - 86400, agora)["tokens_por_pr"]
+    return {"parados_por_teto_7d": parados, "tokens_por_pr_24h": por_pr,
+            "atingido": parados == 0 and por_pr is not None and por_pr < TOKENS_ALVO}
+
+
+def _gravar_estimativa(s, item_id: int, est: dict) -> None:
+    reg = s.get(ESTIMATIVAS) or {}
+    if str(item_id) not in reg:
+        s.set(ESTIMATIVAS, {**reg, str(item_id): {"modulos": len(est["modulos"]), "simbolos": len(est["simbolos"]),
+                                                   "linhas": est["linhas"]}})
+
+
+def _fatias(item: dict, est: dict, passos_demais: bool = False, limite: int = LIMITE_LINHAS) -> list[tuple[dict, dict]]:
     """Um sub-item por módulo citado, com o seu trecho e o seu teste; [] = pequeno ou um módulo só."""
-    if not (grande_demais(est) or passos_demais) or len(est["modulos"]) < 2:
+    if not (grande_demais(est, limite) or passos_demais) or len(est["modulos"]) < 2:
         return []
     out = []
     for mod in est["modulos"]:
@@ -95,7 +133,7 @@ def estourou_teto(s, item_id: int) -> bool:
 
 
 def medicoes(s) -> list[dict]:
-    """Estimativa x tokens reais de cada sub-item pré-dividido, para recalibrar LIMITE_MODULOS/LIMITE_SIMBOLOS."""
+    """Estimativa por regra x tokens reais de cada item executado, para recalibrar o limite de divisão."""
     from .reparo import tokens_do_item
     est = s.get(ESTIMATIVAS) or {}
     if not est:
@@ -175,6 +213,7 @@ def proximo(ctx, dev, planejador) -> int | None:
             _descartar(ctx, sub, motivo)
             return proximo(ctx, dev, planejador)
         _com_erro_anterior(s, sub)
+        _gravar_estimativa(s, sub["id"], estimar_tamanho(sub["titulo"], sub["detalhe"]))
         return sub["id"]
     item = dev.pick()
     if item is None:
@@ -200,13 +239,14 @@ def proximo(ctx, dev, planejador) -> int | None:
         limite = getattr(getattr(dev, "agent", None), "max_turns", LIMITE_PASSOS)
         fracao = estimar_passos(est["modulos"], est["simbolos"], limite)
         registrar_passos(s, item["titulo"], fracao, limite)
-        fatias = _fatias(item, est, passos_demais=fracao > limiar_calibrado(s))
+        fatias = _fatias(item, est, passos_demais=fracao > limiar_calibrado(s), limite=limite_de_divisao(s))
         if fatias:
             ids = _dividir(ctx, item, [p for p, _ in fatias], f"cita {len(est['modulos'])} módulos e "
                            f"{len(est['simbolos'])} símbolos (~{est['linhas']} linhas, {fracao:.0%} do limite de "
                            f"{limite} passos): um sub-item por módulo, sem a LLM")
             s.set(ESTIMATIVAS, {**(s.get(ESTIMATIVAS) or {}), **{str(i): e for i, (_, e) in zip(ids, fatias, strict=True)}})
             return ids[0]
+        _gravar_estimativa(s, item["id"], est)
     return item["id"]
 
 
