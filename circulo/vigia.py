@@ -50,6 +50,34 @@ ACOES = {"abrir_item": "a trava é estrutural e repetível: um item pequeno no r
          "observar": "ainda não dá para dizer se é trava: registrar e medir de novo na próxima passagem"}
 CONF_AGIR = 0.5
 ALVO_DESTRAVAR = 0.8            # dos disparos da estagnação com resultado, ao menos 80% destravam o loop em EXPIRA_EM giros
+REPETICAO = 4                   # limiares do StuckDetector do OpenHands: a mesma ação com o mesmo resultado seguidas vezes
+ERRO_REPETIDO = 3               # a mesma ação terminando no mesmo erro
+MONOLOGO = 3                    # giros em que nada rodou
+ALTERNANCIA = 6                 # eventos alternando A/B/A/B
+ALVO_PADRAO = 0.8               # dos disparos da estagnação em 7 dias, ao menos 80% com o padrão nomeado
+
+
+def _normalizar(e: dict) -> tuple:
+    """(ação, resultado) pelo conteúdo: ids, números e horários não distinguem um evento do outro."""
+    return tuple(re.sub(r"[#\d:.\-]+", "", str(e.get(k) or "")).strip() or None for k in ("acao", "resultado"))
+
+
+def detectar_travamento(eventos: list[dict]) -> dict | None:
+    """O padrão da cauda dos giros parados (desde o último avanço): {padrao, ciclos, limiar} ou None se for saudável."""
+    ev = [_normalizar(e) for e in eventos or []]
+    if not ev:
+        return None
+    rep = next((i for i, e in enumerate(reversed(ev)) if e != ev[-1]), len(ev))
+    acao, resultado = ev[-1]
+    for padrao, ciclos, limiar, vale in (("monologo", rep, MONOLOGO, acao is None),
+                                         ("erro_repetido", rep, ERRO_REPETIDO, acao is not None and (resultado or "").startswith("erro")),
+                                         ("acao_repetida", rep, REPETICAO, acao is not None)):
+        if vale and ciclos >= limiar:
+            return {"padrao": padrao, "ciclos": ciclos, "limiar": limiar}
+    n = 0 if len(ev) < 2 or ev[-1] == ev[-2] else 2
+    while n and n < len(ev) and ev[-n - 1] == ev[-n + 1]:
+        n += 1
+    return {"padrao": "alternancia", "ciclos": n, "limiar": ALTERNANCIA} if n >= ALTERNANCIA else None
 
 
 def _um(s, sql, args=()):
@@ -244,9 +272,11 @@ def s_estagnacao(s, now):
     sem = int(p.get("sem", 0))
     if sem < ESTAGNADO:
         return None
-    return {"chave": "estagnacao", "titulo": f"{sem} giros seguidos com trabalho pendente e nada avançando",
+    t = detectar_travamento(p.get("eventos") or [])
+    nome = f" · padrão {t['padrao']} ({t['ciclos']}x, limiar {t['limiar']})" if t else " · sem padrão nomeado"
+    return {"chave": "estagnacao", "titulo": f"{sem} giros seguidos com trabalho pendente e nada avançando{nome}",
             "evidencia": {"giros_sem_avanco": sem, "limiar": ESTAGNADO, "recusas": p.get("recusas") or {}, "parado": parado(s),
-                          "pendencias": pendencias(s, p, now)},
+                          "pendencias": pendencias(s, p, now), "padrao": t},
             "gravidade": min(1.0, sem / 20),
             "sugestao": "ver recusas do porteiro e a fila"}
 
@@ -561,7 +591,9 @@ class Vigia:
 
     def _agir(self, c: dict, now: float) -> None:
         ev = c["evidencia"] if isinstance(c["evidencia"], str) else json.dumps(c["evidencia"], ensure_ascii=False, default=str)
-        self.s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em,giro) VALUES(?,?,?,?,?)", (c["chave"], c["acao"], ev, now, self.s.tick))
+        padrao = ((c["evidencia"] if isinstance(c["evidencia"], dict) else {}).get("padrao") or {}).get("padrao")
+        self.s.x("INSERT INTO vigia_disparos(chave,acao,evidencia,em,giro,padrao) VALUES(?,?,?,?,?,?)",
+                 (c["chave"], c["acao"], ev, now, self.s.tick, padrao))
         if c["acao"] == "abrir_item":
             titulo = f"Vigia: {c['titulo'][:150]}"
             ja = self.s.one("SELECT id FROM roadmap WHERE status IN ('pendente','em_andamento') AND titulo LIKE ?", (f"Vigia: {c['chave'].split(':')[0]}%",))
@@ -610,6 +642,12 @@ def resultado_30d(store, chave: str, now: float | None = None) -> dict[str, Any]
             "taxa_destravou": round(r["d"] / r["com"], 2) if r["com"] else None, "em_giros": EXPIRA_EM, "alvo": ALVO_DESTRAVAR}
 
 
+def padrao_7d(store, chave: str, now: float | None = None) -> dict[str, Any]:
+    """Dos disparos de `chave` nos últimos 7 dias, a fração com o padrão de travamento nomeado (alvo ALVO_PADRAO)."""
+    r = store.one("SELECT COUNT(*) n, COUNT(padrao) p FROM vigia_disparos WHERE chave=? AND em>=?", (chave, (now or time.time()) - 7 * 86400))
+    return {"disparos": r["n"], "com_padrao": r["p"], "fracao": round(r["p"] / r["n"], 2) if r["n"] else None, "alvo": ALVO_PADRAO}
+
+
 def resumo(store, limite: int = 20) -> dict[str, Any]:
     abertas = [dict(r) for r in store.q("SELECT * FROM vigia WHERE status='aberta' ORDER BY gravidade DESC, primeira_em")]
     hist = [dict(r) for r in store.q("SELECT id, chave, titulo, veredito, acao, conf, item_id, primeira_em, resolvida_em FROM vigia "
@@ -624,4 +662,5 @@ def resumo(store, limite: int = 20) -> dict[str, Any]:
     travas = [a for a in abertas if a["veredito"] == "trava"]
     return {"estado": "travado" if travas else ("observando" if abertas else "livre"), "travas": len(travas), "abertas": abertas,
             "resolvidas": hist, "ultima_em": ult.get("em"), "sondas": [f.__name__[2:] for f in SONDAS], "intervalo_s": INTERVALO,
-            "disparos_30d": {"estagnacao": disparos_30d(store, "estagnacao")}, "resultado_30d": {"estagnacao": resultado_30d(store, "estagnacao")}}
+            "disparos_30d": {"estagnacao": disparos_30d(store, "estagnacao")}, "resultado_30d": {"estagnacao": resultado_30d(store, "estagnacao")},
+            "padrao_7d": {"estagnacao": padrao_7d(store, "estagnacao")}}

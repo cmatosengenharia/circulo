@@ -6,7 +6,8 @@ Tarefa que o idle não deixa rodar não é trabalho pendente: `pode_rodar` é a 
 """
 
 ESTAGNADO = 10      # giros com trabalho pendente e nada avançando = estagnação (lição de estrutura); o Vigia age a partir dele
-EXPIRA_EM = 30      # cada disparo da estagnação fecha: 'destravou' se o loop avança em até 30 giros, senão 'expirou'
+EVENTOS = 20       # (ação, resultado) dos últimos giros parados, lidos pelo vigia.detectar_travamento
+EXPIRA_EM = 30     # cada disparo da estagnação fecha: 'destravou' se o loop avança em até 30 giros, senão 'expirou'
 SEGURAS = ("analisar_padroes", "rodar_regressao", "resumo", "evoluir_projeto")   # modo seguro: só baixo risco
 COMPONENTE = {"revisar_baixa_confianca": "meta", "evoluir_harness": "meta"}     # (corrigir_codigo tem quarentena própria)
 
@@ -27,6 +28,9 @@ def anotar_giro(st: dict, r) -> None:
                                    + [f"erro em {e.split(':', 1)[0].split()[0]}" for e in r.errors if e.strip()])
     for f in feitos:
         rodou[f] = int(rodou.get(f, 0)) + 1
+    acao = None if r is None else (r.idle_task or ("pedido" if r.handled_event else None))
+    erro = next((f for f in feitos if f.startswith("erro em ")), "sem avanço")
+    st["eventos"] = (st.get("eventos") or [])[-(EVENTOS - 1):] + [{"acao": acao, "resultado": erro}]
 
 
 def medir_disparos(store, giro: int, avancou: bool) -> None:
