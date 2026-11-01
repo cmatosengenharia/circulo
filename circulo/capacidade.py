@@ -6,8 +6,11 @@ vazão (tarefas concluídas). O gargalo é o agente com a maior carga: ocupaçã
 
 Escalar = mais trabalhadores do mesmo agente no mesmo giro. Só para quem não conflita na esteira de entrega:
 - Arquiteto (`estudar_pedido`): cada estudo é um item, independente → N estudos ao mesmo tempo.
-- Desenvolvedor (`corrigir_codigo`): N itens distintos, cada um no seu worktree e branch; o git do repositório principal
-  fica sob trava; o Revisor já barra PRs que tocam os mesmos arquivos; o gate serializa os merges.
+- Desenvolvedor (`corrigir_codigo`): até 2 itens, cada um no seu worktree e branch; o git do repositório principal
+  fica sob trava; o Revisor já barra PRs que tocam os mesmos arquivos; o gate serializa os merges. Worktree só desloca o
+  conflito para o merge, então a partição vem antes, aqui: com 3 ou mais itens na fila, sobe para 2 só se o par que o
+  Developer pegaria (`SelfDeveloper.picks`) tem pegadas de arquivos disjuntas e fora dos pontos de convergência
+  (registros, __init__, fila, lições); par sobreposto desce para 1 na hora, e os dois itens saem um de cada vez.
 Nunca: QA/gate (merge serial na main), DevOps/corpo, Gerente de produto (fila com teto), PO, Redator.
 
 A decisão de escalar passa pelo Jev (noul) com o estado medido; sobe um trabalhador por vez até MAX_PARALELO, e desce
@@ -15,6 +18,7 @@ quando a fila esvazia. Roda na thread do SRE, uma vez por minuto; o painel receb
 """
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -23,7 +27,7 @@ from .state import Store
 
 KV = "capacidade"
 ESCALAVEIS = {"estudar_pedido": "Arquiteto: estudos são independentes por item",
-              "corrigir_codigo": "Desenvolvedor: itens distintos, worktrees separados, git sob trava, Revisor barra arquivos em comum"}
+              "corrigir_codigo": "Desenvolvedor: 2 itens com pegadas de arquivos disjuntas, worktrees separados, git sob trava, Revisor barra arquivos em comum"}
 NAO_ESCALAVEIS = {"revisar_prs": "merge serial na main", "atualizar_corpo": "uma versão em prova por vez", "planejar_roteiro": "fila com teto",
                   "indagar": "uma passagem basta", "documentar": "um PR de docs por vez"}
 MAX_PARALELO = 3
@@ -32,6 +36,46 @@ OCUPACAO_ALTA = 0.6        # fração da hora ocupado
 FILA_ALTA = 3              # itens esperando
 SOBE_A_CADA = 900          # 15 min entre escaladas do mesmo agente
 MIN_ANTES_DE_DESCER = 600
+MAX_DEV = 2                # Developers em paralelo
+CONVERGENCIA = frozenset({"circulo/__init__.py", "circulo/cli.py", "circulo/nomes.py", "circulo/state.py",   # registros
+                          "circulo/roadmap.py", "circulo/licoes.py", "CHANGELOG.md", "pyproject.toml"})     # fila e lições
+_ARQUIVO = re.compile(r"\b((?:circulo|fabrica|tests|docs)/[\w/]+\.\w+|CHANGELOG\.md|pyproject\.toml)\b")
+
+
+def pegada(item: dict) -> frozenset[str]:
+    """Os arquivos que o item deve tocar: o módulo que o Planejador gravou, os caminhos citados no texto e o teste de cada
+    módulo do pacote (é ali que o Developer acrescenta o teste novo)."""
+    arqs = set(_ARQUIVO.findall(f"{item.get('modulo') or ''} {item.get('titulo') or ''} {item.get('detalhe') or ''}"))
+    if item.get("modulo") and not _ARQUIVO.fullmatch(item["modulo"]):
+        arqs.add(item["modulo"])
+    arqs |= {f"tests/test_{m.group(1)}.py" for a in arqs if (m := re.fullmatch(r"(?:circulo|fabrica)/(\w+)\.py", a))}
+    return frozenset(arqs)
+
+
+def colisao(a: frozenset[str], b: frozenset[str]) -> list[str]:
+    """Por que dois itens não podem ir em paralelo ([] = podem): arquivo em comum, ponto de convergência ou pegada vazia."""
+    if not a or not b:
+        return ["(pegada desconhecida)"]
+    return sorted((a & b) | ((a | b) & CONVERGENCIA))
+
+
+class _Fila:
+    """O que `SelfDeveloper.picks` lê (store e PRs abertos): o Escalador simula o par que o Developer pegaria."""
+    def __init__(self, store: Store):
+        self.s = store
+
+    def abertos(self) -> list[dict]:
+        from .self_dev import SelfDeveloper
+        return SelfDeveloper.abertos(self)
+
+
+def par_do_developer(store: Store) -> tuple[list[dict], list[str]]:
+    """(os itens que o Developer pegaria com 2 trabalhadores, a colisão entre eles); colisão [] = par disjunto."""
+    from .self_dev import SelfDeveloper
+    par = SelfDeveloper.picks(_Fila(store), MAX_DEV)
+    if len(par) < MAX_DEV:
+        return par, ["(fila sem par)"]
+    return par, colisao(pegada(par[0]), pegada(par[1]))
 
 
 def _n(store: Store, sql: str, args=()) -> int:
@@ -131,6 +175,19 @@ def decidir(store: Store, dl, medidas: list[dict], agora: float | None = None) -
             _definir(store, ag, n - 1, "fila vazia", agora)
             acoes.append({"agente": ag, "acao": "descer", "para": n - 1})
             continue
+        if ag == "corrigir_codigo":
+            par, choque = par_do_developer(store)
+            ids = " e ".join(f"#{i['id']}" for i in par)
+            if n > 1 and choque and m["fila"] > 0:          # o par se cruza: um de cada vez, já (esperar é abrir o conflito)
+                _definir(store, ag, 1, f"pegadas se cruzam ({ids}): {', '.join(choque)[:200]}", agora)
+                acoes.append({"agente": ag, "acao": "descer", "para": 1})
+            elif n > MAX_DEV:
+                _definir(store, ag, MAX_DEV, f"teto de {MAX_DEV} Developers em paralelo", agora)
+                acoes.append({"agente": ag, "acao": "descer", "para": MAX_DEV})
+            elif n < MAX_DEV and m["fila"] >= FILA_ALTA and not choque and agora - desde >= SOBE_A_CADA:
+                _definir(store, ag, MAX_DEV, f"fila {m['fila']}, par {ids} com pegadas disjuntas (regra)", agora)
+                acoes.append({"agente": ag, "acao": "subir", "para": MAX_DEV, "conf": 1.0})
+            continue
         if m["sobrecarregado"] and n < MAX_PARALELO and agora - desde >= SOBE_A_CADA:
             if dl is None:
                 sim, conf, fonte = True, 1.0, "regra"
@@ -169,4 +226,5 @@ def resumo(store: Store) -> dict[str, Any]:
             "historico": list(reversed(store.get(KV + "_hist") or []))[:10], "escalaveis": ESCALAVEIS, "nao_escalaveis": NAO_ESCALAVEIS, "max_paralelo": MAX_PARALELO}
 
 
-__all__ = ["medir", "gargalo", "decidir", "rodar", "resumo", "trabalhadores", "ESCALAVEIS", "MAX_PARALELO"]
+__all__ = ["medir", "gargalo", "decidir", "rodar", "resumo", "trabalhadores", "pegada", "colisao", "par_do_developer",
+           "ESCALAVEIS", "MAX_PARALELO", "MAX_DEV", "CONVERGENCIA"]

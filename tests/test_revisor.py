@@ -125,6 +125,21 @@ def test_arquivo_compartilhado_com_pr_aberto_e_rejeitado_e_o_item_espera_aquele_
     assert dev2.run_once().status == "proposto"                                    # refeito sobre a main nova
 
 
+def test_pr_que_toca_modulo_em_uso_pelo_outro_developer_e_recusado_mesmo_antes_do_pr_dele(circle, repo):  # noqa: F811
+    ids = _itens(circle, 2)
+    s = circle.store
+    s.x("UPDATE roadmap SET status='em_andamento', modulo='mesmo.py', updated_at=? WHERE id=?", (time.time(), ids[1]))   # o outro trabalhador, ainda sem PR
+    gh = GHVarios(repo.parent / "origin.git")
+    r = SelfDeveloper(circle.ctx, repo, AgenteDeArquivo("mesmo.py"), gh, test_cmd=OK_CMD).run_once()
+    assert r.status == "revisor_rejeitou" and f"em uso pelo item #{ids[1]}" in r.detalhe and not gh.prs
+    rv = json.loads(s.one("SELECT evidencia FROM revisoes ORDER BY id DESC LIMIT 1")["evidencia"])
+    assert rv["em_uso"] == [{"item_id": ids[1], "arquivos": ["mesmo.py"]}]
+    s.x("UPDATE roadmap SET status='feito' WHERE id=?", (ids[1],))                      # o outro terminou
+    r = SelfDeveloper(circle.ctx, repo, AgenteDeArquivo("mesmo.py"), gh, test_cmd=OK_CMD).run_once()
+    assert r.status == "proposto", r.detalhe
+    assert revisor.em_uso(s, ids[0], ["outro.py", "CHANGELOG.md"]) == []
+
+
 def test_main_que_andou_e_quebra_o_pr_e_rejeitada_antes_de_empurrar(circle, repo):  # noqa: F811
     ids = _itens(circle, 1)
     gh = GHVarios(repo.parent / "origin.git")

@@ -6,6 +6,8 @@ Dois validadores, nenhum deles bloqueia por palpite — cada um mede e deixa ras
    `.shimNNN` com um runner de testes improvisado, clones aninhados de fixtures (`.shim297/tmp…/0/repo/` sem commit:
    o `git add -A` quebrou e abriu a lição #87), caches. O validador apaga o que nunca deveria virar commit e devolve
    o que apagou; o item segue. Lição #87 fica impossível: não há mais pasta estranha quando o `git add` roda.
+   Confere também que o agente escreveu só no próprio worktree (`escritas_fora`): arquivo do repositório principal
+   mudado depois que o worktree nasceu é falha medida, porque agentes em paralelo às vezes gravam na árvore principal.
 2. `revisao` (LLM, "segundo par de olhos", uma chamada por PR): lê o diff e o título do item e devolve um veredito
    JSON {aprovado, problemas[], risco}. Só reprova com um PROBLEMA CONCRETO (teste que não prova o item, mudança fora
    do escopo, regressão visível no diff); reprovado vira UMA rodada de correção local do Developer, nunca descarte.
@@ -23,6 +25,7 @@ from pathlib import Path
 LIXO = ("\\.shim\\d*", "__pycache__", "\\.pytest_cache", "\\.ruff_cache", "\\.mypy_cache", "node_modules", "\\.venv")
 PADRAO_LIXO = re.compile("^(?:" + "|".join(LIXO) + ")$")
 PONTO_WORKTREE = "validador:worktree"
+PONTO_FORA = "validador:fora_do_worktree"
 PONTO_REVISAO = "validador:revisao"
 MAX_DIFF = 24_000                # caracteres do diff que vão ao revisor (o resto é resumido pelo numstat)
 MAX_TOKENS = 1200
@@ -63,13 +66,34 @@ def limpar_worktree(wt: Path) -> list[str]:
     return apagados
 
 
+def escritas_fora(wt: Path) -> list[str]:
+    """Arquivos do repositório principal que mudaram depois que este worktree nasceu: o agente escreveu na árvore
+    principal em vez da sua (o trabalho some do PR e colide com o outro Developer). [] se `wt` não é worktree ligado."""
+    wt = Path(wt)
+    if not (wt / ".git").is_file():               # worktree ligado tem `.git` arquivo; o principal (ou pasta solta) não
+        return []
+    p = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=wt, capture_output=True, text=True)
+    comum = Path(p.stdout.strip()) if p.returncode == 0 else None
+    if comum is None or comum.name != ".git" or comum.parent.resolve() == wt.resolve():
+        return []
+    principal, nasceu = comum.parent, (wt / ".git").stat().st_mtime
+    st = subprocess.run(["git", "status", "--porcelain", "-uall", "-z"], cwd=principal, capture_output=True, text=True)
+    caminhos = [x[3:] for x in st.stdout.split("\0") if len(x) > 3]
+    return sorted(c for c in caminhos if (principal / c).is_file() and (principal / c).stat().st_mtime >= nasceu)
+
+
 def validar_worktree(ctx, wt: Path, item_id: int | None = None) -> list[str]:
-    """Agente 1, antes do `git add -A`: limpa e registra. O item nunca para por isso."""
+    """Agente 1, antes do `git add -A`: limpa, confere que o agente escreveu só no próprio worktree e registra.
+    O lixo não para o item; escrita fora do worktree vira falha medida (e lição) em `validador:fora_do_worktree`."""
     apagados = limpar_worktree(wt)
-    with contextlib.suppress(Exception):          # registrar nunca derruba a entrega
+    sujeito = f"roteiro #{item_id}" if item_id else Path(wt).name
+    with contextlib.suppress(Exception):          # medir e registrar nunca derrubam a entrega
         from .licoes import registrar as monitorar
-        monitorar(ctx, PONTO_WORKTREE, not apagados, sujeito=f"roteiro #{item_id}" if item_id else wt.name, licao=False,
+        monitorar(ctx, PONTO_WORKTREE, not apagados, sujeito=sujeito, licao=False,
                   motivo="" if not apagados else "lixo apagado antes do commit: " + ", ".join(apagados)[:300])
+        fora = escritas_fora(wt)
+        monitorar(ctx, PONTO_FORA, not fora, sujeito=sujeito, item_id=item_id,
+                  motivo="" if not fora else "o agente escreveu no repositório principal, fora do próprio worktree: " + ", ".join(fora)[:300])
     return apagados
 
 
