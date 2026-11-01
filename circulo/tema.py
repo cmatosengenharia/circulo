@@ -165,7 +165,7 @@ def aplicar(html: str) -> str:
     return corpo.replace("</style>", bloco + "</style>", 1)
 
 
-PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html", "aprovacoes.html", "trabalho.html")
+PAGINAS = ("painel.html", "home.html", "fluxo.html", "rastros.html", "integracoes.html", "equipe.html", "aprovacoes.html", "trabalho.html", "assunto.html")
 
 
 def reescrever(pasta: Path | None = None) -> list[str]:

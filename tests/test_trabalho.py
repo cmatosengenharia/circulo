@@ -151,3 +151,27 @@ def test_card_de_links_agrupa_por_assunto_com_total_e_busca_inline(circle):
         assert [h["rotulo"] for h in achados] == ["Runbook de reprocessamento"]
     finally:
         srv.shutdown()
+
+
+def test_ficha_do_assunto_tem_pagina_propria_e_o_nome_na_tabela_e_link(circle):
+    """/trabalho/assunto/<nome>: a ficha completa de assuntos.ver (descrição, decisões com data, pendências, notas, links)
+    e o AGENTS.md gerado; o nome do assunto na tabela de /trabalho leva a ela."""
+    trabalho.semear(circle.store, circle.data_dir)
+    srv = serve(circle.store.path, port=0, background=True)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+
+    def get(caminho):
+        with urllib.request.urlopen(base + caminho, timeout=5) as r:
+            return r.read().decode()
+    try:
+        assert 'href="/trabalho/assunto/${encodeURIComponent(a.nome)}"' in get("/trabalho")
+        html = get("/trabalho/assunto/Migra%C3%A7%C3%A3o%20Blip%20%E2%86%92%20Amazon%20Connect")
+        assert 'id="navTopo"' in html and "/api/trabalho/ficha?nome=" in html and "AGENTS.md" in html
+        f = json.loads(get("/api/trabalho/ficha?nome=svc-sms"))
+        assert f["nome"] == "svc-sms" and f["descricao"].startswith("microsserviço de envio de SMS")
+        assert len(f["decisoes"]) == 1 and f["decisoes"][0]["data"].count("/") == 2 and len(f["pendencias"]) == 1
+        assert len(f["notas"]) == 2 and len(f["links"]) == 2 and all(lk["url"].startswith("http") for lk in f["links"])
+        assert f["agents"].startswith("# ") and "svc-sms" in f["agents"]
+        assert "erro" in json.loads(get("/api/trabalho/ficha?nome=n%C3%A3o%20existe"))
+    finally:
+        srv.shutdown()

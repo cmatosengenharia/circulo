@@ -418,10 +418,10 @@ def make_handler(db_path: str):
                 self.send_header("Location", f"/missao/{kit_project_id(self._store(), 'circulo')}")
                 self.end_headers()
                 return
-            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes", "/trabalho") or u.path.startswith(("/projeto/", "/missao/")):
+            if u.path in ("/", "/integracoes", "/rastros", "/fluxo", "/equipe", "/aprovacoes", "/trabalho") or u.path.startswith(("/projeto/", "/missao/", "/trabalho/assunto/")):
                 inicio = "equipe.html" if os.environ.get("CIRCULO_ENTRADA") == "equipe" else "home.html"   # produto: a equipe é a porta de entrada
                 body = _page({"/": inicio, "/integracoes": "integracoes.html", "/rastros": "rastros.html", "/trabalho": "trabalho.html",
-                              "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "painel.html"))
+                              "/fluxo": "fluxo.html", "/equipe": "equipe.html", "/aprovacoes": "aprovacoes.html"}.get(u.path, "assunto.html" if u.path.startswith("/trabalho/assunto/") else "painel.html"))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))

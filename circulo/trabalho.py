@@ -243,6 +243,15 @@ def api_get(store, data_dir: Path, caminho: str, q: dict) -> dict | None:
     if caminho == "/api/trabalho/perguntar":
         notas = assuntos.perguntar(store, um("q")[:300])
         return {"notas": notas, "texto": assuntos.responder(notas)}
+    if caminho == "/api/trabalho/ficha":
+        f = assuntos.ver(store, um("nome"))
+        if not f:
+            return {"erro": "assunto não encontrado"}
+        Links(store)
+        links = {u: u for u in f["links"]} | {r["url"]: r["rotulo"] for r in
+                                               store.q("SELECT url, rotulo FROM catalogo_links WHERE assunto=? ORDER BY rotulo", (f["nome"],))}
+        return {**f, "links": [{"url": u, "rotulo": r} for u, r in links.items()],
+                "agents": contexto_cursor.gerar(store, f["nome"])["AGENTS.md"]}
     if caminho == "/api/trabalho/contexto":
         try:
             return {"assunto": um("assunto"), "arquivos": contexto_cursor.gerar(store, um("assunto") or None)}
