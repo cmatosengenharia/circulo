@@ -125,6 +125,11 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <ol id="daily"></ol>
       <div class="daily-acoes"><span class="muted" id="dailyEmitida" aria-live="polite"></span><button type="button" id="dailyCopiar">Copiar</button><button type="button" class="primaria" id="dailyGerar" hidden>Gerar agora</button></div>
     </section>
+    <section class="card" aria-label="Digest da semana para o time">
+      <h2>Digest da semana</h2>
+      <p class="muted">Em markdown, para colar no canal do time: o que entrou, quem pediu e o tempo do pedido ao merge.</p>
+      <div class="daily-acoes"><span class="muted" id="digestMsg" aria-live="polite"></span><button type="button" id="digestCopiar">Copiar digest</button></div>
+    </section>
     <section class="card" aria-label="Pendências">
       <h2>Pendências abertas</h2>
       <ul id="pendencias"></ul>
@@ -226,6 +231,10 @@ function mostrarDaily(d) {
 $("#dailyCopiar").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(dailyTexto); $("#dailyEmitida").textContent = "✓ pauta copiada (texto puro)"; }
   catch { $("#dailyEmitida").textContent = "não deu para copiar: selecione a pauta e copie à mão"; }
+});
+$("#digestCopiar").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(await (await fetch("/api/digest?formato=md")).text()); $("#digestMsg").textContent = "✓ digest copiado (markdown)"; }
+  catch { $("#digestMsg").textContent = "não deu para copiar: abra /api/digest?formato=md e copie à mão"; }
 });
 $("#dailyGerar").addEventListener("click", async () => { const j = await POST("/api/trabalho/daily", {}); if (j.erro) $("#msg").textContent = j.erro; else mostrarDaily(j); });
 function mostrarContexto(c) {
