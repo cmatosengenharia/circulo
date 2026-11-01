@@ -1,0 +1,12 @@
+[project]
+name = "repo-cliente"
+version = "0.1.0"
+
+[tool.circulo]
+nome = "repo_cliente"
+testes = "python -m pytest -q"
+
+[tool.pytest.ini_options]
+python_files = ["teste_*.py"]
+pythonpath = ["."]
+testpaths = ["tests"]
