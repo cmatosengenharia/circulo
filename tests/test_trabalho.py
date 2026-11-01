@@ -2,10 +2,12 @@
 com a semente de dados de exemplo que deixa o esqueleto inteiro funcionando antes do dado real."""
 import json
 import urllib.request
+from datetime import datetime
 
 import pytest
 
 from circulo import assuntos, gasto_cursor, tema, trabalho
+from circulo.budget import TZ
 from circulo.links import Links
 from circulo.painel import serve
 
@@ -84,6 +86,35 @@ def test_tela_meu_trabalho_no_painel_e_no_menu(circle):
     finally:
         srv.shutdown()
     assert assuntos.ver(circle.store, "GAIA")["decisoes"][0]["texto"].startswith("toda PR")
+
+
+def test_botao_importar_csv_do_cursor_entra_pela_tela_sem_duplicar(circle):
+    """O botão 'Importar CSV do Cursor' envia o arquivo a POST /api/trabalho/gasto, que chama gasto_cursor.importar_csv;
+    a resposta diz quantas linhas novas entraram e traz o orçamento já atualizado; reimportar não duplica."""
+    hoje = datetime.now(TZ).date().isoformat()                                  # o card mostra o mês corrente
+    csv_cursor = ("Date,Model,Total Tokens,Cost\n"
+                  f"{hoje},claude-sonnet,120000,$1.25\n"
+                  f"{hoje},gpt-5,80000,$0.80\n"
+                  f"{hoje},claude-sonnet,5000,Included\n")
+    srv = serve(circle.store.path, port=0, background=True)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+
+    def enviar(corpo):
+        req = urllib.request.Request(base + "/api/trabalho/gasto", data=json.dumps(corpo).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "X-Circulo": "1"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(base + "/trabalho", timeout=5) as r:
+            html = r.read().decode()
+        assert "Importar CSV do Cursor" in html and "/api/trabalho/gasto" in html and 'type="file"' in html
+        primeira = enviar({"texto": csv_cursor, "assunto": "svc-sms", "tipo": "bugfix"})
+        assert primeira["ok"] and primeira["novas"] == 2 and primeira["orcamento"]["gasto_mes"] == 205
+        assert enviar({"texto": csv_cursor})["novas"] == 0                                    # reimportar não duplica
+    finally:
+        srv.shutdown()
+    assert circle.store.one("SELECT COUNT(*) n FROM gasto_cursor WHERE origem='csv'")["n"] == 2
+    assert trabalho.api_post(circle.store, circle.data_dir, "/api/trabalho/gasto", {"texto": ""})[1] == 400
 
 
 def test_configuracao_pede_o_exemplo_e_o_sre_semeia_uma_vez(circle, monkeypatch):

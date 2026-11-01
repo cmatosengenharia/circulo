@@ -134,7 +134,9 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <div class="muted" id="orcLegenda"></div>
       <table style="margin-top:8px"><thead><tr><th>Por assunto (mês)</th><th class="n">US$</th></tr></thead><tbody id="orcAssunto"></tbody></table>
       <table style="margin-top:8px"><thead><tr><th>Por tipo de tarefa</th><th class="n">US$</th></tr></thead><tbody id="orcTipo"></tbody></table>
-      <p class="muted">Lançar: <code>python -m circulo.gasto_cursor 3,20 --assunto svc-sms --tipo bugfix</code> ou importar o CSV do Cursor com <code>--csv</code>.</p>
+      <form class="ask" id="gastoCsv"><input id="gastoAssunto" autocomplete="off" placeholder="assunto (opcional)" aria-label="Assunto do gasto importado (opcional)"><input id="gastoTipo" autocomplete="off" placeholder="tipo (opcional)" aria-label="Tipo de tarefa do gasto importado (opcional)"><input type="file" id="gastoArquivo" accept=".csv,text/csv" hidden><button type="button" id="gastoBotao">Importar CSV do Cursor</button></form>
+      <div class="resp" id="gastoMsg" aria-live="polite"></div>
+      <p class="muted">Exporte o CSV de uso no dashboard do Cursor; reimportar o mesmo arquivo não duplica. Pelo terminal: <code>python -m circulo.gasto_cursor 3,20 --assunto svc-sms --tipo bugfix</code> ou <code>--csv</code>.</p>
     </section>
     <section class="card" aria-label="Links da empresa">
       <h2>Links da empresa <span class="muted" id="linksInfo"></span></h2>
@@ -204,6 +206,14 @@ $("#novoAssunto").addEventListener("submit", async e => {
 $("#contextoForm").addEventListener("submit", async e => {
   e.preventDefault(); const j = await (await fetch("/api/trabalho/contexto?assunto=" + encodeURIComponent($("#contextoAssunto").value))).json();
   if (j.erro) $("#msg").textContent = j.erro; else mostrarContexto(j);
+});
+$("#gastoBotao").addEventListener("click", () => $("#gastoArquivo").click());
+$("#gastoArquivo").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const j = await POST("/api/trabalho/gasto", {texto: await f.text(), assunto: $("#gastoAssunto").value.trim(), tipo: $("#gastoTipo").value.trim()});
+  e.target.value = "";
+  $("#gastoMsg").textContent = j.erro || `✓ ${j.novas} linha(s) nova(s) de ${f.name}` + (j.novas ? "" : " (já importadas antes)") + ` · ${j.orcamento.texto}`;
+  if (!j.erro) carregar();
 });
 $("#apagarExemplo").addEventListener("click", async () => { const j = await POST("/api/trabalho/exemplo", {acao: "apagar"}); $("#msg").textContent = j.erro || `✓ exemplo apagado (${j.apagado.notas} notas, ${j.apagado.links} links, ${j.apagado.gastos} gastos)`; carregar(); });
 $("#semearExemplo").addEventListener("click", async () => { const j = await POST("/api/trabalho/exemplo", {acao: "semear"}); $("#msg").textContent = j.erro || "✓ exemplo semeado"; carregar(); });
