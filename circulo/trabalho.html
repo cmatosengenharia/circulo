@@ -25,6 +25,7 @@ h2{font-size:16px;margin:0 0 8px}
 .k{display:inline-block;min-width:22px;text-align:center;font-weight:700;font-size:12px;border-radius:999px;padding:0 6px;border:1.5px solid currentColor;margin-left:4px}
 .k.bad{color:var(--bad)}.k.ok{color:var(--ok)}.k.jev{color:var(--jev)}
 form.ask{display:flex;gap:8px;margin:8px 0 0}
+.daily-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 0}
 form.ask input{flex:1;min-width:0;min-height:36px;padding:6px 10px;border-radius:var(--r-sm);font:inherit}
 button{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
 button:hover{background:var(--hover);border-color:var(--ink)}
@@ -122,6 +123,7 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
       <h2>Daily de hoje</h2>
       <p class="muted">Das suas notas em <span id="notasPasta"></span>: ontem, hoje (pendências abertas) e bloqueios. Às 8 h vai ao console e à notificação.</p>
       <ol id="daily"></ol>
+      <div class="daily-acoes"><span class="muted" id="dailyEmitida" aria-live="polite"></span><button type="button" id="dailyCopiar">Copiar</button><button type="button" class="primaria" id="dailyGerar" hidden>Gerar agora</button></div>
     </section>
     <section class="card" aria-label="Pendências">
       <h2>Pendências abertas</h2>
@@ -199,7 +201,7 @@ async function carregar() {
     $("#pastas").textContent = `· pastas em ${V.pastas}`; $("#notasPasta").textContent = V.notas_pasta;
     $("#assuntos").innerHTML = V.assuntos.map(a => `<tr><td><a href="/trabalho/assunto/${encodeURIComponent(a.nome)}"><b>${esc(a.nome)}</b></a><div class="muted">${esc(a.descricao)}</div></td><td class="n">${a.decisoes}</td><td class="n">${a.pendencias ? `<span class="k bad">${a.pendencias}</span>` : 0}</td><td class="n">${a.notas}</td><td class="n">${a.links}</td><td class="n">${esc(a.ultima || "—")}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">nenhum assunto ainda</td></tr>`;
     $("#contextoAssunto").innerHTML = V.assuntos.map(a => `<option ${V.contexto && V.contexto.assunto === a.nome ? "selected" : ""}>${esc(a.nome)}</option>`).join("");
-    lista("#daily", V.daily.slice(1), l => `<li>${esc(l)}</li>`, V.daily[0] ? esc(V.daily[0]) : "sem pasta de notas ainda");
+    mostrarDaily(await (await fetch("/api/trabalho/daily")).json());
     lista("#pendencias", V.pendencias, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span> <button type="button" data-feita="${n.id}" aria-label="Marcar como feita: ${esc(n.texto)}">Feita</button></li>`, "nenhuma pendência aberta");
     lista("#decisoes", V.decisoes, n => `<li><span class="pill">${esc(n.assunto)}</span>${esc(n.texto)} <span class="muted">${esc(n.data)}</span></li>`, "nenhuma decisão anotada");
     const o = V.orcamento, pct = Math.min(100, Math.round(100 * o.gasto_mes / Math.max(1, o.limite)));
@@ -214,6 +216,18 @@ async function carregar() {
     $("#gaia").innerHTML = V.gaia.etapas.map(e => `<tr><td><b>${esc(e.etapa)}</b></td><td>${esc(e.exige)}</td><td>${esc(e.portao)}</td></tr>`).join("") || `<tr><td colspan="3" class="muted">sem mapa do GAIA ainda: forneça a parte compartilhável e o loop monta os portões</td></tr>`;
   } catch { $("#msg").textContent = "sem conexão com o painel"; }
 }
+let dailyTexto = "";
+function mostrarDaily(d) {
+  dailyTexto = d.texto;
+  lista("#daily", d.linhas.slice(1), l => `<li>${esc(l)}</li>`, esc(d.linhas[0]));
+  $("#dailyEmitida").textContent = d.emitida_em ? `${d.linhas[0]} · emitida às ${d.emitida_em}` : `${d.linhas[0]} · ainda não emitida hoje (prévia)`;
+  $("#dailyGerar").hidden = !!d.emitida_em;
+}
+$("#dailyCopiar").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(dailyTexto); $("#dailyEmitida").textContent = "✓ pauta copiada (texto puro)"; }
+  catch { $("#dailyEmitida").textContent = "não deu para copiar: selecione a pauta e copie à mão"; }
+});
+$("#dailyGerar").addEventListener("click", async () => { const j = await POST("/api/trabalho/daily", {}); if (j.erro) $("#msg").textContent = j.erro; else mostrarDaily(j); });
 function mostrarContexto(c) {
   $("#contexto").innerHTML = c ? Object.entries(c.arquivos).map(([k, v]) => `<div class="muted" style="margin-top:6px">${esc(k)}</div><pre>${esc(v)}</pre>`).join("") : `<p class="muted">sem assunto com notas ainda</p>`;
 }

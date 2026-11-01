@@ -28,6 +28,7 @@ HORA = 8
 MAX_LINHAS = 10
 MAX_CHARS = 200
 CHAVE = "daily_ultima"
+EMITIDA = "daily_emitida"       # kv: {"em": epoch, "linhas": [...]} da última emissão
 
 _DATA_NO_NOME = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 _ABERTA = re.compile(r"^[-*]\s*\[\s\]\s*(.+)$")
@@ -108,14 +109,32 @@ def pauta(data_dir: Path, agora: float | None = None, store=None) -> list[str]:
     return [cabecalho] + linhas
 
 
+def emitir(store, data_dir: Path, agora: float | None = None) -> list[str]:
+    """Gera a pauta e registra a emissão de hoje (dia, hora e as linhas): às HORA h ou pelo 'Gerar agora' da tela."""
+    agora = agora or time.time()
+    linhas = pauta(data_dir, agora, store)
+    store.set(CHAVE, _dia(agora))
+    store.set(EMITIDA, {"em": agora, "linhas": linhas})
+    return linhas
+
+
+def estado(store, data_dir: Path, agora: float | None = None) -> dict:
+    """O que a tela mostra: a pauta emitida hoje e a hora (HH:MM); sem emissão hoje, a prévia e emitida_em None.
+    `texto` é a pauta em texto puro, uma linha por linha da pauta (até MAX_LINHAS), para o botão 'Copiar'."""
+    agora = agora or time.time()
+    e = store.get(EMITIDA) or {}
+    hoje = bool(e) and _dia(e["em"]) == _dia(agora)
+    linhas = e["linhas"] if hoje else pauta(data_dir, agora, store)
+    return {"linhas": linhas, "texto": "\n".join(linhas),
+            "emitida_em": time.strftime("%H:%M", time.localtime(e["em"])) if hoje else None}
+
+
 def checar(store, data_dir: Path, reply, agora: float | None = None, notificar=notificar_mac) -> list[str] | None:
     """Uma passagem (o SRE chama a cada minuto): a partir das HORA h, emite a pauta uma vez por dia."""
     agora = agora or time.time()
-    hoje = _dia(agora)
-    if time.localtime(agora).tm_hour < HORA or store.get(CHAVE) == hoje or not tem_fonte(store, data_dir):
+    if time.localtime(agora).tm_hour < HORA or store.get(CHAVE) == _dia(agora) or not tem_fonte(store, data_dir):
         return None
-    linhas = pauta(data_dir, agora, store)
-    store.set(CHAVE, hoje)
+    linhas = emitir(store, data_dir, agora)
     reply("\n".join(linhas), "resposta")
     notificar(linhas[0], " | ".join(linhas[1:]))
     return linhas
