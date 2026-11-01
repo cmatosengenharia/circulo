@@ -95,7 +95,8 @@ def test_portao_so_aceita_comandos_da_allowlist(circle):
 
 def test_portoes_natos_espelham_o_gate_do_merge():
     r = {x.portao: x.ok for x in portoes_natos_pr([{"filename": "circulo/engine.py", "additions": 900, "deletions": 0}])}
-    assert r == {"constituição intacta": True, "tamanho": False, "teste novo": False, "sem marcador de conflito": True}
+    assert r == {"constituição intacta": True, "tamanho": False, "teste novo": False, "sem marcador de conflito": True,
+                 "sem segredo em claro": True}
     r = {x.portao: x.ok for x in portoes_natos_pr([{"filename": "tests/test_a.py", "additions": 3, "deletions": 0}],
                                                   {"tests/test_a.py": ["<<<<<<< HEAD", "x = 1", "======="]})}
     assert r["sem marcador de conflito"] is False
