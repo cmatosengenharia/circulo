@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.72.0 — 2026-10-31
+
+**Autonomia: nada espera humano; repositórios de referência viram código no loop.**
+
+- Cássio (31/10): "nessas primeiras versões ele não pode depender de mim/humano para nada" e "temos uma gama de
+  repositórios no GitHub que pode ajudar o loop; vamos varrer esses repos e trazer no formato de código".
+- `circulo/autonomia.py` (SRE, cada passagem): cada ponto do "Precisa de você" tem decisão padrão com prazo, avisada
+  como "Decidi sozinho: …" — item contestado (2 h) e "depende de você" (2 h) saem da fila; orçamento esgotado vira
+  modo sem limite; Norte sem evolução no prazo → o loop reescreve a própria estratégia (`norte_estrategia`: cota de
+  produto 0,5 → 0,7 → 0,85, vagas de produto no Indagador 2 → 3 → 4, épicos girados, marco recomeça); lição esgotada
+  sobe de camada e, no topo, é aceita; diagnóstico do Médico escalado "para você" vira item urgente (2 h);
+  lançamento em revisão é confirmado (24 h); aviso velho é visto (24 h). O que o loop não pode fazer (chave, login,
+  extrato) fica no diagnóstico sem travar nada.
+- `mercado.REPOS` (25 repositórios: agentes de código, memória/economia de tokens por grafo, leitura de código) +
+  `estudar_repositorio` a cada 4 h (idle `pesquisar_mercado`): o Pesquisador lê o repositório na web e devolve até 3
+  técnicas "para trazer como código", que viram itens de origem `referencia` já estudados — o Developer pega direto,
+  com prioridade de produto (`norte.e_produto`, `item_de_produto`, `pick`). As perguntas vão ao conselho pela persona
+  `mercado`. kv `repos_referencia` sobrescreve a lista; arquivo na caixa com `tipo: referencia` acrescenta.
+- Testes: `tests/test_autonomia.py`, `test_estudo_de_repositorio_vira_item_pronto_para_o_developer`.
+
 ## 1.71.0 — 2026-10-31
 
 **O loop estava faminto, não lento: fila nunca vazia, Jev só veta produto, higiene da fila, lição esgotada.**

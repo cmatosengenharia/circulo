@@ -254,13 +254,14 @@ def _norte(s, agora) -> list[Pergunta]:
 
 def _mercado(s, agora) -> list[Pergunta]:
     """O que a pesquisa de mercado semanal (norte_mercado.pesquisar) deixou: perguntas com fontes, cada uma uma vez."""
-    pesq = s.get("mercado_pesquisa") or {}
     out = []
-    for i, p in enumerate((pesq.get("perguntas") or [])[:4]):
-        if not p.get("texto"):
-            continue
-        out.append(Pergunta(f"mercado:{pesq.get('em', 0):.0f}:{i}", "mercado", p["texto"][:300], float(p.get("relevancia", 0.6)),
-                            {"fontes": p.get("fontes", [])[:4], "pratica": p.get("pratica", "")[:200], "pesquisado_em": pesq.get("em")}, custo=1.5, eixo="produto"))
+    for prefixo, pesq in (("mercado", s.get("mercado_pesquisa") or {}), ("repo", s.get("repos_estudo") or {})):
+        for i, p in enumerate((pesq.get("perguntas") or [])[:4]):
+            if not p.get("texto"):
+                continue
+            out.append(Pergunta(f"{prefixo}:{pesq.get('em', 0):.0f}:{i}", "mercado", p["texto"][:300], float(p.get("relevancia", 0.6)),
+                                {"fontes": p.get("fontes", [])[:4], "pratica": p.get("pratica", "")[:200], "pesquisado_em": pesq.get("em"),
+                                 "repositorio": pesq.get("repo")}, custo=1.5, eixo="produto"))
     return out
 
 
@@ -292,11 +293,13 @@ EPICOS = (
 
 def _epicos(s, agora) -> list[Pergunta]:
     """Fila nunca vazia: sem item de produto pendente, cada épico vira uma pergunta do PM com eixo produto."""
-    pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND (origem='pedido_cassio' "
+    pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND (origem IN ('pedido_cassio','referencia') "
                   "OR EXISTS (SELECT 1 FROM perguntas p WHERE p.item_id=roadmap.id AND p.eixo IN ('produto','missao')))")
     if pend:
         return []
-    epicos = s.get("norte_epicos") or [{"chave": c, "texto": x} for c, x in EPICOS]
+    epicos = list(s.get("norte_epicos") or [{"chave": c, "texto": x} for c, x in EPICOS])
+    giro = int((s.get("norte_estrategia") or {}).get("rotacao", 0)) % max(len(epicos), 1)    # a autonomia gira a lista
+    epicos = epicos[giro:] + epicos[:giro]
     return [Pergunta(f"epico:{e['chave']}", "pm", str(e["texto"])[:400], float(e.get("relevancia", 0.7)),
                      {"epico": e["chave"], "base": "medido", "fila_de_produto": 0}, eixo="produto") for e in epicos if e.get("texto")]
 

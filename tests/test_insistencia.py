@@ -81,3 +81,48 @@ def test_licao_com_tres_prs_que_ainda_reincide_nao_abre_mais_item(circle):
     assert "esgotada" in avisos[0] and s.get(insistencia.KV_LICOES)["9"]["prs"] == 3
     assert any(i["tipo"] == "licao_esgotada" and i["ref"] == "9" for i in aprovacoes.pendentes(s, agora, diagnostico=False))
     assert not insistencia.licao_esgotada(s, {"id": 10, "item_id": None}, None, agora)
+
+
+class _LLM:
+    busca_web = True
+
+    def __init__(self, texto):
+        self.texto, self.prompts = texto, []
+
+    def generate(self, *, system, prompt, model, max_tokens, web_search=0):
+        from circulo.llm import LLMResult
+        self.prompts.append((system, prompt))
+        return LLMResult(self.texto, 0, model, [], entrada=10, saida=5)
+
+
+def test_estudo_de_repositorio_vira_item_pronto_para_o_developer(circle):
+    import json
+    from circulo import mercado, norte
+    from circulo.self_dev import SelfDeveloper
+    s = circle.store
+    s.x("UPDATE roadmap SET status='feito'")
+    resposta = json.dumps({"perguntas": [{"texto": "Como tech lead, por que o loop não compacta o contexto por grafo?", "pratica": "graphiti", "fontes": [], "relevancia": 0.8}],
+                           "itens": [{"titulo": "Portar a poda de contexto por grafo do graphiti: memoria.py envia só os nós ligados ao item",
+                                      "detalhe": "lá: graphiti_core/search; aqui: memoria.para() filtra por aresta", "sucesso": "tokens por chamada do Developer caem 20% no teste",
+                                      "fontes": ["https://github.com/getzep/graphiti/blob/main/README.md"]},
+                                     {"titulo": "x", "detalhe": ""}]})
+    circle.ctx.dl.llm = _LLM(resposta)
+    avisos = []
+    circle.ctx.reply = lambda m, k="": avisos.append(m)
+    assert mercado.repo_devido(s)
+    r = mercado.estudar_repositorio(circle.ctx)
+    assert r["repo"] == mercado.REPOS[0] and len(r["itens"]) == 1 and "repositorio:" in circle.ctx.dl.llm.prompts[0][1]
+    item = dict(s.one("SELECT * FROM roadmap WHERE id=?", (r["itens"][0],)))
+    assert item["origem"] == "referencia" and item["estudo"] and item["status"] == "pendente" and "graphiti" in item["detalhe"]
+    assert norte.e_produto(s, item) and norte.item_de_produto(s)["id"] == item["id"]
+    dev = SelfDeveloper.__new__(SelfDeveloper)
+    dev.s = s
+    assert dev.pick()["id"] == item["id"]                                             # o Developer pega direto, sem estudo nem conselho
+    assert not mercado.repo_devido(s) and "viraram item" in avisos[-1]
+    assert r["perguntas"][0]["fontes"] == [mercado.REPOS[0]]
+    from circulo import perguntas
+    assert any(p.id.startswith("repo:") and p.evidencia["repositorio"] == mercado.REPOS[0] for p in perguntas._mercado(s, time.time()))
+    r2 = mercado.estudar_repositorio(circle.ctx)                                        # rodízio: o próximo da lista; título repetido não duplica
+    assert r2["repo"] == mercado.REPOS[1] and r2["itens"] == []
+    s.set("repos_referencia", ["https://github.com/x/y"])
+    assert mercado.repos(s) == ["https://github.com/x/y"]

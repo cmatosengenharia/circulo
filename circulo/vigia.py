@@ -166,7 +166,7 @@ def s_developer_parado(s, now):
     if _dev_sem_vaga(s):
         return None
     item = s.one("SELECT id, titulo FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND estudo IS NOT NULL "
-                 "AND evidencia NOT LIKE '%depende de você%' AND origem IN ('pedido_cassio','loop','erro') ORDER BY ordem LIMIT 1")
+                 "AND evidencia NOT LIKE '%depende de você%' AND origem IN ('pedido_cassio','referencia','loop','erro') ORDER BY ordem LIMIT 1")
     if not item:
         return None
     ult = _um(s, "SELECT MAX(em) FROM trail WHERE etapa='developer' OR tarefa='corrigir_codigo'")
@@ -178,7 +178,7 @@ def s_developer_parado(s, now):
 
 
 def s_fila_seca(s, now):
-    pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop','erro')")
+    pend = _um(s, "SELECT COUNT(*) FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','referencia','loop','erro')")
     val = _um(s, "SELECT COUNT(*) FROM perguntas WHERE status='valida'")
     plan = float((_kv(s, "planejador", {}) or {}).get("em", 0))
     ocupado = _dev_sem_vaga(s)
@@ -475,12 +475,13 @@ class Vigia:
         if mem is not None and mem.graft:
             mem.espelhar_pendentes()                                 # linhas antigas ganham nó no Graft, 50 por passagem
             graft.manter(self.s, now)                                # apply-safe a cada 6 h; duplicata do mesmo registro resolvida
-        from . import daily, gasto_cursor, norte, pastas, sentinela, trabalho
+        from . import autonomia, daily, gasto_cursor, norte, pastas, sentinela, trabalho
         sentinela.checar(self.s, self.ctx.reply, now)                # fila pronta e nada entrou na main há 4 h: avisa você
         daily.checar(self.s, self.ctx.data_dir, self.ctx.reply, now)  # 8 h: pauta da daily por assunto, das suas notas
         gasto_cursor.avisar(self.s, self.ctx.reply)                  # uma vez por dia: os US$ do Cursor acabam antes do fim do mês?
         pastas.manter(self.s, pastas.raiz(self.ctx.data_dir))        # pastas padrão por assunto, espelhando o console
         trabalho.semear_se_pedido(self.s, self.ctx.data_dir, self.ctx.reply)   # CIRCULO_EXEMPLO=1: o exemplo da tela, uma vez
+        autonomia.rodar(self.s, now)                                  # nada espera humano: decisão padrão com prazo (31/10)
         norte.cobrar(self.s, self.ctx.reply, now)                    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita
         from . import conta
         try:

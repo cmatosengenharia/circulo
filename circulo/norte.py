@@ -43,7 +43,7 @@ def e_produto(store, item: dict | None) -> bool:
     """Item de produto: a pergunta de origem tem eixo produto/missão, ou é um pedido seu que não é erro."""
     if not item:
         return False
-    if item.get("origem") == "pedido_cassio":
+    if item.get("origem") in ("pedido_cassio", "referencia"):      # seu pedido, ou técnica trazida de repositório de referência
         return True
     return (eixo_do_item(store, item.get("id")) in EIXOS_PRODUTO)
 
@@ -105,15 +105,20 @@ def prefere_produto(store, agora: float | None = None) -> bool:
     if store.get("entrega_parada"):
         return False
     f = fracao_produto_recente(store, agora)
-    return f is None or f < COTA_PRODUTO
+    return f is None or f < cota(store)
+
+
+def cota(store) -> float:
+    """A cota em vigor: COTA_PRODUTO, ou a que o loop subiu sozinho ao reescrever a estratégia (autonomia)."""
+    return float((store.get("norte_estrategia") or {}).get("cota", COTA_PRODUTO))
 
 
 def item_de_produto(store, extra_sql: str = "", args: tuple = ()) -> dict | None:
     """O item de produto pendente e estudado mais prioritário (pedido seu, ou item cuja pergunta tem eixo produto/missão)."""
     r = store.one("SELECT * FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND estudo IS NOT NULL "
-                  "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%' AND (origem='pedido_cassio' OR EXISTS "
+                  "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%' AND (origem IN ('pedido_cassio','referencia') OR EXISTS "
                   "(SELECT 1 FROM perguntas p WHERE p.item_id=roadmap.id AND p.eixo IN ('produto','missao')))" + extra_sql +
-                  " ORDER BY CASE origem WHEN 'pedido_cassio' THEN 0 ELSE 1 END, ordem LIMIT 1", args)
+                  " ORDER BY CASE origem WHEN 'pedido_cassio' THEN 0 WHEN 'referencia' THEN 1 ELSE 2 END, ordem LIMIT 1", args)
     return dict(r) if r else None
 
 
@@ -160,5 +165,6 @@ def cobrar(store, reply, agora: float | None = None) -> dict | None:
 def resumo(store) -> dict:
     m = medir(store)
     r = m.pop("_resumo")
-    return {"resultados": [{"chave": k, **v} for k, v in m.items()], "cota": COTA_PRODUTO, "marco": store.get("norte_marco"),
+    return {"resultados": [{"chave": k, **v} for k, v in m.items()], "cota": cota(store), "marco": store.get("norte_marco"),
+            "estrategia": store.get("norte_estrategia"),
             "fracao_24h": fracao_produto_recente(store), "prefere_produto": prefere_produto(store), **r}

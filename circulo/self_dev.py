@@ -301,7 +301,7 @@ class SelfDeveloper:
                  or (item_de_produto(self.s, ESPERA_PR) if prefere_produto(self.s) else None)
                  or self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
                  # pedido é hipótese: só entra depois de estudado (pesquisa em fontes confiáveis + veredito)
-                 or self.s.one("SELECT * FROM roadmap WHERE origem='pedido_cassio' AND status='pendente' AND COALESCE(desativado,0)=0 "
+                 or self.s.one("SELECT * FROM roadmap WHERE origem IN ('pedido_cassio','referencia') AND status='pendente' AND COALESCE(desativado,0)=0 "
                                "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + " ORDER BY ordem LIMIT 1")
                  or self.s.one("SELECT * FROM roadmap WHERE origem='loop' AND status='pendente' AND COALESCE(desativado,0)=0 "   # por último, o que o próprio loop planejou a partir da evidência (também estudado)
                                "AND estudo IS NOT NULL" + ESPERA_PR + " ORDER BY ordem LIMIT 1"))
@@ -371,7 +371,7 @@ class SelfDeveloper:
             vistos, args = {int(i["id"]) for i in out}, tuple(ocupados)
             fora = (f" AND id NOT IN ({','.join(map(str, vistos))})" if vistos else "") + (" AND COALESCE(modulo,'') NOT IN (%s)" % ",".join("?" * len(args)) if args else "")
             r = (self.s.one("SELECT * FROM roadmap WHERE origem='erro' AND status='pendente' AND COALESCE(desativado,0)=0" + ESPERA_PR + fora + " ORDER BY ordem LIMIT 1", args)
-                 or self.s.one("SELECT * FROM roadmap WHERE origem IN ('pedido_cassio','loop') AND status='pendente' AND COALESCE(desativado,0)=0 "
+                 or self.s.one("SELECT * FROM roadmap WHERE origem IN ('pedido_cassio','referencia','loop') AND status='pendente' AND COALESCE(desativado,0)=0 "
                                "AND estudo IS NOT NULL AND evidencia NOT LIKE '%depende de você%'" + ESPERA_PR + fora + " ORDER BY ordem LIMIT 1", args))
             if not r:
                 break

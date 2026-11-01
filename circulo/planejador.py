@@ -136,7 +136,7 @@ class Planejador:
             return f"Claude Code no limite de uso até {lim['hora']}"     # o próprio Planejador viu o limite: até o reset, nem chama
         # fila com folga: o Developer trabalha num item enquanto o próximo já está planejado e estudado. Planeja quando
         # há menos de FOLGA itens prontos ou a caminho (pendentes do loop/seus, estudados ou esperando estudo).
-        fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','loop') "
+        fila = self.s.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND origem IN ('pedido_cassio','referencia','loop') "
                           "AND evidencia NOT LIKE '%depende de você%'")["n"]
         if fila >= FOLGA:
             return f"{FILA_CHEIA} ({fila} itens)"

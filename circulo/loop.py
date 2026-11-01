@@ -53,7 +53,7 @@ TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop
            "checar_licoes": "Reexecutando no main os testes das lições para fechar ou reabrir",
            "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev",
            "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana",
-           "pesquisar_mercado": "Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal)"}
+           "pesquisar_mercado": "Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal + 1 repositório/dia)"}
 IDLE_COST = {"documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000, "pesquisar_mercado": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
@@ -573,7 +573,7 @@ class Circle:
             return indagador.precisa(self.store, self.engine)
         if t == "pesquisar_mercado":
             from . import mercado
-            return self.ctx.dl.llm is not None and mercado.devida(self.store)
+            return self.ctx.dl.llm is not None and (mercado.devida(self.store) or mercado.repo_devido(self.store))
         return False
 
     # ------------------------------------------------------------ neurônio de progresso
@@ -694,7 +694,7 @@ class Circle:
             jtbd.antecipar(self.store)
         elif pick == "pesquisar_mercado":
             from . import mercado
-            mercado.pesquisar(self.ctx)
+            mercado.pesquisar(self.ctx) if mercado.devida(self.store) else mercado.estudar_repositorio(self.ctx)   # semanal; senão 1 repo/dia
         elif pick == "documentar":
             from . import documentador
             documentador.rodar(self.ctx, gh=getattr(self.gate, "gh", None))

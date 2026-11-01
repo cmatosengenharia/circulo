@@ -60,6 +60,12 @@ def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
             shutil.move(str(arq), str(pasta / "invalidos" / arq.name))
             continue
         tipo = cab.get("tipo", "pedido").lower()
+        if tipo == "referencia":                     # URL de repositório de referência: entra no rodízio de estudo diário
+            urls = re.findall(r"https?://\S+", texto)
+            lista = list(store.get("repos_referencia") or __import__("circulo.mercado", fromlist=["REPOS"]).REPOS)
+            store.set("repos_referencia", lista + [u for u in urls if u not in lista])
+            shutil.move(str(arq), str(pasta / "lidos" / f"{time.strftime('%Y-%m-%d_%H%M%S', time.localtime(agora))}-ref-{arq.name}"))
+            continue
         if tipo == "missao":
             eid = store.enqueue("novo_projeto", {"pedido": texto, "at": agora, "origem": "caixa", "arquivo": arq.name})
         else:

@@ -101,7 +101,8 @@ def candidatas(ctx, project: dict | None) -> list[dict]:
                      "evidencia": {**p.evidencia, "base": "medido"}} for p in Conselho(ctx).candidatas()]
         # 31/10: as perguntas de produto (Norte, épicos) entravam por último e o corte em MAX_CANDIDATAS as deixava de fora
         # em quase toda passagem; agora VAGAS_PRODUTO delas vão na frente do funil e do especialista
-        produto = [c for c in conselho if c.get("eixo") == "produto"][:VAGAS_PRODUTO]
+        vagas = int((s.get("norte_estrategia") or {}).get("vagas", VAGAS_PRODUTO))      # a autonomia pode abrir mais vagas
+        produto = [c for c in conselho if c.get("eixo") == "produto"][:vagas]
         out = produto + candidatas_funil(s)
         out += sorted(candidatas_especialista(s), key=lambda c: -c["relevancia"])
         out += [c for c in conselho if c not in produto]
