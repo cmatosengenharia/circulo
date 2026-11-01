@@ -250,12 +250,16 @@ class DeveloperComReparo(SelfDeveloper):
     def _licoes_txt(self, item_id: int | None = None) -> str:
         """O contexto do prompt mais o AGENTS.md da tarefa (fora do grupo de controle); o evento dela fica gravado."""
         txt = super()._licoes_txt(item_id)
-        item = self.s.one("SELECT titulo FROM roadmap WHERE id=?", (item_id,)) if item_id else None
+        item = self.s.one("SELECT titulo, detalhe FROM roadmap WHERE id=?", (item_id,)) if item_id else None
         if item is None:
             return txt
         conv = convencoes(self.repo, item["titulo"])
         registrar_convencoes(self.s, item["titulo"], conv)
-        return txt + conv["texto"]
+        from . import skills
+        escolhidas = skills.para_tarefa(getattr(self.ctx, "dl", None), dict(item), self.repo)    # o Jev escolhe a skill da tarefa
+        if escolhidas:
+            self.s.set("skills_uso", {**(self.s.get("skills_uso") or {}), item["titulo"][:120]: [s["nome"] for s in escolhidas]})
+        return txt + conv["texto"] + skills.texto_para_prompt(escolhidas)
 
     def run_once(self, item_id: int | None = None, autorizado: bool = False) -> DevResult:
         self._reabrir()

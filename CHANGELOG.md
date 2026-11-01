@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.73.0 — 2026-10-31
+
+**Skills reutilizadas: catálogo de 38 skills prontas, instalação por PR, o Jev escolhe a skill de cada tarefa.**
+
+- Cássio: "pegar vários repos que já possuem skills preparadas (frontend profissional, vídeo para Instagram/YouTube,
+  economia de tokens, arquitetura, segurança) e implementar no ecossistema do loop".
+- `circulo/skills.py`: `CATALOGO` (anthropics/skills: docx/pdf/pptx/xlsx, frontend-design, web-artifacts-builder,
+  canvas-design, theme-factory, webapp-testing, slack-gif-creator, mcp-builder, skill-creator; obra/superpowers:
+  brainstorming, writing-plans, test-driven-development, systematic-debugging, verification-before-completion,
+  using-git-worktrees, subagent-driven-development; trailofbits/skills: differential-review, insecure-defaults,
+  semgrep, supply-chain-risk-auditor, sharp-edges, agentic-actions-auditor; remotion-dev/skills: best-practices,
+  create, captions, render; google-labs-code shadcn-ui; microsoft frontend-design-review e cloud-solution-architect;
+  cloudflare web-perf e security-audit; vercel next-best-practices; supabase postgres; testmu-ai pytest/playwright).
+  kv `skills_catalogo` sobrescreve.
+- `pedir_instalacao` (SRE, 1×/dia, 3 por dia): item de origem `referencia` por skill, para o Developer copiar a pasta
+  da skill para `.claude/skills/<nome>/` por PR conferindo a licença (source-available/sem licença: só o SKILL.md com
+  atribuição). O Claude Code do Developer carrega as skills do repositório automaticamente.
+- `para_tarefa`: a cada tarefa o Jev escolhe (`skills_para_tarefa`, regra local por sobreposição de palavras; tela/
+  painel/html puxa a de frontend) a skill instalada que serve, e o prompt diz qual usar; kv `skills_uso` registra.
+- Testes: `tests/test_skills.py`.
+
 ## 1.72.1 — 2026-10-31
 
 **Garimpo: a camada que varre o GitHub pelo que o loop precisa agora.**

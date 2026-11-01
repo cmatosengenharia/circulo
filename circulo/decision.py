@@ -201,7 +201,7 @@ class LocalJev:
                 v = self._valor_missao(c) if c else 0
                 out[qid] = Decision(qid, "score", 2.0 if v >= 2.5 else 1.0 if v >= 0.6 else 0.0, 0.6, self.source)
                 continue
-            if qid.startswith(("indaga_", "vigia_", "revisor_", "assunto_")):      # a heurística mora no módulo do agente
+            if qid.startswith(("indaga_", "vigia_", "revisor_", "assunto_", "skills_")):      # a heurística mora no módulo do agente
                 out[qid] = self._agente(qid, q, state)
                 continue
             if qid.startswith("mens_"):
@@ -233,8 +233,8 @@ class LocalJev:
         return Decision(qid, "noul", p, abs(2 * p - 1), self.source)
 
     def _agente(self, qid, q: Question, state):
-        from . import assuntos, indagador, revisor, vigia
-        mod = {"indaga": indagador, "vigia": vigia, "revisor": revisor, "assunto": assuntos}[qid.split("_", 1)[0]]
+        from . import assuntos, indagador, revisor, skills, vigia
+        mod = {"indaga": indagador, "vigia": vigia, "revisor": revisor, "assunto": assuntos, "skills": skills}[qid.split("_", 1)[0]]
         return mod.regra(self, qid, q, state)
 
     # --- porteiros
