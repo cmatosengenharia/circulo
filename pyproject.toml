@@ -21,7 +21,8 @@ build-backend = "setuptools.build_meta"
 packages = ["circulo", "fabrica"]
 
 [tool.setuptools.package-data]
-circulo = ["painel.html", "home.html", "integracoes.html", "rastros.html", "fluxo.html", "equipe.html", "aprovacoes.html", "trabalho.html", "assunto.html", "DESIGN.md", "jobs_rotulados.json"]
+circulo = ["painel.html", "home.html", "integracoes.html", "rastros.html", "fluxo.html", "equipe.html", "aprovacoes.html", "trabalho.html", "assunto.html", "DESIGN.md", "jobs_rotulados.json",
+           "modelos/**/*", "modelos/*/.github/workflows/*"]
 fabrica = ["painel.html", "README.md"]
 
 [tool.ruff.lint.per-file-ignores]

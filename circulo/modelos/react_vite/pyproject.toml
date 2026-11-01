@@ -1,0 +1,2 @@
+[tool.circulo]
+testes = "node --test"
