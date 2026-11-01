@@ -452,7 +452,7 @@ def make_handler(db_path: str):
                 self._sse_fluxo(int(v) if v.isdigit() else 0, int(m) if m.isdigit() else 0)
             elif u.path == "/api/equipe":
                 from .equipe import retrato
-                self._json(retrato(self._store()))
+                self._json(retrato(self._store(), q.get("pedido", [""])[0][:120]))
             elif u.path == "/metrics":
                 from .observabilidade import prometheus
                 body = prometheus(self._store()).encode()

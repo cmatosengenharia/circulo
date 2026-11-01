@@ -342,7 +342,8 @@ def quadro(store: Store) -> list[dict]:
     ]
 
 
-def retrato(store: Store) -> dict[str, Any]:
+def retrato(store: Store, pedido: str | None = None) -> dict[str, Any]:
+    """Quem faz o quê e o quadro; com `pedido` (ev<N>), também o fio daquele pedido até o merge (caminho.caminho)."""
     ativo, detalhe, desde = _agora(store)
     carga = _carga(store)
     ritmo = store.get("ritmo") or {}
@@ -366,9 +367,13 @@ def retrato(store: Store) -> dict[str, Any]:
                         "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")})
     q = quadro(store)
     motivo.alertar_sem_motivo(store, sorted({k["id"] for col in q for k in col["cards"] if (k.get("motivo") or {}).get("codigo") == "sem_motivo"}))
-    return {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
-            "gargalo": cap.get("gargalo"), "paralelo": cap.get("paralelo") or {},
-            "quadro": q, "tick": store.tick}
+    r = {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,
+         "gargalo": cap.get("gargalo"), "paralelo": cap.get("paralelo") or {},
+         "quadro": q, "tick": store.tick}
+    if pedido:
+        from .caminho import caminho
+        r["pedido"] = caminho(store, pedido)
+    return r
 
 
 def resumo_json(store: Store) -> str:
