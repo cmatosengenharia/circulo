@@ -224,20 +224,21 @@ def ver(store: Store, nome: str) -> dict | None:
 
 
 def perguntar(store: Store, pergunta: str, k: int = 5) -> list[dict]:
-    """As notas que respondem à pergunta: primeiro o que o Graft acha por significado, depois por palavra."""
+    """As notas que respondem à pergunta: primeiro o que o Graft acha por significado, depois por palavra. Cada nota diz
+    `por`: "palavra" se divide algum termo com a pergunta, "significado" se só o Graft a achou."""
     preparar(store)
     tipo = next((t for t, rx in FILTRO.items() if rx.search(pergunta or "")), None)
     rows = {r["id"]: r for r in store.q(_SELECT + (" WHERE n.tipo=?" if tipo else ""), (tipo,) if tipo else ())}
     ordem = [int(h["ref"]) for h in graft.recuperar(pergunta, k=12)
              if h.get("tipo") == "assunto_nota" and str(h.get("ref", "")).isdigit() and int(h["ref"]) in rows]
     q = set(termos(pergunta, 30)) - {"decidimos", "decidiu", "decisao", "decisoes", "pendencia", "pendencias", "link", "links"}
-    lexico = sorted(((len(q & set(termos(r["texto"] + " " + r["nome"], 40))), r["created_at"], i) for i, r in rows.items()),
-                    reverse=True)
-    ordem += [i for p, _, i in lexico if p > 0]
-    return [_nota(rows[i]) for i in dict.fromkeys(ordem)][:k]
+    pontos = {i: len(q & set(termos(r["texto"] + " " + r["nome"], 40))) for i, r in rows.items()}
+    ordem += [i for _, _, i in sorted(((p, rows[i]["created_at"], i) for i, p in pontos.items() if p > 0), reverse=True)]
+    return [{**_nota(rows[i]), "por": "palavra" if pontos[i] else "significado"} for i in dict.fromkeys(ordem)][:k]
 
 
 def responder(notas: list[dict]) -> str:
     if not notas:
         return "Não achei nada anotado sobre isso."
-    return "\n".join(f"{n['data']} · [{n['assunto']}] {n['texto']} (nota #{n['id']}: \"{n['origem']}\")" for n in notas)
+    return "\n".join(f"{n['data']} · [{n['assunto']}] {n['texto']}{' (por significado)' if n.get('por') == 'significado' else ''}"
+                     f" (nota #{n['id']}: \"{n['origem']}\")" for n in notas)
