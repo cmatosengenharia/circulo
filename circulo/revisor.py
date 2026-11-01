@@ -8,7 +8,8 @@ paralelização não traz conflito nem quebra:
    - traz a main atual para a branch: conflito = rejeita; sem conflito, roda lint e testes de novo (o código que passava
      na main de uma hora atrás pode quebrar na de agora);
    - compara os arquivos mudados com os dos outros PRs abertos do Developer: arquivo compartilhado = rejeita (o mais
-     antigo tem prioridade; o item espera aquele PR fechar);
+     antigo tem prioridade; o item espera aquele PR fechar); e com a pegada do item que outro Developer faz em
+     paralelo e ainda não tem PR (`em_uso`): módulo em uso pelo outro = rejeita;
    - simula o merge com cada branch aberta (`git merge-tree`): conflito = rejeita.
 2. no gate (`no_gate`), para PR já aberto: arquivo compartilhado com um PR mais antigo ainda aberto = rejeita.
 
@@ -68,6 +69,24 @@ def compartilhados(arquivos: list[str], outros: list[dict]) -> list[dict]:
         comum = sorted(meus & {a for a in (o.get("arquivos") or []) if a not in NAO_CONTA})
         if comum:
             out.append({"pr": o["number"], "item_id": o.get("item_id"), "arquivos": comum})
+    return out
+
+
+EM_USO_S = 2 * 3600          # item em andamento há mais que isso não segura ninguém (sessão do agente: até 1 h)
+
+
+def em_uso(store, item_id: int, arquivos: list[str]) -> list[dict]:
+    """Com quais itens que outro Developer está fazendo agora (em andamento, ainda sem PR aberto) estes arquivos se
+    cruzam, pela pegada que o Escalador estima (capacidade.pegada): o PR aberto ainda não existe para comparar."""
+    from .capacidade import pegada
+    meus = {a for a in arquivos if a not in NAO_CONTA}
+    rows = store.q("SELECT * FROM roadmap WHERE status='em_andamento' AND id<>? AND updated_at>=? AND NOT EXISTS "
+                   "(SELECT 1 FROM prs WHERE prs.status='aberto' AND prs.item_id=roadmap.id) ORDER BY id", (item_id, time.time() - EM_USO_S))
+    out = []
+    for r in rows:
+        comum = sorted(meus & pegada(dict(r)))
+        if comum:
+            out.append({"item_id": r["id"], "arquivos": comum})
     return out
 
 
@@ -306,6 +325,11 @@ def antes_do_pr(ctx, wt: Path, item: dict, arquivos: list[str], autor: tuple[str
             c = ev["compartilhados"][0]
             aguarda = c["pr"]
             motivo = f"compartilha {', '.join(c['arquivos'][:4])} com o PR #{c['pr']} (mais antigo, ainda aberto)"
+    if not motivo:
+        ev["em_uso"] = em_uso(s, item["id"], arquivos)
+        if ev["em_uso"]:
+            u = ev["em_uso"][0]
+            motivo = f"toca {', '.join(u['arquivos'][:4])}, em uso pelo item #{u['item_id']} (outro Developer em paralelo, ainda sem PR)"
     if not motivo and outros:
         for o in outros:
             _git(["fetch", "-q", "origin", o["branch"]], wt)
