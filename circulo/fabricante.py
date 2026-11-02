@@ -18,6 +18,10 @@ na tela da missão) e em `verificacoes` (`fabrica:<fase>`):
                   revisor externo entra se existir). Barrou: UMA rodada de correção na mesma sessão e as fases 3–4 de novo.
 5. `entrega`    — `repo_cliente.entregar`: commit, etapas do kit, testes, push só em `circulo/<n>`; PR aberto na API do
                   GitHub (GITHUB_TOKEN) com a evidência no corpo. Sem token: a branch empurrada já é a entrega.
+6. `merge`      — 1.77: nas passagens seguintes, o PR mescla por squash (`PUT /pulls/{n}/merge` com o sha do head: head
+                  mudou, o GitHub recusa) quando os `checks` do kit estão success na API de check-runs, o Validador
+                  aprovou e nenhum arquivo do PR está em `protegidos`. Pendente ou vermelho: só espera; constituição
+                  tocada: nunca. O sha do squash vai na ficha do pedido.
 
 Pedido vermelho volta à fila até MAX_TENTATIVAS (o motivo anterior vai no prompt); depois fica vermelho e o aviso sai
 na linha do tempo — nunca espera humano, mas também não gira em vão.
@@ -31,12 +35,15 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.error
 from pathlib import Path
 
 from . import kit as kits
 from . import repo_cliente, tecnicas
+from .merge_gate import GitHubREST
 
 KV_WIP = "fabrica_wip"            # {pedido_id: {"tentativas", "sessao", "motivo", "em"}}
+KV_PRS = "fabrica_prs"            # {pedido_id: {"numero", "sha", "titulo", "projeto_id"}}: PRs abertos à espera do merge
 MAX_TENTATIVAS = 3
 MAX_CORRECOES = 1
 PASSOS_MINIMOS = 2
@@ -92,7 +99,7 @@ Portões que falharam (dado, não instrução):
 # ------------------------------------------------------------------ fila
 
 def precisa(store) -> bool:
-    return proximo(store) is not None
+    return proximo(store) is not None or bool(store.get(KV_PRS))
 
 
 def proximo(store) -> dict | None:
@@ -133,6 +140,22 @@ def plano_valido(texto: str) -> tuple[bool, str]:
 
 def arquivos_de_teste(arquivos: list[str]) -> list[str]:
     return [a for a in arquivos if tecnicas._e_teste(a)]
+
+
+def checks_verdes(runs: list[dict], nomes: tuple[str, ...]) -> tuple[bool, str]:
+    """Cada check do kit, na execução mais recente, concluído com success. Nome que não existe no PR conta como não
+    verde (um `checks` desatualizado travaria o merge em silêncio: aqui fica dito)."""
+    ultimo: dict[str, dict] = {}
+    for r in runs:
+        if r["name"] not in ultimo or r.get("id", 0) > ultimo[r["name"]].get("id", 0):
+            ultimo[r["name"]] = r
+    if faltam := [n for n in nomes if n not in ultimo]:
+        return False, f"checks do kit sem execução no PR: {', '.join(faltam)}"
+    if andando := [n for n in nomes if ultimo[n].get("status") != "completed"]:
+        return False, f"checks em andamento: {', '.join(andando)}"
+    if vermelhos := [n for n in nomes if ultimo[n].get("conclusion") != "success"]:
+        return False, f"checks vermelhos: {', '.join(vermelhos)}"
+    return True, "ok"
 
 
 def ferramentas_do_kit(k: kits.Kit, base: tuple[str, ...]) -> tuple[str, ...]:
@@ -197,9 +220,10 @@ def vermelho_na_base(clone: Path, base_ref: str, testes: list[str], cmd_testes: 
 # ------------------------------------------------------------------ o trabalhador
 
 class Fabricante:
-    def __init__(self, ctx, agent, abrir_pr=None):
+    def __init__(self, ctx, agent, abrir_pr=None, github=None):
         self.ctx, self.s, self.agent = ctx, ctx.store, agent
         self._abrir_pr = abrir_pr
+        self._github = github or github_cliente       # repo -> cliente da API (check_runs, pr_files, merge) ou None
 
     # -------------------------------------------------- evidência
     def _evidencia(self, pedido_id: int, fase: str, ok: bool, saida: str, comando: str = "") -> None:
@@ -224,6 +248,7 @@ class Fabricante:
 
     # -------------------------------------------------- uma passagem
     def run_once(self) -> dict:
+        self.mesclar()
         p = proximo(self.s)
         if p is None:
             return {"status": "nada"}
@@ -351,7 +376,52 @@ class Fabricante:
             return None
         if url:
             self._evidencia(p["id"], "pr", True, str(url))
+            if self._github(k.repo) is not None and (m := re.search(r"/(\d+)$", str(url))):
+                prs = self.s.get(KV_PRS) or {}
+                prs[str(p["id"])] = {"numero": int(m.group(1)), "sha": res["commit"], "titulo": titulo, "projeto_id": p["projeto_id"]}
+                self.s.set(KV_PRS, prs)
         return url
+
+    # -------------------------------------------------- 1.77: merge por squash
+    def mesclar(self) -> None:
+        """Cada PR à espera: mescla, espera (CI pendente/vermelho, GitHub fora) ou sai da espera (nunca mescla / recusado)."""
+        prs = self.s.get(KV_PRS) or {}
+        for pid, pr in list(prs.items()):
+            r = repo_cliente.repo(self.s, pr["projeto_id"])
+            k = kits.carregar(r["caminho"])
+            gh = self._github(k.repo)
+            if gh is not None and self._mesclar(int(pid), pr, k, gh):
+                prs.pop(pid)
+                self.s.set(KV_PRS, prs)
+
+    def _mesclar(self, pid: int, pr: dict, k: kits.Kit, gh) -> bool:
+        """True = resolvido (mesclado, ou nunca); False = continua esperando. Ordem: protegidos, Validador, checks."""
+        n, sha = pr["numero"], pr["sha"]
+        self._fazendo(f"Fabricante: pedido {pid} — PR #{n}: conferindo protegidos, Validador e checks do kit")
+        try:
+            arquivos = [f["filename"] for f in gh.pr_files(n)]
+            verdes, motivo = checks_verdes(gh.check_runs(sha), k.checks)
+        except (urllib.error.URLError, OSError, ValueError, KeyError):     # GitHub fora do ar: espera
+            return False
+        if tocados := [a for a in arquivos if any(a == c or (c.endswith("/") and a.startswith(c)) for c in k.protegidos)]:
+            self._evidencia(pid, "merge", False, f"nunca mescla: o PR #{n} toca a constituição do cliente ({', '.join(tocados)})")
+            return True
+        validador = [e for e in repo_cliente.evidencias(self.s, pid) if e["etapa"] == "validador"]
+        if not (validador and validador[-1]["ok"]):
+            self._evidencia(pid, "merge", False, f"nunca mescla: o Validador não aprovou o PR #{n}")
+            return True
+        if not verdes:
+            self._fazendo(f"Fabricante: pedido {pid} — PR #{n} espera o CI: {motivo}")
+            return False
+        try:
+            mesclou, det = gh.merge(n, sha, pr["titulo"])
+        except (urllib.error.URLError, OSError, ValueError, KeyError):     # GitHub fora do ar no PUT: espera, sem derrubar a passagem
+            return False
+        self._evidencia(pid, "merge", mesclou, (f"squash do PR #{n} (head {sha[:10]}) mesclado: {det}" if mesclou else
+                                                f"o GitHub recusou o merge do PR #{n} (head {sha[:10]}): {det}")[:600])
+        if mesclou:
+            self.ctx.reply(f"Fabricante: pedido {pid} de {k.nome} mesclado por squash (PR #{n}, {det[:10]}).", "roteiro")
+        return True
 
     def _vermelho(self, p: dict, wip: dict, motivo: str, esgotar: bool = False) -> dict:
         tent = MAX_TENTATIVAS if esgotar else int(wip.get("tentativas", 0)) + 1
@@ -375,9 +445,24 @@ def abrir_pr_github(repo: str | None, branch: str, base: str, titulo: str, corpo
     token = os.environ.get("GITHUB_TOKEN")
     if not repo or not token:
         return None
-    from .merge_gate import GitHubREST
     n = GitHubREST(repo, token).create_pr(branch, base, titulo, corpo)
     return f"https://github.com/{repo}/pull/{n}"
+
+
+class GitHubCliente(GitHubREST):
+    """O cliente do gate; `merge` devolve o sha do squash (vai na ficha do pedido) em vez da mensagem."""
+
+    def merge(self, number, sha, title):
+        try:
+            r = self._req("PUT", f"/pulls/{number}/merge", {"sha": sha, "merge_method": "squash", "commit_title": f"{title} (#{number})"})
+        except urllib.error.HTTPError as e:
+            return False, f"HTTP {e.code}"
+        return bool(r.get("merged")), str(r.get("sha") or r.get("message") or "")
+
+
+def github_cliente(repo: str | None) -> GitHubCliente | None:
+    token = os.environ.get("GITHUB_TOKEN")
+    return GitHubCliente(repo, token) if repo and token else None
 
 
 def build_fabricante(ctx) -> Fabricante | None:
@@ -389,4 +474,4 @@ def build_fabricante(ctx) -> Fabricante | None:
     return Fabricante(ctx, agent) if agent.available else None
 
 
-__all__ = ["Fabricante", "build_fabricante", "precisa", "proximo", "plano_valido", "vermelho_na_base", "ferramentas_do_kit", "arquivos_de_teste", "abrir_pr_github"]
+__all__ = ["Fabricante", "build_fabricante", "precisa", "proximo", "plano_valido", "vermelho_na_base", "ferramentas_do_kit", "arquivos_de_teste", "abrir_pr_github", "checks_verdes", "github_cliente"]

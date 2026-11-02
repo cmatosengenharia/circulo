@@ -262,6 +262,117 @@ def test_fabricar_vem_antes_do_trabalho_interno_do_loop_e_alterna_com_ele(fabric
     assert circle._trabalho_pronto(tasks)[0] == "fabricar"
 
 
+# ---------------------------------------------------------------- 1.77: auto-merge squash do PR do cliente
+VERDE = [{"id": 1, "name": "Testes", "status": "completed", "conclusion": "success"}]
+
+
+class GitHubFalso:
+    """A API do cliente: check-runs do head, arquivos do PR e o merge por squash (recusa head divergente, como o GitHub)."""
+
+    def __init__(self, runs, arquivos=None):
+        self.runs, self.arquivos, self.merged, self.head = runs, arquivos or [{"filename": "calc.py"}, {"filename": "tests/teste_sub.py"}], [], None
+
+    def check_runs(self, sha):
+        return self.runs
+
+    def pr_files(self, n):
+        return self.arquivos
+
+    def merge(self, n, sha, titulo):
+        if self.head is not None and sha != self.head:
+            return False, "Head branch was modified. Review and try the merge again."
+        self.merged.append((n, sha, titulo))
+        return True, "5qu45h"
+
+
+def com_github(fabrica, gh) -> Fabricante:
+    return Fabricante(fabrica["circle"].ctx, AgenteFalso(), abrir_pr=fabrica["fab"]._abrir_pr, github=lambda repo: gh)
+
+
+def _merge(store, pedido_id):
+    return [e for e in repo_cliente.evidencias(store, pedido_id) if e["etapa"] == "merge"]
+
+
+def test_pr_do_cliente_mescla_por_squash_com_checks_verdes_validador_ok_e_nada_protegido(fabrica):
+    """Verde mescla: checks do kit (`Testes`) success na API de check-runs, Validador aprovado, nenhum arquivo em
+    `protegidos`; squash pela API com o sha do head; `fabrica:merge` em verificacoes e o sha do merge na ficha."""
+    store, pedido = fabrica["store"], fabrica["pedido"]
+    gh = GitHubFalso(VERDE)
+    fab = com_github(fabrica, gh)
+    assert fab.run_once()["status"] == "entregue" and gh.merged == []          # o CI é assíncrono: mescla na passagem seguinte
+    assert fabricante.precisa(store)                                           # PR pendente de merge é trabalho
+    assert fab.run_once() == {"status": "nada"}
+    head = store.one("SELECT commit_sha FROM pedidos_repo WHERE id=?", (pedido["id"],))["commit_sha"]
+    assert gh.merged == [(pedido["id"], head, "Criar a função subtrair em calc.py")]
+    [m] = _merge(store, pedido["id"])
+    assert m["ok"] and "5qu45h" in m["saida"]
+    assert store.one("SELECT ok FROM verificacoes WHERE ponto='fabrica:merge' ORDER BY id DESC")["ok"] == 1
+    assert not fabricante.precisa(store) and fab.run_once() == {"status": "nada"} and len(gh.merged) == 1
+
+
+def test_pr_do_cliente_com_check_vermelho_pendente_ou_ausente_so_espera(fabrica):
+    store, pedido = fabrica["store"], fabrica["pedido"]
+    gh = GitHubFalso([{"id": 1, "name": "Testes", "status": "completed", "conclusion": "failure"}])
+    fab = com_github(fabrica, gh)
+    assert fab.run_once()["status"] == "entregue"
+    for runs in ([{"id": 1, "name": "Testes", "status": "completed", "conclusion": "failure"}],
+                 [{"id": 2, "name": "Testes", "status": "in_progress", "conclusion": None}],
+                 [{"id": 3, "name": "CI", "status": "completed", "conclusion": "success"}]):     # nome do kit não existe no PR
+        gh.runs = runs
+        assert fab.run_once() == {"status": "nada"} and gh.merged == [] and fabricante.precisa(store)
+    assert _merge(store, pedido["id"]) == []
+    gh.runs = [{"id": 1, "name": "Testes", "status": "completed", "conclusion": "failure"}, {"id": 4, "name": "Testes", "status": "completed", "conclusion": "success"}]
+    fab.run_once()
+    assert len(gh.merged) == 1 and _merge(store, pedido["id"])[0]["ok"]       # a execução mais recente do check decide
+
+
+def test_pr_do_cliente_que_toca_protegido_nunca_mescla_mesmo_verde(fabrica):
+    store, pedido = fabrica["store"], fabrica["pedido"]
+    gh = GitHubFalso(VERDE, arquivos=[{"filename": "calc.py"}, {"filename": ".github/workflows/ci.yml"}])
+    fab = com_github(fabrica, gh)
+    assert fab.run_once()["status"] == "entregue"
+    fab.run_once()
+    assert gh.merged == [] and not fabricante.precisa(store)                 # não fica esperando: nunca
+    [m] = _merge(store, pedido["id"])
+    assert not m["ok"] and ".github/" in m["saida"] and "nunca" in m["saida"]
+    assert store.one("SELECT ok FROM verificacoes WHERE ponto='fabrica:merge' ORDER BY id DESC")["ok"] == 0
+
+
+def test_merge_leva_o_sha_do_head_avaliado_e_head_divergente_nao_mescla(fabrica):
+    store, pedido = fabrica["store"], fabrica["pedido"]
+    gh = GitHubFalso(VERDE)
+    fab = com_github(fabrica, gh)
+    assert fab.run_once()["status"] == "entregue"
+    gh.head = "outro-commit-empurrado-depois"
+    fab.run_once()
+    assert gh.merged == [] and not fabricante.precisa(store)
+    [m] = _merge(store, pedido["id"])
+    assert not m["ok"] and "Head branch was modified" in m["saida"]
+
+
+def test_github_fora_do_ar_no_merge_so_espera_e_nao_derruba_a_passagem(fabrica):
+    """O PUT do merge falha com URLError (GitHub fora): a passagem do Fabricante segue, o PR continua à espera e
+    mescla quando o GitHub volta. Antes a exceção saía de `mesclar()`, no começo de `run_once()`, antes de `proximo()`."""
+    import urllib.error
+    store, pedido = fabrica["store"], fabrica["pedido"]
+    gh = GitHubFalso(VERDE)
+    fab = com_github(fabrica, gh)
+    assert fab.run_once()["status"] == "entregue"
+    fora = [True]
+    merge_real = gh.merge
+
+    def merge(n, sha, titulo):
+        if fora[0]:
+            raise urllib.error.URLError("api.github.com: connection refused")
+        return merge_real(n, sha, titulo)
+    gh.merge = merge
+    assert fab.run_once() == {"status": "nada"} and gh.merged == []
+    assert fabricante.precisa(store) and _merge(store, pedido["id"]) == []
+    fora[0] = False
+    fab.run_once()
+    assert len(gh.merged) == 1 and _merge(store, pedido["id"])[0]["ok"] and not fabricante.precisa(store)
+
+
 def test_pedido_que_depende_do_que_nao_existe_fica_bloqueado_sem_queimar_tentativas(fabrica):
     """Pedido #1 da esteira (Playwright no painel): o painel não existe; o agente explicou em vez de planejar e o pedido
     queimou 2 planos por tentativa. Agora ele responde `Bloqueado: …`, a ficha registra, o pedido fica vermelho sem
