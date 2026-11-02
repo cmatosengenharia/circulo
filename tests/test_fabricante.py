@@ -225,3 +225,21 @@ def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_pa
     fab.run_once()
     kit = [e for e in repo_cliente.evidencias(store, fabrica["pedido"]["id"]) if e["etapa"] == "kit"]
     assert kit and kit[0]["ok"] and "dotnet test Cliente.sln" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]
+
+
+# ---------------------------------------------------------------- 1.76.2: o card da missão de repositório mede o Fabricante
+def test_card_da_missao_repo_mede_pedidos_e_mostra_o_fabricante_trabalhando(fabrica):
+    """Cássio (1/11): 'temos o card esteira na interface sem dados de que está rodando'. O card de kit repo não tem ciclos
+    de missão: mede pedidos (fila, entregues, barrados), e 'Trabalhando agora' aparece quando o Fabricante está num pedido dele."""
+    from circulo import projects
+    store, reg, fab = fabrica["store"], fabrica["reg"], fabrica["fab"]
+    antes = next(c for c in projects.cards(store) if c["id"] == reg["id"])
+    assert antes["metricas"]["fabrica"] == {"abertos": 1, "entregues": 0, "vermelhos": 0, "trabalhados": 0}
+    assert antes["metricas"]["principal"]["rotulo"] == "Pedidos entregues" and antes["metricas"]["principal"]["valor"] == 0.0
+    assert antes["metricas"]["versao"] == "1 pedido(s)" and antes["agora"] is False
+    store.set("etapa", {"nome": "fabricante", "tick": store.tick, "em": 0, "projeto": reg["id"]})
+    assert next(c for c in projects.cards(store) if c["id"] == reg["id"])["agora"] is True
+    fab.run_once()
+    depois = next(c for c in projects.cards(store) if c["id"] == reg["id"])["metricas"]
+    assert depois["fabrica"]["entregues"] == 1 and depois["fabrica"]["trabalhados"] == 1 and depois["principal"]["valor"] == 1.0
+    assert depois["ciclos"] == 1 and depois["evolucoes"] == 1 and depois["prs"]["abertos"] == 1 and depois["erros_abertos"] == 0

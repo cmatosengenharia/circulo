@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.76.2 — 2026-11-02
+
+- Painel: o card de uma missão de repositório cliente (kit `repo`, a esteira) media ciclos de missão e por isso ficava
+  "sem dados": agora mede o Fabricante — pedidos na fila, entregues, barrados, trabalhados; KPI "Pedidos entregues";
+  "Trabalhando agora" quando o Fabricante está num pedido dele (a etapa `fabricante` leva o projeto do pedido).
+  Cássio (1/11): "temos o card esteira na interface sem dados de que está rodando".
+
 ## 1.76.1 — 2026-11-02
 
 - Fábrica: o clone registrado do cliente acompanha o remoto antes de cada trabalho (`repo_cliente.atualizar`: fetch +
