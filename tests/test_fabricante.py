@@ -243,3 +243,20 @@ def test_card_da_missao_repo_mede_pedidos_e_mostra_o_fabricante_trabalhando(fabr
     depois = next(c for c in projects.cards(store) if c["id"] == reg["id"])["metricas"]
     assert depois["fabrica"]["entregues"] == 1 and depois["fabrica"]["trabalhados"] == 1 and depois["principal"]["valor"] == 1.0
     assert depois["ciclos"] == 1 and depois["evolucoes"] == 1 and depois["prs"]["abertos"] == 1 and depois["erros_abertos"] == 0
+
+
+def test_fabricar_vem_antes_do_trabalho_interno_do_loop_e_alterna_com_ele(fabrica, monkeypatch):
+    """1.76.3: com pedido aberto, o giro vai ao Fabricante antes de estudar/corrigir item do loop; no giro seguinte o
+    espaço de 2 dá a vez ao trabalho interno; depois volta ao Fabricante. Antes, atrás de estudar/corrigir, nunca rodava."""
+    from circulo import loop as lp
+    circle = fabrica["circle"]
+    assert lp.TRABALHO.index("fabricar") < lp.TRABALHO.index("estudar_pedido") < lp.TRABALHO.index("corrigir_codigo")
+    monkeypatch.setattr(circle, "_tem_trabalho", lambda t: t in ("fabricar", "corrigir_codigo", "estudar_pedido"))
+    tasks = ["fabricar", "corrigir_codigo", "estudar_pedido"]
+    circle.store.set("idle_last", {})
+    assert circle._trabalho_pronto(tasks)[0] == "fabricar"
+    circle.store.set("idle_last", {"fabricar": circle.store.tick, "estudar_pedido": circle.store.tick})
+    pronto = circle._trabalho_pronto(tasks)
+    assert "fabricar" not in pronto and pronto[0] == "corrigir_codigo"                   # espaço de 2 giros: a vez do loop
+    circle.store.set("idle_last", {"fabricar": circle.store.tick - 2, "corrigir_codigo": circle.store.tick, "estudar_pedido": circle.store.tick - 2})
+    assert circle._trabalho_pronto(tasks)[0] == "fabricar"

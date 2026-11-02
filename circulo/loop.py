@@ -36,8 +36,9 @@ from .orcamento_dia import avisar_marcos, com_tokens_dia
 from .policy import PolicyStore
 from .state import Store
 
-TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "fabricar", "revisar_prs", "planejar_roteiro", "indagar", "pesquisar_mercado")
-ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
+TRABALHO = ("atualizar_corpo", "fabricar", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar", "pesquisar_mercado")
+ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2, "fabricar": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
+# 1.76.3: `fabricar` (produto do cliente) antes do trabalho interno do loop (Cássio: "MVP da esteira primeiro"); atrás de estudar/corrigir nunca rodava. Espaço 2: alternam.
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
