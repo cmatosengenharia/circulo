@@ -30,6 +30,7 @@ EQUIPE: dict[str, dict[str, str]] = {
     "planejar_roteiro": {"grupo": "produto", "faz": "Transforma a pergunta validada num item pequeno e medível do roteiro."},
     "estudar_pedido": {"grupo": "engenharia", "faz": "Pesquisa fontes confiáveis e decide adotar, adaptar ou contestar o item."},
     "corrigir_codigo": {"grupo": "engenharia", "faz": "Escreve o código e o teste num worktree, passa nos portões e abre o PR."},
+    "fabricar": {"grupo": "engenharia", "faz": "Plano, teste antes do código, técnicas e revisão cruzada num repositório cliente; empurra circulo/<pedido> e abre o PR com a evidência."},
     "revisor": {"grupo": "engenharia", "faz": "Confere cada PR contra a main de agora e os outros PRs abertos; devolve o que cruza."},
     "revisar_prs": {"grupo": "engenharia", "faz": "CI verde, teste novo, constituição intacta: mescla ou devolve com o motivo."},
     "atualizar_corpo": {"grupo": "engenharia", "faz": "Sobe o código novo em produção, prova em 5 giros e desfaz se piorar."},
@@ -52,7 +53,7 @@ ALIAS = {"shadow": "meta_learner", "pedido": "cassio", "decisao": "orquestrador"
          "analisar_padroes": "rotinas", "revisar_baixa_confianca": "rotinas", "rodar_regressao": "rotinas", "resumo": "rotinas",
          "propor_feature": "rotinas", "evoluir_harness": "rotinas", "conectar_missoes": "evoluir_projeto", "checar_licoes": "licoes",
          "indagador": "indagar", "developer": "corrigir_codigo", "gate": "revisar_prs", "planejador": "planejar_roteiro",
-         "estudo": "estudar_pedido", "corpo": "atualizar_corpo"}
+         "estudo": "estudar_pedido", "corpo": "atualizar_corpo", "fabricante": "fabricar"}
 TONS = ("pergunta", "resposta", "tarefa", "entrega", "devolucao", "alerta", "status")
 
 

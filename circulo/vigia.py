@@ -524,7 +524,7 @@ class Vigia:
         experimentos.avaliar(self.s, self.ctx.reply, now)           # janela vencida: melhorou/neutro/piorou/inconclusivo
         alavancas.girar(self.s, self.ctx.reply, now)                # uma alavanca de economia por vez, com guarda de qualidade
         praticas.retrospectivo(self.s, now, os.environ.get("CIRCULO_REPO_DIR"), self.ctx.reply)   # 1×/dia: até 3 práticas
-        norte.cobrar(self.s, self.ctx.reply, now)                    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita
+        norte.cobrar(self.s, self.ctx.reply, now, dl=self.ctx.dl)    # prazo de 2 dias do Norte: evoluiu ou a solução é reescrita; e a classe de cada item pendente (1.76)
         from . import conta
         try:
             conta.vigiar(self.s, self.ctx.reply, now)              # assinatura: sessão do Claude de pé, relogin quando cai

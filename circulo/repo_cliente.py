@@ -100,6 +100,33 @@ def registrar(store, pasta: str | Path, nome: str | None = None) -> dict:
     return {**repo(store, pid), "nome": k.nome, "avisos": k.avisos}
 
 
+def atualizar(store, pid: int) -> dict:
+    """O clone registrado acompanha o remoto antes de cada trabalho (1.76.1): `fetch` + fast-forward da base, só se o
+    clone está limpo e na base (nunca sobrescreve trabalho local), e o kit é relido — `testes`, `base` e as etapas de
+    `circulo.toml`/pyproject passam a valer. Sem rede, o clone fica como está e o kit registrado continua valendo.
+
+    Por quê: a esteira foi registrada antes de ter `circulo.toml`, e o loop guardou `python -m pytest` como teste de um
+    repositório .NET; o clone ficou 3 commits atrás e cada entrega sairia vermelha por causa do loop, não do pedido."""
+    r = repo(store, pid)
+    if r is None:
+        raise ValueError(f"projeto {pid} não é um repositório cliente (kit '{KIT}')")
+    pasta, res = Path(r["caminho"]), {"avancou": False, "kit_mudou": False, "erro": None}
+    try:
+        limpo = not _git(pasta, "status", "--porcelain") and _git(pasta, "branch", "--show-current") == r["base"]
+        if limpo:
+            antes = _git(pasta, "rev-parse", "HEAD")
+            _git(pasta, "fetch", "-q", "origin", r["base"], timeout=120)
+            _git(pasta, "merge", "-q", "--ff-only", f"origin/{r['base']}")
+            res["avancou"] = _git(pasta, "rev-parse", "HEAD") != antes
+    except (OSError, subprocess.SubprocessError) as exc:
+        res["erro"] = str(exc)[:200]
+    k = kits.carregar(pasta)
+    if k.testes != r["testes"]:
+        store.x("UPDATE repos_cliente SET testes=? WHERE projeto_id=?", (k.testes, pid))
+        res["kit_mudou"] = True
+    return {**res, "testes": k.testes}
+
+
 def repo(store, pid: int) -> dict | None:
     _esquema(store)
     r = store.one("SELECT projeto_id id, caminho, remoto, base, testes FROM repos_cliente WHERE projeto_id=?", (pid,))
@@ -136,16 +163,30 @@ def receber(store, pid: int, texto: str, raiz: Path) -> dict:
     n = store.x("INSERT INTO pedidos_repo(projeto_id,texto,status,created_at,updated_at) VALUES(?,?,'aberto',?,?)", (pid, texto, agora, agora))
     branch, clone = f"{PREFIXO}{n}", raiz / f"projeto-{pid}" / f"pedido-{n}"
     try:
-        shutil.rmtree(clone, ignore_errors=True)
-        clone.parent.mkdir(parents=True, exist_ok=True)
-        _git(clone.parent, "clone", "-q", "--branch", r["base"], "--single-branch", r["remoto"], clone.name, timeout=600)
-        _git(clone, "checkout", "-q", "-b", branch)
+        _clonar(r, branch, clone)
     except (OSError, subprocess.SubprocessError):
         store.x("DELETE FROM pedidos_repo WHERE id=?", (n,))
         raise
     store.x("UPDATE pedidos_repo SET branch=?, pasta=? WHERE id=?", (branch, str(clone), n))
     _etapa(store, n, r["caminho"], clone, "pedido")
     return _pedido(store, n)
+
+
+def _clonar(r: dict, branch: str, clone: Path) -> None:
+    shutil.rmtree(clone, ignore_errors=True)
+    clone.parent.mkdir(parents=True, exist_ok=True)
+    _git(clone.parent, "clone", "-q", "--branch", r["base"], "--single-branch", r["remoto"], clone.name, timeout=600)
+    _git(clone, "checkout", "-q", "-b", branch)
+
+
+def reclonar(store, pedido_id: int) -> dict:
+    """O clone do pedido sumiu (máquina trocada, pasta apagada): refaz na mesma pasta e branch (1.75, Fabricante)."""
+    p = _pedido(store, pedido_id)
+    r = repo(store, p["projeto_id"])
+    if r is None or not p.get("pasta") or not p.get("branch"):
+        raise ValueError(f"pedido {pedido_id} sem repositório, pasta ou branch")
+    _clonar(r, p["branch"], Path(p["pasta"]))
+    return _pedido(store, pedido_id)
 
 
 def _etapa(store, pedido_id: int, caminho: str, clone: Path, etapa: str) -> bool:
@@ -216,4 +257,4 @@ def vermelho(store, pedido_id: int) -> None:
     store.x("UPDATE pedidos_repo SET status='vermelho', updated_at=? WHERE id=?", (time.time(), pedido_id))
 
 
-__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar", "vermelho", "evidencias", "fichas"]
+__all__ = ["KIT", "PREFIXO", "registrar", "atualizar", "repo", "repos", "pedidos", "receber", "reclonar", "entregar", "vermelho", "evidencias", "fichas"]

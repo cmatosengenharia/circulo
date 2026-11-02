@@ -251,9 +251,19 @@ def metricas(store: Store, p) -> dict:
         m["commits"] = repo_stats()
         m["principal"] = {"rotulo": "Roteiro concluído", "valor": rot.get("feito", 0) / total, "formato": "pct", "historico": [],
                           "ajuda": "Pedidos seus e correções que o próprio loop registrou, já entregues."}
-    elif kit == "repo":
+    elif kit == "repo":                                     # 1.76.2: o card mede o Fabricante, não ciclos de missão
         from .repo_cliente import fichas
         m["pedidos"] = fichas(store, pid)
+        est = {r["status"]: r["n"] for r in store.q("SELECT status, COUNT(*) n FROM pedidos_repo WHERE projeto_id=? GROUP BY status", (pid,))}
+        total = sum(est.values())
+        m["fabrica"] = {"abertos": est.get("aberto", 0), "entregues": est.get("entregue", 0), "vermelhos": est.get("vermelho", 0),
+                        "trabalhados": store.one("SELECT COUNT(DISTINCT e.pedido_id) n FROM etapas_repo e JOIN pedidos_repo p ON p.id=e.pedido_id WHERE p.projeto_id=?", (pid,))["n"]}
+        m["ciclos"], m["evolucoes"] = m["fabrica"]["trabalhados"], m["fabrica"]["entregues"]
+        m["prs"] = {"abertos": m["fabrica"]["entregues"], "mergeados": m["prs"]["mergeados"]}
+        m["erros_abertos"] = m["fabrica"]["vermelhos"]
+        m["versao"] = f"{total} pedido(s)"
+        m["principal"] = {"rotulo": "Pedidos entregues", "valor": (m["fabrica"]["entregues"] / total) if total else None, "formato": "pct", "historico": [],
+                          "ajuda": "Pedidos deste repositório que o Fabricante entregou como PR (plano, teste antes do código, testes do cliente, portões)."}
     return m
 
 

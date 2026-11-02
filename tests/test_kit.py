@@ -96,3 +96,12 @@ def test_regra_declarada_numa_etapa_vira_checagem_no_repositorio(tmp_path):
     assert kit.checar(k, "pr") == ["test -f GAIA.md"]                                   # roda na pasta do repositório
     (r / "GAIA.md").write_text("ok")
     assert kit.checar(k, "pr") == []
+
+
+def test_circulo_toml_declara_o_kit_de_repositorio_que_nao_e_python(tmp_path):
+    """1.75 (ADR 0014): a Esteira em .NET declara as mesmas chaves em circulo.toml; o kit lê, inclusive as etapas."""
+    (tmp_path / "circulo.toml").write_text('nome = "esteira"\nrepo = "x/esteira"\ntestes = "dotnet test E.sln"\nprotegidos = [".github/", "circulo.toml"]\n'
+                                           '[etapas]\npr = ["bash scripts/portoes.sh"]\n', encoding="utf-8")
+    k = kit.carregar(tmp_path)
+    assert (k.nome, k.repo, k.testes, k.protegidos, k.etapas["pr"]) == ("esteira", "x/esteira", "dotnet test E.sln", (".github/", "circulo.toml"), ("bash scripts/portoes.sh",))
+    assert not any("pyproject" in a for a in k.avisos)

@@ -34,6 +34,15 @@ from . import conflitos
 from .decision import Decision, Question, SN
 from .diff_size import parse_numstat
 from .validador import feedback_validador as feedback_validador, revisar_pr as revisar_pr, validar_worktree as validar_worktree  # a porta do Validador (1.70) para a constituição
+from .tecnicas import PROMPT as TECNICAS_PROMPT  # re-export explícito
+TECNICAS_PROMPT = TECNICAS_PROMPT  # a porta das técnicas absorvidas (1.75) para a constituição
+
+
+def medir_tecnicas(ctx, item_id, titulo: str, saida_agente: dict, arquivos: list[str], adicionadas: dict, wt) -> list:
+    """1.75: mede as técnicas absorvidas sobre a entrega do Developer (item do roteiro + passos e resposta do agente)."""
+    from . import tecnicas
+    item = dict(ctx.store.one("SELECT id, titulo, detalhe FROM roadmap WHERE id=?", (item_id,)) or {"id": item_id, "titulo": titulo, "detalhe": ""})
+    return tecnicas.medir(ctx, item, saida_agente.get("passos", []), saida_agente.get("resposta", ""), arquivos, adicionadas, wt)
 
 MAX_PRS_ABERTOS = 3           # PRs do Developer abertos ao mesmo tempo
 SEGURO_MIN = 0.5              # p(seguro) abaixo disso, com confiança, o Jev rejeita mesmo sem problema medido

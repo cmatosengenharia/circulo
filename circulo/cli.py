@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> None:
     cm.add_argument("--json", action="store_true")
     sub.add_parser("latencia", help="os 5 PRs mais lentos da semana até o merge, com a etapa dominante (CI, rebase, merge)")
     sub.add_parser("status")
+    sub.add_parser("tecnicas", help="prova que as técnicas absorvidas (plano/teste antes, cirúrgica, simplicidade, resposta direta, revisão cruzada) estão ativas: medições por entrega")
     sub.add_parser("resumo")
     sub.add_parser("respostas", help="mostra respostas ainda não lidas")
     sub.add_parser("snapshot", help="faz um backup consistente do banco agora")
@@ -287,6 +288,9 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps({**c.status(), "trava": trava(c.store)}, ensure_ascii=False, indent=2))
     elif args.cmd == "resumo":
         print(c.write_summary().read_text(encoding="utf-8"))
+    elif args.cmd == "tecnicas":
+        from .tecnicas import texto_relatorio
+        print(texto_relatorio(c.store))
     elif args.cmd == "respostas":
         rows = c.store.q("SELECT id, message FROM alerts WHERE kind='resposta' AND delivered=0 ORDER BY id")
         for r in rows:

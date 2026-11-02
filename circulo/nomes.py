@@ -16,6 +16,7 @@ AGENTES: dict[str, dict[str, str]] = {
     "planejar_roteiro": {"nome": "Gerente de produto", "cargo": "Transforma pergunta em item", "curto": "GP",       "antes": "Planejador"},
     "estudar_pedido":   {"nome": "Arquiteto",          "cargo": "Estuda antes de construir", "curto": "Arquiteto",  "antes": "Estudo / Pesquisa"},
     "corrigir_codigo":  {"nome": "Desenvolvedor",      "cargo": "Escreve código e teste",  "curto": "Dev",          "antes": "Developer"},
+    "fabricar":         {"nome": "Fabricante",         "cargo": "Entrega pedidos de repositório cliente", "curto": "Fábrica", "antes": "Fabricante"},
     "revisor":          {"nome": "Revisor de código",  "cargo": "Confere cada PR antes de entrar", "curto": "Revisor", "antes": "Revisor"},
     "revisar_prs":      {"nome": "QA e release",       "cargo": "CI verde, teste novo, merge", "curto": "QA",       "antes": "Gate"},
     "atualizar_corpo":  {"nome": "DevOps",             "cargo": "Sobe para produção e prova", "curto": "DevOps",    "antes": "Corpo"},

@@ -3,7 +3,8 @@
 O que é motor (Jev First, SRE, Médico, memória do time, Escalador, painel, Developer, gate) fica igual; o que é do
 repositório — nome, constituição (arquivos que o Developer nunca toca), comando de testes e de lint, checks que o
 gate exige, o pedido inicial — vem do próprio repositório, em `[tool.circulo]` no `pyproject.toml` dele (ou dos
-padrões), e `circulo init <pasta>` grava tudo no arquivo de configuração do loop e deixa o repositório pronto:
+padrões), e `circulo init <pasta>` grava tudo no arquivo de configuração do loop e deixa o repositório pronto (repositório que não é
+Python declara as mesmas chaves em `circulo.toml` na raiz — 1.75):
 
     circulo init ~/Projects/meu-repo --pedido "entregar o que eu pedir com evidência, pelo menor custo"
     circulo configurar      # chaves (Jev, LLM, GitHub) — só você digita
@@ -93,15 +94,21 @@ def _remoto(pasta: Path) -> str | None:
 def carregar(pasta: str | Path, pedido: str | None = None, nome: str | None = None) -> Kit:
     pasta = Path(pasta).expanduser().resolve()
     cfg: dict = {}
-    pp = pasta / "pyproject.toml"
+    pp, ct = pasta / "pyproject.toml", pasta / "circulo.toml"
     avisos = []
-    if pp.exists():
+    if ct.exists():          # 1.75: repositório que não é Python (a Esteira em .NET) declara o kit em circulo.toml, mesmas chaves, sem [tool]
+        try:
+            lido = tomllib.loads(ct.read_text(encoding="utf-8"))
+            cfg = lido.get("tool", {}).get("circulo") or lido.get("circulo") or lido or {}
+        except (tomllib.TOMLDecodeError, OSError) as exc:
+            avisos.append(f"circulo.toml não pôde ser lido ({exc}); usando padrões")
+    elif pp.exists():
         try:
             cfg = tomllib.loads(pp.read_text(encoding="utf-8")).get("tool", {}).get("circulo", {}) or {}
         except (tomllib.TOMLDecodeError, OSError) as exc:
             avisos.append(f"pyproject.toml não pôde ser lido ({exc}); usando padrões")
     else:
-        avisos.append("sem pyproject.toml: o Developer vai rodar os testes com o comando padrão; declare [tool.circulo] para ajustar")
+        avisos.append("sem pyproject.toml nem circulo.toml: o Developer vai rodar os testes com o comando padrão; declare [tool.circulo] (ou circulo.toml) para ajustar")
     if not (pasta / ".git").exists():
         avisos.append("a pasta não é um repositório git: o Developer precisa de um clone com remoto no GitHub")
     if not (pasta / "tests").exists() and not list(pasta.glob("test*")):
