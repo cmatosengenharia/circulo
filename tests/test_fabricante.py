@@ -205,13 +205,13 @@ def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_pa
     assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == reg["testes"]
     outro = tmp_path / "outro-clone"
     git(tmp_path, "clone", "-q", remoto.as_uri(), str(outro))
-    (outro / "circulo.toml").write_text('nome = "cliente"\ntestes = "dotnet test Cliente.sln --nologo"\n', encoding="utf-8")
+    (outro / "circulo.toml").write_text('nome = "cliente"\ntestes = "python -m pytest -q --maxfail=1"\n', encoding="utf-8")   # nunca `dotnet` aqui: a 1ª execução dele no runner, morta pelo timeout, deixava ~/.nuget/NuGet/NuGet.Config vazio para o teste do esqueleto .NET
     git(outro, "add", "-A")
     git(outro, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "kit do cliente")
     git(outro, "push", "-q", "origin", "main")
     at = repo_cliente.atualizar(store, reg["id"])
-    assert at == {"avancou": True, "kit_mudou": True, "erro": None, "testes": "dotnet test Cliente.sln --nologo"}
-    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == "dotnet test Cliente.sln --nologo"
+    assert at == {"avancou": True, "kit_mudou": True, "erro": None, "testes": "python -m pytest -q --maxfail=1"}
+    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == "python -m pytest -q --maxfail=1"
     assert repo_cliente.atualizar(store, reg["id"])["avancou"] is False                      # já na ponta: nada a fazer
     pasta = Path(reg["caminho"])
     (pasta / "rascunho.txt").write_text("trabalho local do Cássio", encoding="utf-8")       # clone sujo: nunca é tocado
@@ -224,7 +224,7 @@ def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_pa
     fab = fabrica["fab"]
     fab.run_once()
     kit = [e for e in repo_cliente.evidencias(store, fabrica["pedido"]["id"]) if e["etapa"] == "kit"]
-    assert kit and kit[0]["ok"] and "dotnet test Cliente.sln" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]
+    assert kit and kit[0]["ok"] and "--maxfail=1" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]
 
 
 # ---------------------------------------------------------------- 1.76.2: o card da missão de repositório mede o Fabricante
