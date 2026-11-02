@@ -713,8 +713,9 @@ class Circle:
             if item and res.status not in ("proposto", "consertado"):
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")   # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
         elif pick == "fabricar":
-            self._stage("fabricante", {"tarefa": "fabricar", "detalhe": "Fabricante trabalhando num pedido de repositório cliente"})
-            self.fabricante.run_once()         # entregue/vermelho já avisam na linha do tempo
+            prox = fabricante.proximo(self.store)
+            self._stage("fabricante", {"tarefa": "fabricar", "detalhe": f"Fabricante no pedido #{prox['id']} do repositório cliente" if prox else "Fabricante", "projeto": prox["projeto_id"] if prox else None})
+            self.fabricante.run_once()         # entregue/vermelho já avisam na linha do tempo; o card da missão mostra "Trabalhando agora"
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "jardinagem":

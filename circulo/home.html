@@ -242,7 +242,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const STATUS = {rodando:"Rodando", modo_seguro:"Rodando em modo seguro", pausado_humano:"Pausado por você",
   pausado_orcamento:"Pausado: orçamento do dia acabou", parado:"Loop parado"};
 const ETAPA = {orquestrador:"no orquestrador", pedido:"atendendo um pedido", idle:"em evolução natural", projeto:"construindo",
-  developer:"corrigindo o próprio código", meta_learner:"com o Cientista de dados", shadow:"avaliando shadow", saude:"checando a saúde"};
+  developer:"corrigindo o próprio código", meta_learner:"com o Cientista de dados", shadow:"avaliando shadow", saude:"checando a saúde", fabricante:"no Fabricante, entregando um pedido do cliente"};
 const PSTATUS = {ativo:"Ativo", aguardando_kit:"Aguardando kit", manutencao:"Em manutenção", pausado:"Pausado", cumprida:"Cumprida"};
 const REL = {mesmo_publico:"mesmo público", complementa:"complementa", consome:"usa a saída", compartilha_dados:"compartilha dados"};
 function ago(ts) {
@@ -264,6 +264,7 @@ function cardLive(p) {
   if (p.status === "cumprida") return `Meta atingida com evidência; volta se a pesquisa achar algo novo`;
   if (p.kit === "geral" && !p.regua) return `Próximo ciclo: pesquisar e montar a régua`;
   if (p.kit === "circulo" && p.roteiro) return `Roteiro: ${p.roteiro.feito} de ${p.roteiro.total} feitos`;
+  if (p.kit === "repo" && p.metricas.fabrica) { const f = p.metricas.fabrica; return `<span class="chip ${f.abertos ? "fila" : ""}">${f.abertos} na fila</span> ${f.entregues} entregue(s)${f.vermelhos ? ` · ${f.vermelhos} barrado(s)` : ""} · o Fabricante pega o mais antigo`; }
   return "Última atividade " + ago(p.ultima_atividade);
 }
 const NUM = n => n == null ? "—" : Number(n).toLocaleString("pt-BR");
