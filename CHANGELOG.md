@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.76.4 — 2026-11-02
+
+- Fabricante: pedido que depende do que o repositório ainda não tem (tela, endpoint, worker) pode ser respondido com
+  `Bloqueado: <o que falta>` na fase de plano: a ficha registra, o pedido fica vermelho sem novas tentativas (não é
+  promessa quebrada; sem lição estrutural) e o próximo pedido segue. Primeira rodada real na esteira (03:20): o pedido #1
+  (Playwright no painel) queimou 2 planos porque o agente explicou que o painel não existe e o validador exigiu o formato.
+
 ## 1.76.3 — 2026-11-02
 
 - Loop: `fabricar` (pedido de repositório cliente — a esteira) vem antes do trabalho interno (estudar/corrigir item do

@@ -58,7 +58,10 @@ Suposições: <as suposições que você está fazendo; se o pedido tiver duas l
 ...
 Arquivos: <lista dos arquivos que vai criar/mudar — e nenhum outro>
 Custo: <o que a mudança passa a custar por job, se algo (tokens, minutos de render)>
+Se o pedido depende de algo que NÃO existe neste repositório (uma tela, um endpoint, um worker, um serviço) e não dá para
+entregá-lo sem isso, não invente um plano: responda em uma linha só `Bloqueado: <o que falta, e o que o traria>`.
 """
+BLOQUEADO = re.compile(r"(?im)^\s*bloqueado\s*:\s*(.+)$")
 
 IMPLEMENTAR_TEMPLATE = """Agora execute o plano abaixo neste repositório, passo a passo, na ordem.
 
@@ -248,6 +251,8 @@ class Fabricante:
         plano, sessao = self._planejar(p, k, clone, anterior, wip.get("sessao"))
         if plano is None:
             return self._vermelho(p, wip, "sem plano válido em duas tentativas")
+        if m := BLOQUEADO.match(plano):          # 1.76.4: depende de algo que o repositório ainda não tem — registra e segue; não gasta as 3 tentativas
+            return self._vermelho(p, wip, f"bloqueado: {m.group(1).strip()[:300]}", esgotar=True)
         item = {"id": None, "titulo": p["texto"].strip().splitlines()[0][:160], "detalhe": p["texto"] + "\n" + plano}
         ferramentas = ferramentas_do_kit(k, self._ferramentas_base())
         lint = f" e `{k.lint}`" if k.lint else ""
@@ -282,6 +287,9 @@ class Fabricante:
         for _tentativa in range(2):
             out = self._agente(PLANO_TEMPLATE.format(nome=k.nome, branch=p["branch"], pedido=p["texto"], anterior=anterior), clone, None, LEITURA)
             plano = str(out.get("resposta") or "").strip()
+            if BLOQUEADO.match(plano):
+                self._evidencia(p["id"], "plano", False, plano[:1500])
+                return plano, None
             ok, motivo = plano_valido(plano)
             self._evidencia(p["id"], "plano", ok, plano if ok else f"{motivo}\n{plano}"[:1500])
             if ok:
@@ -345,16 +353,20 @@ class Fabricante:
             self._evidencia(p["id"], "pr", True, str(url))
         return url
 
-    def _vermelho(self, p: dict, wip: dict, motivo: str) -> dict:
-        tent = int(wip.get("tentativas", 0)) + 1
+    def _vermelho(self, p: dict, wip: dict, motivo: str, esgotar: bool = False) -> dict:
+        tent = MAX_TENTATIVAS if esgotar else int(wip.get("tentativas", 0)) + 1
         _guardar_wip(self.s, p["id"], tentativas=tent, motivo=motivo)
         self.s.x("UPDATE pedidos_repo SET status='vermelho', updated_at=? WHERE id=?", (time.time(), p["id"]))
         esgotou = tent >= MAX_TENTATIVAS
-        if esgotou:   # 1.76: falha de entrega para cliente é lição estrutural com item de prevenção, acima de qualquer lição interna
+        if esgotar:   # bloqueado por dependência: não é promessa quebrada; fica registrado na ficha e o próximo pedido segue
+            from .licoes import registrar as monitorar
+            monitorar(self.ctx, "fabrica:bloqueado", False, sujeito=f"pedido {p['id']}", licao=False, motivo=motivo[:300])
+        elif esgotou:   # 1.76: falha de entrega para cliente é lição estrutural com item de prevenção, acima de qualquer lição interna
             from .licoes import registrar as monitorar
             monitorar(self.ctx, "fabrica:promessa", False, sujeito=f"pedido {p['id']}", classe="estrutural", licao=True,
                       motivo=f"promessa não cumprida: pedido {p['id']} esgotou {MAX_TENTATIVAS} tentativas: {motivo[:300]}", titulo=f"Promessa não cumprida: pedido {p['id']}")
-        self.ctx.reply(f"Fabricante: pedido {p['id']} barrado ({tent}/{MAX_TENTATIVAS}): {motivo[:160]}" + (" — esgotou as tentativas; fica vermelho na missão." if esgotou else ""), "saude")
+        self.ctx.reply(f"Fabricante: pedido {p['id']} " + (f"bloqueado: {motivo[11:171]} — fica vermelho na missão até o que falta existir." if esgotar else
+                       f"barrado ({tent}/{MAX_TENTATIVAS}): {motivo[:160]}" + (" — esgotou as tentativas; fica vermelho na missão." if esgotou else "")), "saude")
         return {"status": "vermelho", "pedido": p["id"], "motivo": motivo, "tentativas": tent, "esgotou": esgotou}
 
 

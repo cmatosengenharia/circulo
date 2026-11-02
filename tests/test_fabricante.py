@@ -260,3 +260,20 @@ def test_fabricar_vem_antes_do_trabalho_interno_do_loop_e_alterna_com_ele(fabric
     assert "fabricar" not in pronto and pronto[0] == "corrigir_codigo"                   # espaço de 2 giros: a vez do loop
     circle.store.set("idle_last", {"fabricar": circle.store.tick - 2, "corrigir_codigo": circle.store.tick, "estudar_pedido": circle.store.tick - 2})
     assert circle._trabalho_pronto(tasks)[0] == "fabricar"
+
+
+def test_pedido_que_depende_do_que_nao_existe_fica_bloqueado_sem_queimar_tentativas(fabrica):
+    """Pedido #1 da esteira (Playwright no painel): o painel não existe; o agente explicou em vez de planejar e o pedido
+    queimou 2 planos por tentativa. Agora ele responde `Bloqueado: …`, a ficha registra, o pedido fica vermelho sem
+    novas tentativas (não é promessa quebrada: sem lição estrutural) e o Fabricante segue para o próximo."""
+    fab, store, pedido = fabrica["fab"], fabrica["store"], fabrica["pedido"]
+    fab.agent.plano = "Bloqueado: o painel web de aprovação (web/) não existe; o pedido 12 (painel mínimo) o traria."
+    res = fab.run_once()
+    assert res["status"] == "vermelho" and res["esgotou"] and res["motivo"].startswith("bloqueado: o painel web")
+    assert len(fab.agent.chamadas) == 1                                                        # um plano, não dois
+    planos = [e for e in repo_cliente.evidencias(store, pedido["id"]) if e["etapa"] == "plano"]
+    assert len(planos) == 1 and not planos[0]["ok"] and planos[0]["saida"].startswith("Bloqueado:")
+    assert not store.q("SELECT 1 FROM licoes WHERE classe='estrutural' AND descricao LIKE '%promessa%'")
+    assert fab.run_once()["status"] == "nada"                                                  # não volta para a fila
+    aviso = store.one("SELECT message FROM alerts WHERE message LIKE 'Fabricante: pedido%' ORDER BY id DESC LIMIT 1")["message"]
+    assert "bloqueado" in aviso and "painel" in aviso
