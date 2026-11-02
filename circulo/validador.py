@@ -167,9 +167,10 @@ def _chamar_llm(ctx, item: dict):
     return chamar
 
 
-def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
+def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None, externo=None) -> dict:
     """Agente 2: revisão independente do diff. Devolve {aprovado, problemas, risco, fonte}. `chamar(system, prompt)`
-    -> texto; por padrão a LLM do ctx. Qualquer falha = aprovado (fonte 'indisponivel')."""
+    -> texto; por padrão a LLM do ctx. `externo(system, prompt)` -> veredito ou None; por padrão `revisor_externo`.
+    Qualquer falha = aprovado (fonte 'indisponivel')."""
     from . import criterio_aceite, revisao_dupla, segredos, validador_telas
     from .neuronios import diff_do_worktree
     stat, diff = _diff(wt, base)
@@ -188,7 +189,7 @@ def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
     if v is None:
         v, fonte = {"aprovado": True, "problemas": [], "risco": "baixo"}, ("indisponivel" if fonte == "indisponivel" else "sem_veredito")
     v["fonte"] = fonte
-    ext = revisor_externo(SYSTEM, prompt)        # 1.75 (octopus): um segundo revisor de outro fornecedor, só se existir no PATH
+    ext = (externo or revisor_externo)(SYSTEM, prompt)        # 1.75 (octopus): um segundo revisor de outro fornecedor, só se existir no PATH
     if ext is not None:
         v["externo"] = ext
         if not ext["aprovado"]:
