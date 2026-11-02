@@ -205,13 +205,13 @@ def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_pa
     assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == reg["testes"]
     outro = tmp_path / "outro-clone"
     git(tmp_path, "clone", "-q", remoto.as_uri(), str(outro))
-    (outro / "circulo.toml").write_text('nome = "cliente"\ntestes = "dotnet test Cliente.sln --nologo"\n', encoding="utf-8")
+    (outro / "circulo.toml").write_text('nome = "cliente"\ntestes = "python -m pytest -q --maxfail=1"\n', encoding="utf-8")   # nunca `dotnet` aqui: a 1ª execução dele no runner, morta pelo timeout, deixava ~/.nuget/NuGet/NuGet.Config vazio para o teste do esqueleto .NET
     git(outro, "add", "-A")
     git(outro, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "kit do cliente")
     git(outro, "push", "-q", "origin", "main")
     at = repo_cliente.atualizar(store, reg["id"])
-    assert at == {"avancou": True, "kit_mudou": True, "erro": None, "testes": "dotnet test Cliente.sln --nologo"}
-    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == "dotnet test Cliente.sln --nologo"
+    assert at == {"avancou": True, "kit_mudou": True, "erro": None, "testes": "python -m pytest -q --maxfail=1"}
+    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == "python -m pytest -q --maxfail=1"
     assert repo_cliente.atualizar(store, reg["id"])["avancou"] is False                      # já na ponta: nada a fazer
     pasta = Path(reg["caminho"])
     (pasta / "rascunho.txt").write_text("trabalho local do Cássio", encoding="utf-8")       # clone sujo: nunca é tocado
@@ -224,7 +224,7 @@ def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_pa
     fab = fabrica["fab"]
     fab.run_once()
     kit = [e for e in repo_cliente.evidencias(store, fabrica["pedido"]["id"]) if e["etapa"] == "kit"]
-    assert kit and kit[0]["ok"] and "dotnet test Cliente.sln" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]
+    assert kit and kit[0]["ok"] and "--maxfail=1" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]
 
 
 # ---------------------------------------------------------------- 1.76.2: o card da missão de repositório mede o Fabricante
@@ -260,3 +260,20 @@ def test_fabricar_vem_antes_do_trabalho_interno_do_loop_e_alterna_com_ele(fabric
     assert "fabricar" not in pronto and pronto[0] == "corrigir_codigo"                   # espaço de 2 giros: a vez do loop
     circle.store.set("idle_last", {"fabricar": circle.store.tick - 2, "corrigir_codigo": circle.store.tick, "estudar_pedido": circle.store.tick - 2})
     assert circle._trabalho_pronto(tasks)[0] == "fabricar"
+
+
+def test_pedido_que_depende_do_que_nao_existe_fica_bloqueado_sem_queimar_tentativas(fabrica):
+    """Pedido #1 da esteira (Playwright no painel): o painel não existe; o agente explicou em vez de planejar e o pedido
+    queimou 2 planos por tentativa. Agora ele responde `Bloqueado: …`, a ficha registra, o pedido fica vermelho sem
+    novas tentativas (não é promessa quebrada: sem lição estrutural) e o Fabricante segue para o próximo."""
+    fab, store, pedido = fabrica["fab"], fabrica["store"], fabrica["pedido"]
+    fab.agent.plano = "Bloqueado: o painel web de aprovação (web/) não existe; o pedido 12 (painel mínimo) o traria."
+    res = fab.run_once()
+    assert res["status"] == "vermelho" and res["esgotou"] and res["motivo"].startswith("bloqueado: o painel web")
+    assert len(fab.agent.chamadas) == 1                                                        # um plano, não dois
+    planos = [e for e in repo_cliente.evidencias(store, pedido["id"]) if e["etapa"] == "plano"]
+    assert len(planos) == 1 and not planos[0]["ok"] and planos[0]["saida"].startswith("Bloqueado:")
+    assert not store.q("SELECT 1 FROM licoes WHERE classe='estrutural' AND descricao LIKE '%promessa%'")
+    assert fab.run_once()["status"] == "nada"                                                  # não volta para a fila
+    aviso = store.one("SELECT message FROM alerts WHERE message LIKE 'Fabricante: pedido%' ORDER BY id DESC LIMIT 1")["message"]
+    assert "bloqueado" in aviso and "painel" in aviso
