@@ -22,6 +22,8 @@ def test_cada_esqueleto_vira_produto_com_ci_proprio_verde_e_primeiro_pr_aberto(t
     ferramenta = {"react_vite": "node", "dotnet": "dotnet"}.get(tipo)
     if ferramenta and not shutil.which(ferramenta):
         pytest.skip(f"{ferramenta} não instalado")
+    if tipo == "dotnet":   # 1ª execução do dotnet num runner novo: o restore paralelo de 2 projetos cria ~/.nuget/NuGet/NuGet.Config ao mesmo
+        subprocess.run(["dotnet", "nuget", "list", "source"], capture_output=True, timeout=300, check=False)   # tempo e um lê o XML pela metade ("Root element is missing"); aquecer uma vez resolve
     assert produto_novo.tipos() == ESQUELETOS
     store, dados = Store(tmp_path / "circulo.db"), tmp_path / "dados"
 
