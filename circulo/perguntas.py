@@ -23,7 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import conflitos, financeiro, jobs, jtbd, pedido_claro, pedidos_repetidos
+from . import conflitos, financeiro, jobs, jtbd, pedido_claro, pedidos_repetidos, persona_cliente
 from .curador_licoes import sem_checagem
 from .custo import tokens_com_e_sem_pr, tokens_por_desfecho, tokens_por_veredito
 from .decision import Question
@@ -65,6 +65,7 @@ PERSONAS = {
     "tech_lead": "Tech lead da equipe: um pedido vira PR revisado, com testes, em horas; o console mostra em 10 s o que trava",
     "pm": "PM do produto: o que o time ganha a cada semana precisa ser visível, pedido por alguém e medido no uso",
     "mercado": "Mercado: o que as melhores fábricas de software com IA já fazem e o loop ainda não (com fontes)",
+    persona_cliente.PERSONA: persona_cliente.OBJETIVO,
 }
 
 
@@ -265,7 +266,7 @@ def _mercado(s, agora) -> list[Pergunta]:
     return out
 
 
-NORTE_PERSONAS = ("tech_lead", "pm", "mercado")
+NORTE_PERSONAS = ("tech_lead", "pm", "mercado", persona_cliente.PERSONA)
 # 31/10: a fila nunca fica vazia. Em 280 giros o Developer trabalhou em 12: a única fonte de itens era o conselho, e o
 # Jev descartava 94 % das perguntas. Os épicos são a direção de produto em pedaços (kv `norte_epicos` sobrescreve):
 # cada um vira uma pergunta do PM com eixo produto sempre que não há item de produto pendente. Descanso e "esgotada"
@@ -304,7 +305,12 @@ def _epicos(s, agora) -> list[Pergunta]:
                      {"epico": e["chave"], "base": "medido", "fila_de_produto": 0}, eixo="produto") for e in epicos if e.get("texto")]
 
 
-SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro, _norte, _mercado, _epicos]
+def _cliente(s, agora) -> list[Pergunta]:
+    return persona_cliente.perguntas(s)
+
+
+SINAIS: list[Callable] = [_usuario, _economista, _operador, _cientista, _arquiteto, _auditor, _cetico, _financeiro, _norte, _mercado, _epicos,
+                          _cliente]
 
 
 # ------------------------------------------------------------------ o conselho
