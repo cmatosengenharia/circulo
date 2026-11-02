@@ -17,3 +17,5 @@ Técnicas portadas (reescritas, não copiadas) de projetos de terceiros. Cada um
   comum, teto de rodadas). Só o método; nenhum texto ou código da fonte foi copiado.
 - Portado: skill `continuous-learning-v2` → `circulo/licoes_confianca.py` (ECC-3: a confiança dos 'instintos' nasce
   baixa, sobe com confirmação, cai com contradição e promove acima de um limiar). Só o método; nada da fonte foi copiado.
+- Portado: hook `gateguard-fact-force.js` → `circulo/gateguard.py` (ECC-5: a primeira edição de um arquivo existente
+  espera o grep de quem o importa). Reescrito em Python; nenhum código da fonte foi copiado.
