@@ -18,7 +18,7 @@ import subprocess
 import unicodedata
 from pathlib import Path
 
-from . import assuntos
+from . import assuntos, licoes_confianca
 from .state import Store
 
 LIMITE_AGENTS = 60
@@ -70,13 +70,13 @@ def _itens_do_assunto(store: Store, nome: str) -> list[tuple[str, str]]:
 
 def _itens_do_repositorio(store: Store) -> list[tuple[str, str]]:
     return [("armadilha", f"{r['descricao'].strip()} (lição #{r['id']})")
-            for r in store.q("SELECT id, descricao FROM licoes WHERE status='evidenciada' "
-                             "ORDER BY COALESCE(evidenciada_tick, 0) DESC, id DESC")]
+            for r in licoes_confianca.para_agents(store)]
 
 
 def gerar(store: Store, assunto: str | None = None, readme: str = "", nome: str | None = None,
           teto: int = LIMITE_AGENTS) -> dict[str, str]:
-    """{caminho relativo: conteúdo}. Com `assunto`, da memória dele; sem, das lições evidenciadas do repositório."""
+    """{caminho relativo: conteúdo}. Com `assunto`, da memória dele; sem, das lições evidenciadas do repositório
+    (fora da quarentena) e das candidatas por confiança (licoes_confianca.para_agents)."""
     titulo = assunto or nome or "repositório"
     itens = _itens_do_assunto(store, assunto) if assunto else _itens_do_repositorio(store)
     doc = _norm(readme)

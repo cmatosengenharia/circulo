@@ -15,3 +15,5 @@ Técnicas portadas (reescritas, não copiadas) de projetos de terceiros. Cada um
 - Licença: MIT
 - Portado: skill `santa-method` → `circulo/revisao_dupla.py` (ECC-2: dois revisores, mesma rubrica, sem contexto
   comum, teto de rodadas). Só o método; nenhum texto ou código da fonte foi copiado.
+- Portado: skill `continuous-learning-v2` → `circulo/licoes_confianca.py` (ECC-3: a confiança dos 'instintos' nasce
+  baixa, sobe com confirmação, cai com contradição e promove acima de um limiar). Só o método; nada da fonte foi copiado.
