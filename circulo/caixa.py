@@ -7,7 +7,7 @@ atalho do macOS, uma pasta sincronizada).
 
 Formato do arquivo (texto puro, UTF-8):
     ---            (cabeçalho opcional, uma chave por linha)
-    tipo: pedido | missao          (padrão: pedido — vai para o roteiro do loop; missao cria uma missão nova)
+    tipo: pedido | missao | referencia | resultado   (padrão: pedido — roteiro do loop; missao cria missão; referencia: URL de repo; resultado: `projeto; metrica; valor` por linha)
     projeto: 2                     (padrão: a missão do loop; um repositório cliente vira branch circulo/<pedido> nele)
     de: Ana                        (quem pediu; padrão: cassio — a Equipe ao vivo e o digest agrupam por ele)
     ---
@@ -71,6 +71,11 @@ def ler(store, data_dir: Path, agora: float | None = None) -> list[int]:
             lista = list(store.get("repos_referencia") or __import__("circulo.mercado", fromlist=["REPOS"]).REPOS)
             store.set("repos_referencia", lista + [u for u in urls if u not in lista])
             shutil.move(str(arq), str(pasta / "lidos" / f"{time.strftime('%Y-%m-%d_%H%M%S', time.localtime(agora))}-ref-{arq.name}"))
+            continue
+        if tipo == "resultado":                      # 1.76: resultado do lado do cliente reportado pela esteira/dogfooding (`projeto; metrica; valor` por linha)
+            from . import resultado
+            resultado.ler_resultados_da_caixa(store, texto, agora)
+            shutil.move(str(arq), str(pasta / "lidos" / f"{time.strftime('%Y-%m-%d_%H%M%S', time.localtime(agora))}-res-{arq.name}"))
             continue
         if tipo == "missao":
             eid = store.enqueue("novo_projeto", {"pedido": texto, "at": agora, "origem": "caixa", "arquivo": arq.name})

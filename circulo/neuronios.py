@@ -35,6 +35,7 @@ CEREBROS = (  # prefixo do ponto → cérebro
     ("missao:", "missao"), ("financas:", "Cérebro Financeiro"), ("evolucao:", "Cérebro do Loop"),
     ("developer:", "Cérebro do Loop"), ("gate:", "Cérebro do Loop"), ("planejador:", "Cérebro do Loop"),
     ("execucao:", "Cérebro do Loop"), ("saude:", "Cérebro do Loop"), ("estudo:", "Cérebro do Loop"),
+    ("tecnica:", "Cérebro do Loop"), ("fabrica:", "Cérebro do Loop"),
 )
 
 

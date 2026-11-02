@@ -17,7 +17,7 @@ from . import digest_semanal, finance, ingestao, intencoes, jobs, jtbd, parada, 
 from .agents import Analyst, Categorizer, Collector, Ctx, Developer, Planner
 from .budget import TZ, Budget
 from .decision import SN, Decision, DecisionLayer, Gate, JevClient, LLMClient, Question, build_jev
-from . import caixa, cao_de_guarda, guardrails
+from . import caixa, cao_de_guarda, documentador, fabricante, fatiador, guardrails, indagador, jardineiro, mercado
 from .disjuntor import protegida
 from .evolution import HealthMonitor, MetaLearner, Shadow
 from .merge_gate import MergeGate, build_gate
@@ -36,16 +36,16 @@ from .orcamento_dia import avisar_marcos, com_tokens_dia
 from .policy import PolicyStore
 from .state import Store
 
-TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "revisar_prs", "planejar_roteiro", "indagar", "pesquisar_mercado")
+TRABALHO = ("atualizar_corpo", "evoluir_projeto", "estudar_pedido", "corrigir_codigo", "fabricar", "revisar_prs", "planejar_roteiro", "indagar", "pesquisar_mercado")
 ESPACO = {"corrigir_codigo": 2, "revisar_prs": 2}   # em giros; com o descanso longo (5 min), 10 giros eram 50 min de espera
 CONF_PARA_BARRAR = 0.5  # o Jev só barra uma tarefa que destrava a fila se disser "não" com confiança >= isto; abaixo, a regra decide
 ESPERA_EM_VOO = 45     # s: há trabalho em voo (PR no CI, tarefa no espaçamento, corpo validando) — não dorme 5 min
 RASTRO_A_CADA = 20          # a cada 20 giros, confere o fio de ponta a ponta das entregas recentes
-VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
+VALOR = {"atualizar_corpo": 0.9, "estudar_pedido": 0.85, "planejar_roteiro": 0.8, "corrigir_codigo": 0.85, "fabricar": 0.9, "evoluir_projeto": 0.8, "revisar_prs": 0.7, "evoluir_harness": 0.6, "propor_feature": 0.5}
 TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop em docs/", "analisar_padroes": "Procurando padrões nos gastos", "revisar_baixa_confianca": "Revendo o que decidiu com pouca confiança",
            "rodar_regressao": "Rodando a regressão sobre o histórico", "resumo": "Escrevendo o resumo", "propor_feature": "Propondo uma melhoria",
            "revisar_prs": "Revisando PRs abertos no gate", "evoluir_harness": "Testando prompts por A/B", "conectar_missoes": "Ligando missões que se complementam",
-           "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código",
+           "evoluir_projeto": "Evoluindo missões", "corrigir_codigo": "Corrigindo o próprio código", "fabricar": "Fabricante: entregando um pedido de repositório cliente (plano, teste antes, validação cruzada, PR)",
            "planejar_roteiro": "Planejando o próximo item do roteiro a partir da evidência",
            "estudar_pedido": "Estudando o pedido em fontes confiáveis antes de executar",
            "atualizar_corpo": "Validando e passando a rodar o código que o loop evoluiu",
@@ -54,7 +54,7 @@ TAREFAS = {"documentar": "Redator técnico: atualizando a documentação do loop
            "indagar": "Indagador: levantando as perguntas da missão e passando cada uma pelo Jev",
            "antecipar": "Preparando antes do pedido o que você pediu 3 ou mais vezes na semana",
            "pesquisar_mercado": "Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal + 1 repositório/dia)"}
-IDLE_COST = {"documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000, "pesquisar_mercado": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
+IDLE_COST = {"fabricar": 0, "documentar": 0, "analisar_padroes": 0, "revisar_baixa_confianca": 0, "rodar_regressao": 0, "resumo": 0, "propor_feature": 1500, "revisar_prs": 0, "evoluir_projeto": 0, "evoluir_harness": 800, "conectar_missoes": 0, "corrigir_codigo": 0, "planejar_roteiro": 6000, "estudar_pedido": 30000, "pesquisar_mercado": 30000}  # Developer: assinatura, não API; estudo: ~30 mil com a busca
 
 
 @dataclass
@@ -119,6 +119,7 @@ class Circle:
         self.engine.graph = self.graph
         self.engine.on_stage = lambda nome, pid: self._stage(nome, {"projeto": pid})
         self.self_dev = self_dev if self_dev is not None else build_developer(self.ctx)
+        self.fabricante = fabricante.build_fabricante(self.ctx)      # 1.75: entrega pedidos de repositório cliente (a Esteira é o primeiro)
         if self.self_dev is not None and dono:
             self.self_dev.recuperar()
             self.self_dev.concluir_mergeados()
@@ -311,7 +312,6 @@ class Circle:
             from .rastro import elo
             elo(self.store, f"pedido:{event_id}", f"item:{item}", "virou_item")
             self.memory.add("feedback", payload["text"], project_id=pid, source="Cássio", trust="confiavel")
-            from . import indagador
             indagador.classificar_pedido(self.ctx, payload["text"], item)      # anota eixo e pertinência; a fila é a mesma
             na_frente = self.store.one("SELECT COUNT(*) n FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 "
                                        "AND evidencia NOT LIKE '%depende de você%' AND ordem < ?", (ordem,))["n"]
@@ -420,21 +420,20 @@ class Circle:
             tasks.append("conectar_missoes")
         if self.engine.ready and "evoluir_harness" not in tasks:
             tasks.append("evoluir_harness")
-        from . import jardineiro
         if jardineiro.precisa(self.store) and "jardinagem" not in tasks:
             tasks.append("jardinagem")
         if self.corpo is not None and self.licoes.a_checar_no_main() and "checar_licoes" not in tasks:
             tasks.append("checar_licoes")
-        from . import indagador
         if indagador.precisa(self.store, self.engine) and "indagar" not in tasks:
             tasks.append("indagar")
         if jtbd.precisa(self.store) and "antecipar" not in tasks:
             tasks.append("antecipar")
-        from . import documentador
         if self.gate is not None and documentador.precisa(self.store) and "documentar" not in tasks:
             tasks.append("documentar")
         if self._dev_tem_trabalho() and "corrigir_codigo" not in tasks:
             tasks.append("corrigir_codigo")
+        if self._tem_trabalho("fabricar") and "fabricar" not in tasks:
+            tasks.append("fabricar")
         if self.corpo is not None and self._corpo_precisa() and "atualizar_corpo" not in tasks:
             tasks.append("atualizar_corpo")
         if self.self_dev is not None and self.estudo.precisa() and "estudar_pedido" not in tasks:
@@ -476,7 +475,6 @@ class Circle:
             if est > 0:   # só pergunta ao Jev quando há gasto
                 contexto.update({"est_tokens": est, "value_signal": VALOR.get(pick, 0.6)})
                 if pick == "planejar_roteiro":
-                    from . import indagador
                     pv = indagador.espiar(s, "loop")
                     if pv:   # a pergunta já passou pelo Jev: o gasto é para respondê-la, e o valor vem da classificação dela
                         contexto.update({"pergunta_validada": pv["texto"][:200], "eixo": pv["eixo"],
@@ -553,10 +551,14 @@ class Circle:
         dev = self.self_dev
         if dev is None:
             return False
-        from . import fatiador
         return dev.tem_trabalho() or (not dev.busy() and not dev.em_espera() and fatiador.tem_trabalho(self.store))
 
+    def _fabrica_tem_trabalho(self) -> bool:
+        return self.fabricante is not None and fabricante.precisa(self.store)
+
     def _tem_trabalho(self, t: str) -> bool:
+        if t == "fabricar":
+            return self._fabrica_tem_trabalho()
         if t == "evoluir_projeto":
             return bool(self.engine.ready and self.engine.candidates())
         if t == "corrigir_codigo":
@@ -570,10 +572,8 @@ class Circle:
         if t == "revisar_prs":
             return self.store.one("SELECT COUNT(*) n FROM prs WHERE status='aberto'")["n"] > 0
         if t == "indagar":
-            from . import indagador
             return indagador.precisa(self.store, self.engine)
         if t == "pesquisar_mercado":
-            from . import mercado
             return self.ctx.dl.llm is not None and (mercado.devida(self.store) or mercado.repo_devido(self.store))
         return False
 
@@ -694,16 +694,13 @@ class Circle:
         elif pick == "antecipar":
             jtbd.antecipar(self.store)
         elif pick == "pesquisar_mercado":
-            from . import mercado
             mercado.pesquisar(self.ctx) if mercado.devida(self.store) else mercado.estudar_repositorio(self.ctx)   # semanal; senão 1 repo/dia
         elif pick == "documentar":
-            from . import documentador
             documentador.rodar(self.ctx, gh=getattr(self.gate, "gh", None))
         elif pick == "atualizar_corpo":
             from .corpo_caminho import atualizar_corpo
             atualizar_corpo(self.corpo)    # lição #1: arquivo não rastreado que a main traz não trava a troca
         elif pick == "corrigir_codigo":
-            from . import fatiador
             livre = not (self.self_dev.busy() or self.self_dev.em_espera()) and self.self_dev._conserto() is None   # conserto de PR reprovado vem antes de tudo (o sub-item seguinte esperava o PR que ninguém consertava: 45 min parado)
             item_id = fatiador.proximo(self.ctx, self.self_dev, self.planejador) if livre else None
             if livre and item_id is None:
@@ -715,15 +712,16 @@ class Circle:
             res = self.self_dev.run_paralelo(item_id=item_id, autorizado=True) if livre else self.self_dev.run_once(item_id=item_id, autorizado=True)
             if item and res.status not in ("proposto", "consertado"):
                 self.ctx.reply(f"Developer: “{item['titulo']}” → {res.status}: {str(res.detalhe or '')[:160]}", "saude")   # tudo o que o Developer tentou fica visível na linha do tempo, inclusive o que não deu certo
+        elif pick == "fabricar":
+            self._stage("fabricante", {"tarefa": "fabricar", "detalhe": "Fabricante trabalhando num pedido de repositório cliente"})
+            self.fabricante.run_once()         # entregue/vermelho já avisam na linha do tempo
         elif pick == "evoluir_harness":
             self.lab.evaluate() or self.lab.maybe_propose()
         elif pick == "jardinagem":
-            from . import jardineiro
             jardineiro.podar(self.store, self.ctx.reply)
         elif pick == "checar_licoes":
             self.licoes.checar_no_main(self.corpo.repo)
         elif pick == "indagar":
-            from . import indagador
             res = indagador.rodar(self.ctx, self.engine)        # inclui uma dúvida do Jev estudada pelo Arquiteto e reclassificada
             if res and res["cerebro"] == "loop" and (res["validas"] or res.get("duvida_valida")):
                 seguro(self.planejador.no_giro, validou=True)   # a pergunta validada vira item neste giro (falha fica em TENTATIVAS)

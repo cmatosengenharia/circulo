@@ -131,6 +131,19 @@ def _git_saida(args: list[str], cwd: Path) -> str:
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True).stdout
 
 
+def modelo_cruzado(modelo: str, modelo_developer: str, modelos: dict) -> str:
+    """1.75, revisão cruzada: o Validador nunca usa o mesmo modelo do Developer. Coincidiu, troca para o outro nível
+    do harness; sem outro nível, fica (a medida `tecnica:revisao_cruzada` registra que não foi cruzada)."""
+    if not modelo_developer or _familia(modelo) != _familia(modelo_developer):
+        return modelo
+    outros = [m for m in (modelos or {}).values() if _familia(m) != _familia(modelo_developer)]
+    return outros[0] if outros else modelo
+
+
+def _familia(m: str) -> str:
+    return re.sub(r"[-_ ]?\d[\d.\-]*$", "", (m or "").split(",")[0].strip().lower())
+
+
 def _chamar_llm(ctx, item: dict):
     """A LLM do loop no papel `validador`: modelo escolhido pelo Jev (pick_model_detalhe), chamada registrada e cobrada."""
     import time
@@ -140,6 +153,9 @@ def _chamar_llm(ctx, item: dict):
         escolha = dl.pick_model_detalhe("validador", {"tarefa": item.get("titulo", ""), "tipo": "validador"})
         from . import alavancas
         modelo, teto = alavancas.aplicar(s, "validador", escolha["modelo"], MAX_TOKENS)
+        politica = getattr(dl, "policy", None)
+        modelo = modelo_cruzado(modelo, str(item.get("modelo_developer") or ""), ((politica() if callable(politica) else {}).get("harness", {}) or {}).get("models", {}))
+        item["modelo_validador"] = modelo
         t0 = time.time()
         out = dl.llm.generate(system=system, prompt=prompt, model=modelo, max_tokens=teto)
         ctx.budget.charge(out.tokens, "llm")
@@ -172,6 +188,17 @@ def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
     if v is None:
         v, fonte = {"aprovado": True, "problemas": [], "risco": "baixo"}, ("indisponivel" if fonte == "indisponivel" else "sem_veredito")
     v["fonte"] = fonte
+    ext = revisor_externo(SYSTEM, prompt)        # 1.75 (octopus): um segundo revisor de outro fornecedor, só se existir no PATH
+    if ext is not None:
+        v["externo"] = ext
+        if not ext["aprovado"]:
+            v["aprovado"], v["problemas"] = False, [*v["problemas"], *[f"revisor externo ({ext['comando']}): {p}" for p in ext["problemas"]]]
+        if fonte != "llm":
+            fonte = v["fonte"] = "externo"
+    with contextlib.suppress(Exception):
+        from . import tecnicas
+        cruzada, motivo = tecnicas.revisao_cruzada(str(item.get("modelo_developer") or ""), str(item.get("modelo_validador") or ""), fonte)
+        tecnicas.registrar(ctx, "revisao_cruzada", cruzada, sujeito=f"roteiro #{item.get('id')}", motivo=motivo)
     if frase and fonte == "llm" and isinstance(cr := _criterio_de(str(texto)), tuple):
         criterio_aceite.julgar(ctx.store, item.get("id"), *cr, adicionadas)
         if not cr[0]:
@@ -181,11 +208,41 @@ def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
     if achados := segredos.verificar(ctx, adicionadas, sujeito=f"roteiro #{item.get('id')}"):
         v["aprovado"], v["problemas"] = False, [*v["problemas"], *achados]
     v = revisao_dupla.combinar(ctx.store, item.get("id"), wt, v, revisao_dupla.opinar(ctx.dl, item, diff))
+    from . import resultado          # 1.76: landing/demo/README de oferta vendem o resultado, nunca "IA/plataforma/ferramenta" antes dele
+    if discurso := [p for a in resultado.arquivos_de_oferta(adicionadas) for p in resultado.discurso_de_plataforma("\n".join(adicionadas[a]))]:
+        v["aprovado"], v["problemas"] = False, [*v["problemas"], *discurso[:3]]
     with contextlib.suppress(Exception):
         from .licoes import registrar as monitorar
         monitorar(ctx, PONTO_REVISAO, v["aprovado"], sujeito=f"roteiro #{item.get('id')}", licao=False,
                   motivo="" if v["aprovado"] else "; ".join(v["problemas"])[:400])
     return v
+
+
+EXTERNOS = (("codex", ["codex", "exec", "--skip-git-repo-check", "-"]), ("gemini", ["gemini", "-p", "-"]))   # lê o prompt do stdin
+TIMEOUT_EXTERNO = 600
+
+
+def revisor_externo(system: str, prompt: str, executar=None) -> dict | None:
+    """Revisão cruzada de outro fornecedor (ideia do claude-octopus): o primeiro CLI de EXTERNOS no PATH recebe o mesmo
+    prompt e devolve o mesmo JSON. Desligado por CIRCULO_REVISOR_EXTERNO=0; nenhum instalado = None (nada a medir).
+    Qualquer falha (timeout, JSON inválido) = None: o externo nunca para a entrega."""
+    import os
+    if os.environ.get("CIRCULO_REVISOR_EXTERNO", "1") == "0":
+        return None
+    for nome, argv in EXTERNOS:
+        if shutil.which(argv[0]) is None:
+            continue
+        try:
+            if executar is None:
+                p = subprocess.run(argv, input=f"{system}\n\n{prompt}", capture_output=True, text=True, timeout=TIMEOUT_EXTERNO)
+                texto = p.stdout
+            else:
+                texto = executar(argv, f"{system}\n\n{prompt}")
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return None
+        v = veredito_de(str(texto or ""))
+        return {**v, "comando": nome} if v else None
+    return None
 
 
 def feedback_validador(v: dict) -> str:

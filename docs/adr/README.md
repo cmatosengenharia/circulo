@@ -13,3 +13,17 @@ Gerados de `circulo/absorcao_fontes.py` por `python -m circulo.absorcao adr`.
 | [0007](0007-absorcao-supabase-agent-skills.md) | Supabase agent skills (oficial) | produto | 2 | 2 |
 | [0008](0008-absorcao-remotion-skills.md) | Remotion skills | produto | 3 | 4 |
 | [0009](0009-absorcao-pipeline-video-oss.md) | Pipeline de vídeo open source (cortes, reframe, transcrição, postagem) | produto, venda | 4 | 4 |
+
+## ADRs de decisão (0010 em diante)
+
+Escritos à mão, um por decisão. Cada ADR de skill absorvida diz: o que entrou, o que ficou de fora e por quê, e qual
+medida prova que a técnica está ativa (`circulo tecnicas`, ponto `tecnica:<nome>` em `verificacoes`).
+
+| nº | título |
+| --- | --- |
+| [0010](0010-superpowers.md) | obra/superpowers absorvido: plano e teste antes do código, verificação antes de declarar pronto, revisão por olhos novos |
+| [0011](0011-karpathy-guidelines.md) | andrej-karpathy-skills absorvido: simplicidade e mudança cirúrgica como portões |
+| [0012](0012-i-have-adhd.md) | i-have-adhd absorvido: resposta direta medida |
+| [0013](0013-claude-octopus.md) | nyldn/claude-octopus: só o revisor cruzado de outro fornecedor |
+| [0014](0014-fabricante.md) | Fabricante: o loop evolui repositórios cliente (primeiro produto: Esteira de Vídeo) — fecha o PRE-1 |
+| [0015](0015-vender-resultado.md) | Vender resultado, não ferramenta: Norte do lado do cliente, promessa cumprida, classe Jev |

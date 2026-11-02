@@ -1,6 +1,6 @@
 # Instalação em 5 minutos
 
-Versão: **1.73.1**. Precisa de Python 3.11+, git e, para o loop corrigir código, o Claude Code.
+Versão: **1.76.0**. Precisa de Python 3.11+, git e, para o loop corrigir código, o Claude Code.
 
 ## 1. Instalar
 
