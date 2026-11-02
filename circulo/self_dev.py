@@ -27,6 +27,7 @@ from typing import Protocol
 
 from .agents import Ctx
 from .budget import TZ
+from .corpo import rodar_com_prazo
 from .merge_gate import protegidos
 from .reproducao import SEGREDOS, ambiente_isolado, liberar_worktree
 from .licoes import registrar as monitorar
@@ -156,6 +157,7 @@ class CodeAgent(Protocol):
 
 # O que o Claude Code pode rodar sem pedir aprovação (não há ninguém para aprovar em `-p`): testes, lint e git de leitura no próprio worktree. Sem isto ele escrevia código e teste às cegas e pedia "aprove os comandos" — 25% das chamadas de 20/10 terminaram assim, e o item voltava para a fila barrado nos portões.
 GIT_PRAZO = 300              # segundos por comando git (rede inclusa)
+TESTES_PRAZO = int(os.environ["CIRCULO_TESTES_PRAZO"]) if os.environ.get("CIRCULO_TESTES_PRAZO", "").isdigit() else 900   # segundos de lint+testes do worktree (suíte do loop: 5–8 min); valor inválido não derruba o import
 FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
                "Bash(git log:*)", "Bash(git stash:*)", "Bash(git show:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)",
                "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)", "Bash(graft:*)")
@@ -516,9 +518,9 @@ class SelfDeveloper:
             self.lint_cmd = [sys.executable, *LINT_CMD] if garantir_ruff() else []
         etapas = ([("lint", self.lint_cmd)] if self.lint_cmd else []) + [("testes", self.test_cmd)]
         for nome, cmd in etapas:
-            p = subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=900, env=ambiente_isolado())
-            if p.returncode != 0:
-                saida = (p.stdout + p.stderr)[-1500:]
+            codigo, saida = rodar_com_prazo(cmd, wt, ambiente_isolado(), TESTES_PRAZO)   # prazo estourado = reprovação `timeout` com o fim da saída, não incidente (2/11: 7 TimeoutExpired isolaram o Developer por 320 giros)
+            if codigo != 0:
+                saida = saida[-1500:]
                 if registrar:
                     monitorar(self.ctx, f"developer:{nome}", False, sujeito=str(wt.name), motivo=saida)
                 return False, saida

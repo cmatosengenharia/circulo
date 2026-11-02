@@ -15,6 +15,7 @@ def painel(circle):
     srv = serve(circle.store.path, port=0, background=True)
     yield f"http://127.0.0.1:{srv.server_address[1]}"
     srv.shutdown()
+    srv.server_close()
 
 
 def get(url):

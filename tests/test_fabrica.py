@@ -154,6 +154,7 @@ def test_painel_mostra_o_chao_de_fabrica_e_aceita_pedido(oficina):
         assert fab.pausada and fab.passo() is None and retrato(fab.estado)["pausada"]
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_cli_demo_tem_projeto_de_exemplo_que_fecha_o_circulo(tmp_path):

@@ -169,6 +169,7 @@ def test_painel_mostra_motor_e_serve_entrega_isolada(motor):
         assert card["nota"] is not None and card["versoes"] == 1 and card["motor_pronto"]
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_roteiro_versionado_atualiza_estado_sem_duplicar(circle):

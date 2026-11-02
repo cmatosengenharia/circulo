@@ -88,6 +88,7 @@ def test_tela_meu_trabalho_no_painel_e_no_menu(circle):
             assert "Blip" in json.loads(r.read())["texto"]
     finally:
         srv.shutdown()
+        srv.server_close()
     assert assuntos.ver(circle.store, "GAIA")["decisoes"][0]["texto"].startswith("toda PR")
 
 
@@ -116,6 +117,7 @@ def test_botao_importar_csv_do_cursor_entra_pela_tela_sem_duplicar(circle):
         assert enviar({"texto": csv_cursor})["novas"] == 0                                    # reimportar não duplica
     finally:
         srv.shutdown()
+        srv.server_close()
     assert circle.store.one("SELECT COUNT(*) n FROM gasto_cursor WHERE origem='csv'")["n"] == 2
     assert trabalho.api_post(circle.store, circle.data_dir, "/api/trabalho/gasto", {"texto": ""})[1] == 400
 
@@ -153,6 +155,7 @@ def test_card_de_links_agrupa_por_assunto_com_total_e_busca_inline(circle):
         assert [h["rotulo"] for h in achados] == ["Runbook de reprocessamento"]
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_ficha_do_assunto_tem_pagina_propria_e_o_nome_na_tabela_e_link(circle):
@@ -177,6 +180,7 @@ def test_ficha_do_assunto_tem_pagina_propria_e_o_nome_na_tabela_e_link(circle):
         assert "erro" in json.loads(get("/api/trabalho/ficha?nome=n%C3%A3o%20existe"))
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_endpoint_da_daily_mostra_a_hora_de_emissao_gera_agora_e_copia_texto_puro(circle):
@@ -205,6 +209,7 @@ def test_endpoint_da_daily_mostra_a_hora_de_emissao_gera_agora_e_copia_texto_pur
         depois = json.loads(get("/api/trabalho/daily"))
     finally:
         srv.shutdown()
+        srv.server_close()
     assert gerada["ok"] and depois["emitida_em"] == gerada["emitida_em"]
     assert gerada["emitida_em"] in {time.strftime("%H:%M", time.localtime(t)) for t in (t0, time.time())}
     texto = depois["texto"].split("\n")

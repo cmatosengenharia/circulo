@@ -147,6 +147,7 @@ def test_api_digest_formato_md_e_botao_no_painel(circle):
             html = r.read().decode()
     finally:
         srv.shutdown()
+        srv.server_close()
     assert tipo.startswith("text/markdown") and md.startswith("## Digest da semana") and "#901" in md
     assert [p["number"] for p in prs] == [901]
     assert "Copiar digest" in html and "/api/digest?formato=md" in html

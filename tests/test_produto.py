@@ -73,3 +73,4 @@ def test_api_de_produto(motor, monkeypatch):  # noqa: F811
         assert post(base + "/api/ligacoes", {"a": pid, "b": pid, "relacao": "complementa"}, {"X-Circulo": "1"})[0] == 400
     finally:
         srv.shutdown()
+        srv.server_close()
