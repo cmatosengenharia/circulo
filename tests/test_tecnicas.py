@@ -137,8 +137,12 @@ def test_revisor_externo_so_roda_se_o_cli_existir_e_nunca_para_a_entrega(monkeyp
     assert validador.revisor_externo("s", "p", executar=executar) is None
 
 
-def test_revisar_pr_soma_o_revisor_externo_e_mede_a_revisao_cruzada(circle, tmp_path, monkeypatch):
+def test_revisar_pr_soma_o_revisor_externo_e_mede_a_revisao_cruzada(circle, tmp_path):
+    """Lição #99: com o externo desligado pelo conftest (CIRCULO_REVISOR_EXTERNO=0), este teste reprovava na chamada de
+    revisar_pr. O externo entra injetado, sem depender do ambiente nem de patch global de subprocess."""
+    import os
     import subprocess
+    assert os.environ["CIRCULO_REVISOR_EXTERNO"] == "0"
     wt = tmp_path / "wt"
     wt.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=wt, check=True)
@@ -146,14 +150,11 @@ def test_revisar_pr_soma_o_revisor_externo_e_mede_a_revisao_cruzada(circle, tmp_
     subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base"], cwd=wt, check=True)
     (wt / "a.py").write_text("x = 2\n", encoding="utf-8")
-    monkeypatch.setenv("CIRCULO_REVISOR_EXTERNO", "1")          # o conftest desliga o externo; este teste o simula
-    monkeypatch.setattr(validador.shutil, "which", lambda nome: "/usr/bin/codex" if nome == "codex" else None)
-    run_real = subprocess.run
-    monkeypatch.setattr(validador.subprocess, "run", lambda *a, **k: type("P", (), {"stdout": '{"aprovado": false, "problemas": ["falta teste"], "risco": "alto"}'})()
-                        if a and a[0] and a[0][0] == "codex" else run_real(*a, **k))
+    externo = {"aprovado": False, "problemas": ["falta teste"], "risco": "alto", "comando": "codex"}
     item = {"id": 1, "titulo": "mudar a", "detalhe": "", "modelo_developer": "claude-opus-5-5"}
-    v = validador.revisar_pr(circle.ctx, wt, "HEAD", item, chamar=lambda s, p: '{"aprovado": true, "problemas": [], "risco": "baixo"}')
-    assert v["aprovado"] is False and any("revisor externo (codex)" in p for p in v["problemas"])
+    v = validador.revisar_pr(circle.ctx, wt, "HEAD", item, chamar=lambda s, p: '{"aprovado": true, "problemas": [], "risco": "baixo"}',
+                             externo=lambda s, p: externo)
+    assert v["aprovado"] is False and "revisor externo (codex): falta teste" in v["problemas"]
     r = circle.store.one("SELECT ok, motivo FROM verificacoes WHERE ponto='tecnica:revisao_cruzada' ORDER BY id DESC")
     assert r is not None and r["ok"] == 1
 
