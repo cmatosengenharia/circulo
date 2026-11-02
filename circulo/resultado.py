@@ -4,9 +4,11 @@ Cássio (1/11, "Vender resultado, não ferramenta"): por fora uma agência que e
 software autônomo. O Norte media só o lado do loop (PRs, lead time); PR mergeado não conta como produto se nenhum
 resultado de cliente mudou. Aqui ficam:
 
-- os três resultados do lado do cliente que entram no Norte (`medir`): taxa de promessa cumprida (pedidos de
+- os resultados do lado do cliente que entram no Norte (`medir`): taxa de promessa cumprida (pedidos de
   cliente entregues no prazo e sem intervenção ÷ pedidos abertos, meta 90 %), pedidos de cliente entregues por semana,
-  e publicações por semana nos canais-piloto (reportadas pela esteira/dogfooding por arquivo na caixa, `tipo: resultado`);
+  publicações por semana nos canais-piloto (reportadas pela esteira/dogfooding por arquivo na caixa, `tipo: resultado`)
+  e a prova social: visualizações e seguidores como indicadores antecedentes sem meta (métrica de vaidade, Ries) e
+  cliques e leads vindos do conteúdo como meta, calibrada pela linha de base das 2–4 primeiras semanas;
 - a classificação Jev de cada item (`classificar`): entrega de resultado / confiabilidade da entrega / ferramenta
   (meta-trabalho). Ferramenta só entra se um dos dois primeiros depender dela: `item_de_produto` ordena por isso;
 - a PROMESSA.md de cada produto (`promessa`): trabalho que substitui, resultado em uma frase, cadência, preço
@@ -29,6 +31,7 @@ SEMANA = 7 * 86400.0
 PRAZO_PROMESSA_H = 48.0                 # prazo prometido por pedido (kv `promessa_prazo_h` sobrescreve)
 META_PROMESSA = 0.9
 KV_RESULTADOS = "resultados_cliente"    # [{"projeto", "metrica", "valor", "em"}] reportados de fora (caixa `tipo: resultado`)
+KV_METAS = "metas_calibradas"           # {chave: meta} de cliques/leads: linha de base das 4 primeiras semanas; editar é decisão humana
 KV_CLASSES = "classificacao_itens"      # {item_id: {"classe", "por", "em"}}
 CLASSES = ("resultado", "confiabilidade", "ferramenta")
 ORDEM = {"resultado": 0, "confiabilidade": 1, "ferramenta": 2}
@@ -43,7 +46,18 @@ RESULTADOS = (
     ("promessa_cumprida", "Taxa de promessa cumprida: pedidos de cliente entregues no prazo e sem intervenção ÷ abertos (7 dias)", META_PROMESSA, "maior"),
     ("pedidos_cliente_semana", "Pedidos de repositório cliente entregues por semana", 3.0, "maior"),
     ("publicacoes_semana", "Publicações por semana nos canais-piloto com conteúdo da esteira (reportadas pela esteira)", 3.0, "maior"),
+    # prova social (missão Vender resultado, item G): audiência é métrica de vaidade (Ries) e entra só como antecedente;
+    # a conversão vinda do conteúdo da esteira é a meta, calibrada pela linha de base (2–4 semanas) em vez de um número fixo
+    ("visualizacoes_semana", "Visualizações por semana nos canais-piloto (indicador antecedente, sem meta)", None, "maior"),
+    ("seguidores_semana", "Seguidores ganhos por semana nos canais-piloto (indicador antecedente, sem meta)", None, "maior"),
+    ("cliques_semana", "Cliques vindos do conteúdo da esteira por semana (meta: linha de base das 2–4 primeiras semanas)", None, "maior"),
+    ("leads_semana", "Leads vindos do conteúdo da esteira por semana (meta: linha de base das 2–4 primeiras semanas)", None, "maior"),
 )
+ANTECEDENTES = ("visualizacoes_semana", "seguidores_semana")
+CALIBRADAS = ("cliques_semana", "leads_semana")
+METRICAS = {"publicacoes_semana": ("publicacoes", "publicações", "videos_publicados"), "visualizacoes_semana": ("visualizacoes", "visualizações", "views"),
+            "seguidores_semana": ("seguidores", "followers"), "cliques_semana": ("cliques", "clicks"), "leads_semana": ("leads",)}
+BASE_SEMANAS = (2, 4)                   # a meta calibrada aparece com 2 semanas fechadas de histórico e fixa na 4ª
 
 
 # ------------------------------------------------------------------ medição
@@ -90,23 +104,54 @@ def ler_resultados_da_caixa(store, texto: str, agora: float | None = None) -> in
     return n
 
 
-def publicacoes_semana(store, agora: float | None = None) -> float | None:
+def _reportados(store, chave: str) -> list[dict]:
+    return sorted((r for r in (store.get(KV_RESULTADOS) or []) if r.get("metrica") in METRICAS[chave]), key=lambda r: float(r["em"]))
+
+
+def reportado_semana(store, chave: str, agora: float | None = None) -> float | None:
     agora = agora or time.time()
-    rs = [r for r in (store.get(KV_RESULTADOS) or []) if r.get("metrica") in ("publicacoes", "publicações", "videos_publicados") and agora - float(r["em"]) < SEMANA]
+    rs = [r for r in _reportados(store, chave) if agora - float(r["em"]) < SEMANA]
     return float(sum(float(r["valor"]) for r in rs)) if rs else None
 
 
+def meta_calibrada(store, chave: str, agora: float | None = None) -> float | None:
+    """Meta de cliques/leads: a média semanal das semanas fechadas desde o primeiro reporte (2 a 4); None antes de 2 semanas.
+    Na 4ª semana fica gravada em `KV_METAS` e não se move mais; um valor posto ali à mão vale sempre."""
+    metas = store.get(KV_METAS) or {}
+    if chave in metas:
+        return metas[chave]
+    agora = agora or time.time()
+    rs = _reportados(store, chave)
+    minimo, maximo = BASE_SEMANAS
+    semanas = min(maximo, int((agora - float(rs[0]["em"])) // SEMANA)) if rs else 0
+    if semanas < minimo:
+        return None
+    fim = float(rs[0]["em"]) + semanas * SEMANA
+    meta = round(sum(float(r["valor"]) for r in rs if float(r["em"]) < fim) / semanas, 1)
+    if semanas == maximo:
+        store.set(KV_METAS, {**metas, chave: meta})
+    return meta
+
+
 def medir(store, agora: float | None = None) -> dict:
-    """Os resultados do lado do cliente no formato do Norte ({valor, meta, sentido, distancia, descricao})."""
+    """Os resultados do lado do cliente no formato do Norte ({valor, meta, sentido, distancia, descricao}). Antecedentes
+    (`ANTECEDENTES`) e metas ainda não calibradas têm meta None e distância 0: não puxam o loop."""
     agora = agora or time.time()
     pc = promessa_cumprida(store, agora)
     entregues = sum(1 for p in _pedidos(store, agora - SEMANA) if p["status"] == "entregue")
-    valores = {"promessa_cumprida": pc["taxa"], "pedidos_cliente_semana": entregues, "publicacoes_semana": publicacoes_semana(store, agora)}
+    valores = {"promessa_cumprida": pc["taxa"], "pedidos_cliente_semana": entregues, **{c: reportado_semana(store, c, agora) for c in METRICAS}}
     out = {}
     for chave, descricao, meta, sentido in RESULTADOS:
         v = valores[chave]
-        dist = 1.0 if v is None else (0.0 if v >= meta else min(1.0, (meta - v) / max(meta, 1e-9)))
+        if chave in CALIBRADAS:
+            meta = meta_calibrada(store, chave, agora)
+        if meta is None:
+            dist = 0.0
+        else:
+            dist = 1.0 if v is None else (0.0 if v >= meta else min(1.0, (meta - v) / max(meta, 1e-9)))
         out[chave] = {"descricao": descricao, "valor": v, "meta": meta, "sentido": sentido, "distancia": round(dist, 2), "lado": "cliente"}
+        if chave in ANTECEDENTES:
+            out[chave]["antecedente"] = True
     out["promessa_cumprida"].update({k: pc[k] for k in ("abertos", "cumpridos", "atrasados")})
     return out
 
