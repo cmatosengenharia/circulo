@@ -195,3 +195,33 @@ def test_loop_poe_fabricar_no_trabalho_real_quando_ha_pedido(fabrica, monkeypatc
 
 def test_build_fabricante_nunca_dentro_de_testes(circle):
     assert fabricante.build_fabricante(circle.ctx) is None
+
+
+# ---------------------------------------------------------------- 1.76.1: o clone registrado acompanha o remoto
+def test_clone_registrado_avanca_e_rele_o_kit_antes_de_trabalhar(fabrica, tmp_path):
+    """A esteira foi registrada antes de ter circulo.toml: `testes` ficou `python -m pytest` para um repo .NET e o clone
+    3 commits atrás. Antes de cada trabalho o clone registrado dá fast-forward e o kit é relido; sujo, não é tocado."""
+    store, reg, remoto = fabrica["store"], fabrica["reg"], fabrica["remoto"]
+    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == reg["testes"]
+    outro = tmp_path / "outro-clone"
+    git(tmp_path, "clone", "-q", remoto.as_uri(), str(outro))
+    (outro / "circulo.toml").write_text('nome = "cliente"\ntestes = "dotnet test Cliente.sln --nologo"\n', encoding="utf-8")
+    git(outro, "add", "-A")
+    git(outro, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "kit do cliente")
+    git(outro, "push", "-q", "origin", "main")
+    at = repo_cliente.atualizar(store, reg["id"])
+    assert at == {"avancou": True, "kit_mudou": True, "erro": None, "testes": "dotnet test Cliente.sln --nologo"}
+    assert store.one("SELECT testes FROM repos_cliente WHERE projeto_id=?", (reg["id"],))["testes"] == "dotnet test Cliente.sln --nologo"
+    assert repo_cliente.atualizar(store, reg["id"])["avancou"] is False                      # já na ponta: nada a fazer
+    pasta = Path(reg["caminho"])
+    (pasta / "rascunho.txt").write_text("trabalho local do Cássio", encoding="utf-8")       # clone sujo: nunca é tocado
+    (outro / "x.txt").write_text("x", encoding="utf-8")
+    git(outro, "add", "-A")
+    git(outro, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "mais um")
+    git(outro, "push", "-q", "origin", "main")
+    assert repo_cliente.atualizar(store, reg["id"])["avancou"] is False and (pasta / "rascunho.txt").exists()
+    (pasta / "rascunho.txt").unlink()
+    fab = fabrica["fab"]
+    fab.run_once()
+    kit = [e for e in repo_cliente.evidencias(store, fabrica["pedido"]["id"]) if e["etapa"] == "kit"]
+    assert kit and kit[0]["ok"] and "dotnet test Cliente.sln" in kit[0]["saida"] and "clone avançou" in kit[0]["saida"]

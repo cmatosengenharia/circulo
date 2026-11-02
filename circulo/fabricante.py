@@ -224,8 +224,10 @@ class Fabricante:
         p = proximo(self.s)
         if p is None:
             return {"status": "nada"}
+        at = repo_cliente.atualizar(self.s, p["projeto_id"])         # 1.76.1: clone registrado e kit (testes, etapas) de AGORA
         r = repo_cliente.repo(self.s, p["projeto_id"])
         k = kits.carregar(r["caminho"])
+        self._evidencia(p["id"], "kit", at["erro"] is None, f"testes: `{at['testes']}`" + (" (kit relido)" if at["kit_mudou"] else "") + ("; clone avançou" if at["avancou"] else "") + (f"; sem atualizar o clone: {at['erro']}" if at["erro"] else ""))
         clone = Path(p["pasta"] or "")
         wip = _wip(self.s, p["id"])
         if not (clone / ".git").exists():

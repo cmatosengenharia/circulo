@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.76.1 — 2026-11-02
+
+- Fábrica: o clone registrado do cliente acompanha o remoto antes de cada trabalho (`repo_cliente.atualizar`: fetch +
+  fast-forward só com clone limpo e na base; kit relido, `testes` atualizado; evidência `kit` na ficha do pedido).
+  Causa: a esteira foi registrada antes de ter `circulo.toml` — o loop guardou `python -m pytest -q -x` como teste de
+  um repositório .NET e o clone ficou 3 commits atrás; toda entrega sairia vermelha por culpa do loop, não do pedido.
+
 ## 1.76.0 — 2026-11-01
 
 **Vender resultado, não ferramenta: o Norte mede o lado do cliente; taxa de promessa cumprida; classe Jev de cada item.**
