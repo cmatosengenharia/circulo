@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import __version__, finance
 from . import atividade as atv
-from . import alavancas, modelo_menor, planos, registro, repo_stats
+from . import alavancas, modelo_menor, planos, registro, repo_stats, tecnicas
 from .budget import TZ
 from .falhas_painel import (_falhas_antes, agrupar_por_causa, causas_vs_antes, falhas_por_causa, falhas_por_componente,
                             variacao)
@@ -140,7 +140,7 @@ def estado(store: Store, projeto: int | None = None) -> dict:
         "conversa": conversa(s, projeto),
         "projeto": (next((c for c in cards(s) if c["id"] == projeto), None) if projeto else None),
         **({"motor": motor(s, projeto)} if kit == "geral" else {}),
-        **({"roteiro": roteiro(s), "incidentes": incidentes(s), "licoes": _licoes(s), "cerebros": _cerebros(s), "quarentena": {
+        **({"roteiro": roteiro(s), "incidentes": incidentes(s), "licoes": _licoes(s), "tecnicas": tecnicas.relatorio(s), "cerebros": _cerebros(s), "quarentena": {
             k: v for k, v in (s.get("quarentena", {}) or {}).items() if v["ate_tick"] > s.tick}} if kit == "circulo" else {}),
     }
 

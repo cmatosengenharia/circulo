@@ -141,4 +141,29 @@ def test_vigia_roda_o_medico_e_painel_expoe(circle, painel):  # noqa: F811
     assert "Médico do loop" in urllib.request.urlopen(painel + "/loop", timeout=5).read().decode()
 
 
+def test_tecnica_que_barra_reprovando_o_mesmo_item_3x_seguidas_vira_diagnostico_e_item(circle):
+    """Técnica que barra (cirurgica, simplicidade) reprovando o MESMO item ≥ 3 vezes seguidas: o Médico diagnostica e,
+    com o veredito de corrigir, abre item urgente na frente da fila. Reprovação em itens diferentes ou com um ok no meio não conta."""
+    from circulo import tecnicas
+    s = circle.store
+    tecnicas.registrar(circle.ctx, "cirurgica", False, "roteiro #7", "3 arquivos de código fora do escopo")
+    tecnicas.registrar(circle.ctx, "cirurgica", False, "roteiro #9", "4 arquivos de código fora do escopo")
+    tecnicas.registrar(circle.ctx, "cirurgica", False, "roteiro #7", "3 arquivos de código fora do escopo")
+    tecnicas.registrar(circle.ctx, "plano_antes", False, "roteiro #7", "editou antes de planejar")
+    assert medico.sondar(s) == []                                             # 2 seguidas não é padrão; plano_antes não barra
+    tecnicas.registrar(circle.ctx, "cirurgica", False, "roteiro #7", "5 arquivos de código fora do escopo")
+    [a] = medico.sondar(s)
+    assert a["tipo"] == "repeticao_sem_progresso" and a["chave"] == "tecnica:cirurgica:roteiro #7"
+    assert a["evidencia"] == {"tecnica": "cirurgica", "item": "roteiro #7", "reprovacoes_seguidas": 3, "ultima_falha": "5 arquivos de código fora do escopo", "base": "medido"}
+    a["veredito"] = {"bloqueia": True, "dono": "codigo_do_loop", "remedio": 2, "fonte": "jev"}
+    assert medico.decidir(a) == "corrigir"
+    m = Medico(circle.ctx)
+    did = s.x("INSERT INTO diagnosticos(chave,tipo,titulo,evidencia,status,primeira_em,ultima_em) VALUES(?,?,?,?,'observando',1,1)", (a["chave"], a["tipo"], a["titulo"], "{}"))
+    assert m.corrigir(a, did, time.time()).startswith("item urgente")
+    item = s.one("SELECT * FROM roadmap WHERE id=(SELECT item_id FROM diagnosticos WHERE id=?)", (did,))
+    assert item["origem"] == "erro" and "cirurgica" in item["titulo"] and "roteiro #7" in item["detalhe"]
+    tecnicas.registrar(circle.ctx, "cirurgica", True, "roteiro #7")
+    assert medico.sondar(s) == []                                             # passou: a sequência quebrou
+
+
 from test_painel import painel  # noqa: E402,F401 — fixture do servidor do painel
