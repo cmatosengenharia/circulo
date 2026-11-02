@@ -40,8 +40,34 @@ def test_norte_ganha_tres_resultados_do_lado_do_cliente_com_meta(circle):
     assert m["pedidos_cliente_semana"]["valor"] == 1 and m["publicacoes_semana"]["valor"] == 3.0 and m["publicacoes_semana"]["distancia"] == 0
     todo = norte.medir(s, agora)
     assert {"promessa_cumprida", "pedidos_cliente_semana", "publicacoes_semana"} <= set(todo)
-    assert len([k for k in todo if not k.startswith("_")]) == 9
-    assert sum(1 for r in norte.resumo(s)["resultados"] if r.get("lado") == "cliente") == 3
+    assert len([k for k in todo if not k.startswith("_")]) == 13
+    assert sum(1 for r in norte.resumo(s)["resultados"] if r.get("lado") == "cliente") == 7
+
+
+def test_prova_social_visualizacoes_e_seguidores_sao_antecedentes_e_cliques_e_leads_tem_meta_da_linha_de_base(circle):
+    """Métrica de vaidade (Ries) entra como indicador antecedente sem meta; a conversão (cliques, leads) tem meta própria,
+    calibrada pela linha de base das 2–4 primeiras semanas em vez de um número fixo."""
+    s, agora, W = circle.store, time.time(), resultado.SEMANA
+    assert ler_resultados_da_caixa(s, "esteira; visualizacoes; 1200\nesteira; seguidores; 30\nesteira; cliques; 10\nesteira; leads; 3\n", agora) == 4
+    m = medir(s, agora)
+    for chave, v in (("visualizacoes_semana", 1200.0), ("seguidores_semana", 30.0)):
+        assert m[chave]["valor"] == v and m[chave]["meta"] is None and m[chave]["distancia"] == 0 and m[chave]["antecedente"]
+    assert m["cliques_semana"]["valor"] == 10.0 and m["leads_semana"]["valor"] == 3.0
+    assert m["cliques_semana"]["meta"] is None and m["cliques_semana"]["distancia"] == 0      # menos de 2 semanas: ainda sem linha de base
+    assert not m["cliques_semana"].get("antecedente") and not m["leads_semana"].get("antecedente")
+    for sem in (1.5, 2.5, 3.5):                                                               # 3 semanas fechadas de histórico
+        ler_resultados_da_caixa(s, "esteira; cliques; 20\nesteira; leads; 2\n", agora - sem * W)
+    m = medir(s, agora)
+    assert m["cliques_semana"]["meta"] == 20.0 and m["cliques_semana"]["distancia"] == 0.5    # média semanal da base; 10 de 20
+    assert m["leads_semana"]["meta"] == 2.0 and m["leads_semana"]["distancia"] == 0           # 3 ≥ 2
+    ler_resultados_da_caixa(s, "esteira; cliques; 40\nesteira; leads; 6\n", agora - 4.5 * W)  # a 4ª semana fecha a base: meta fixa
+    assert medir(s, agora)["cliques_semana"]["meta"] == 25.0
+    assert s.get(resultado.KV_METAS)["cliques_semana"] == 25.0 and s.get(resultado.KV_METAS)["leads_semana"] == 3.0
+    ler_resultados_da_caixa(s, "esteira; cliques; 400\n", agora - 5.5 * W)                    # dado anterior à base fechada não a move
+    assert medir(s, agora)["cliques_semana"]["meta"] == 25.0
+    s.set(resultado.KV_METAS, {**s.get(resultado.KV_METAS), "leads_semana": 10})            # mudar a meta é decisão humana: o kv manda
+    assert medir(s, agora)["leads_semana"]["meta"] == 10 and medir(s, agora)["leads_semana"]["distancia"] == 0.7
+    assert sum(1 for r in norte.resumo(s)["resultados"] if r.get("lado") == "cliente") == 7
 
 
 def test_caixa_le_arquivo_tipo_resultado(circle, tmp_path):
