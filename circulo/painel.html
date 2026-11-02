@@ -567,6 +567,10 @@ form.ask input:focus,.orc-form input:focus,.ligar select:focus,.paralelo select:
         <ul class="list" id="verificacoes"></ul>
         <div id="cerebros" class="cerebros"></div></details>
     </section>
+    <section data-aba="seguranca" class="panel c5 zero-only" hidden aria-label="Técnicas do time">
+      <h2>Técnicas <small class="sub" style="text-transform:none;letter-spacing:0;font-weight:400">medidas a cada entrega · taxa nas últimas 30 medições</small></h2>
+      <ul class="list" id="tecnicas"></ul>
+    </section>
     <section data-aba="jev" class="panel c7 zero-only" hidden aria-label="Aluno do Jev">
       <div class="cabeca"><div><h2>Aluno do Jev</h2><p class="sub" style="margin:2px 0 0">Um modelo local aprende com as respostas confiantes do Jev e palpita em sombra; a decisão continua sendo do Jev. Clique numa pergunta.</p></div>
         <button class="btn" type="button" id="alunoTreinar" title="Treina agora com as decisões gravadas (normalmente a cada 6 h ou 200 decisões novas)">Treinar agora</button></div>
@@ -930,6 +934,8 @@ function render(s) {
       || `<li><span class="pt" data-e="ok"></span><div class="tx">Nenhuma lição aberta.</div></li>`;
     $("#licoesTodas").innerHTML = (LC.ultimas || []).map(lic).join("") || `<li class="empty">Nenhuma lição ainda.</li>`;
     $("#verificacoes").innerHTML = (LC.verificacoes_24h || []).map(v => `<li><span>${esc(v.ponto)}<span class="meta">${v.total} verificações · ${v.falhas || 0} falhas</span></span><span class="chip ${v.falhas ? "aberto" : "resolvido"}">${v.total ? Math.round(100 * (v.total - (v.falhas || 0)) / v.total) : 100}% ok</span></li>`).join("") || `<li class="empty">Nenhuma verificação ainda.</li>`;
+    const TN = {plano_antes:"Plano antes do código", teste_antes:"Teste antes do código", cirurgica:"Mudança cirúrgica (barra)", simplicidade:"Simplicidade (barra)", resposta_direta:"Resposta direta", revisao_cruzada:"Revisão cruzada"};
+    $("#tecnicas").innerHTML = (s.tecnicas || []).map(t => `<li><span>${TN[t.tecnica] || esc(t.tecnica)}<span class="meta">${t.ativa ? `${t.ok}/${t.medicoes} ok${t.ultima_falha ? ` · última falha: ${esc(t.ultima_falha)}` : ""}` : "sem medição ainda"}</span></span><span class="chip ${t.ativa ? (t.ok === t.medicoes ? "resolvido" : "aberto") : ""}">${t.ativa ? `${Math.round(100 * t.taxa)}% ok` : "—"}</span></li>`).join("") || `<li class="empty">Nenhuma técnica medida ainda.</li>`;
   }
   renderKpis(s); renderAgora(); renderRitmo(s.ritmo); renderModelos(s.llm);
   if (!passos.length && s.giros && s.giros.length) {           // primeira carga: passos do último giro

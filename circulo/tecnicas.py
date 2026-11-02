@@ -27,6 +27,7 @@ from pathlib import Path
 
 PREFIXO = "tecnica:"
 NOMES = ("plano_antes", "teste_antes", "cirurgica", "simplicidade", "resposta_direta", "revisao_cruzada")
+BARRAM = ("cirurgica", "simplicidade")   # portões do neurônio "abrir PR"; as demais são evidência
 MAX_FORA_DO_ESCOPO = 2          # arquivos de código mudados que o item não cita (além dos de teste/docs)
 MAX_LINHAS_RESPOSTA = 12
 JANELA = 30                     # últimas medições por técnica no relatório
@@ -199,7 +200,7 @@ def medir(ctx, item: dict, passos: list[str], resposta: str, arquivos: list[str]
     sujeito = f"roteiro #{item.get('id')}" if item.get("id") else str(item.get("titulo", ""))[:120]
     for nome, (ok, motivo) in medidas.items():
         registrar(ctx, nome, ok, sujeito, motivo)
-    return [Resultado(f"técnica {n}", *medidas[n]) for n in ("cirurgica", "simplicidade")]
+    return [Resultado(f"técnica {n}", *medidas[n]) for n in BARRAM]
 
 
 def registrar(ctx, nome: str, ok: bool, sujeito: str = "", motivo: str = "") -> None:
@@ -227,5 +228,5 @@ def texto_relatorio(store) -> str:
     return "\n".join(linhas)
 
 
-__all__ = ["NOMES", "PROMPT", "PREFIXO", "plano_antes", "teste_antes", "cirurgica", "simplicidade", "resposta_direta",
+__all__ = ["NOMES", "BARRAM", "PROMPT", "PREFIXO", "plano_antes", "teste_antes", "cirurgica", "simplicidade", "resposta_direta",
            "revisao_cruzada", "medir", "registrar", "relatorio", "texto_relatorio", "escopo_do_item", "dependencias_novas"]
