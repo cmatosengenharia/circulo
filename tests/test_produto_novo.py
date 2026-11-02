@@ -39,7 +39,8 @@ def test_cada_esqueleto_vira_produto_com_ci_proprio_verde_e_primeiro_pr_aberto(t
     (Path(pedido["pasta"]) / "README.md").write_text("# Conta Palavras\n\nPrimeira entrega.\n")
     e = repo_cliente.entregar(store, pedido["id"], "primeira entrega")
 
-    assert e["testes_ok"] and not e["bloqueado_por"], f"CI próprio do esqueleto {tipo} vermelho"
+    assert e["testes_ok"] and not e["bloqueado_por"], (f"CI próprio do esqueleto {tipo} vermelho (bloqueado_por={e['bloqueado_por']}):\n"
+                                                     f"{str(e.get('testes_saida', ''))[-1500:]}")   # a saída na falha: 4 flakes cegos em 1 h (01/11)
     assert git(remoto, "rev-parse", f"refs/heads/{r['branch']}") == e["commit"]          # o primeiro PR, no remoto
     assert git(remoto, "diff", "--name-only", f"main...{r['branch']}") == "README.md"
 

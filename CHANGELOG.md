@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.76.3 — 2026-11-02
+
+- Loop: `fabricar` (pedido de repositório cliente — a esteira) vem antes do trabalho interno (estudar/corrigir item do
+  loop) na ordem de trabalho real, com espaço de 2 giros: um giro para o produto, um para o loop evoluir a si mesmo.
+  Antes, atrás de estudar/corrigir, o Fabricante nunca rodava (`idle_last` sem `fabricar` após 34 pedidos abertos):
+  sempre há item novo do loop. Cássio: "MVP da esteira primeiro; vender resultado, não ferramenta".
+
 ## 1.76.2 — 2026-11-02
 
 - Painel: o card de uma missão de repositório cliente (kit `repo`, a esteira) media ciclos de missão e por isso ficava
