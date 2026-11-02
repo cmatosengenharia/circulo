@@ -40,6 +40,7 @@ def test_equipe_ao_vivo_mostra_os_pedidos_por_pessoa(circle, tmp_path):
             api = {p["de"]: p["itens"] for p in json.loads(r.read())["por_pessoa"]}
     finally:
         srv.shutdown()
+        srv.server_close()
     assert api["Ana"] == [a] and api["Bruno"] == [b]                          # a Equipe ao vivo recebe pela API
 
 

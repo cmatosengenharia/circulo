@@ -177,3 +177,20 @@ def test_saida_focada_corta_pelo_final_sem_cortar_o_resumo_do_pytest():
 def test_testes_do_developer_do_loop_rodam_com_tb_short(circle, repo):  # noqa: F811
     dev = DeveloperComReparo(circle.ctx, repo, ZipAgent(), FakeGH())
     assert dev.test_cmd[-3:] == ["-q", "-x", "--tb=short"] and "pytest" in dev.test_cmd
+
+
+def test_prazo_estourado_no_developer_do_loop_e_reprovacao_de_ambiente_e_nao_incidente(circle, repo, monkeypatch):  # noqa: F811
+    """2/11: o loop usa DeveloperComReparo, não SelfDeveloper, e os 900 s fixos daqui viraram sete TimeoutExpired (incidente)
+    que isolaram o Developer por 320 giros com a suíte verde. Prazo estourado é reprovação `timeout` (classe ambiente,
+    assinatura developer:testes:timeout) com o fim da saída, e o loop segue."""
+    from circulo import reparo
+    from circulo.licoes import assinatura_de, classificar
+    monkeypatch.setattr(reparo, "TESTES_PRAZO", 1)
+    dev = DeveloperComReparo(circle.ctx, repo, ZipAgent(), FakeGH(), lint_cmd=[], fix_cmds=[],
+                             test_cmd=["python3", "-u", "-c", "import time; print('tests/test_lento.py'); time.sleep(5)"])
+    ok, saida = dev.verificar(repo)
+    assert ok is False and "timeout" in saida and "passou de 1 s" in saida and "tests/test_lento.py" in saida
+    r = circle.store.one("SELECT ok, motivo FROM verificacoes WHERE ponto='developer:testes' ORDER BY id DESC")
+    assert r["ok"] == 0 and "passou de 1 s" in r["motivo"]
+    assert classificar("developer:testes", saida) == "ambiente"
+    assert assinatura_de("developer:testes", saida) == "developer:testes:timeout"

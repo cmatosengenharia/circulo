@@ -92,3 +92,4 @@ def test_api_cola_e_busca(tmp_path):
         assert [(h["url"], h["assunto"]) for h in achados] == [("https://wiki.empresa/a", "migração")]
     finally:
         srv.shutdown()
+        srv.server_close()

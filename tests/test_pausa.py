@@ -83,6 +83,7 @@ def test_api_e_card_da_pausa(motor):  # noqa: F811
         assert code == 200 and r["estado"] == "rodando"
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_central_de_confianca_mostra_missoes_pausadas(motor):  # noqa: F811

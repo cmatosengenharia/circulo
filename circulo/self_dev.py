@@ -157,7 +157,7 @@ class CodeAgent(Protocol):
 
 # O que o Claude Code pode rodar sem pedir aprovação (não há ninguém para aprovar em `-p`): testes, lint e git de leitura no próprio worktree. Sem isto ele escrevia código e teste às cegas e pedia "aprove os comandos" — 25% das chamadas de 20/10 terminaram assim, e o item voltava para a fila barrado nos portões.
 GIT_PRAZO = 300              # segundos por comando git (rede inclusa)
-TESTES_PRAZO = int(os.environ.get("CIRCULO_TESTES_PRAZO", "900"))   # segundos para lint+testes do worktree (a suíte do loop leva 5–8 min)
+TESTES_PRAZO = int(os.environ["CIRCULO_TESTES_PRAZO"]) if os.environ.get("CIRCULO_TESTES_PRAZO", "").isdigit() else 900   # segundos de lint+testes do worktree (suíte do loop: 5–8 min); valor inválido não derruba o import
 FERRAMENTAS = ("Bash(python:*)", "Bash(python3:*)", "Bash(python3.11:*)", "Bash(python3.12:*)", "Bash(python3.13:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(git diff:*)", "Bash(git status:*)",
                "Bash(git log:*)", "Bash(git stash:*)", "Bash(git show:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)",
                "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(sed -n:*)", "Bash(find:*)", "Bash(graft:*)")
@@ -518,8 +518,7 @@ class SelfDeveloper:
             self.lint_cmd = [sys.executable, *LINT_CMD] if garantir_ruff() else []
         etapas = ([("lint", self.lint_cmd)] if self.lint_cmd else []) + [("testes", self.test_cmd)]
         for nome, cmd in etapas:
-            # prazo estourado = reprovação com nome (o fim da saída diz onde parou), não incidente: 2/11 sete TimeoutExpired isolaram o Developer por 320 giros com a suíte verde
-            codigo, saida = rodar_com_prazo(cmd, wt, ambiente_isolado(), TESTES_PRAZO)
+            codigo, saida = rodar_com_prazo(cmd, wt, ambiente_isolado(), TESTES_PRAZO)   # prazo estourado = reprovação `timeout` com o fim da saída, não incidente (2/11: 7 TimeoutExpired isolaram o Developer por 320 giros)
             if codigo != 0:
                 saida = saida[-1500:]
                 if registrar:

@@ -39,6 +39,7 @@ def servidor_compat():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_port}/v1", visto
     srv.shutdown()
+    srv.server_close()
 
 
 def test_provedor_compativel_traduz_o_porte_e_mede_o_uso(servidor_compat, monkeypatch):

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
 import urllib.request
 from importlib import resources
@@ -119,6 +120,8 @@ def verificar(db_path: str | None = None, navegador: bool | None = None) -> dict
     finally:
         srv.shutdown()
         srv.server_close()
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
     return {"ok": not erros, "erros": erros, "conferidos": conferidos}
 
 

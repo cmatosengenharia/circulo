@@ -132,6 +132,7 @@ def test_painel_sobe_antes_do_loop_e_mostra_desligado(tmp_path):
         assert data["loop"]["vivo"]["estado"] == "desligado" and data["projetos"][0]["kit"] == "circulo"
     finally:
         srv.shutdown()
+        srv.server_close()
 
 
 def test_desativar_item_do_roteiro_tira_da_fila_do_developer(circle, painel):
@@ -199,6 +200,7 @@ def test_faixa_de_saude_com_incidente_aberto_nao_fica_verde_e_aparece_no_painel(
         assert time.monotonic() - t0 < 0.5
     finally:
         srv.shutdown()
+        srv.server_close()
     assert "JSONDecodeError" in pagina and "&lt;b&gt;" in pagina and "<script src" not in pagina
     for campo in ("Giros", "Jev em dúvida", "Incidentes abertos", "Falhas de LLM", "Gate"):
         assert campo in pagina
@@ -690,15 +692,17 @@ def test_candidatos_a_modelo_menor_por_papel_em_7_dias(tmp_path):
     assert modelos_menores(Store(tmp_path / "v.db").db, agora) == []
 
 
-def test_desligar_o_painel_encerra_o_fluxo_sse_em_vez_de_deixar_a_thread_girando(circle):
+@pytest.mark.parametrize("rota", ["/api/fluxo/eventos", "/api/eventos"])      # _sse_fluxo e _sse
+def test_desligar_o_painel_encerra_o_fluxo_sse_em_vez_de_deixar_a_thread_girando(circle, rota):
     """Os fluxos SSE giravam `while True`: cada painel de teste deixava threads órfãs lendo um banco apagado a cada 0,4 s.
     Com `shutdown()`, o laço sai e a conexão fecha."""
     srv = serve(circle.store.path, port=0, background=True)
-    r = urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/fluxo/eventos", timeout=5)
+    r = urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}{rota}", timeout=5)
     assert r.readline().startswith(b"event:")                      # o fluxo está vivo
     fim = threading.Thread(target=r.read, daemon=True)
     fim.start()
     srv.shutdown()
+    srv.server_close()
     fim.join(timeout=3)
     srv.server_close()
     assert not fim.is_alive()                                        # a conexão fechou: o laço do servidor terminou
