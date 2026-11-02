@@ -388,3 +388,25 @@ def test_pedido_que_depende_do_que_nao_existe_fica_bloqueado_sem_queimar_tentati
     assert fab.run_once()["status"] == "nada"                                                  # não volta para a fila
     aviso = store.one("SELECT message FROM alerts WHERE message LIKE 'Fabricante: pedido%' ORDER BY id DESC LIMIT 1")["message"]
     assert "bloqueado" in aviso and "painel" in aviso
+
+
+def test_licao_98_escrita_recusada_pelo_agente_bloqueia_o_pedido_sem_queimar_tentativas(fabrica):
+    """Lição #98 (pedido 3 da esteira, skills em .claude/skills): o Claude Code recusou o Write em `.claude/` e o agente
+    terminou "ok" só com o teste escrito; o Fabricante rodou os portões, a correção e queimou as 3 tentativas com
+    "testes do cliente falham no clone". Escrita pedida pelo agente que não existe no clone depois = recusada: o
+    pedido fica bloqueado na hora, sem portões, sem correção e sem lição de promessa."""
+    fab, store, pedido = fabrica["fab"], fabrica["store"], fabrica["pedido"]
+
+    def implementar(wd, task):
+        (wd / "tests" / "teste_sub.py").write_text(TESTE, encoding="utf-8")
+        return {"passos": ["Claude Code: escrevendo tests/teste_sub.py", f"Claude Code: escrevendo {wd}/.claude/skills/dotnet-patterns/SKILL.md"],
+                "resposta": "Parei: a ferramenta Write recusou escrever em .claude/skills/."}
+    fab.agent.implementar = implementar
+    res = fab.run_once()
+    assert res["status"] == "vermelho" and res["esgotou"] and res["motivo"].startswith("bloqueado: ")
+    assert ".claude/skills/dotnet-patterns/SKILL.md" in res["motivo"]
+    etapas = [e["etapa"] for e in repo_cliente.evidencias(store, pedido["id"])]
+    assert "teste_vermelho" not in etapas and "teste_verde" not in etapas
+    assert sum("BARRADA" in c["task"] for c in fab.agent.chamadas) == 0                       # nenhuma rodada de correção
+    assert not store.q("SELECT 1 FROM licoes WHERE classe='estrutural' AND descricao LIKE '%promessa%'")
+    assert fab.run_once()["status"] == "nada"

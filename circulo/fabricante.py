@@ -138,6 +138,23 @@ def plano_valido(texto: str) -> tuple[bool, str]:
     return True, ""
 
 
+def escritas_recusadas(passos: list[str], clone: Path) -> list[str]:
+    """Lição #98: arquivos que o agente mandou escrever (passo `Claude Code: escrevendo X`) dentro do clone e que não
+    existem depois: o Claude Code recusou a escrita (`.claude/` é sensível em `-p`). Caminho fora do clone não conta."""
+    recusadas = []
+    for passo in passos:
+        if not passo.startswith("Claude Code: escrevendo "):
+            continue
+        arq = passo[len("Claude Code: escrevendo "):]
+        if arq.startswith("/"):
+            if not arq.startswith(f"{clone}/"):
+                continue
+            arq = arq[len(f"{clone}/"):]
+        if arq and not (clone / arq).exists():
+            recusadas.append(arq)
+    return recusadas
+
+
 def arquivos_de_teste(arquivos: list[str]) -> list[str]:
     return [a for a in arquivos if tecnicas._e_teste(a)]
 
@@ -288,6 +305,9 @@ class Fabricante:
         if not out.get("ok"):
             self._evidencia(p["id"], "implementar", False, str(out.get("log", ""))[-800:])
             return self._vermelho(p, wip, "o agente parou no meio")
+        if recusadas := escritas_recusadas(list(out.get("passos") or []), clone):   # lição #98: escrita recusada pelo Claude Code; os portões nunca passariam
+            self._evidencia(p["id"], "implementar", False, f"escrita recusada em: {', '.join(recusadas)}")
+            return self._vermelho(p, wip, f"bloqueado: o agente não consegue escrever em {', '.join(recusadas)[:260]}", esgotar=True)
         if not _git(clone, "status", "--porcelain"):
             self._evidencia(p["id"], "implementar", False, "o agente não mudou nada")
             return self._vermelho(p, wip, "o agente não produziu mudança")
