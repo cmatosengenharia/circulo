@@ -190,6 +190,152 @@ def test_reprovacoes_seguidas_param_o_projeto(motor):
     assert c.store.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "manutencao"
 
 
+# Saída real do Builder na missão 7 (“antecipar:evoluir_loop”, tick 22206, chamada 1986 no llm_cache do loop): um plano
+# em Markdown que traz o modelo do relatório num bloco ```md. O Jev recebeu só o modelo (`tamanho` 618 de 7166) e
+# reprovou: verify_formato 0,03. Na única rodada aprovada (tick 21799) a saída não tinha cerca e o Jev viu os 8283 caracteres.
+PEDIDO_MISSAO_7 = "Preparar antes do pedido: relatório do que o loop mudou na semana e do que ainda falta."
+PLANO_MISSAO_7 = """# Plano: relatório semanal automático do loop (`relatorio_semana`)
+
+**Data do plano:** segunda, 02/11/2026
+**Objetivo:** trocar os pedidos manuais de "relatório da semana" (23 em 7 dias) por um relatório gerado por agendamento e lido numa única consulta ao kv.
+**Estado:** plano. Nada foi executado, e os números do relatório vêm do histórico real do repositório quando o job rodar. Não inventei dados.
+
+## Síntese (1 a 3 linhas)
+Um cron roda toda segunda às 8h, gera o relatório em formato fixo e o grava em `relatorio_semana`. O bloco "mudou" reaproveita a saída do #260 ("PRs por categoria"). O #380 (catálogo de trabalhos) aparece só como item pendente em "falta". Meta: 0 pedidos manuais nas 2 primeiras semanas de execução.
+
+## Premissas e decisões já tomadas
+- **#380** é um item pendente que entra no relatório. Não é origem nem escopo dele. O job nunca escreve em `catalogo_trabalhos`, só lê, e só se precisar citar o status.
+- **#260** já entrega "PRs por categoria". O job consome essa saída e não recalcula categorias. Duplicar essa lógica causaria divergência entre os dois.
+- **Fuso do cron:** o fuso `America/Sao_Paulo` é uma suposição minha. Confirme antes do passo 5.
+- **Janela da semana:** segunda 00:00 a domingo 23:59 do fuso acima. O relatório de segunda 8h cobre a semana encerrada no domingo anterior.
+
+## Etapas
+
+| # | Etapa | Entrega / critério de pronto | Prazo | Est. (h) |
+|---|---|---|---|---|
+| 1 | Congelar o esquema do kv `relatorio_semana` (ver abaixo) | Esquema documentado, com a chave e o nome dos campos | ter 03/11 | 1,0 |
+| 2 | Mapear a saída do #260 e definir o adaptador (entrada: PRs mergeados por categoria/label, com ID e link) | Adaptador lê o #260 sem reimplementar a categorização | ter 03/11 | 1,5 |
+| 3 | Implementar as métricas DORA (fórmulas abaixo) a partir do histórico do repositório | Valores reproduzíveis, conferidos manualmente em 1 semana passada | qua 04/11 | 2,5 |
+| 4 | Implementar o gerador do relatório: síntese, 3 blocos, diagnóstico de "falta" | Markdown no formato fixo, validado por checagem automática | qui 05/11 | 3,0 |
+| 5 | Agendar o cron `0 8 * * 1` (fuso confirmado) e gravar em `relatorio_semana` | Cron ativo, com execução de teste em dry-run | sex 06/11 | 1,0 |
+| 6 | Validação pré-publicação: checagens de integridade (abaixo) | Todas as checagens passam no dry-run | sex 06/11 | 1,0 |
+| 7 | **1ª execução real** | `relatorio_semana` publicado, com registro de horário | seg 09/11, 08:00 | 0,5 (conferência) |
+| 8 | **2ª execução real** (semana consecutiva) | Segunda edição publicada, comprovando a recorrência | seg 16/11, 08:00 | 0,5 |
+| 9 | Medir as horas reais e comparar com a estimativa (registrar no bloco de custo) | Tabela estimado × real preenchida | seg 16/11 | 0,5 |
+| 10 | Fechamento: contar os pedidos manuais de "relatório da semana" de 09/11 a 22/11 | Meta: 0 (baseline: 23 em 7 dias) | dom 22/11 | 0,5 |
+
+## Formato fixo do relatório (kv `relatorio_semana`)
+Uma única chave, com o Markdown completo e a edição mais recente. Uma consulta devolve tudo, e o histórico das semanas fica em `relatorio_semana_AAAA-Www`, se quiser arquivar.
+
+```md
+# Relatório da semana — {início} a {fim}
+**Síntese:** {1 a 3 linhas}
+
+## 1. Mudou (por categoria/label)
+Fonte: saída do #260. Cada item aponta para um PR mergeado ou um commit (ID ou link).
+- {categoria}: {n} PRs — #{id} {título} ({link})
+Total de PRs mergeados na semana: {N}  (= histórico do repositório)
+
+## 2. Em andamento
+- {PR/item aberto} — {estado} — aberto em {data}
+
+## 3. Falta e decisões pendentes
+- Leitura diagnóstica: {≥1 frase cruzando frequência e lead time}
+- #380 — catálogo de trabalhos — pendente
+- {outras pendências / decisões necessárias}
+
+## Métricas DORA
+| Métrica | Valor | Fórmula | Fonte |
+```
+
+## Métricas DORA (fixas, toda semana)
+
+| Métrica | Fórmula | Fonte de dados |
+|---|---|---|
+| **Frequência de entrega** | Contagem de PRs com `merged_at` dentro da janela da semana | Histórico de PRs do repositório (mesma base do #260) |
+| **Lead time** | Mediana de (`merged_at` − `created_at`) em horas, dos PRs mergeados na semana | Histórico de PRs do repositório |
+| **Taxa de falha de mudança** (se viável) | (PRs mergeados na semana que foram revertidos ou geraram hotfix em até 7 dias) ÷ (PRs mergeados na semana) × 100 | Label `revert`/`hotfix` ou título convencional (`revert:`, `fix:` ligado a PR anterior) |
+
+**Viabilidade da taxa de falha:** só é confiável se os reverts e hotfixes forem identificáveis por label ou convenção de commit. Se não forem, o relatório mostra "n/d" e o motivo. Não estimo esse valor.
+
+## Leitura diagnóstica do "falta"
+Cada edição inclui pelo menos uma frase que cruza as duas métricas e diz onde o trabalho acumula. Regra de decisão:
+- **Frequência alta e lead time crescente:** o trabalho acumula na revisão ou na espera pelo merge. Citar os PRs abertos há mais tempo.
+- **Frequência baixa e lead time baixo:** pouco trabalho entrando. O gargalo está antes do PR, na definição ou nas decisões pendentes.
+- **Frequência baixa e lead time alto:** o fluxo está travado. Listar os bloqueios.
+- **Ambos estáveis:** dizer isso explicitamente e apontar a próxima pendência da lista (ex.: #380).
+
+## Checagens de integridade (passo 6, repetidas a cada execução)
+1. Os 3 blocos e a síntese de 1 a 3 linhas estão presentes (100% das edições).
+2. Todo item de "mudou" tem ID ou link de PR/commit.
+3. A contagem de PRs mergeados do relatório é igual à contagem direta do histórico do repositório (divergência = 0). Se divergir, o job **não publica**. Ele grava o erro e avisa.
+4. O conteúdo de `catalogo_trabalhos` é idêntico antes e depois da execução (o job não escreve nele).
+5. O #380 aparece apenas em "falta", nunca como origem ou escopo.
+6. Uma leitura do kv devolve o relatório completo.
+
+## Custo e prazo (hipótese **a validar**)
+
+| Item | Estimado (h) | Real (h) | Desvio |
+|---|---|---|---|
+| Implementação (passos 1 a 6) | 10,0 | a medir | a preencher em 16/11 |
+| Operação nas 2 primeiras semanas (passos 7 a 10) | 2,0 | a medir | a preencher em 16/11 |
+| **Total** | **12,0** | a medir | |
+
+A estimativa é uma hipótese minha, sem medição prévia. O custo de execução do cron em si depende da infraestrutura usada, que não conheço. Não coloquei valor em dinheiro. As horas reais serão medidas e comparadas na segunda 16/11, a semana seguinte à primeira execução.
+
+## Critérios de sucesso (verificáveis em 22/11/2026)
+- Execuções comprovadas em 09/11 e 16/11 (2 semanas consecutivas), ambas às 8h de segunda.
+- 0 pedidos manuais de "relatório da semana" entre 09/11 e 22/11 (baseline: 23 em 7 dias).
+- 100% das edições com os 3 blocos, a síntese e as 2 ou 3 métricas DORA.
+- Divergência de PRs mergeados = 0 nas duas edições.
+- `catalogo_trabalhos` inalterado pelo job.
+
+## Riscos
+- **Fuso ou cron mal configurado:** o relatório sai fora do horário. Mitigação: a execução de teste do passo 5 confere o horário.
+- **O #260 muda o formato de saída:** o adaptador quebra. Mitigação: a checagem 2 bloqueia a publicação e avisa.
+- **Taxa de falha inviável por falta de labels:** mostrar "n/d" e propor adotar a label `revert`/`hotfix`, que fica como decisão pendente.
+"""
+
+
+class FakeGenMissao7(FakeGen):
+    """LLM que devolve a saída real da missão 7: um plano em Markdown com o modelo do relatório num bloco ```md."""
+
+    def generate(self, *, system, prompt, model, max_tokens, web_search=0):
+        if "Researcher" in system:
+            return LLMResult("- Relatório semanal do loop com o que mudou e o que ainda falta sai por agendamento | https://exemplo.org/a\n"
+                             "- Preparar antes do pedido um relatório da semana em formato fixo evita pedidos repetidos | https://exemplo.org/b\n",
+                             500, model)
+        if "Rubric" in system:
+            return LLMResult("- Cita o orçamento aprovado pela diretoria em reais | 3\n- Define o salário do analista contratado | 2\n"
+                             "- Tem etapas numeradas com prazo | 1\n", 300, model)
+        if "Builder" in system or "Improver" in system:
+            return LLMResult(PLANO_MISSAO_7, 3745, model)
+        return super().generate(system=system, prompt=prompt, model=model, max_tokens=max_tokens, web_search=web_search)
+
+
+def test_plano_real_da_missao_7_chega_inteiro_a_verificacao_e_passa_com_o_mesmo_veredito_em_3_rodadas(tmp_path, clock, monkeypatch):
+    """Missão “Vender resultado”, item C, no caso real da missão 7 (tick 22206): `_strip_fences` pegava o primeiro par de
+    cercas e a verificação pós-LLM recebia só o modelo de relatório com placeholders (618 dos 7166 caracteres); o Jev
+    reprovava o formato e o veredito dependia de a saída daquela rodada trazer ou não um bloco cercado."""
+    gen = FakeGenMissao7()
+    c = Circle(tmp_path, jev=LocalJev(), llm=gen, now=clock)
+    c.submit_project(PEDIDO_MISSAO_7)
+    c.tick()
+    pid = c.store.one("SELECT MAX(id) id FROM projects")["id"]
+    verificados, original = [], c.engine.ctx.dl.verify_output
+
+    def verify_output(content, pedido, fmt):
+        verificados.append(content)
+        return original(content, pedido, fmt)
+    monkeypatch.setattr(c.engine.ctx.dl, "verify_output", verify_output)
+    assert c.engine.cycle(pid).fase == "pesquisa"
+    assert [c.engine.cycle(pid).aceita for _ in range(3)] == [True, True, True]
+    assert verificados == [PLANO_MISSAO_7.strip()] * 3            # o plano inteiro, não o modelo entre as cercas
+    vereditos = c.store.q("SELECT ok FROM verificacoes WHERE ponto='missao:verificacao_saida' ORDER BY id")
+    assert [v["ok"] for v in vereditos] == [1, 1, 1]
+    assert "```md" in c.engine.current(pid)["content"]
+
+
 def test_cada_chamada_de_llm_fica_registrada_com_o_modelo_escolhido_pelo_jev(motor):
     from circulo.registro import historico, recentes, resumo
     c, gen, pid = motor
