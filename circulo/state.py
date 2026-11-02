@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterable
 
-from circulo import roadmap
+from circulo import licoes_confianca, roadmap
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -171,7 +171,8 @@ CREATE TABLE IF NOT EXISTS licoes (
   corrigida_tick INTEGER,
   evidenciada_tick INTEGER,
   created_at REAL NOT NULL,
-  updated_at REAL NOT NULL
+  updated_at REAL NOT NULL,
+  confianca REAL NOT NULL DEFAULT 0.3  -- licoes_confianca.py
 );
 
 -- portões aprendidos (neurogênese): nascem de uma lição e barram o erro antes de a saída do neurônio seguir adiante
@@ -656,7 +657,8 @@ class Store:
                   ("decisions", "estado", "TEXT"), ("roadmap", "modulo", "TEXT"), ("ledger", "import_key", "TEXT"),
                   ("frescor", "versao", "TEXT"),
                   ("vigia_disparos", "giro", "INTEGER"), ("vigia_disparos", "resultado", "TEXT"),
-                  ("vigia_disparos", "giros_ate_destravar", "INTEGER"), ("vigia_disparos", "padrao", "TEXT"))
+                  ("vigia_disparos", "giros_ate_destravar", "INTEGER"), ("vigia_disparos", "padrao", "TEXT"),
+                  ("licoes", "confianca", f"REAL NOT NULL DEFAULT {licoes_confianca.INICIAL}"))
 
     def _migrate(self) -> None:
         for table, col, typ in self.MIGRATIONS:
@@ -664,6 +666,7 @@ class Store:
             if col not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         roadmap.migrar(self.db)
+        licoes_confianca.migrar(self.db)
         # a lição que volta a ficar aberta (reincidência, reabertura no main) carimba quando: a idade da trava é a do
         # período aberto atual, não a de created_at (item #170: reincidiu agora e o Vigia via "aberta há 76 h")
         self.db.execute("""CREATE TRIGGER IF NOT EXISTS licoes_aberta_em AFTER UPDATE OF status ON licoes
