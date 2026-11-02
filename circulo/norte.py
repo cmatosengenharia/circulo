@@ -85,6 +85,8 @@ def medir(store, agora: float | None = None) -> dict[str, Any]:
         else:
             dist = 0.0 if v >= meta else min(1.0, (meta - v) / max(meta, 1e-9))
         out[chave] = {"descricao": descricao, "valor": v, "meta": meta, "sentido": sentido, "distancia": round(dist, 2)}
+    from . import resultado
+    out.update(resultado.medir(store, agora))     # 1.76: resultados do LADO DO CLIENTE (promessa cumprida, pedidos e publicações por semana)
     out["_resumo"] = {"prs_7d": len(prs), "produto_7d": len(produto), "medido_em": agora}
     return out
 
@@ -115,11 +117,13 @@ def cota(store) -> float:
 
 def item_de_produto(store, extra_sql: str = "", args: tuple = ()) -> dict | None:
     """O item de produto pendente e estudado mais prioritário (pedido seu, ou item cuja pergunta tem eixo produto/missão)."""
-    r = store.one("SELECT * FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND estudo IS NOT NULL "
-                  "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%' AND (origem IN ('pedido_cassio','referencia') OR EXISTS "
-                  "(SELECT 1 FROM perguntas p WHERE p.item_id=roadmap.id AND p.eixo IN ('produto','missao')))" + extra_sql +
-                  " ORDER BY CASE origem WHEN 'pedido_cassio' THEN 0 WHEN 'referencia' THEN 1 ELSE 2 END, ordem LIMIT 1", args)
-    return dict(r) if r else None
+    rows = store.q("SELECT * FROM roadmap WHERE status='pendente' AND COALESCE(desativado,0)=0 AND estudo IS NOT NULL "
+                   "AND COALESCE(evidencia,'') NOT LIKE '%depende de você%' AND (origem IN ('pedido_cassio','referencia') OR EXISTS "
+                   "(SELECT 1 FROM perguntas p WHERE p.item_id=roadmap.id AND p.eixo IN ('produto','missao')))" + extra_sql +
+                   " ORDER BY CASE origem WHEN 'pedido_cassio' THEN 0 WHEN 'referencia' THEN 1 ELSE 2 END, ordem LIMIT 10", args)
+    from . import resultado
+    itens = resultado.ordenar_por_classe(store, [dict(r) for r in rows])   # 1.76: resultado > confiabilidade > ferramenta (meta-trabalho por último)
+    return itens[0] if itens else None
 
 
 PRAZO_H = 48                 # Cássio (25/10): se em 2 dias a fração de produto não evoluiu, a solução é reescrita
@@ -138,10 +142,14 @@ def marco(store, agora: float | None = None) -> dict:
     return m
 
 
-def cobrar(store, reply, agora: float | None = None) -> dict | None:
+def cobrar(store, reply, agora: float | None = None, dl=None) -> dict | None:
     """No fim do prazo, compara com o marco: evoluiu (mais PRs de produto, fração maior ou console mexido) ou não.
-    Sem evolução, avisa e põe no "Precisa de você": a solução precisa ser reescrita, não insistida."""
+    Sem evolução, avisa e põe no "Precisa de você": a solução precisa ser reescrita, não insistida.
+    Com `dl` (o Vigia, 1×/dia): antes, o Jev classifica os itens pendentes em resultado/confiabilidade/ferramenta (1.76)."""
     agora = agora or time.time()
+    if dl is not None:
+        from . import resultado
+        resultado.classificar_pendentes(dl, store)
     m = marco(store, agora)
     if m.get("cobrado") or agora < float(m["prazo_em"]):
         return None

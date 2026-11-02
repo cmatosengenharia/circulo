@@ -136,16 +136,30 @@ def receber(store, pid: int, texto: str, raiz: Path) -> dict:
     n = store.x("INSERT INTO pedidos_repo(projeto_id,texto,status,created_at,updated_at) VALUES(?,?,'aberto',?,?)", (pid, texto, agora, agora))
     branch, clone = f"{PREFIXO}{n}", raiz / f"projeto-{pid}" / f"pedido-{n}"
     try:
-        shutil.rmtree(clone, ignore_errors=True)
-        clone.parent.mkdir(parents=True, exist_ok=True)
-        _git(clone.parent, "clone", "-q", "--branch", r["base"], "--single-branch", r["remoto"], clone.name, timeout=600)
-        _git(clone, "checkout", "-q", "-b", branch)
+        _clonar(r, branch, clone)
     except (OSError, subprocess.SubprocessError):
         store.x("DELETE FROM pedidos_repo WHERE id=?", (n,))
         raise
     store.x("UPDATE pedidos_repo SET branch=?, pasta=? WHERE id=?", (branch, str(clone), n))
     _etapa(store, n, r["caminho"], clone, "pedido")
     return _pedido(store, n)
+
+
+def _clonar(r: dict, branch: str, clone: Path) -> None:
+    shutil.rmtree(clone, ignore_errors=True)
+    clone.parent.mkdir(parents=True, exist_ok=True)
+    _git(clone.parent, "clone", "-q", "--branch", r["base"], "--single-branch", r["remoto"], clone.name, timeout=600)
+    _git(clone, "checkout", "-q", "-b", branch)
+
+
+def reclonar(store, pedido_id: int) -> dict:
+    """O clone do pedido sumiu (máquina trocada, pasta apagada): refaz na mesma pasta e branch (1.75, Fabricante)."""
+    p = _pedido(store, pedido_id)
+    r = repo(store, p["projeto_id"])
+    if r is None or not p.get("pasta") or not p.get("branch"):
+        raise ValueError(f"pedido {pedido_id} sem repositório, pasta ou branch")
+    _clonar(r, p["branch"], Path(p["pasta"]))
+    return _pedido(store, pedido_id)
 
 
 def _etapa(store, pedido_id: int, caminho: str, clone: Path, etapa: str) -> bool:
@@ -216,4 +230,4 @@ def vermelho(store, pedido_id: int) -> None:
     store.x("UPDATE pedidos_repo SET status='vermelho', updated_at=? WHERE id=?", (time.time(), pedido_id))
 
 
-__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "entregar", "vermelho", "evidencias", "fichas"]
+__all__ = ["KIT", "PREFIXO", "registrar", "repo", "repos", "pedidos", "receber", "reclonar", "entregar", "vermelho", "evidencias", "fichas"]

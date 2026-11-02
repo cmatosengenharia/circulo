@@ -35,7 +35,7 @@ def test_norte_mede_cada_resultado_com_meta_e_distancia(circle):
     assert m["console_semana"]["valor"] == 1 and m["merge_sem_conserto"]["valor"] == 0.5 and m["merge_sem_conserto"]["distancia"] > 0
     assert m["lead_time_h"]["valor"] > 0 and m["prs_produto_semana"]["distancia"] > 0 and m["repositorios"]["valor"] == 1
     r = norte.resumo(s)
-    assert len(r["resultados"]) == 6 and r["prs_7d"] == 2 and r["fracao_24h"] == 0.5
+    assert len(r["resultados"]) == 9 and r["prs_7d"] == 2 and r["fracao_24h"] == 0.5     # 6 do lado do loop + 3 do lado do cliente (1.76)
 
 
 def test_cota_poe_produto_antes_da_manutencao_quando_a_entrega_e_saudavel(circle, tmp_path):

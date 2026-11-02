@@ -43,6 +43,8 @@ TEMAS = (
     ("economia de tokens por grafo", "knowledge graph memory llm agent token"),
     ("validação de agentes", "llm agent evaluation harness self-correction"),
     ("fábrica de software com agentes", "autonomous software engineering agent pull request"),
+    ("serviços operados por IA", "agentic services outcome based pricing ai agency playbook"),       # 1.76: vender resultado, não ferramenta
+    ("skills de vídeo e motion", "claude skill remotion reels automated video captions motion"),    # 1.76: técnicas, não produto
 )
 PALAVRAS_FORA = {"como", "para", "que", "com", "sem", "uma", "um", "o", "a", "os", "as", "de", "do", "da", "dos", "das", "no", "na",
                  "nos", "nas", "e", "ou", "em", "por", "pelo", "pela", "loop", "pm", "tech", "lead", "falta", "item", "itens", "cada",

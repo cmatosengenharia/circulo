@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.76.0 — 2026-11-01
+
+**Vender resultado, não ferramenta: o Norte mede o lado do cliente; taxa de promessa cumprida; classe Jev de cada item.**
+
+- Cássio ("Pedido ao loop — Vender resultado, não ferramenta", missão): por fora agência, por dentro software autônomo;
+  PR mergeado não conta como produto se nenhum resultado de cliente mudou. ADR 0015.
+- `circulo/resultado.py`: taxa de promessa cumprida (pedidos de cliente entregues em ≤ 48 h sem intervenção ÷ abertos,
+  meta 90 %), pedidos de cliente entregues por semana e publicações por semana nos canais-piloto (arquivo `tipo:
+  resultado` na caixa, `projeto; metrica; valor`) entram no Norte (`/api/norte`, `lado: cliente`).
+- Classificação Jev `classe_do_item` (resultado / confiabilidade / ferramenta), 1×/dia pelo Vigia via `norte.cobrar`;
+  `norte.item_de_produto` ordena resultado > confiabilidade > ferramenta.
+- `PROMESSA.md` por produto (5 campos); o Fabricante registra `fabrica:promessa_md` em toda entrega. Pedido de cliente
+  que esgota as tentativas vira lição estrutural com item de prevenção (`fabrica:promessa`).
+- Validador reprova landing/demo/README de oferta com título de "IA/plataforma/ferramenta" antes do resultado.
+- Garimpo: temas "serviços operados por IA" e "skills de vídeo e motion"; pesquisa semanal pergunta que trabalho pago
+  por pessoa o concorrente substituiu e por quanto cobra.
+- Testes: `tests/test_resultado.py` (9).
+
+## 1.75.0 — 2026-11-01
+
+**Skills externas absorvidas como portões medidos; Fabricante entrega repositórios cliente (Esteira de Vídeo é o primeiro).**
+
+- Cássio: "instale e estude superpowers, andrej-karpathy-skills, i-have-adhd (e octopus se houver Codex/Gemini); não copie
+  cegamente: extraia as técnicas e incorpore; ADR por skill; validação automática de que cada técnica está ativa" e
+  "integre o repo esteira como primeiro produto evoluído pelo loop, com plano, teste antes do código e evidência".
+- `circulo/tecnicas.py`: seis técnicas medidas a cada entrega e gravadas em `verificacoes` (`tecnica:<nome>`):
+  plano_antes e teste_antes (ordem dos passos do Claude Code), cirurgica (arquivos de código fora do escopo do item;
+  **barra**), simplicidade (dependência nova não pedida, def/class que ninguém usa; **barra**), resposta_direta (mensagem
+  final ≤ 12 linhas sem preâmbulo) e revisao_cruzada (Validador com modelo diferente do Developer). `tecnicas.PROMPT`
+  entra no prompt do Developer e do Fabricante; `circulo tecnicas` imprime a taxa por técnica (técnica sem medição =
+  inativa). ADRs 0010 (superpowers), 0011 (karpathy), 0012 (i-have-adhd), 0013 (octopus) em `docs/adr/`.
+- `validador.modelo_cruzado`: o Validador nunca revisa com o modelo do Developer; `validador.revisor_externo`: `codex`
+  ou `gemini` no PATH viram um segundo revisor (opcional; `CIRCULO_REVISOR_EXTERNO=0` desliga).
+- 7 skills vendorizadas em `.claude/skills/` (MIT; origem e commit em `.claude/skills/ORIGEM.md`): test-driven-development,
+  writing-plans, verification-before-completion, systematic-debugging, requesting-code-review, karpathy-guidelines,
+  i-have-adhd. O Jev já escolhe por tarefa (`skills.para_tarefa`).
+- `circulo/fabricante.py` (ADR 0014): trabalho real `fabricar` no idle. Para cada pedido de repositório cliente: plano
+  (só leitura, formato verificável), implementação na mesma sessão, prova de que os testes novos FALHAM na base
+  (worktree da base, qualquer linguagem), testes do cliente, técnicas, Validador, `repo_cliente.entregar` e PR com a
+  evidência no corpo. Vermelho volta à fila até 3 vezes com o motivo; `repo_cliente.reclonar` refaz clone sumido.
+- `kit.carregar` lê `circulo.toml` (repositório que não é Python, como a Esteira em .NET); as ferramentas do agente
+  somam os executáveis do kit (`Bash(dotnet:*)`). `ClaudeCodeAgent.run` aceita `ferramentas` e devolve `resposta`.
+- Testes: `tests/test_tecnicas.py` (21), `tests/test_fabricante.py` (10, de ponta a ponta com remoto git local).
+- Fecha o PRE-1 apontado pela absorção (1.74.0): agora há quem trabalhe os `pedidos_repo` abertos.
+
 ## 1.74.0 — 2026-11-01
 
 **Absorção de repositórios: ADR por fonte, técnicas com prova, prioridade para o MVP da esteira e para vender, escudo das skills e varredura diária do ranking.**
