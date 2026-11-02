@@ -6,6 +6,9 @@
   `Bloqueado: <o que falta>` na fase de plano: a ficha registra, o pedido fica vermelho sem novas tentativas (não é
   promessa quebrada; sem lição estrutural) e o próximo pedido segue. Primeira rodada real na esteira (03:20): o pedido #1
   (Playwright no painel) queimou 2 planos porque o agente explicou que o painel não existe e o validador exigiu o formato.
+- Testes: os 5 flakes do esqueleto .NET na CI desde a 1.76.1 eram do próprio loop — o teste do clone registrado disparava
+  `dotnet test` num repositório Python de mentira; morto pelo timeout na 1ª execução do dotnet, deixava
+  `~/.nuget/NuGet/NuGet.Config` vazio para o teste seguinte. Lição: teste do loop nunca invoca a ferramenta real do cliente.
 
 ## 1.76.3 — 2026-11-02
 
