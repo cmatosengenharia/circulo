@@ -14,6 +14,7 @@ Dois validadores, nenhum deles bloqueia por palpite — cada um mede e deixa ras
    Sem LLM, JSON inválido ou timeout = aprovado (o validador nunca para a entrega: CI e gate continuam depois dele).
    Dentro dela, `validador_telas.verificar` confere as telas que o diff toca (id quebrado, erro de JS) contra a base,
    e `segredos.verificar` reprova qualquer segredo em claro nas linhas adicionadas (regras internas + gitleaks).
+   Por fim a revisão dupla (`revisao_dupla`): o Jev pontua o mesmo diff contra a mesma rubrica, sem ver este veredito.
 """
 from __future__ import annotations
 
@@ -22,6 +23,8 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+
+from .revisao_dupla import RUBRICA
 
 LIXO = ("\\.shim\\d*", "__pycache__", "\\.pytest_cache", "\\.ruff_cache", "\\.mypy_cache", "node_modules", "\\.venv")
 PADRAO_LIXO = re.compile("^(?:" + "|".join(LIXO) + ")$")
@@ -32,8 +35,7 @@ MAX_DIFF = 24_000                # caracteres do diff que vão ao revisor (o res
 MAX_TOKENS = 1200
 SYSTEM = ("Você é o Validador do círculo autoevolutivo: um revisor de código independente do Developer. Responda SÓ com JSON: "
           '{"aprovado": true|false, "problemas": ["…"], "risco": "baixo|medio|alto"}. Reprove APENAS por problema concreto e '
-          "verificável no diff: o teste novo não prova o que o item pede, mudança fora do escopo do item, regressão visível, "
-          "teste enfraquecido ou removido, segredo ou caminho absoluto no código. Dúvida de estilo não reprova. Se vier um "
+          "verificável no diff: " + ", ".join(p for _, p in RUBRICA) + ". Dúvida de estilo não reprova. Se vier um "
           'critério de aceite, diga também se o diff o atende: "criterio_ok": true|false, "criterio_evidencia": "o que no '
           'diff mostra isso".')
 
@@ -152,7 +154,7 @@ def _chamar_llm(ctx, item: dict):
 def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
     """Agente 2: revisão independente do diff. Devolve {aprovado, problemas, risco, fonte}. `chamar(system, prompt)`
     -> texto; por padrão a LLM do ctx. Qualquer falha = aprovado (fonte 'indisponivel')."""
-    from . import criterio_aceite, segredos, validador_telas
+    from . import criterio_aceite, revisao_dupla, segredos, validador_telas
     from .neuronios import diff_do_worktree
     stat, diff = _diff(wt, base)
     adicionadas = diff_do_worktree(wt, base, _git_saida)[1]
@@ -178,6 +180,7 @@ def revisar_pr(ctx, wt: Path, base: str, item: dict, chamar=None) -> dict:
         v["aprovado"], v["problemas"] = False, [*v["problemas"], *telas]
     if achados := segredos.verificar(ctx, adicionadas, sujeito=f"roteiro #{item.get('id')}"):
         v["aprovado"], v["problemas"] = False, [*v["problemas"], *achados]
+    v = revisao_dupla.combinar(ctx.store, item.get("id"), wt, v, revisao_dupla.opinar(ctx.dl, item, diff))
     with contextlib.suppress(Exception):
         from .licoes import registrar as monitorar
         monitorar(ctx, PONTO_REVISAO, v["aprovado"], sujeito=f"roteiro #{item.get('id')}", licao=False,
