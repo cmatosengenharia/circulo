@@ -6,12 +6,12 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | # | Lição | Classe | Status | Ocorrências | Reincidências | Prevenção |
 |---|---|---|---|---|---|---|
 | 59 | developer:agente:maximo_de_passos | trabalho | validada | 24 | 12 | Checagem: teste tests/test_developer.py::test_licao_59_parada_no_maximo_de_passos_devolve_a_tarefa_ao_fatiador; não repe |
-| 47 | loop:estagnado | estrutural | validada | 34 | 8 | Checagem: teste tests/test_licao_47_regressao.py; não repetir: loop:progresso: havia trabalho pendente e nada avançou em |
+| 47 | loop:estagnado | estrutural | validada | 36 | 9 | Checagem: teste tests/test_licao_47_regressao.py; não repetir: loop:progresso: havia trabalho pendente e nada avançou em |
 | 15 | rastro:lacuna | trabalho | obsoleta | 18 | 8 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 60 | painel:frescor_atrasado | ambiente | obsoleta | 274 | 6 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 2 | corpo:validacao_falhou | estrutural | obsoleta | 8 | 4 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |
+| 22 | estudo:saida_invalida | estrutural | aceita | 15 | 3 | Sem prevenção verificável: falta um teste de regressão (lição #22) ou checagem determinística; não repetir: estudo:pedid |
 | 50 | gate:main_vermelha | estrutural | sem_prevencao | 15 | 2 | Sem prevenção verificável: falta um teste de regressão (lição #50) ou checagem determinística; não repetir: gate:main: C |
-| 22 | estudo:saida_invalida | estrutural | obsoleta | 14 | 2 | Obsoleta por prazo: evidenciada há 16781 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 73 | developer:testes:.................................................. | trabalho | evidenciada | 4 | 2 | Fechada: pytest --collect-only verde no main (sha 374a415dd938, exit 0); não repetir: developer:testes: ================ |
 | 26 | developer:reparo:- aprendido#n: teste tests/test_vigia_trava_estado | trabalho | obsoleta | 3 | 2 | Obsoleta por prazo: evidenciada há 16700 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 36 | developer:abrir_pr:lint:F811 | trabalho | obsoleta | 28 | 1 | Obsoleta por prazo: evidenciada há 15029 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
@@ -21,6 +21,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 9 | developer:testes:ImportError | trabalho | evidenciada | 2 | 1 | CI (teste ou lint): developer:testes: ==================================== ERRORS ==================================== |
 | 19 | developer:testes:timeout | ambiente | obsoleta | 2 | 1 | Obsoleta por prazo: evidenciada há 7278 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 35 | developer:reparo:lint:F811 | trabalho | obsoleta | 2 | 1 | Obsoleta por prazo: evidenciada há 15099 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
+| 52 | developer:abrir_pr:- tamanho: n linhas n: quebre em partes | trabalho | sem_prevencao | 2 | 1 | Sem prevenção verificável: falta um teste de regressão (lição #52) ou checagem determinística; não repetir: developer:ab |
 | 68 | incidente:c8d7b601a88abc41 | estrutural | obsoleta | 2 | 1 | Obsoleta por prazo: evidenciada há 6753 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 70 | developer:testes:lint:B905,E501,F541 | trabalho | obsoleta | 1 | 1 | Obsoleta por prazo: evidenciada há 6158 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 71 | developer:reparo:lint:B905,E501,F541 | trabalho | sem_prevencao | 1 | 1 | Sem prevenção verificável: falta um teste de regressão (lição #71) ou checagem determinística; não repetir: developer:re |
@@ -48,6 +49,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 44 | corpo:regressao_pos_atualizacao | estrutural | obsoleta | 3 | 0 | Obsoleta por prazo: evidenciada há 16024 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 57 | gate:ci:ImportError | trabalho | obsoleta | 3 | 0 | Obsoleta por prazo: evidenciada há 15876 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 61 | developer:testes:teste:tests/test_jev_passe.py::test_po_manda_ao_jev_s | trabalho | evidenciada | 3 | 0 | Fechada: tests/test_jev_passe.py::test_po_manda_ao_jev_se_a_pergunta_ja_foi_feita_e_se_a_base_e_medida passou no main (s |
+| 96 | incidente:d33e6bb6e24965f8 | ambiente | aberta | 3 | 0 | Não repetir: execucao:idle:corrigir_codigo: TimeoutExpired: Command '['/Users/cassiomatos/Projects/circulo/.venv/bin/pyt |
 | 11 | developer:abrir_pr:- constituição intacta: altera a constituição: .gi | trabalho | evidenciada | 2 | 0 | Não repetir: developer:abrir_pr: - constituição intacta: altera a constituição: .github/workflows/ci.yml, circulo/self_d |
 | 13 | developer:testes:teste:tests/test_fatiador.py::test_tres_falhas_divide | trabalho | evidenciada | 2 | 0 | Fechada: tests/test_fatiador.py::test_tres_falhas_dividem_o_item_e_ele_nao_e_reexecutado_inteiro passou no main (sha 39c |
 | 16 | incidente:a177d1fac10c373b | ambiente | obsoleta | 2 | 0 | Obsoleta por prazo: evidenciada há 18210 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
@@ -63,6 +65,9 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 64 | developer:base:teste:tests/test_memoria.py::test_estudo_parecido_e_ite | trabalho | evidenciada | 2 | 0 | Fechada: tests/test_memoria.py::test_estudo_parecido_e_item_parecido passou no main (sha 4582daeebe18, exit 0 em 2 execu |
 | 66 | developer:abrir_pr:- reprodução primeiro: os testes novos já passam n | trabalho | obsoleta | 2 | 0 | Obsoleta por prazo: evidenciada há 15091 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 89 | developer:testes:teste:tests/test_decision.py::test_jev_fora_do_ar_nao | desconhecida | sem_prevencao | 2 | 0 | Sem prevenção verificável: causa desconhecida, o timeout não prova erro de ambiente; falta tests/test_licao_89_regressao |
+| 92 | developer:reparo:alvo_inexistente | trabalho | obsoleta | 2 | 0 | Fechada: referência a teste inexistente (tests/test_autonomia.py::test_missoes_evoluem_em_paralelo); reabre se o teste a |
+| 93 | developer:testes:teste:tests/test_gateguard.py::test_settings_do_repos | trabalho | obsoleta | 2 | 0 | Fechada: referência a teste inexistente (tests/test_gateguard.py::test_settings_do_repositorio_liga_o_hook_e_passa_no_es |
+| 95 | developer:testes:teste:tests/test_orcamento.py::test_modo_ilimitado_e_ | trabalho | aberta | 2 | 0 | Não repetir: developer:testes: E       AssertionError: assert ('ilimitado' == 'ilimitado' |
 | 5 | developer:testes:teste:tests/test_camadas.py::test_merge_vira_marco_no | trabalho | evidenciada | 1 | 0 | Fechada: tests/test_camadas.py::test_merge_vira_marco_no_grafico passou no main (sha 960bf25528e3, exit 0 em 2 execuções |
 | 6 | developer:lint:lint:B905 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 18575 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 10 | developer:reparo:- constituição intacta: altera a constituição: .gi | trabalho | evidenciada | 1 | 0 | Não repetir: developer:reparo: rodada 1/1 não resolveu; 15041 tokens |
@@ -75,7 +80,6 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 41 | developer:base:teste:tests/test_loop.py::test_run_forever_respeita_max | trabalho | evidenciada | 1 | 0 | Fechada: tests/test_loop.py::test_run_forever_respeita_max_ticks passou no main (sha 5699c3c2b39b, exit 0 em 2 execuções |
 | 45 | planejador:saida_invalida | estrutural | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 16008 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 51 | developer:reparo:- tamanho: n linhas n: quebre em partes | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 16500 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
-| 52 | developer:abrir_pr:- tamanho: n linhas n: quebre em partes | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 16500 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 55 | developer:agente:deslogado | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 16413 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 65 | developer:reparo:- reprodução primeiro: os testes novos já passam n | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 15093 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura volta |
 | 69 | developer:agente:timeout | ambiente | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 6774 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
@@ -83,7 +87,7 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 75 | developer:abrir_pr:- lint e testes iguais ao ci : ................... | trabalho | evidenciada | 1 | 0 | Fechada: pytest --collect-only verde no main (sha 985793980f7b, exit 0); não repetir: developer:abrir_pr: ============== |
 | 79 | developer:testes:lint:B905,F811 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 6158 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 80 | developer:reparo:lint:B905,F811 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 6158 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
-| 81 | gate:ci:teste:tests/test_autonomia.py::test_missoes_evoluem_em_paralel | trabalho | evidenciada | 1 | 0 | Fechada: tests/test_autonomia.py::test_missoes_evoluem_em_paralelo passou no main (sha d396c81b6f66, exit 0 em 2 execuçõ |
+| 81 | gate:ci:teste:tests/test_autonomia.py::test_missoes_evoluem_em_paralel | trabalho | sem_prevencao | 1 | 0 | Sem prevenção verificável: falta um teste de regressão (lição #81) ou checagem determinística; não repetir: gate:ci: che |
 | 82 | developer:testes:lint:F811 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 4206 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 83 | developer:agente:y_subagents:_n_completed:_n_failed:_n_ki | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 3622 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 84 | developer:testes:lint:B007,B905,E501 | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 3049 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
@@ -91,3 +95,6 @@ evidenciada (o erro não voltou). Esta lista é o banco de lições como está h
 | 86 | developer:agente:unset:_n_started_in_background:_n_max_de | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 2086 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar |
 | 87 | incidente:37e8abc2882fd909 | estrutural | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
 | 88 | developer:agente:nd:_n_max_depth:_n_spawned_by_subagents: | trabalho | obsoleta | 1 | 0 | Obsoleta por prazo: evidenciada há 30 giros sem reincidir (regra: 30 giros ou 7 dias); reincide se a assinatura voltar;  |
+| 90 | developer:reparo:- constituição intacta: altera a constituição: cir | trabalho | aberta | 1 | 0 | Não repetir: developer:reparo: rodada 1/1 não resolveu; 4583 tokens |
+| 91 | corpo:validacao_falhou:teste:tests/test_evolution.py::test_codigo_pass | estrutural | obsoleta | 1 | 0 | Obsoleta por TTL: 6 h sem reincidir com o caminho exercitado; reincide se a assinatura voltar |
+| 94 | developer:abrir_pr:- constituição intacta: altera a constituição: cir | trabalho | aberta | 1 | 0 | Não repetir: developer:abrir_pr: (reparo não repetido: a mesma falha já resistiu a uma rodada; lição developer:reparo:-  |

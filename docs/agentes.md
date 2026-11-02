@@ -25,6 +25,7 @@ telas (`circulo/nomes.py`); o nome técnico antigo fica entre parênteses.
 |---|---|---|
 | **Arquiteto** | `estudar_pedido` (Estudo / Pesquisa) | Pesquisa fontes confiáveis e decide adotar, adaptar ou contestar o item. |
 | **Desenvolvedor** | `corrigir_codigo` (Developer) | Escreve o código e o teste num worktree, passa nos portões e abre o PR. |
+| **Fabricante** | `fabricar` (Fabricante) | Plano, teste antes do código, técnicas e revisão cruzada num repositório cliente; empurra circulo/<pedido> e abre o PR com a evidência. |
 | **Revisor de código** | `revisor` (Revisor) | Confere cada PR contra a main de agora e os outros PRs abertos; devolve o que cruza. |
 | **QA e release** | `revisar_prs` (Gate) | CI verde, teste novo, constituição intacta: mescla ou devolve com o motivo. |
 | **DevOps** | `atualizar_corpo` (Corpo) | Sobe o código novo em produção, prova em 5 giros e desfaz se piorar. |
@@ -56,10 +57,11 @@ Cada giro escolhe uma tarefa (as de trabalho primeiro, depois as de manutenção
 | Tarefa | O que faz |
 |---|---|
 | `atualizar_corpo` (DevOps) | Validando e passando a rodar o código que o loop evoluiu |
+| `fabricar` (Fabricante) | Fabricante: entregando um pedido de repositório cliente (plano, teste antes, validação cruzada, PR) |
 | `evoluir_projeto` (Gerente de missões) | Evoluindo missões |
 | `estudar_pedido` (Arquiteto) | Estudando o pedido em fontes confiáveis antes de executar |
 | `corrigir_codigo` (Desenvolvedor) | Corrigindo o próprio código |
 | `revisar_prs` (QA e release) | Revisando PRs abertos no gate |
 | `planejar_roteiro` (Gerente de produto) | Planejando o próximo item do roteiro a partir da evidência |
 | `indagar` (Product owner) | Indagador: levantando as perguntas da missão e passando cada uma pelo Jev |
-| `pesquisar_mercado` (Pesquisar mercado) | Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal) |
+| `pesquisar_mercado` (Pesquisar mercado) | Pesquisador: o que as melhores fábricas de software com IA fazem e o loop ainda não (semanal + 1 repositório/dia) |
