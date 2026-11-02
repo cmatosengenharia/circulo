@@ -115,3 +115,4 @@ def test_painel_abre_rapido_com_200_giros(circle):
             assert b"Trilha do loop" in r.read()
     finally:
         srv.shutdown()
+        srv.server_close()

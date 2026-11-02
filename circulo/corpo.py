@@ -223,9 +223,10 @@ def rodar_com_prazo(cmd: list[str], cwd, env: dict, prazo: int) -> tuple[int, st
             p.kill()
         try:
             out, _ = p.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            out = ""
-        return -1, f"validação passou de {prazo} s: {' '.join(cmd)}\n{(out or '')[-800:]}"
+        except subprocess.TimeoutExpired as e:      # um descendente com sessão própria segura o pipe: fica o que já saiu
+            out = e.output.decode(errors="replace") if isinstance(e.output, bytes) else (e.output or "")
+        # `timeout` no motivo: lições classificam como ambiente (não como erro de código a corrigir com LLM)
+        return -1, f"timeout: validação passou de {prazo} s: {' '.join(cmd)}\n{(out or '')[-800:]}"
 
 
 def build_corpo(ctx, data_dir: Path) -> Corpo | None:

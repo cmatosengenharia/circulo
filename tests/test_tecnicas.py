@@ -146,6 +146,7 @@ def test_revisar_pr_soma_o_revisor_externo_e_mede_a_revisao_cruzada(circle, tmp_
     subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base"], cwd=wt, check=True)
     (wt / "a.py").write_text("x = 2\n", encoding="utf-8")
+    monkeypatch.setenv("CIRCULO_REVISOR_EXTERNO", "1")          # o conftest desliga o externo; este teste o simula
     monkeypatch.setattr(validador.shutil, "which", lambda nome: "/usr/bin/codex" if nome == "codex" else None)
     run_real = subprocess.run
     monkeypatch.setattr(validador.subprocess, "run", lambda *a, **k: type("P", (), {"stdout": '{"aprovado": false, "problemas": ["falta teste"], "risco": "alto"}'})()
@@ -222,3 +223,10 @@ def test_skills_vendorizadas_estao_instaladas_com_licenca():
     origem = (raiz / ".claude" / "skills" / "ORIGEM.md").read_text(encoding="utf-8")
     assert "MIT" in origem and "obra/superpowers" in origem and "claude-octopus" in origem
     assert all((raiz / "docs" / "adr" / f).exists() for f in ("0010-superpowers.md", "0011-karpathy-guidelines.md", "0012-i-have-adhd.md", "0013-claude-octopus.md"))
+
+
+def test_revisor_externo_fica_desligado_por_padrao_nos_testes(monkeypatch):
+    """2/11: com o `codex` no PATH do Mac do loop, cada `revisar_pr` dos testes chamava o revisor externo de verdade
+    (2,7 s) e a suíte local passava de 20 min — além do prazo do Developer. O conftest desliga; só quem testa o externo liga."""
+    monkeypatch.setattr(validador.shutil, "which", lambda nome: "/usr/bin/codex" if nome == "codex" else None)
+    assert validador.revisor_externo("s", "p", executar=lambda *a: pytest.fail("chamou o revisor externo real")) is None

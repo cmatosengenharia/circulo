@@ -12,7 +12,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY circulo ./circulo
 COPY fabrica ./fabrica
-RUN pip install --no-cache-dir -e ".[llm]" && pip install --no-cache-dir ruff pytest
+RUN pip install --no-cache-dir -e ".[llm]" && pip install --no-cache-dir ruff pytest pytest-timeout
 
 ENV CIRCULO_ENV=/dados/env \
     CIRCULO_REPO_DIR=/repo \

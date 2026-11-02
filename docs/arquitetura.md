@@ -1,6 +1,6 @@
 # Arquitetura
 
-Versão documentada: **1.76.4**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
+Versão documentada: **1.76.5**. Python 3.11+, biblioteca padrão, SQLite (WAL) e um servidor HTTP próprio para o
 painel. Toda decisão passa primeiro pelo Jev (cascata regra → aluno → Jev → LLM).
 
 ## Constituição
@@ -128,7 +128,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `norte.py` | 178 | Norte: para onde o loop evolui, em resultados mensuráveis — não em erros. |
 | `observabilidade.py` | 385 | Observabilidade do loop: sinais de ouro, SLOs com orçamento de erro, métricas no padrão Prometheus e exportação OTLP. |
 | `orcamento_dia.py` | 62 | Orçamento diário de tokens vindo da configuração, com aviso antes do corte. |
-| `painel.py` | 900 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
+| `painel.py` | 890 | Painel local do círculo: estado, feed ao vivo (SSE) e controles do humano. |
 | `parada.py` | 91 | Parada verificável (kill switch): o botão do painel, a confirmação do loop e o teste semanal. |
 | `pastas.py` | 53 | Pastas padrão por assunto no Mac, espelhando os assuntos do console (`circulo assunto novo`). |
 | `pausa.py` | 131 | Pausar e retomar missão por missão, sem parar o loop inteiro. |
@@ -166,7 +166,8 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `rodadas_revisao.py` | 76 | Rodadas de comentário de revisão até o merge (pergunta do conselho #446): só mede. |
 | `saida_json.py` | 59 | Contrato de saída JSON de um papel (lição #22): as chaves obrigatórias do esquema chegam inteiras, ou um motivo tipado. |
 | `segredos.py` | 121 | Gate determinístico de segredos no diff do PR (pedido #827, fatia 1). |
-| `self_dev.py` ⚖️ | 897 | Developer do projeto zero: o círculo corrigindo o próprio código. |
+| `self_dev.py` ⚖️ | 899 | Developer do projeto zero: o círculo corrigindo o próprio código. |
+| `servidor.py` | 25 | Servidor HTTP do painel e da verificação das telas: threads daemon, aba fechada no meio da resposta não vira traceback, e `encerrando` tira os fluxos SSE do laço no `shutdown()`. |
 | `sentinela.py` | 94 | Sentinela da entrega: olha o RESULTADO (o que entrou na main), não os erros. |
 | `silencio.py` | 39 | Silêncio suspeito (pergunta #619): zero incidente aberto só é verde se o loop também não estagnou nem tem lição de estrutura aberta nos últimos 7 dias; ausência de alerta não prova saúde. |
 | `skills.py` | 170 | Skills reutilizadas: catálogo de skills prontas em repositórios públicos, instalação por PR em `.claude/skills/` e a escolha, pelo Jev, de qual skill cada tarefa do Developer deve usar. |

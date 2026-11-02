@@ -69,6 +69,7 @@ def test_trilha_de_etapas_no_sse(circle):
     circle.tick()
     th.join(6)
     srv.shutdown()
+    srv.server_close()
     assert [g["etapa"] for g in got][:2] == ["orquestrador", "idle"]
 
 

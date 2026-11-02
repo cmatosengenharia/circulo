@@ -57,11 +57,12 @@ import time
 from pathlib import Path
 
 from . import disjuntor, falhas, pedido_claro
+from .corpo import rodar_com_prazo
 from .developer import (LIMITE_PASSOS, REPARO, GitHubComConvencoes, convencoes, passos_usados, registrar_convencoes,
                         registrar_passos_usados)
 from .fatiador import CORTES
 from .merge_gate import CONSTITUICAO
-from .self_dev import (CORRECAO_LOCAL, LINT_CMD, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
+from .self_dev import (CORRECAO_LOCAL, LINT_CMD, TESTES_PRAZO, DevResult, SelfDeveloper, _git, ambiente_isolado, build_self_dev,
                        garantir_ruff)
 
 REVERTIDA = "developer:constituicao_revertida"
@@ -543,16 +544,13 @@ class DeveloperComReparo(SelfDeveloper):
         if conhecida:
             saida, causa, sig = "", conhecida["causa"], conhecida["assinatura"]
         else:
-            try:
-                p = subprocess.run([sys.executable, "-m", "pytest", "-q", "--tb=short", *testes], cwd=wt,
-                                   capture_output=True, text=True, timeout=900, env=_ambiente())
-            except subprocess.TimeoutExpired:
+            codigo, saida = rodar_com_prazo([sys.executable, "-m", "pytest", "-q", "--tb=short", *testes], wt, _ambiente(), TESTES_PRAZO)
+            if codigo == -1:                         # prazo estourado: sem veredito sobre a base (e o grupo de processos já morreu)
                 return ""
-            if p.returncode in (0, 5):               # 5 = nenhum teste coletado
+            if codigo in (0, 5):                     # 5 = nenhum teste coletado
                 if vermelhas.pop(chave, None):
                     self.s.set(BASE_VERMELHA, vermelhas)
                 return ""
-            saida = p.stdout + p.stderr
             causa = causa_testes(saida)
             sig = assinatura_falha(saida) or causa
         from .licoes import registrar as monitorar
@@ -636,7 +634,10 @@ class DeveloperComReparo(SelfDeveloper):
         from .licoes import registrar as monitorar
 
         def rodar(cmd):
-            return subprocess.run(cmd, cwd=wt, capture_output=True, text=True, timeout=900, env=_ambiente())
+            # prazo estourado = reprovação `timeout` com o fim da saída, não incidente (2/11: sete TimeoutExpired dos 900 s
+            # fixos daqui isolaram o Developer do loop por 320 giros com a suíte verde); o grupo de processos inteiro morre
+            codigo, saida = rodar_com_prazo(cmd, wt, _ambiente(), TESTES_PRAZO)
+            return subprocess.CompletedProcess(cmd, codigo, saida, "")
 
         for nome, cmd in etapas:
             p = rodar(cmd)

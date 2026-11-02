@@ -121,8 +121,9 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
                                     listar_testes)
             sumido = next((a for a in argv if "pytest" in argv and a.startswith("tests/") and not (
                 alvo_pytest_existe(wt, a) and ("::" not in a or alvo_coletado(wt, a, env)))), None)
-            cp = None if sumido else subprocess.run([sys.executable, *argv], cwd=wt, capture_output=True, text=True,
-                                                    timeout=900, env=env)
+            from .corpo import rodar_com_prazo          # local: self_dev importa este módulo
+            from .self_dev import TESTES_PRAZO
+            cp = None if sumido else subprocess.CompletedProcess(argv, *rodar_com_prazo([sys.executable, *argv], wt, env, TESTES_PRAZO), "")
             ok, motivo = (True, "") if cp is None else (cp.returncode == 0, (cp.stdout + cp.stderr)[-800:])
             if sumido or ("pytest" in argv and cp.returncode == 4 and "not found" in motivo):     # o teste citado já não existe: portão obsoleto
                 store.x("UPDATE portoes SET ativo=0, updated_at=? WHERE id=?", (time.time(), p["id"]))
