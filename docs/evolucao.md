@@ -7,6 +7,7 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 | Versão | Data | Destaque | Itens |
 |---|---|---|---|
+| 1.76.5 | 2026-11-02 | 371 s | 1 |
 | 1.76.4 | 2026-11-02 | - Fabricante: pedido que depende do que o repositório ainda não tem (tela, endpoint, worker) pode ser respondido com | 2 |
 | 1.76.3 | 2026-11-02 | - Loop: `fabricar` (pedido de repositório cliente — a esteira) vem antes do trabalho interno (estudar/corrigir item do | 1 |
 | 1.76.2 | 2026-11-02 | - Painel: o card de uma missão de repositório cliente (kit `repo`, a esteira) media ciclos de missão e por isso ficava | 1 |
@@ -46,14 +47,15 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.54.0 | 2026-10-21 | Rollback de dados junto com o de código, e a constituição protegida fora do sistema. | 2 |
 | 1.53.0 | 2026-10-21 | Higiene: as telas e a memória sem ruído. | 4 |
 | 1.52.0 | 2026-10-21 | Desenvolvedor com sessão contínua e contexto do código. | 3 |
-| 1.51.0 | 2026-10-21 | Desfecho por decisão: o Jev passa a ver o que cada "sim" rendeu. | 4 |
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 70 · **observabilidade** 45 · **correcao** 37 · **documentacao** 31 · **seguranca** 12 · **velocidade** 5.
+Por tipo: **funcionalidade** 67 · **observabilidade** 47 · **correcao** 35 · **documentacao** 34 · **seguranca** 12 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #348 | 02/11/2026 | documentacao (45%) | — | PR #348 | — |
+| #347 | 02/11/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #339 | 01/11/2026 | funcionalidade (63%) | sim | Revisão dupla independente (Santa): Validador LLM e rubrica do Jev precisam aprovar, sem contexto… | item #370 (referencia) |
 | #338 | 01/11/2026 | funcionalidade (70%) | sim | Entrevistas no formato Mom Test entram como pergunta do PM no conselho do loop | item #369 (referencia) |
 | #337 | 01/11/2026 | funcionalidade (100%) | sim | Fábrica: o Developer trabalha os pedidos abertos dos repositórios cliente (esteira primeiro) | item #368 (referencia) |
@@ -78,24 +80,24 @@ Por tipo: **funcionalidade** 70 · **observabilidade** 45 · **correcao** 37 · 
 | #317 | 01/11/2026 | funcionalidade (71%) | sim | Validador com Playwright headless por tela: reprova PR com id quebrado ou erro de console | pergunta do cassio: “Frontend medido: instrumentar o painel (cliques por card, telas abertas, tempo a” |
 | #316 | 01/11/2026 | correcao (63%) | sim | Lição #72: developer:abrir_pr: --> tests/test_vigia_drena.py:93:89 | item #182 (erro) |
 | #315 | 01/11/2026 | correcao (87%) | — | Retrospectivo diário: até 3 práticas em docs/PRATICAS.md e kv praticas, com remoção por resultado | pergunta do cassio: “Autoevolução: retrospectivo diário → manual de práticas. Uma vez por dia o loop ” |
-| #314 | 01/11/2026 | funcionalidade (0%) | — | Veredito de experimento: regra z-score local primeiro, Jev só na fronteira (corte 0,6) | pergunta do cassio: “Autoevolução: o Jev julga o experimento. Para cada experimento fechado, o Jev de” |
-| #313 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown copiável (o que… | pergunta do cassio: “Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown c” |
-| #312 | 01/11/2026 | funcionalidade (0%) | — | Experimento universal: item com hipótese, métrica, margem e janela; Vigia mede e grava veredito | pergunta do cassio: “Autoevolução: experimento universal. Todo item do loop carrega hipótese + métric” |
-| #311 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.checar) e o… | pergunta do cassio: “Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.” |
-| #310 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: sincronizar AGENTS.md/.cursor/rules no repo cliente só com lições não inferíveis, via PR | pergunta do cassio: “Fábrica: para um projeto de kit 'repo', o loop gera AGENTS.md e .cursor/rules a ” |
-| #309 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele pedido (caixa → item… | pergunta do cassio: “Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele p” |
-| #308 | 01/11/2026 | funcionalidade (0%) | — | Critério de aceite verificável por pedido: Arquiteto define, Validador confere, PR mostra ✓/✗ | pergunta do cassio: “Fábrica: todo pedido em uma frase (circulo pedir / caixa) ganha um critério de a” |
-| #307 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: `circulo init <pasta>` registra repo cliente (kit 'repo') e pedido `projeto: <id>` abre PR… | pergunta do cassio: “Fábrica: `circulo init <pasta>` num repositório Python de exemplo (tests/fixture” |
-| #306 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o modelo mais usado e o… | pergunta do cassio: “Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o mod” |
-| #305 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) e mostra a hora em… | pergunta do cassio: “Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) ” |
-| #304 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pendencia {id, feita})… | pergunta do cassio: “Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pend” |
-| #303 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver): descrição… | pergunta do cassio: “Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver” |
-| #302 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: card de links agrupado por assunto (colapsável), com o total por assunto e busca… | pergunta do cassio: “Meu trabalho: card de links agrupado por assunto (colapsável), com o total por a” |
-| #301 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, quando a palavra não… | pergunta do cassio: “Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, qua” |
-| #300 | 01/11/2026 | funcionalidade (0%) | — | Arquivar nota sem assunto pela tela: 3 opções, 1 clique, e aprender a escolha | pergunta do cassio: “Meu trabalho: quando a regra local não sabe o assunto de uma nota (trabalho.anot” |
-| #299 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arquivo (POST… | pergunta do cassio: “Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arqui” |
-| #298 | 31/10/2026 | funcionalidade (0%) | — | Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e as decisões de… | pergunta do cassio: “Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e” |
-| #297 | 31/10/2026 | funcionalidade (0%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #314 | 01/11/2026 | documentacao (81%) | — | Veredito de experimento: regra z-score local primeiro, Jev só na fronteira (corte 0,6) | pergunta do cassio: “Autoevolução: o Jev julga o experimento. Para cada experimento fechado, o Jev de” |
+| #313 | 01/11/2026 | funcionalidade (63%) | sim | Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown copiável (o que… | pergunta do cassio: “Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown c” |
+| #312 | 01/11/2026 | funcionalidade (81%) | sim | Experimento universal: item com hipótese, métrica, margem e janela; Vigia mede e grava veredito | pergunta do cassio: “Autoevolução: experimento universal. Todo item do loop carrega hipótese + métric” |
+| #311 | 01/11/2026 | funcionalidade (75%) | sim | Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.checar) e o… | pergunta do cassio: “Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.” |
+| #310 | 01/11/2026 | funcionalidade (96%) | sim | Fábrica: sincronizar AGENTS.md/.cursor/rules no repo cliente só com lições não inferíveis, via PR | pergunta do cassio: “Fábrica: para um projeto de kit 'repo', o loop gera AGENTS.md e .cursor/rules a ” |
+| #309 | 01/11/2026 | funcionalidade (93%) | sim | Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele pedido (caixa → item… | pergunta do cassio: “Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele p” |
+| #308 | 01/11/2026 | funcionalidade (84%) | sim | Critério de aceite verificável por pedido: Arquiteto define, Validador confere, PR mostra ✓/✗ | pergunta do cassio: “Fábrica: todo pedido em uma frase (circulo pedir / caixa) ganha um critério de a” |
+| #307 | 01/11/2026 | funcionalidade (88%) | sim | Fábrica: `circulo init <pasta>` registra repo cliente (kit 'repo') e pedido `projeto: <id>` abre PR… | pergunta do cassio: “Fábrica: `circulo init <pasta>` num repositório Python de exemplo (tests/fixture” |
+| #306 | 01/11/2026 | observabilidade (71%) | sim | Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o modelo mais usado e o… | pergunta do cassio: “Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o mod” |
+| #305 | 01/11/2026 | observabilidade (74%) | sim | Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) e mostra a hora em… | pergunta do cassio: “Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) ” |
+| #304 | 01/11/2026 | funcionalidade (100%) | sim | Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pendencia {id, feita})… | pergunta do cassio: “Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pend” |
+| #303 | 01/11/2026 | funcionalidade (99%) | sim | Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver): descrição… | pergunta do cassio: “Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver” |
+| #302 | 01/11/2026 | funcionalidade (95%) | sim | Meu trabalho: card de links agrupado por assunto (colapsável), com o total por assunto e busca… | pergunta do cassio: “Meu trabalho: card de links agrupado por assunto (colapsável), com o total por a” |
+| #301 | 01/11/2026 | funcionalidade (95%) | sim | Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, quando a palavra não… | pergunta do cassio: “Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, qua” |
+| #300 | 01/11/2026 | funcionalidade (98%) | sim | Arquivar nota sem assunto pela tela: 3 opções, 1 clique, e aprender a escolha | pergunta do cassio: “Meu trabalho: quando a regra local não sabe o assunto de uma nota (trabalho.anot” |
+| #299 | 01/11/2026 | funcionalidade (98%) | sim | Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arquivo (POST… | pergunta do cassio: “Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arqui” |
+| #298 | 31/10/2026 | funcionalidade (98%) | sim | Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e as decisões de… | pergunta do cassio: “Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e” |
+| #297 | 31/10/2026 | funcionalidade (52%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #296 | 31/10/2026 | correcao (81%) | sim | Lição com 'já corrigido' e checagem sem id caminho::nome vira sem_prevencao e pede teste | pergunta do curador_licoes: “A lição #47 (loop:estagnado, 'nada avançou em 10 giros') está marcada como reinc” |
 | #295 | 31/10/2026 | correcao (82%) | sim | Fechar todo disparo de estagnação com desfecho (destravou/expirou) para medir os 13 sem resultado | pergunta do operador: “A lição #47 (loop:estagnado, 'sem recusa registrada') reincidiu mesmo com o PR #” |
 | #294 | 31/10/2026 | documentacao (56%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -252,5 +254,3 @@ Por tipo: **funcionalidade** 70 · **observabilidade** 45 · **correcao** 37 · 
 | #143 | 24/10/2026 | observabilidade (54%) | sim | Vigia: 2 lição(ões) de estrutura aberta(s) há 76 h bloqueando a evolução | item #170 (loop) |
 | #142 | 24/10/2026 | correcao (89%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
 | #141 | 23/10/2026 | correcao (92%) | — | Lição #19: developer:testes: __… | item #168 (erro) |
-| #140 | 23/10/2026 | correcao (82%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #139 | 23/10/2026 | correcao (68%) | sim | Teste do Developer em paralelo: Barrier(2) com timeout e causa raiz de test_capacidade.py:112 | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |

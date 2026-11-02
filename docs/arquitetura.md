@@ -43,7 +43,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `contexto_cliente.py` | 71 | Fábrica: AGENTS.md/.cursor/rules no repositório do cliente (kit 'repo') só por PR e só quando muda. |
 | `contexto_cursor.py` | 161 | Contexto enxuto para o Cursor: AGENTS.md curto e regras .cursor/rules/*.mdc escopadas por glob. |
 | `controle.py` | 131 | Plano de controle em processo próprio: painel + SRE (travas) + Médico + Higiene + Escalador. |
-| `corpo.py` ⚖️ | 237 | Corpo: o loop passa a rodar o código que ele mesmo evoluiu, com evidência antes e depois. |
+| `corpo.py` ⚖️ | 238 | Corpo: o loop passa a rodar o código que ele mesmo evoluiu, com evidência antes e depois. |
 | `corpo_caminho.py` | 65 | Caminho livre para o corpo trocar de código (lição #1). |
 | `corpo_pr.py` | 63 | Corpo do PR do Developer: template fixo de impacto e risco. |
 | `criterio_aceite.py` | 125 | Critério de aceite verificável por pedido: o Arquiteto define, o portão confere, o PR mostra ✓/✗. |
@@ -123,7 +123,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `modelo_menor.py` | 28 | Candidatos a modelo menor por papel de LLM (pergunta #553): só mede e ranqueia, não roda sombra nem troca modelo. |
 | `money.py` | 45 | Dinheiro sempre em centavos (int). Nunca float. |
 | `motivo.py` | 114 | Motivo tipado de recusa/parada (pergunta #269): por que um PR foi recusado ou um item parou, em três campos. |
-| `neuronios.py` | 257 | Cérebros e neurônios: cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros. |
+| `neuronios.py` | 258 | Cérebros e neurônios: cada ponto do fluxo segue o mesmo contrato, e o loop cria portões novos a partir dos próprios erros. |
 | `nomes.py` | 71 | Os nomes dos agentes, num lugar só, para todas as telas falarem a mesma língua. |
 | `norte.py` | 178 | Norte: para onde o loop evolui, em resultados mensuráveis — não em erros. |
 | `observabilidade.py` | 385 | Observabilidade do loop: sinais de ouro, SLOs com orçamento de erro, métricas no padrão Prometheus e exportação OTLP. |
@@ -152,10 +152,10 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `rastro.py` | 448 | Rastreabilidade de ponta a ponta: de onde veio cada mudança do loop até a prova de que ela funciona rodando. |
 | `registro.py` | 105 | Registro estruturado das chamadas de LLM. |
 | `regras.py` | 256 | Regras promovidas do Jev (pergunta #533): o par (entrada normalizada → decisão) que o Jev repete vira regra determinística consultada ANTES dele. |
-| `reparo.py` | 769 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
+| `reparo.py` | 770 | Reparo do Developer antes do PR: passo determinístico primeiro, depois no máximo UMA rodada do agente. |
 | `repo_cliente.py` | 260 | Fábrica: o loop trabalhando no repositório de um cliente — kit 'repo'. |
 | `repo_stats.py` | 65 | Números do repositório do loop (commits), lidos do clone local. Cache curto: o painel atualiza a cada poucos segundos. |
-| `reproducao.py` | 282 | Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo. |
+| `reproducao.py` | 283 | Reprodução primeiro: o teste novo de uma correção precisa FALHAR no código antigo e passar no novo. |
 | `resultado.py` | 211 | Resultado do lado do cliente (1.76): o loop vende RESULTADO, não ferramenta (ADR 0015). |
 | `resumo_semanal.py` | 77 | Resumo semanal para a equipe: o changelog (produto/infra, cada PR com o pedido de origem, e a fração de produto contra a meta), os PRs sem pedido listados à parte, o uso medido (leituras do digest em 7 dias) e as consultas 7d de cada PR de produto, com os que ninguém consultou sinalizados, e os pedidos abertos ainda sem PR de produto mergeado, do mais velho ao mais novo, para a equipe ver o que vem a seguir. Cada consulta fica em `uso_resumo` (recurso, created_at): 'resumo' e 'pr:<número>' de cada PR de produto mostrado. Compõe `changelog` e `digest_semanal`; não refaz a coleta nem a classificação. |
 | `revisao_dupla.py` | 97 | Revisão dupla independente (ECC-2 do ADR 0001, portado da skill `santa-method` do everything-claude-code, MIT). |
@@ -167,8 +167,8 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `saida_json.py` | 59 | Contrato de saída JSON de um papel (lição #22): as chaves obrigatórias do esquema chegam inteiras, ou um motivo tipado. |
 | `segredos.py` | 121 | Gate determinístico de segredos no diff do PR (pedido #827, fatia 1). |
 | `self_dev.py` ⚖️ | 899 | Developer do projeto zero: o círculo corrigindo o próprio código. |
-| `servidor.py` | 25 | Servidor HTTP do painel e da verificação das telas: threads daemon, aba fechada no meio da resposta não vira traceback, e `encerrando` tira os fluxos SSE do laço no `shutdown()`. |
 | `sentinela.py` | 94 | Sentinela da entrega: olha o RESULTADO (o que entrou na main), não os erros. |
+| `servidor.py` | 25 | Servidor HTTP do painel e da verificação das telas: threads daemon; aba fechada no meio da resposta não vira traceback; e `encerrando` avisa os fluxos SSE — que giram até o cliente sumir — para sair quando o servidor desliga (2/11: cada painel de teste deixava threads órfãs lendo um banco já apagado a cada 0,4 s). |
 | `silencio.py` | 39 | Silêncio suspeito (pergunta #619): zero incidente aberto só é verde se o loop também não estagnou nem tem lição de estrutura aberta nos últimos 7 dias; ausência de alerta não prova saúde. |
 | `skills.py` | 170 | Skills reutilizadas: catálogo de skills prontas em repositórios públicos, instalação por PR em `.claude/skills/` e a escolha, pelo Jev, de qual skill cada tarefa do Developer deve usar. |
 | `state.py` | 790 | Estado persistente do círculo (SQLite). Tudo que o loop precisa para retomar de onde parou. |
@@ -182,7 +182,7 @@ Módulos que nenhum agente pode alterar por PR (o CI e o gate recusam): `merge_g
 | `validador.py` | 250 | Validador: os agentes de validação que ficam entre o Developer e o PR (1.70). |
 | `validador_telas.py` | 142 | Validador por tela: o PR que quebra uma tela do painel não passa (pedido #819, fatia 1: o gate antes da telemetria). |
 | `veredito_experimento.py` | 57 | Veredito de um experimento fechado: regra z-score local primeiro, o Jev (experimento_veredito) só na fronteira. |
-| `verificacao.py` | 150 | Verificação de ponta a ponta do painel, com um mapa de funcionalidades (Lauren Tan: "verification skills"). |
+| `verificacao.py` | 154 | Verificação de ponta a ponta do painel, com um mapa de funcionalidades (Lauren Tan: "verification skills"). |
 | `vigia.py` | 666 | Vigia: o agente que roda em paralelo ao giro e vigia as travas da autoevolução. |
 
 ## Telas
