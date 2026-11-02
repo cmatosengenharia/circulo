@@ -8,7 +8,6 @@ Versão: **1.76.5**. Precisa de Python 3.11+, git e, para o loop corrigir códig
 git clone https://github.com/cmatosengenharia/circulo && cd circulo
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[llm]"
-pip install -e ".[dev]"   # só para rodar a suíte: pytest-timeout faz teste pendurado falhar com nome em vez de segurar tudo
 circulo --version
 ```
 
