@@ -152,6 +152,9 @@ def avaliar_aprendidos(store, neuronio: str, wt: Path, adicionadas: dict[str, li
         from .criterio_aceite import conferir
         criterio = conferir(store, item_id, wt, adicionadas, env)        # o critério de aceite congelado do item
         res += [criterio] if criterio else []
+        from .revisao_dupla import portao
+        dupla = portao(store, item_id, wt)                               # teto de rodadas sem acordo Validador × Jev
+        res += [dupla] if dupla else []
     return res
 
 
