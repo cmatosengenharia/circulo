@@ -76,9 +76,18 @@ def _lines(text: str) -> list[tuple[str, str]]:
     return out
 
 
-def _strip_fences(text: str) -> str:
-    m = re.search(r"```(?:html|markdown|md)?\s*\n(.*?)```", text, re.S)
-    return m.group(1).strip() if m else text.strip()
+def _strip_fences(text: str, fmt: str = "md") -> str:
+    """Tira só o envelope ```…``` que a LLM põe em volta da entrega. Em Markdown os blocos de código são conteúdo:
+    o envelope é a cerca que abre a resposta (uma cerca ```md pode vir depois de uma linha de aviso; uma cerca sem
+    linguagem só se abre a resposta) e a que a fecha; sem as duas, a resposta inteira é a entrega. Antes, o primeiro
+    par de cercas virava a entrega: o plano da missão 7 (tick 22206) chegava à verificação pós-LLM reduzido ao modelo
+    de relatório com placeholders que ele trazia num bloco ```md."""
+    text = text.strip()
+    if fmt == "html":
+        m = re.search(r"```(?:html|markdown|md)?\s*\n(.*?)```", text, re.S)
+    else:
+        m = re.match(r"(?:[^\n`]*\n```(?:markdown|md)|```(?:markdown|md)?)[ \t]*\n(.*)\n```$", text, re.S)
+    return m.group(1).strip() if m else text
 
 
 MAX_PARALELO = 4          # giros em paralelo na mesma missão (variantes que disputam um torneio)
@@ -435,7 +444,7 @@ class Engine:
 
         def variante(i):
             text, _ = self._gen(role, prompts[i], res, p)
-            content = _strip_fences(text)
+            content = _strip_fences(text, fmt)
             ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
             monitorar(self.ctx, PONTO_SAIDA, ok, sujeito=p.get("nome") or f"missão {p['id']}",
                       motivo="" if ok else f"checagens reprovadas: {checks}",
@@ -443,7 +452,7 @@ class Engine:
             if not ok:
                 falhas = [k for k, v in checks.items() if v < 0.5]
                 text, _ = self._gen(role, prompts[i] + f"\n\nA versão anterior foi reprovada nas checagens: {', '.join(falhas)}. Corrija.", res, p)
-                content = _strip_fences(text)
+                content = _strip_fences(text, fmt)
                 ok, checks = self.ctx.dl.verify_output(content, p["pedido"], fmt)
             return content, ok, checks
 
