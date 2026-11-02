@@ -706,3 +706,19 @@ def test_desligar_o_painel_encerra_o_fluxo_sse_em_vez_de_deixar_a_thread_girando
     fim.join(timeout=3)
     srv.server_close()
     assert not fim.is_alive()                                        # a conexão fechou: o laço do servidor terminou
+
+
+def test_card_tecnicas_no_json_do_painel(circle, painel):
+    """Card “Técnicas”: o JSON do loop traz `circulo/tecnicas.relatorio` (taxa nas últimas 30 medições, última falha)."""
+    from circulo import tecnicas
+    tecnicas.registrar(circle.ctx, "cirurgica", True, "roteiro #7")
+    tecnicas.registrar(circle.ctx, "cirurgica", False, "roteiro #8", "3 arquivos de código fora do escopo")
+    zero = kit_project_id(circle.store, "circulo")
+    s = estado(circle.store, zero)
+    assert [t["tecnica"] for t in s["tecnicas"]] == list(tecnicas.NOMES)
+    c = next(t for t in s["tecnicas"] if t["tecnica"] == "cirurgica")
+    assert c["medicoes"] == 2 and c["taxa"] == 0.5 and c["ultima_falha"] == "3 arquivos de código fora do escopo"
+    assert next(t for t in s["tecnicas"] if t["tecnica"] == "simplicidade")["ativa"] is False
+    assert "tecnicas" not in estado(circle.store, 1)                       # só na tela do loop
+    with urllib.request.urlopen(f"{painel}/missao/{zero}", timeout=5) as r:
+        assert 'id="tecnicas"' in r.read().decode()

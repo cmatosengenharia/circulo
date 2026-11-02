@@ -1,7 +1,7 @@
 """O Médico do loop: plano de controle que diagnostica gargalos por PADRÃO medido e responde pela escada mais barata.
 
 Para não virar ruído (as oito regras acordadas):
-1. uma fonte só: `incidents`, `run_errors`, `trail`, `llm_calls`, `prs`, `alerts` — toda frase tem uma consulta;
+1. uma fonte só: `incidents`, `run_errors`, `trail`, `llm_calls`, `prs`, `alerts`, `verificacoes` — toda frase tem uma consulta;
 2. padrão, não evento: ≥ MIN_VEZES ocorrências da mesma chave em JANELA; fecha só depois de SILENCIO sem ocorrência;
 3. impressão digital: chave única por causa; aberta, só conta `vezes`; nunca um segundo diagnóstico igual;
 4. o Jev decide (bloqueia? de quem é? remédio seguro?) com a evidência medida; em dúvida, só observa;
@@ -122,7 +122,26 @@ def s_agente_mudo(store: Store, now: float) -> list[dict]:
              "evidencia": {"vezes_1h": int(r["n"]), "erro": (r["e"] or "")[:200], "base": "medido"}, "gravidade": 0.8}]
 
 
-SONDAS = (s_erro_repetido, s_repeticao_sem_progresso, s_agente_mudo)
+def s_tecnica_reprova_o_mesmo_item(store: Store, now: float) -> list[dict]:
+    """Técnica que barra (tecnicas.BARRAM) reprovando o MESMO item ≥ MIN_VEZES vezes seguidas: o Developer gira sem passar."""
+    from .tecnicas import BARRAM, PREFIXO
+    out = []
+    for tecnica in BARRAM:
+        ponto = f"{PREFIXO}{tecnica}"
+        for r in store.q("SELECT sujeito FROM verificacoes WHERE ponto=? AND sujeito!='' AND created_at>=? GROUP BY sujeito", (ponto, now - JANELA)):
+            ultimas = store.q("SELECT ok, motivo FROM verificacoes WHERE ponto=? AND sujeito=? ORDER BY id DESC LIMIT 30", (ponto, r["sujeito"]))
+            seguidas = next((i for i, u in enumerate(ultimas) if u["ok"]), len(ultimas))
+            if seguidas < MIN_VEZES:
+                continue
+            out.append({"chave": f"tecnica:{tecnica}:{r['sujeito']}", "tipo": "repeticao_sem_progresso",
+                        "titulo": f"A técnica {tecnica} reprovou “{r['sujeito'][:70]}” {seguidas}× seguidas",
+                        "evidencia": {"tecnica": tecnica, "item": r["sujeito"], "reprovacoes_seguidas": seguidas,
+                                      "ultima_falha": (ultimas[0]["motivo"] or "")[:200], "base": "medido"},
+                        "gravidade": 0.7})
+    return out
+
+
+SONDAS = (s_erro_repetido, s_repeticao_sem_progresso, s_agente_mudo, s_tecnica_reprova_o_mesmo_item)
 
 
 def contexto_conhecido(store: Store, now: float) -> str | None:
