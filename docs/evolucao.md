@@ -7,6 +7,18 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 | Versão | Data | Destaque | Itens |
 |---|---|---|---|
+| 1.76.4 | 2026-11-02 | - Fabricante: pedido que depende do que o repositório ainda não tem (tela, endpoint, worker) pode ser respondido com | 2 |
+| 1.76.3 | 2026-11-02 | - Loop: `fabricar` (pedido de repositório cliente — a esteira) vem antes do trabalho interno (estudar/corrigir item do | 1 |
+| 1.76.2 | 2026-11-02 | - Painel: o card de uma missão de repositório cliente (kit `repo`, a esteira) media ciclos de missão e por isso ficava | 1 |
+| 1.76.1 | 2026-11-02 | - Fábrica: o clone registrado do cliente acompanha o remoto antes de cada trabalho (`repo_cliente.atualizar`: fetch + | 1 |
+| 1.76.0 | 2026-11-01 | Vender resultado, não ferramenta: o Norte mede o lado do cliente; taxa de promessa cumprida; classe Jev de cada item. | 7 |
+| 1.75.0 | 2026-11-01 | Skills externas absorvidas como portões medidos; Fabricante entrega repositórios cliente (Esteira de Vídeo é o primeiro). | 8 |
+| 1.74.0 | 2026-11-01 | Absorção de repositórios: ADR por fonte, técnicas com prova, prioridade para o MVP da esteira e para vender, escudo das skills e varredura diária do ranking. | 6 |
+| 1.73.1 | 2026-11-01 | - CI da 1.73.0 vermelho por lint (F401, `time` sem uso em tests/test_skills.py): corrigido. Lição: rodar o ruff local com `--no-cache`. | 1 |
+| 1.73.0 | 2026-10-31 | Skills reutilizadas: catálogo de 38 skills prontas, instalação por PR, o Jev escolhe a skill de cada tarefa. | 5 |
+| 1.72.1 | 2026-10-31 | Garimpo: a camada que varre o GitHub pelo que o loop precisa agora. | 4 |
+| 1.72.0 | 2026-10-31 | Autonomia: nada espera humano; repositórios de referência viram código no loop. | 4 |
+| 1.71.0 | 2026-10-31 | O loop estava faminto, não lento: fila nunca vazia, Jev só veta produto, higiene da fila, lição esgotada. | 5 |
 | 1.70.0 | 2026-10-30 | Regra: o loop nunca para de evoluir. Agentes de validação entre o Developer e o PR. Sem limite de tokens. | 6 |
 | 1.69.2 | 2026-10-28 | Cobrança do prazo de 48 h do Norte: a cadeia girava em falso — o conselho para de insistir. | 4 |
 | 1.69.1 | 2026-10-26 | - `CIRCULO_EXEMPLO=1` no arquivo de configuração: o SRE semeia o exemplo da tela Meu trabalho uma vez, na primeira | 2 |
@@ -35,25 +47,55 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 | 1.53.0 | 2026-10-21 | Higiene: as telas e a memória sem ruído. | 4 |
 | 1.52.0 | 2026-10-21 | Desenvolvedor com sessão contínua e contexto do código. | 3 |
 | 1.51.0 | 2026-10-21 | Desfecho por decisão: o Jev passa a ver o que cada "sim" rendeu. | 4 |
-| 1.50.0 | 2026-10-20 | O Escalador: quem está sobrecarregado, e mais trabalhadores em paralelo para quem pode. | 5 |
-| 1.49.0 | 2026-10-20 | Saúde e estado | 6 |
-| 1.48.0 | 2026-10-20 | Equipe ao vivo mostra o que cada agente está fazendo, não só quem está trabalhando. | 4 |
-| 1.47.0 | 2026-10-20 | Passe do Jev lab nas quatro perguntas em que o Jev mais duvidava. | 7 |
-| 1.46.0 | 2026-10-20 | O Desenvolvedor parou 45 min com um PR esperando conserto — deadlock entre o fatiador e o conserto. | 3 |
-| 1.45.0 | 2026-10-20 | Os gargalos medidos no Mac (24 h: 1,5 M tokens do Desenvolvedor para 7 itens entregues). | 5 |
-| 1.44.0 | 2026-10-20 | A memória do time (RAG) compartilhada com toda a equipe — a começar pelo Product owner. | 5 |
-| 1.43.0 | 2026-10-20 | Todo consumo do loop pela API, e qualquer API de IA. | 3 |
-| 1.42.0 | 2026-10-20 | Conexões ao vivo na Gestão do loop. | 3 |
-| 1.41.1 | 2026-10-20 | - Painel: aba fechada pelo navegador no meio de um `/api/...` gerava `BrokenPipeError` com traceback no `loop.err`; agora é ignorado (outros erros do servidor continuam no log). | 1 |
-| 1.41.0 | 2026-10-20 | `circulo/medico.py` | 9 |
-| 1.40.2 | 2026-10-20 | Dois defeitos que o loop real expôs em 3 h de 1.40.x, corrigidos com teste: | 2 |
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **observabilidade** 57 · **correcao** 44 · **funcionalidade** 41 · **documentacao** 34 · **seguranca** 19 · **velocidade** 5.
+Por tipo: **funcionalidade** 70 · **observabilidade** 45 · **correcao** 37 · **documentacao** 31 · **seguranca** 12 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #339 | 01/11/2026 | funcionalidade (63%) | sim | Revisão dupla independente (Santa): Validador LLM e rubrica do Jev precisam aprovar, sem contexto… | item #370 (referencia) |
+| #338 | 01/11/2026 | funcionalidade (70%) | sim | Entrevistas no formato Mom Test entram como pergunta do PM no conselho do loop | item #369 (referencia) |
+| #337 | 01/11/2026 | funcionalidade (100%) | sim | Fábrica: o Developer trabalha os pedidos abertos dos repositórios cliente (esteira primeiro) | item #368 (referencia) |
+| #336 | 01/11/2026 | funcionalidade (100%) | sim | Autofix determinístico de lint (ruff --fix com a config do CI) antes do commit do Developer | pergunta do arquiteto: “Os erros de lint F811, F401, F541, B905 e E501 reincidiram nas lições #36, #70, ” |
+| #334 | 01/11/2026 | funcionalidade (47%) | sim | Listar PRs mergeados sem critério de sucesso e classificar se o critério é mensurável | pergunta do cientista: “Das mudanças entregues, quais têm prova medida de que melhoraram algo, e como me” |
+| #333 | 01/11/2026 | funcionalidade (56%) | sim | Painel: 'incidentes_abertos=[]' só é verde se nenhuma lição de estrutura reincidente (≥3x) estiver… | pergunta do cetico: “Que indicador do painel diz 'tudo bem' e pode estar mentindo, e como cruzá-lo co” |
+| #332 | 01/11/2026 | observabilidade (41%) | sim | Registrar os arquivos de cada PR devolvido por conflito para que arquivos_7d deixe de vir vazio | pergunta do operador: “Quais arquivos aparecem em mais PRs que voltaram por conflito nos últimos 7 dias” |
+| #331 | 01/11/2026 | observabilidade (53%) | sim | Fatiador: registrar estimativa vs tokens reais por sub-item e recalibrar o limite de divisão | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
+| #330 | 01/11/2026 | funcionalidade (42%) | — | Classificar saída do agente por regra (configuracao) e abrir disjuntor na 1ª ocorrência | pergunta do operador: “O padrão 'sdk_opt_in_required' (fast_mode off, subagent_stats com spawned=0) rei” |
+| #329 | 01/11/2026 | seguranca (59%) | sim | Portar a política de confirmação por risco de OpenHands: classificar as ações do Developer em… | item #367 (referencia) |
+| #328 | 01/11/2026 | seguranca (48%) | sim | Portar o condensador rolante de OpenHands: resumir o contexto do Developer mantendo keep_first e os… | item #366 (referencia) |
+| #327 | 01/11/2026 | funcionalidade (74%) | sim | Portar o detector de travamento por padrões de OpenHands: o Vigia nomeia o padrão e o limiar em cada disparo d | item #365 (referencia) |
+| #326 | 01/11/2026 | funcionalidade (72%) | sim | Tokens por papel e por PR mergeado + experimento de uma alavanca por vez, com guarda de qualidade | pergunta do cassio: “Economia de tokens medida: por papel (planejador, developer, validador, estudo) ” |
+| #325 | 01/11/2026 | observabilidade (60%) | sim | Validador: gate determinístico de segredos no diff; differential-review opcional para achados médios | pergunta do cassio: “Segurança com skill: todo PR do Developer passa pela skill differential-review (” |
+| #324 | 01/11/2026 | seguranca (86%) | sim | O loop como produto: multiusuário leve — cada pedido registra quem pediu (nome do remetente no… | pergunta do cassio: “O loop como produto: multiusuário leve — cada pedido registra quem pediu (nome d” |
+| #323 | 01/11/2026 | funcionalidade (94%) | sim | O loop como produto: `pip install circulo` funciona a partir do repositório (pyproject com entry… | pergunta do cassio: “O loop como produto: `pip install circulo` funciona a partir do repositório (pyp” |
+| #322 | 01/11/2026 | funcionalidade (86%) | sim | Demo de 30 s por produto: roteiro JSON versionado e mp4 renderizado fora do histórico do git | pergunta do cassio: “Produto que cria produtos: vídeo de demonstração de 30 s por produto (skill remo” |
+| #321 | 01/11/2026 | funcionalidade (89%) | sim | Produto que cria produtos: cada produto criado ganha uma landing page gerada (skill… | pergunta do cassio: “Produto que cria produtos: cada produto criado ganha uma landing page gerada (sk” |
+| #320 | 01/11/2026 | funcionalidade (98%) | sim | Developer em paralelo (2 worktrees) com partição por pegada de arquivos no Escalador | pergunta do cassio: “Developer em paralelo: quando há 3 ou mais itens de produto estudados na fila, o” |
+| #319 | 01/11/2026 | funcionalidade (90%) | sim | Produto novo: gerar repositório a partir de modelos por tipo, com `circulo init` e primeiro pedido | pergunta do cassio: “Produto que cria produtos: missão do tipo "produto novo" gera um repositório nov” |
+| #318 | 01/11/2026 | funcionalidade (100%) | sim | Garimpo: triagem por pontos (licença, atividade, estrelas) e Jev só para aderência, ordenando a fila | pergunta do cassio: “Garimpo com Jev: cada repositório achado no garimpo passa pelo Jev (pergunta gar” |
+| #317 | 01/11/2026 | funcionalidade (71%) | sim | Validador com Playwright headless por tela: reprova PR com id quebrado ou erro de console | pergunta do cassio: “Frontend medido: instrumentar o painel (cliques por card, telas abertas, tempo a” |
+| #316 | 01/11/2026 | correcao (63%) | sim | Lição #72: developer:abrir_pr: --> tests/test_vigia_drena.py:93:89 | item #182 (erro) |
+| #315 | 01/11/2026 | correcao (87%) | — | Retrospectivo diário: até 3 práticas em docs/PRATICAS.md e kv praticas, com remoção por resultado | pergunta do cassio: “Autoevolução: retrospectivo diário → manual de práticas. Uma vez por dia o loop ” |
+| #314 | 01/11/2026 | funcionalidade (0%) | — | Veredito de experimento: regra z-score local primeiro, Jev só na fronteira (corte 0,6) | pergunta do cassio: “Autoevolução: o Jev julga o experimento. Para cada experimento fechado, o Jev de” |
+| #313 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown copiável (o que… | pergunta do cassio: “Fábrica: o digest semanal existente ganha uma versão 'para o time' em markdown c” |
+| #312 | 01/11/2026 | funcionalidade (0%) | — | Experimento universal: item com hipótese, métrica, margem e janela; Vigia mede e grava veredito | pergunta do cassio: “Autoevolução: experimento universal. Todo item do loop carrega hipótese + métric” |
+| #311 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.checar) e o… | pergunta do cassio: “Fábrica: `[tool.circulo.etapas]` do repositório cliente roda em cada etapa (kit.” |
+| #310 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: sincronizar AGENTS.md/.cursor/rules no repo cliente só com lições não inferíveis, via PR | pergunta do cassio: “Fábrica: para um projeto de kit 'repo', o loop gera AGENTS.md e .cursor/rules a ” |
+| #309 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele pedido (caixa → item… | pergunta do cassio: “Fábrica: na Equipe ao vivo, filtrar por pedido mostra a linha do tempo daquele p” |
+| #308 | 01/11/2026 | funcionalidade (0%) | — | Critério de aceite verificável por pedido: Arquiteto define, Validador confere, PR mostra ✓/✗ | pergunta do cassio: “Fábrica: todo pedido em uma frase (circulo pedir / caixa) ganha um critério de a” |
+| #307 | 01/11/2026 | funcionalidade (0%) | — | Fábrica: `circulo init <pasta>` registra repo cliente (kit 'repo') e pedido `projeto: <id>` abre PR… | pergunta do cassio: “Fábrica: `circulo init <pasta>` num repositório Python de exemplo (tests/fixture” |
+| #306 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o modelo mais usado e o… | pergunta do cassio: “Meu trabalho: no card do orçamento de IA, para cada tipo de tarefa mostrar o mod” |
+| #305 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) e mostra a hora em… | pergunta do cassio: “Meu trabalho: a pauta da daily tem botão 'Copiar' (texto puro de até 10 linhas) ” |
+| #304 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pendencia {id, feita})… | pergunta do cassio: “Meu trabalho: marcar uma pendência como feita pela tela (POST /api/trabalho/pend” |
+| #303 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver): descrição… | pergunta do cassio: “Meu trabalho: página /trabalho/assunto/<nome> com a ficha completa (assuntos.ver” |
+| #302 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: card de links agrupado por assunto (colapsável), com o total por assunto e busca… | pergunta do cassio: “Meu trabalho: card de links agrupado por assunto (colapsável), com o total por a” |
+| #301 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, quando a palavra não… | pergunta do cassio: “Meu trabalho: 'o que decidimos sobre X?' usa o Graft (assuntos.perguntar) e, qua” |
+| #300 | 01/11/2026 | funcionalidade (0%) | — | Arquivar nota sem assunto pela tela: 3 opções, 1 clique, e aprender a escolha | pergunta do cassio: “Meu trabalho: quando a regra local não sabe o assunto de uma nota (trabalho.anot” |
+| #299 | 01/11/2026 | funcionalidade (0%) | — | Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arquivo (POST… | pergunta do cassio: “Meu trabalho: botão 'Importar CSV do Cursor' na tela /trabalho que envia o arqui” |
+| #298 | 31/10/2026 | funcionalidade (0%) | — | Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e as decisões de… | pergunta do cassio: “Meu trabalho: a pauta da daily (circulo/daily.py) inclui as pendências abertas e” |
+| #297 | 31/10/2026 | funcionalidade (0%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #296 | 31/10/2026 | correcao (81%) | sim | Lição com 'já corrigido' e checagem sem id caminho::nome vira sem_prevencao e pede teste | pergunta do curador_licoes: “A lição #47 (loop:estagnado, 'nada avançou em 10 giros') está marcada como reinc” |
 | #295 | 31/10/2026 | correcao (82%) | sim | Fechar todo disparo de estagnação com desfecho (destravou/expirou) para medir os 13 sem resultado | pergunta do operador: “A lição #47 (loop:estagnado, 'sem recusa registrada') reincidiu mesmo com o PR #” |
 | #294 | 31/10/2026 | documentacao (56%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
@@ -212,45 +254,3 @@ Por tipo: **observabilidade** 57 · **correcao** 44 · **funcionalidade** 41 · 
 | #141 | 23/10/2026 | correcao (92%) | — | Lição #19: developer:testes: __… | item #168 (erro) |
 | #140 | 23/10/2026 | correcao (82%) | — | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
 | #139 | 23/10/2026 | correcao (68%) | sim | Teste do Developer em paralelo: Barrier(2) com timeout e causa raiz de test_capacidade.py:112 | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #138 | 23/10/2026 | correcao (26%) | — | Canário parametrizado: cada portão aprendido recusa a assinatura da lição que o criou | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #137 | 23/10/2026 | seguranca (33%) | sim | Base vermelha: upsert da falha local por (item, assinatura, sha da main) com contador | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #136 | 23/10/2026 | funcionalidade (27%) | — | Canário para portões aprendidos: reexecutar a assinatura de cada lição e exigir que o portão barre | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #135 | 23/10/2026 | seguranca (28%) | — | Quarentena de item por teto de falhas locais com a mesma assinatura (limite 5, à la DLQ) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #134 | 23/10/2026 | seguranca (72%) | sim | Ligar o agrupador de jobs (#146) ao loop: registrar o job recorrente como proposta antecipada | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #133 | 23/10/2026 | funcionalidade (54%) | sim | Canário de falha para gate:merge: provar com teste que o portão recusa merge com check vermelho | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #132 | 23/10/2026 | seguranca (52%) | sim | Antecipar o job recorrente: abrir item proposto com origem na pergunta quando ele passa de 3… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #131 | 23/10/2026 | observabilidade (74%) | — | Medir tokens do developer por desfecho do item (PR entregue vs sem PR) para achar o desperdício | pergunta do economista: “Qual é o jeito mais barato de obter o mesmo resultado na etapa que mais gasta (d” |
-| #130 | 23/10/2026 | observabilidade (98%) | — | Canário de falha para developer:abrir_pr:sem_marcador_de_conflito e teste_novo | pergunta do auditor: “Qual guardrail nunca barrou nada, e como provar com um teste que ele ainda funci” |
-| #129 | 23/10/2026 | documentacao (0%) | — | Developer: base vermelha com a mesma assinatura de teste para o item em vez de repetir a execução | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #128 | 23/10/2026 | correcao (27%) | — | Medir cobertura de antecipação: fração dos pedidos humanos cujo job já tinha item proativo aberto… | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #127 | 23/10/2026 | observabilidade (50%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 127 h bloqueando a evolução | item #153 (loop) |
-| #126 | 23/10/2026 | observabilidade (41%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 125 h bloqueando a evolução | item #148 (loop) |
-| #125 | 23/10/2026 | observabilidade (80%) | sim | Disjuntor por assinatura no seletor do roadmap, com reteste e fechamento por reexecução verde | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #124 | 23/10/2026 | seguranca (56%) | sim | Isolar test_arquiteto_estuda_varios_itens: tornar o teste determinístico (barreira em vez de tempo) | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #123 | 23/10/2026 | correcao (75%) | — | Função pura que agrupa os pedidos de 7d por job e aponta o job recorrente a antecipar | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #122 | 23/10/2026 | observabilidade (36%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 85 h bloqueando a evolução | item #139 (loop) |
-| #121 | 23/10/2026 | observabilidade (80%) | sim | Vigia: 1 lição(ões) de estrutura aberta(s) há 17 h bloqueando a evolução | item #137 (loop) |
-| #120 | 23/10/2026 | observabilidade (28%) | sim | Fatiador: pré-divisão determinística por módulos/símbolos citados, limite calibrado e teto como… | pergunta do economista: “O sub-item #60 do fatiador estourou o teto de tokens (94705 gastos). Dá para est” |
-| #119 | 23/10/2026 | funcionalidade (66%) | sim | Lição #63: developer:testes: tests/test_capacidade.py:112: AssertionError | item #145 (erro) |
-| #118 | 21/10/2026 | correcao (94%) | sim | Classificar falha de CI por conclusion/anotação (infra vs código) e reexecutar local antes de… | pergunta do arquiteto: “O PR #82 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #117 | 22/10/2026 | documentacao (0%) | sim | Portão pré-PR: descartar item com 2 PRs fechados sem merge (fundir com #128) | pergunta do arquiteto: “O PR #83 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #116 | 21/10/2026 | seguranca (90%) | sim | Portão de reincidência: não abrir PR de item que já fechou 2x sem merge com os mesmos checks… | pergunta do arquiteto: “O PR #84 (“Teste de arquitetura: detectar padrão sdk_opt_in_required em saídas d” |
-| #115 | 21/10/2026 | seguranca (76%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
-| #114 | 21/10/2026 | observabilidade (72%) | sim | Medir falha uniforme de checks por PR fechado e o gasto do developer nele | pergunta do arquiteto: “O PR #48 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #113 | 21/10/2026 | observabilidade (63%) | sim | Portão pré-PR: não abrir PR se a main está vermelha ou se todos os checks falham de modo uniforme | pergunta do arquiteto: “O PR #49 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #112 | 21/10/2026 | seguranca (68%) | sim | Portão pré-PR: não abrir PR enquanto o CI da main estiver vermelho ou sem iniciar | pergunta do arquiteto: “O PR #50 (“Integrar a pré-checagem em developer:abrir_pr antes do push”) fechou ” |
-| #111 | 21/10/2026 | seguranca (50%) | sim | Painel local: faixa de saúde no topo (semáforo + 5 números) em HTML estático, sem Grafana | pergunta do usuario: “Dado que /metrics e o Grafana opcional já existem, qual visão do painel do loop ” |
-| #110 | 21/10/2026 | observabilidade (78%) | sim | Registrar medição antes/depois por item mergeado e listar os sem linha de base | pergunta do cientista: “Dos 15 PRs mergeados em 7 dias, quantos dos 11 itens com critério de sucesso têm” |
-| #109 | 21/10/2026 | observabilidade (95%) | sim | Classificar a falha do developer:agente pela causa real (subtype/is_error), não pelo trecho cru do… | pergunta do operador: “O neurônio developer:agente foi barrado 17 de 181 vezes em 24 h: qual é a causa ” |
-| #108 | 21/10/2026 | correcao (50%) | sim | Disjuntor por assinatura de causa no abrir_pr: após 2 barras iguais no mesmo item, não gasta até a… | pergunta do operador: “O neurônio developer:abrir_pr:aprendido foi barrado 495 de 1910 vezes em 24 h: q” |
-| #107 | 21/10/2026 | seguranca (26%) | sim | Gravar os arquivos realmente em conflito (git merge-tree) de cada PR devolvido e contar por arquivo… | pergunta do operador: “Nos PRs devolvidos por conflito com a main nos últimos 7 dias (hoje 2), quais ar” |
-| #106 | 21/10/2026 | documentacao (100%) | sim | Estado de dado_na_evidencia com features numéricas: o número do campo 'dado' aparece literal na… | pergunta do economista: “O Jev decide “dado_na_evidencia” com dúvida (a regra decidiu 27% de 26 vezes em ” |
-| #105 | 21/10/2026 | observabilidade (38%) | sim | TTL de lição de estrutura: marcar obsoleta se a assinatura não reincide em 6 h | pergunta do operador: “O Vigia mede a trava “3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a e” |
-| #104 | 21/10/2026 | observabilidade (51%) | sim | Estado do revisor_seguro com linhas alteradas, nº de arquivos, categoria dominante e se há teste no… | pergunta do economista: “O Jev decide “revisor_seguro” com dúvida (a regra decidiu 41% de 22 vezes em 24 ” |
-| #103 | 21/10/2026 | observabilidade (47%) | sim | Assinar lição de erro de coleta do pytest pelo módulo e exceção, e fechá-la com --collect-only… | pergunta do curador_licoes: “A lição #9 (developer:testes: ==================================== ERRORS ======” |
-| #102 | 21/10/2026 | correcao (72%) | sim | Pytest com alvo inexistente (exit 4) vira lição obsoleta e não conta como nova ocorrência | pergunta do curador_licoes: “A lição #27 (developer:abrir_pr: ERROR: file or directory not found: tests/test_” |
-| #101 | 21/10/2026 | correcao (72%) | sim | Planejador lê a hora de reset do limite de uso e retoma sozinho, sem sondar a LLM | pergunta do operador: “O Planejador não planeja porque “Claude Code no limite de uso”: essa trava é leg” |
-| #100 | 21/10/2026 | correcao (27%) | sim | Vigia: 3 lição(ões) de estrutura aberta(s) há 14 h bloqueando a evolução | item #102 (loop) |
-| #99 | 21/10/2026 | correcao (36%) | sim | Migração: coluna origem_status e marcar itens antigos sem pergunta como 'legado' | item #133 (sub_item) |
-| #98 | 21/10/2026 | funcionalidade (86%) | sim | Contrato único de saída JSON: extrator tolerante a truncamento para estudo, meta e planejador | pergunta do curador_licoes: “A lição #22 (estudo:pedido: resposta sem JSON válido: tps://github.com/cgwalters” |
-| #97 | 21/10/2026 | funcionalidade (77%) | sim | Extrair erro do agente de JSON estruturado, não de fatia de texto bruto, antes de gravar a lição | pergunta do curador_licoes: “A lição #18 (developer:agente: s","fast_mode_state":"off","fast_mode_disabled_re” |
