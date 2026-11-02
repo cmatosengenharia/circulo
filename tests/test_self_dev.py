@@ -465,3 +465,17 @@ def test_versao_do_painel_e_a_do_pyproject():
     import circulo
     pyproject = (Path(circulo.__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
     assert circulo.__version__ == re.search(r'^version = "([^"]+)"', pyproject, flags=re.M).group(1)
+
+
+def test_suite_pendurada_reprova_com_o_ultimo_teste_na_saida_em_vez_de_virar_incidente(circle, repo, monkeypatch):
+    """2/11: `pytest -q -x` local estourou 900 s sete vezes (suíte verde, mas lenta/pendurada no Mac) e cada TimeoutExpired
+    virou incidente até a etapa do Developer ser isolada por 320 giros. Prazo estourado é reprovação monitorada, com o
+    fim da saída (onde parou), e o loop segue."""
+    from circulo import self_dev
+    monkeypatch.setattr(self_dev, "TESTES_PRAZO", 1)
+    dev = SelfDeveloper(circle.ctx, repo, FixAgent(), FakeGH(), lint_cmd=[],
+                        test_cmd=["python3", "-u", "-c", "import time; print('tests/test_lento.py'); time.sleep(5)"])
+    ok, saida = dev.verificar(repo)
+    assert ok is False and "passou de 1 s" in saida and "tests/test_lento.py" in saida
+    r = circle.store.one("SELECT ok, motivo FROM verificacoes WHERE ponto='developer:testes' ORDER BY id DESC")
+    assert r["ok"] == 0 and "passou de 1 s" in r["motivo"]

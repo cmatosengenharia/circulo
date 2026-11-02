@@ -118,6 +118,7 @@ def verificar(db_path: str | None = None, navegador: bool | None = None) -> dict
             erros += _navegador(base, zero)
     finally:
         srv.shutdown()
+        srv.server_close()
     return {"ok": not erros, "erros": erros, "conferidos": conferidos}
 
 

@@ -25,6 +25,8 @@ def no_keys(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("CIRCULO_SEM_DEVELOPER", "1")
     monkeypatch.setenv("CIRCULO_GRAFT", "0")          # nunca o Graft real (quem testa o Graft usa o `graft_falso`)
+    # nunca o revisor externo real (2/11: com o `codex` no PATH do Mac, cada revisar_pr levava 2,7 s e a suíte 20 min)
+    monkeypatch.setenv("CIRCULO_REVISOR_EXTERNO", "0")
 
 
 @pytest.fixture(autouse=True)

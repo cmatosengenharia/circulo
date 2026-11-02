@@ -1,6 +1,6 @@
 [project]
 name = "circulo"
-version = "1.76.4"
+version = "1.76.5"
 description = "Círculo autoevolutivo Jev First — controle financeiro da família"
 requires-python = ">=3.11"
 dependencies = []
@@ -8,7 +8,7 @@ dependencies = []
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
 metricas = ["prometheus_client>=0.17"]
-dev = ["pytest>=8", "pytest-repeat", "ruff", "prometheus_client>=0.17", "playwright>=1.40"]
+dev = ["pytest>=8", "pytest-repeat", "pytest-timeout", "ruff", "prometheus_client>=0.17", "playwright>=1.40"]
 
 [project.scripts]
 circulo = "circulo.cli:main"
@@ -30,3 +30,7 @@ fabrica = ["painel.html", "README.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Teste pendurado falha com nome em vez de segurar a suíte (2/11: a suíte local parou 2x com 0% de CPU e o Developer
+# ficou isolado por TimeoutExpired de 900 s). faulthandler despeja as pilhas de todas as threads antes do corte.
+timeout = 300
+faulthandler_timeout = 240

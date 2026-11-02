@@ -15,6 +15,7 @@ def painel(circle):
     srv = serve(circle.store.path, port=0, background=True)
     yield f"http://127.0.0.1:{srv.server_address[1]}"
     srv.shutdown()
+    srv.server_close()
 
 
 def post(url, body, headers=None):
@@ -687,3 +688,17 @@ def test_candidatos_a_modelo_menor_por_papel_em_7_dias(tmp_path):
     assert card.index("planejador") < card.index("questionador") and "validador" not in card and "developer" not in card
     assert "16700 tokens/chamada" in card
     assert modelos_menores(Store(tmp_path / "v.db").db, agora) == []
+
+
+def test_desligar_o_painel_encerra_o_fluxo_sse_em_vez_de_deixar_a_thread_girando(circle):
+    """Os fluxos SSE giravam `while True`: cada painel de teste deixava threads órfãs lendo um banco apagado a cada 0,4 s.
+    Com `shutdown()`, o laço sai e a conexão fecha."""
+    srv = serve(circle.store.path, port=0, background=True)
+    r = urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/fluxo/eventos", timeout=5)
+    assert r.readline().startswith(b"event:")                      # o fluxo está vivo
+    fim = threading.Thread(target=r.read, daemon=True)
+    fim.start()
+    srv.shutdown()
+    fim.join(timeout=3)
+    srv.server_close()
+    assert not fim.is_alive()                                        # a conexão fechou: o laço do servidor terminou

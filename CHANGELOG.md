@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.76.5 — 2026-11-02
+
+- Developer destravado: a suíte local levava 20 min (prazo do Developer: 900 s) e às vezes pendurava com 0 % de CPU; sete
+  `TimeoutExpired` em `pytest -q -x` viraram incidente e isolaram a etapa `corrigir_codigo` por 320 giros com o código verde.
+  Causas e correções: (1) com o `codex` no PATH do Mac, cada `revisar_pr` dos testes chamava o revisor externo de verdade
+  (2,7 s × centenas) — o conftest e o ambiente dos testes do Developer desligam `CIRCULO_REVISOR_EXTERNO`; (2) os fluxos SSE
+  do painel giravam `while True` e cada painel de teste deixava threads órfãs lendo um banco apagado — `_Servidor.shutdown()`
+  agora encerra os laços, e `verificacao.verificar` e as fixtures fecham o socket; (3) `pytest-timeout` (300 s por teste,
+  `faulthandler` aos 240 s) faz teste pendurado falhar com nome e pilhas em vez de segurar a suíte; (4) prazo estourado em
+  `SelfDeveloper.verificar` é reprovação monitorada (`developer:testes`, com o fim da saída) em vez de exceção — pelo
+  `rodar_com_prazo` do Corpo, que mata o grupo de processos inteiro — e o prazo é `CIRCULO_TESTES_PRAZO` (padrão 900 s).
+  Medido no Mac do loop, com o loop rodando ao lado: 1.235 s (e 2 travamentos) → **371 s**, 1.613 testes verdes.
+  Diagnóstico completo em `docs/diagnosticos/diagnostico-2026-11-02.md`.
+
 ## 1.76.4 — 2026-11-02
 
 - Fabricante: pedido que depende do que o repositório ainda não tem (tela, endpoint, worker) pode ser respondido com

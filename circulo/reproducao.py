@@ -260,7 +260,8 @@ def ambiente_isolado() -> dict:
     env = {k: v for k, v in os.environ.items() if k not in SEGREDOS}
     # CIRCULO_GRAFT=0: testes nunca falam com o Graft real (22/10: no Mac com graft instalado, os testes ficavam lentos e
     # diferentes do CI, a validação local reprovava toda versão nova e os testes sujavam o grafo de verdade)
-    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0", "CIRCULO_GRAFT": "0", "GRAFT_HOOKS": "0"})
+    env.update({"CIRCULO_SEM_DEVELOPER": "1", "CIRCULO_ENV": os.devnull, "GIT_TERMINAL_PROMPT": "0", "CIRCULO_GRAFT": "0", "GRAFT_HOOKS": "0",
+                "CIRCULO_REVISOR_EXTERNO": "0"})   # nem o revisor externo real (codex no PATH): só o teste que o simula o liga
     return env
 
 

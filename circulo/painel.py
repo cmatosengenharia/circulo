@@ -26,6 +26,7 @@ from .money import fmt_brl
 from .orcamento_dia import limite_hoje, tokens_dia
 from .pedido_estado import pedidos, secao
 from .projects import cards, incidentes, kit_project_id, novos_na_fila, roteiro
+from .servidor import Servidor as _Servidor
 from .status import loop_status
 from .silencio import card_incidentes, reincidentes, sinais_7d
 from .state import Store
@@ -617,7 +618,7 @@ def make_handler(db_path: str):
             cur_eq = cursor_equipe(store, min(minutos, 24 * 60) * 60)
             ultimo_agora = 0.0
             try:
-                while True:
+                while not self.server.encerrando.is_set():
                     evs, cur = eventos(store, cur)
                     msgs, cur_eq = mensagens(store, cur_eq)
                     for e in sorted(evs + msgs, key=lambda x: x["em"]):
@@ -646,7 +647,7 @@ def make_handler(db_path: str):
             last_conf, last_conf_em, conf_enviada_em = None, 0.0, 0.0
             last_cap = None
             try:
-                while True:
+                while not self.server.encerrando.is_set():
                     cap = store.get("capacidade_ultima")
                     if cap and cap.get("em") != last_cap:                       # o Escalador mediu: empurra para a tela
                         last_cap = cap.get("em")
@@ -871,17 +872,6 @@ def make_handler(db_path: str):
             return self._json({"erro": "não encontrado"}, 404)
 
     return Handler
-
-
-class _Servidor(ThreadingHTTPServer):
-    """Navegador fechou a aba no meio da resposta: não é erro do loop, não suja o loop.err."""
-    daemon_threads = True
-
-    def handle_error(self, request, client_address):
-        import sys
-        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
-            return
-        super().handle_error(request, client_address)
 
 
 def serve(db_path: str | Path, port: int = 8765, background: bool = False) -> ThreadingHTTPServer:
