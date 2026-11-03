@@ -50,12 +50,35 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 67 · **observabilidade** 47 · **correcao** 35 · **documentacao** 34 · **seguranca** 12 · **velocidade** 5.
+Por tipo: **funcionalidade** 72 · **observabilidade** 43 · **documentacao** 34 · **correcao** 32 · **seguranca** 14 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #372 | 03/11/2026 | funcionalidade (75%) | — | Instalar a skill frontend-design-review (frontend) em .claude/skills a partir de microsoft/skills | item #389 (referencia) |
+| #371 | 03/11/2026 | funcionalidade (81%) | — | Instalar a skill web-perf (frontend) em .claude/skills a partir de cloudflare/skills | item #390 (referencia) |
+| #370 | 03/11/2026 | funcionalidade (76%) | — | Instalar a skill shadcn-ui (frontend) em .claude/skills a partir de google-labs-code/skills | item #388 (referencia) |
+| #369 | 03/11/2026 | funcionalidade (92%) | — | Instalar a skill theme-factory (frontend) em .claude/skills a partir de anthropics/skills | item #387 (referencia) |
+| #368 | 03/11/2026 | funcionalidade (89%) | — | Instalar a skill canvas-design (frontend) em .claude/skills a partir de anthropics/skills | item #386 (referencia) |
+| #367 | 03/11/2026 | funcionalidade (94%) | — | Instalar a skill frontend-design (frontend) em .claude/skills a partir de anthropics/skills | item #384 (referencia) |
+| #366 | 03/11/2026 | correcao (60%) | — | Lição #50: gate:main: CI da main falhou no 93fe8ef: algo entrou quebrado | item #117 (erro) |
+| #365 | 02/11/2026 | correcao (82%) | — | Instalar a skill web-artifacts-builder (frontend) em .claude/skills a partir de anthropics/skills | item #385 (referencia) |
+| #362 | 02/11/2026 | funcionalidade (89%) | — | Experimento universal aplicado à oferta (missão Vender resultado, item F): toda mudança em… | pergunta do cassio: “Experimento universal aplicado à oferta (missão Vender resultado, item F): toda ” |
+| #361 | 02/11/2026 | funcionalidade (96%) | sim | Catálogo de trabalhos candidatos (missão Vender resultado, item E): kv `catalogo_trabalhos` com os… | pergunta do cassio: “Catálogo de trabalhos candidatos (missão Vender resultado, item E): kv `catalogo” |
+| #360 | 02/11/2026 | seguranca (26%) | sim | Regras de Postgres da Supabase no catálogo de skills do loop (substitui a entrada sem licença) | item #375 (referencia) |
+| #359 | 02/11/2026 | seguranca (33%) | sim | Skills da Expo no catálogo do loop, instaladas só quando um produto pedir app móvel | item #374 (referencia) |
+| #358 | 02/11/2026 | funcionalidade (81%) | sim | Equipe ao vivo (circulo/equipe.py, equipe.html): o Fabricante (chave `fabricar`) aparece com as… | pergunta do cassio: “Equipe ao vivo (circulo/equipe.py, equipe.html): o Fabricante (chave `fabricar`)” |
+| #357 | 02/11/2026 | funcionalidade (75%) | sim | GateGuard no Developer: primeira edição só depois de listar fatos (quem importa, contrato, dado… | item #373 (referencia) |
+| #356 | 02/11/2026 | funcionalidade (52%) | sim | Operador do loop: mesmo traceback 2× ou 2 checkpoints sem progresso troca a estratégia em vez de… | item #372 (referencia) |
+| #355 | 02/11/2026 | correcao (35%) | sim | Lição #99: corpo:atualizar: tests/test_tecnicas.py:155: AssertionError | item #419 (erro) |
+| #354 | 02/11/2026 | correcao (96%) | — | Lição #98: Promessa não cumprida: pedido 3 | item #415 (erro) |
+| #353 | 02/11/2026 | correcao (92%) | sim | Confiabilidade de agência (missão Vender resultado, item C): nenhuma missão passou da verificação… | pergunta do cassio: “Confiabilidade de agência (missão Vender resultado, item C): nenhuma missão pass” |
+| #352 | 02/11/2026 | funcionalidade (56%) | sim | Fabricante: auto-merge squash de PR de cliente com CI verde, Validador ok e sem tocar `protegidos` | pergunta do cassio: “Fabricante (circulo/fabricante.py): quando o PR de um pedido de repositório clie” |
+| #351 | 02/11/2026 | funcionalidade (74%) | sim | Prova social no Norte: visualizações/seguidores como antecedente, cliques e leads da esteira como… | pergunta do cassio: “Métrica de prova social no Norte (missão Vender resultado, item G): visualizaçõe” |
+| #350 | 02/11/2026 | observabilidade (56%) | sim | Painel (circulo/painel.py, painel.html): card “Técnicas” com o relatório de… | pergunta do cassio: “Painel (circulo/painel.py, painel.html): card “Técnicas” com o relatório de `cir” |
+| #349 | 02/11/2026 | funcionalidade (28%) | sim | docs: documentação do loop atualizada pelo Redator técnico | — |
 | #348 | 02/11/2026 | documentacao (45%) | — | PR #348 | — |
 | #347 | 02/11/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #340 | 02/11/2026 | documentacao (99%) | sim | Confiança das lições como nos 'instintos': sobe com confirmação, cai com contradição, promove entre… | item #371 (referencia) |
 | #339 | 01/11/2026 | funcionalidade (63%) | sim | Revisão dupla independente (Santa): Validador LLM e rubrica do Jev precisam aprovar, sem contexto… | item #370 (referencia) |
 | #338 | 01/11/2026 | funcionalidade (70%) | sim | Entrevistas no formato Mom Test entram como pergunta do PM no conselho do loop | item #369 (referencia) |
 | #337 | 01/11/2026 | funcionalidade (100%) | sim | Fábrica: o Developer trabalha os pedidos abertos dos repositórios cliente (esteira primeiro) | item #368 (referencia) |
@@ -231,26 +254,3 @@ Por tipo: **funcionalidade** 67 · **observabilidade** 47 · **correcao** 35 · 
 | #166 | 26/10/2026 | observabilidade (56%) | sim | Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsserviço de… | pergunta do cassio: “Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsse” |
 | #165 | 26/10/2026 | funcionalidade (89%) | sim | Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e depois acho em segundos, por pa | pergunta do cassio: “Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e d” |
 | #164 | 26/10/2026 | funcionalidade (84%) | sim | Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das notas), o que farei hoje (pend | pergunta do cassio: “Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das ” |
-| #163 | 26/10/2026 | funcionalidade (88%) | sim | Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela até o merge: pedido →… | pergunta do cassio: “Quero pedir uma feature em uma frase pelo console e acompanhar o caminho dela at” |
-| #162 | 26/10/2026 | funcionalidade (63%) | sim | Motivo tipado de recusa/parada (gate, check, próxima ação) ao lado do item na Equipe ao vivo | pergunta do cassio: “Na Equipe ao vivo quero entender em 10 segundos por que um PR foi recusado ou um” |
-| #161 | 26/10/2026 | funcionalidade (76%) | sim | Corpo do PR do Developer: template fixo de impacto e risco, com módulos e testes vindos do diff e do gate | pergunta do cassio: “Todo PR do Developer deve vir com um resumo de impacto e risco no corpo: o que m” |
-| #160 | 25/10/2026 | funcionalidade (86%) | sim | Parser puro de e-mail de notificação com dedup por hash+ocorrência, cruzando com o extrato | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #159 | 25/10/2026 | funcionalidade (54%) | — | Teste de ponta a ponta: pasta monitorada → lançamentos > 0 medido no estado do loop | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #158 | 25/10/2026 | funcionalidade (50%) | sim | Impressão digital de PR (título + checks falhos) que bloqueia a 3ª abertura idêntica | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #157 | 25/10/2026 | funcionalidade (45%) | sim | Ingestão de pasta monitorada: importar extratos OFX/CSV novos para os lançamentos, de forma… | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #156 | 25/10/2026 | funcionalidade (93%) | — | Parser OFX/CSV determinístico com dedupe idempotente (FITID ou hash+ocorrência) | pergunta do financeiro: “Qual é a fonte de lançamentos reais mais barata de ingerir de forma automática (” |
-| #155 | 25/10/2026 | correcao (41%) | sim | Validar por ast o id pytest (arquivo, classe, função) antes do reparo, sem rodar pytest | pergunta do operador: “As lições #31 e #35 registram 'ERROR: file or directory not found' ao rodar test” |
-| #154 | 25/10/2026 | correcao (70%) | sim | Reabrir lição 'validada' quando nova lição chega com a mesma assinatura (neurônio+arquivo+código) | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
-| #153 | 25/10/2026 | correcao (54%) | sim | Lição só vira 'validada' se a Prevenção citar um teste/checagem; senão fica 'sem_prevencao' | pergunta do cetico: “As lições #70 e #71 estão 'validada', mas os mesmos erros voltaram nas lições #7” |
-| #152 | 25/10/2026 | correcao (86%) | sim | Lição #78: developer:abrir_pr: --> tests/test_vigia_drena.py:93:89 | item #191 (erro) |
-| #151 | 25/10/2026 | correcao (86%) | sim | Vigia: 2 pergunta(s) validada(s) pelo Jev esperando há 31 min sem virar item (último progresso há 235 min) | item #178 (loop) |
-| #150 | 24/10/2026 | observabilidade (45%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #149 | 24/10/2026 | correcao (28%) | sim | Expor por que a antecipação gerou 0 propostas com 32 pedidos: maior grupo de job e o limiar 3+ | item #176 (loop) |
-| #148 | 24/10/2026 | observabilidade (56%) | sim | Evidência do conselho: contar falhas locais por execução distinta, não por linha repetida | pergunta do arquiteto: “Qual parte do código mais faz o Developer errar e refazer, e como simplificá-la?” |
-| #147 | 24/10/2026 | observabilidade (35%) | sim | Gerar proposta antecipada quando um job de pedido do humano se repete 3+ vezes em 7 dias | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #146 | 24/10/2026 | funcionalidade (52%) | sim | Auditar e corrigir o corte de developer:teto: chave por item raiz, estado persistente, bloqueio | pergunta do operador: “O PR 'Integrar a pré-checagem em developer:abrir_pr antes do push' foi aberto e ” |
-| #145 | 24/10/2026 | documentacao (99%) | — | Medir se a proposta antecipada de job recorrente foi aceita ou o humano pediu o mesmo job depois | pergunta do entrevistador_jtbd: “Nos pedidos do humano da última semana, qual era o trabalho (job) por trás de ca” |
-| #144 | 24/10/2026 | observabilidade (99%) | — | Vigia: 1 lição(ões) de estrutura aberta(s) há 79 h bloqueando a evolução | item #171 (loop) |
-| #143 | 24/10/2026 | observabilidade (54%) | sim | Vigia: 2 lição(ões) de estrutura aberta(s) há 76 h bloqueando a evolução | item #170 (loop) |
-| #142 | 24/10/2026 | correcao (89%) | sim | Lição #47: loop:progresso: havia trabalho pendente e nada avançou em 10 giros; causa provável: sem… | item #115 (erro) |
-| #141 | 23/10/2026 | correcao (92%) | — | Lição #19: developer:testes: __… | item #168 (erro) |
