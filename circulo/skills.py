@@ -42,7 +42,7 @@ CATALOGO = (
     ("canvas-design", "https://github.com/anthropics/skills", "skills/canvas-design", "frontend", "mockups, pôsteres e diagramas em canvas", "Apache-2.0"),
     ("theme-factory", "https://github.com/anthropics/skills", "skills/theme-factory", "frontend", "temas e paletas consistentes", "Apache-2.0"),
     ("shadcn-ui", "https://github.com/google-labs-code/stitch-skills", "plugins/stitch-build/skills/shadcn-ui", "frontend", "componentes shadcn/ui bem usados", "Apache-2.0"),
-    ("frontend-design-review", "https://github.com/microsoft/skills", "skills/frontend-design-review", "frontend", "revisão de design de frontend", "desconhecida"),
+    ("frontend-design-review", "https://github.com/microsoft/skills", ".github/skills/frontend-design-review", "frontend", "revisão de design de frontend", "MIT"),
     ("web-perf", "https://github.com/cloudflare/skills", "skills/web-perf", "frontend", "auditoria de Core Web Vitals", "desconhecida"),
     # testes e qualidade
     ("webapp-testing", "https://github.com/anthropics/skills", "skills/webapp-testing", "testes", "testes de interface com Playwright", "Apache-2.0"),
@@ -107,8 +107,11 @@ def instaladas(repo_dir: Path | str) -> list[dict]:
             cab = arq.read_text(encoding="utf-8")[:2000]
         except (OSError, UnicodeDecodeError):
             continue
-        m = re.search(r"^description:\s*(.+)$", cab, re.M)
-        out.append({"nome": arq.parent.name, "descricao": (m.group(1).strip().strip('"') if m else "")[:300]})
+        m = re.search(r"^description:[ \t]*(.*)$", cab, re.M)
+        desc = m.group(1).strip().strip('"') if m else ""
+        if m and desc[:1] in ("", ">", "|"):                                # bloco YAML (dobrado ou na linha seguinte): as linhas indentadas que seguem
+            desc = " ".join(lin.strip() for lin in re.findall(r"^[ \t]+(.+)$", re.match(r"(?:[ \t]+.*\n?)*", cab[m.end() + 1:]).group(0), re.M))
+        out.append({"nome": arq.parent.name, "descricao": desc[:300]})
     return out
 
 
