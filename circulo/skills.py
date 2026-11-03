@@ -47,7 +47,7 @@ CATALOGO = (
     # testes e qualidade
     ("webapp-testing", "https://github.com/anthropics/skills", "skills/webapp-testing", "testes", "testes de interface com Playwright", "Apache-2.0"),
     ("test-driven-development", "https://github.com/obra/superpowers", "skills/test-driven-development", "testes", "RED-GREEN-REFACTOR disciplinado", "desconhecida"),
-    ("pytest-skill", "https://github.com/testmu-ai/skills", "skills/pytest-skill", "testes", "pytest: fixtures, parametrização, isolamento", "desconhecida"),
+    ("pytest-skill", "https://github.com/LambdaTest/agent-skills", "pytest-skill", "testes", "pytest: fixtures, parametrização, isolamento", "MIT"),
     ("playwright-skill", "https://github.com/testmu-ai/skills", "skills/playwright-skill", "testes", "Playwright de ponta a ponta", "desconhecida"),
     # arquitetura e método
     ("brainstorming", "https://github.com/obra/superpowers", "skills/brainstorming", "arquitetura", "decisões de arquitetura e API antes de codar", "desconhecida"),
