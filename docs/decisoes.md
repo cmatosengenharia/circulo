@@ -1,6 +1,6 @@
 # Decisões Jev First
 
-Catálogo das 63 perguntas que o código faz ao Jev antes de gastar ou mudar algo, lidas do próprio
+Catálogo das 64 perguntas que o código faz ao Jev antes de gastar ou mudar algo, lidas do próprio
 código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afirmação), **choice** (uma opção), **score** (um nível).
 
 | Onde | Tipo | Língua | Instrução |
@@ -28,12 +28,12 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `decision.py:948` | score | português |  |
 | `documentador.py:98` | choice | inglês | What kind of change is delivery `entregas.{…}.titulo` (files `entregas.{…}.arquivos`)? |
 | `documentador.py:99` | noul | inglês | Delivery `entregas.{…}.titulo` changes what the human sees or does in the panel or in the loop's behaviour. |
-| `engine.py:166` | score | português | Valor do próximo ciclo para “{…}” (nota atual {…}) |
-| `engine.py:213` | choice | português | Qual projeto ganha mais com o próximo ciclo (maior melhoria esperada por custo)? |
-| `engine.py:311` | noul | português | Este achado é relevante para o pedido e verificável? {…} |
-| `engine.py:349` | noul | português | Este critério é mensurável na entrega (não é vago)? {…} |
-| `engine.py:545` | noul | português | A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução? |
-| `engine.py:548` | noul | português | A nova versão piorou algo importante em relação à anterior? |
+| `engine.py:175` | score | português | Valor do próximo ciclo para “{…}” (nota atual {…}) |
+| `engine.py:222` | choice | português | Qual projeto ganha mais com o próximo ciclo (maior melhoria esperada por custo)? |
+| `engine.py:320` | noul | português | Este achado é relevante para o pedido e verificável? {…} |
+| `engine.py:358` | noul | português | Este critério é mensurável na entrega (não é vago)? {…} |
+| `engine.py:554` | noul | português | A evidência mostra que a nova versão é melhor e segura para seguir para a próxima evolução? |
+| `engine.py:557` | noul | português | A nova versão piorou algo importante em relação à anterior? |
 | `estudo.py:211` | noul | português | A evidência encontrada sustenta {…} o pedido em vez de executá-lo como está? |
 | `evolution.py:387` | noul | português | A última mudança de política piorou a saúde do sistema e deve ser desfeita? |
 | `garimpo.py:115` | noul | português | O repositório `url` (descrito em `descricao`) atende à `necessidade` do loop? |
@@ -54,17 +54,18 @@ código (`circulo/jev_cobertura.py`). Tipos: **noul** (probabilidade de uma afir
 | `landing.py:127` | noul | inglês | A visitor reads this product landing page for five seconds. Do they understand what `nome` is, what it does for them (`p |
 | `loop.py:458` | choice | português | Qual tarefa de manutenção tem mais valor agora? |
 | `loop.py:509` | noul | português | vale gastar agora? |
-| `medico.py:165` | noul | inglês | Finding `achados.{…}.titulo` (evidence `achados.{…}.evidencia`) is blocking the loop's progress right now. |
-| `medico.py:169` | choice | inglês | Who owns the cause of `achados.{…}.titulo`, given `achados.{…}.evidencia`? |
-| `medico.py:170` | score | inglês | What is the safe response to `achados.{…}.titulo` now? |
+| `medico.py:184` | noul | inglês | Finding `achados.{…}.titulo` (evidence `achados.{…}.evidencia`) is blocking the loop's progress right now. |
+| `medico.py:188` | choice | inglês | Who owns the cause of `achados.{…}.titulo`, given `achados.{…}.evidencia`? |
+| `medico.py:189` | score | inglês | What is the safe response to `achados.{…}.titulo` now? |
 | `perguntas.py:378` | choice | português | Qual destas perguntas, respondida agora, mais ajuda o objetivo do loop pelo menor custo? |
 | `persona_cliente.py:25` | noul | português | A pergunta `candidatas.%d.texto` (persona cliente) pergunta sobre comportamento passado, e não pede opinião sobre a idei |
 | `planejador.py:387` | noul | português | O dado citado pelo planejador aparece de fato na evidência do loop? |
 | `produto_novo.py:40` | choice | português | Qual esqueleto de repositório atende ao `pedido`? |
 | `projects.py:144` | choice | português | Que tipo de solução este pedido pede? |
-| `resultado.py:136` | choice | inglês | What does this backlog `item` deliver? `resultado`: moves a result the paying client sees (published video, delivered re |
+| `resultado.py:181` | choice | inglês | What does this backlog `item` deliver? `resultado`: moves a result the paying client sees (published video, delivered re |
 | `revisao_dupla.py:52` | score | português | O diff está livre deste problema: {…}? |
 | `revisor.py:203` | noul | português | O PR do Developer `pr` é seguro para entrar na main junto com os outros PRs abertos `prs_abertos`? |
-| `skills.py:159` | choice | inglês | Which installed skill should the coding agent use for this `tarefa`? Pick the one whose description matches the work; `n |
+| `skills.py:178` | choice | inglês | Which installed skill should the coding agent use for this `tarefa`? Pick the one whose description matches the work; `n |
+| `trabalhos.py:60` | score | inglês | How ready is this `trabalho` to be the first job the agency sells? Weigh `capacidade` (fraction already delivered by cod |
 | `vigia.py:392` | noul | português | O achado `achados.{…}.titulo` é uma trava real da autoevolução do loop agora? |
 | `vigia.py:397` | choice | português | O que o loop deve fazer com o achado `achados.{…}.titulo`? |
