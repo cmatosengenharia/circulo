@@ -8,6 +8,7 @@ estão aqui; o Jev escolhe por tarefa (`circulo/skills.py`). O que cada uma viro
 | test-driven-development, writing-plans, verification-before-completion, systematic-debugging, requesting-code-review | https://github.com/obra/superpowers (skills/) | 2ce8aa1 | MIT (Jesse Vincent) |
 | karpathy-guidelines | https://github.com/forrestchang/andrej-karpathy-skills | 2c60614 | MIT |
 | i-have-adhd | https://github.com/ayghri/i-have-adhd | 1ecea19 | MIT (Ayoub Ghriss) |
+| xlsx (só o SKILL.md: licença source-available, scripts não copiados) | https://github.com/anthropics/skills (skills/xlsx) | main em 02/11/2026, via a cópia sincronizada do plugin anthropic-skills | source-available (Anthropic; LICENSE.txt do repositório) |
 
 Não vendorizado: nyldn/claude-octopus (MIT) — 63 skills e 12 fornecedores; só a ideia do revisor cruzado de outro
 fornecedor foi trazida (`validador.revisor_externo`, ativa apenas se `codex` ou `gemini` existir no PATH).
