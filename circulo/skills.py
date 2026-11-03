@@ -58,7 +58,7 @@ CATALOGO = (
     ("subagent-driven-development", "https://github.com/obra/superpowers", "skills/subagent-driven-development", "contexto", "subagentes com contexto próprio: economia de tokens no agente principal", "desconhecida"),
     ("cloud-solution-architect", "https://github.com/microsoft/skills", "skills/cloud-solution-architect", "arquitetura", "arquitetura de soluções em nuvem", "desconhecida"),
     ("next-best-practices", "https://github.com/vercel-labs/skills", "skills/next-best-practices", "arquitetura", "Next.js como a Vercel recomenda", "desconhecida"),
-    ("postgres-best-practices", "https://github.com/supabase/skills", "skills/postgres-best-practices", "arquitetura", "Postgres: esquema, índices, consultas", "desconhecida"),
+    ("postgres-best-practices", "https://github.com/supabase/agent-skills", "skills/supabase-postgres-best-practices", "arquitetura", "Postgres: esquema, índices, consultas", "MIT"),
     # segurança
     ("differential-review", "https://github.com/trailofbits/skills", "skills/differential-review", "seguranca", "revisão de segurança de PR e diff, com relatório", "desconhecida"),
     ("insecure-defaults", "https://github.com/trailofbits/skills", "skills/insecure-defaults", "seguranca", "detecta padrões fail-open: segredo fraco, configuração permissiva", "desconhecida"),
