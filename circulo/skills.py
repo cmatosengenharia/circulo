@@ -10,7 +10,8 @@ instaladas as que servem (`skills_para_tarefa`, regra local: sobreposição de p
 skill) e o prompt da tarefa diz quais usar. O catálogo é dado (kv `skills_catalogo` sobrescreve); nada aqui chama LLM.
 
 Fontes do catálogo (31/10): anthropics/skills (Apache-2.0; os 4 de documentos são source-available), obra/superpowers,
-trailofbits/skills, remotion-dev/skills, google-labs-code, microsoft, cloudflare, vercel-labs, testmu-ai. A licença de
+trailofbits/skills, remotion-dev/skills, google-labs-code, microsoft, cloudflare, vercel-labs, testmu-ai; expo/skills (MIT,
+área `mobile`, ADR 0006: pedidas só quando um produto pendente fala de app, iOS, Android ou Expo). A licença de
 cada uma é conferida pelo Developer no PR (o item diz isso); "desconhecida" significa que o catálogo não a afirma.
 """
 from __future__ import annotations
@@ -72,13 +73,22 @@ CATALOGO = (
     ("remotion-captions", "https://github.com/remotion-dev/skills", "remotion-captions", "video", "legendas e subtítulos (reels, shorts)", "desconhecida"),
     ("remotion-render", "https://github.com/remotion-dev/skills", "remotion-render", "video", "renderizar vídeo ou still", "desconhecida"),
     ("slack-gif-creator", "https://github.com/anthropics/skills", "skills/slack-gif-creator", "video", "GIFs animados curtos", "Apache-2.0"),
+    # app móvel (EXPO-1, ADR 0006): só pedidas quando um produto pendente fala de app, iOS, Android ou Expo
+    ("expo-overview", "https://github.com/expo/skills", "skills/expo-overview", "mobile", "app Expo (React Native): visão geral, iOS e Android", "MIT"),
+    ("expo-router", "https://github.com/expo/skills", "skills/expo-router", "mobile", "navegação por arquivos em app Expo", "MIT"),
+    ("expo-ui", "https://github.com/expo/skills", "skills/expo-ui", "mobile", "componentes nativos de iOS e Android em app Expo", "MIT"),
+    ("expo-data-fetching", "https://github.com/expo/skills", "skills/expo-data-fetching", "mobile", "busca de dados e cache em app Expo", "MIT"),
+    ("expo-web-to-native", "https://github.com/expo/skills", "skills/expo-web-to-native", "mobile", "levar telas web para app Expo nativo", "MIT"),
     # MCP e meta
     ("mcp-builder", "https://github.com/anthropics/skills", "skills/mcp-builder", "mcp", "construir servidores MCP", "Apache-2.0"),
     ("skill-creator", "https://github.com/anthropics/skills", "skills/skill-creator", "meta", "criar e avaliar skills novas", "Apache-2.0"),
 )
 AREAS = {"documentos": "documentos", "frontend": "frontend", "testes": "testes", "arquitetura": "arquitetura", "contexto": "contexto",
-         "seguranca": "segurança", "video": "vídeo", "mcp": "MCP", "meta": "meta"}
+         "seguranca": "segurança", "video": "vídeo", "mobile": "app móvel", "mcp": "MCP", "meta": "meta"}
 _FRONT = re.compile(r"(?i)\.html|painel|tela|css|frontend|console|card|layout|tema\.py")
+_MOBILE = re.compile(r"(?i)\b(app|ios|android|expo)\b")
+REGRA_APP = ("Regra do app da esteira: strangler fig — começar pela casca nativa (Expo) e trocar as telas web por nativas "
+             "uma a uma, nunca reescrever tudo de uma vez.")
 
 
 def catalogo(store) -> list[dict]:
@@ -107,9 +117,11 @@ def pedir_instalacao(store, repo_dir: Path | str, agora: float | None = None, ma
     agora = agora or time.time()
     pedidas = store.get(KV_PEDIDOS) or {}
     ja = {s["nome"] for s in instaladas(repo_dir)} | set(pedidas)
+    produto_mobile = any(_MOBILE.search(f"{r['titulo']}\n{r['detalhe'] or ''}") for r in store.q(
+        "SELECT titulo, detalhe FROM roadmap WHERE status IN ('pendente','em_andamento') AND origem!='referencia'"))
     ids = []
     for c in catalogo(store):
-        if c["nome"] in ja:
+        if c["nome"] in ja or (c.get("area") == "mobile" and not produto_mobile):
             continue
         titulo = f"Instalar a skill {c['nome']} ({AREAS.get(c['area'], c['area'])}) em .claude/skills a partir de {c['repo'].split('github.com/')[-1]}"
         detalhe = (f"Copiar a pasta `{c['caminho']}` de {c['repo']} para `.claude/skills/{c['nome']}/` (SKILL.md e os scripts que ele cita), "
@@ -129,9 +141,11 @@ def pedir_instalacao(store, repo_dir: Path | str, agora: float | None = None, ma
 
 
 def regra(jev, qid: str, q: Question, state) -> Decision:
-    """Regra local: a skill cuja descrição mais divide palavras com a tarefa; tela/painel/html puxa a de frontend."""
+    """Regra local: a skill cuja descrição mais divide palavras com a tarefa; tela/painel/html puxa a de frontend;
+    skill de app móvel só entra quando a tarefa fala de app, iOS, Android ou Expo (EXPO-1)."""
     tarefa = set(termos(str(state.get("tarefa", "")), 40))
     front = bool(_FRONT.search(str(state.get("tarefa", ""))))
+    mobile = bool(_MOBILE.search(str(state.get("tarefa", ""))))
     pontos = {}
     for op, desc in (q.criteria or {}).items():
         if op == "nenhuma":
@@ -139,6 +153,8 @@ def regra(jev, qid: str, q: Question, state) -> Decision:
         p = len(tarefa & set(termos(desc, 40)))
         if front and re.search(r"(?i)frontend|design|interface|web", desc):
             p += 2
+        if _MOBILE.search(desc):
+            p = p + 2 if mobile else 0
         pontos[op] = p
     melhor = max(pontos.values(), default=0)
     if melhor <= 0:
@@ -167,4 +183,6 @@ def texto_para_prompt(escolhidas: list[dict]) -> str:
     if not escolhidas:
         return ""
     linhas = "\n".join(f"- /{s['nome']}: {s['descricao']}" for s in escolhidas)
+    if any(_MOBILE.search(s["descricao"]) for s in escolhidas):
+        linhas += f"\n{REGRA_APP}"
     return f"\nSkills instaladas em .claude/skills que servem a esta tarefa — leia o SKILL.md e siga-o:\n{linhas}\n"
