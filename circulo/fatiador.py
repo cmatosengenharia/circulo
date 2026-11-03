@@ -191,6 +191,7 @@ def tem_trabalho(s) -> bool:
 def proximo(ctx, dev, planejador) -> int | None:
     """O id do item que o Developer deve executar agora (sub-item da divisão em curso ou o próximo da fila)."""
     from . import roadmap
+    from .operador_loop import sem_troca, trocar_estrategia
     s, repo = ctx.store, getattr(dev, "repo", None)
     roadmap.reabrir(s)
     for pai in s.q("SELECT id FROM roadmap p WHERE status='dividido' AND NOT EXISTS "
@@ -214,6 +215,7 @@ def proximo(ctx, dev, planejador) -> int | None:
             return proximo(ctx, dev, planejador)
         _com_erro_anterior(s, sub)
         _gravar_estimativa(s, sub["id"], estimar_tamanho(sub["titulo"], sub["detalhe"]))
+        trocar_estrategia(s, sub["id"])
         return sub["id"]
     item = dev.pick()
     if item is None:
@@ -235,7 +237,7 @@ def proximo(ctx, dev, planejador) -> int | None:
         return None
     if item["origem"] in PRE_ORIGENS:
         from .developer import LIMITE_PASSOS, estimar_passos, limiar_calibrado, registrar_passos
-        est = estimar_tamanho(item["titulo"], item["detalhe"])
+        est = estimar_tamanho(item["titulo"], sem_troca(item["detalhe"]))
         limite = getattr(getattr(dev, "agent", None), "max_turns", LIMITE_PASSOS)
         fracao = estimar_passos(est["modulos"], est["simbolos"], limite)
         registrar_passos(s, item["titulo"], fracao, limite)
@@ -247,6 +249,7 @@ def proximo(ctx, dev, planejador) -> int | None:
             s.set(ESTIMATIVAS, {**(s.get(ESTIMATIVAS) or {}), **{str(i): e for i, (_, e) in zip(ids, fatias, strict=True)}})
             return ids[0]
         _gravar_estimativa(s, item["id"], est)
+    trocar_estrategia(s, item["id"])
     return item["id"]
 
 
