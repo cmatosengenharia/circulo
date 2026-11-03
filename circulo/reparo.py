@@ -672,11 +672,9 @@ class DeveloperComReparo(SelfDeveloper):
         """Portão pré-PR: o motivo do adiamento ('' = abre). Na LIMITE_ADIAR-ésima vez seguida com a mesma causa, o
         disjuntor manda o item para triagem."""
         from .licoes import registrar as monitorar
-        from .merge_gate import required_checks
         from .impressao_pr import impressao
-        from .pre_pr import ADIAR, ADIAR_PONTO, checks_dos_prs, conserta_main, decidir, ler_main
-        d = decidir(*ler_main(self.gh), conserta_main=conserta_main(self.s, item_id),
-                    historico=checks_dos_prs(self.s, time.time()), obrigatorios=required_checks())
+        from .pre_pr import ADIAR, ADIAR_PONTO, antes_de_abrir
+        d = antes_de_abrir(self.s, self.gh, item_id)
         tarefa = PREFIXO_TITULO.sub("", titulo)          # o mesmo pedido recriado com outro id segue a mesma contagem
         n = adiado_do_item(self.s, impressao(tarefa, ()), d.causa if d.acao == ADIAR else None)
         if d.acao != ADIAR:

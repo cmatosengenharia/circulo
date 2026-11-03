@@ -284,6 +284,10 @@ def publicar(ctx, repo: Path, docs: dict[str, str], gh=None) -> dict[str, Any]:
             (repo / caminho).parent.mkdir(parents=True, exist_ok=True)
             (repo / caminho).write_text(texto, encoding="utf-8")
         return {"modo": "local", "arquivos": sorted(docs)}
+    from .pre_pr import ADIAR, antes_de_abrir
+    d = antes_de_abrir(s, gh)
+    if d.acao == ADIAR:
+        return {"modo": "adiado", "causa": d.causa}
     _git(["fetch", "-q", "origin", "main"], repo)
     branch = f"{BRANCH_PREFIX}{int(time.time())}"
     wt = repo.parent / f".wt-{branch.replace('/', '-')}"
@@ -325,6 +329,8 @@ def rodar(ctx, repo: Path | None = None, gh=None) -> dict[str, Any] | None:
     if callable(getattr(ctx, "reply", None)):
         if r["modo"] == "pr":
             ctx.reply(f"Redator técnico atualizou a documentação ({len(docs)} arquivos em docs/) e abriu o PR #{r['pr']}; o gate decide.", "docs")
+        elif r["modo"] == "adiado":
+            ctx.reply(f"Redator técnico adiou o PR de documentação ({r['causa']}): um PR agora falharia por motivo externo.", "docs")
         elif r["modo"] == "local":
             ctx.reply(f"Redator técnico escreveu a documentação ({len(docs)} arquivos em docs/) no clone local.", "docs")
     return {**r, "arquivos": len(docs)}

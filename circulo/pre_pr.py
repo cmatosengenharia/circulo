@@ -13,12 +13,13 @@ O histórico só vale desde a última main verde e dentro de JANELA, para o pró
 from __future__ import annotations
 
 import re
+import time
 import urllib.error
 from dataclasses import dataclass
 
 from .gate_causa import checks_falhando
 from .merge_gate import CI_NAO_INICIOU as NAO_INICIOU_MSG
-from .merge_gate import REQUIRED_CHECKS, checks_ok
+from .merge_gate import REQUIRED_CHECKS, checks_ok, required_checks
 
 ABRIR, ADIAR = "abrir", "adiar"
 MAIN_VERMELHA, CI_NAO_INICIOU, SISTEMICO = "main_vermelha", "ci_nao_iniciou", "adiado_sistemico"
@@ -49,6 +50,13 @@ def decidir(conclusao: str | None, jobs_executaram: bool, conserta_main: bool = 
     if len(ultimos) == MIN_PRS and all(c == ultimos[0] for c in ultimos) and set(obrigatorios) <= ultimos[0]:
         return Decisao(ADIAR, SISTEMICO)
     return Decisao(ABRIR)
+
+
+def antes_de_abrir(store, gh, item_id: int | None = None) -> Decisao:
+    """A única porta antes de `gh.create_pr` (lição #50): o Developer e o Redator técnico leem a mesma main e o
+    mesmo histórico de PRs; o Redator abria o PR de docs com a main vermelha e ele falhava nos mesmos checks."""
+    return decidir(*ler_main(gh), conserta_main=conserta_main(store, item_id),
+                   historico=checks_dos_prs(store, time.time()), obrigatorios=required_checks())
 
 
 def checks_dos_prs(store, agora: float) -> list[set[str]]:
