@@ -145,11 +145,13 @@ def marco(store, agora: float | None = None) -> dict:
 def cobrar(store, reply, agora: float | None = None, dl=None) -> dict | None:
     """No fim do prazo, compara com o marco: evoluiu (mais PRs de produto, fração maior ou console mexido) ou não.
     Sem evolução, avisa e põe no "Precisa de você": a solução precisa ser reescrita, não insistida.
-    Com `dl` (o Vigia, 1×/dia): antes, o Jev classifica os itens pendentes em resultado/confiabilidade/ferramenta (1.76)."""
+    Com `dl` (o Vigia, 1×/dia): antes, o Jev classifica os itens pendentes em resultado/confiabilidade/ferramenta (1.76)
+    e ranqueia o catálogo de trabalhos candidatos a vender (item E)."""
     agora = agora or time.time()
     if dl is not None:
-        from . import resultado
+        from . import resultado, trabalhos
         resultado.classificar_pendentes(dl, store)
+        trabalhos.ranquear(dl, store)
     m = marco(store, agora)
     if m.get("cobrado") or agora < float(m["prazo_em"]):
         return None
@@ -173,6 +175,7 @@ def cobrar(store, reply, agora: float | None = None, dl=None) -> dict | None:
 def resumo(store) -> dict:
     m = medir(store)
     r = m.pop("_resumo")
+    from . import trabalhos
     return {"resultados": [{"chave": k, **v} for k, v in m.items()], "cota": cota(store), "marco": store.get("norte_marco"),
-            "estrategia": store.get("norte_estrategia"),
+            "estrategia": store.get("norte_estrategia"), "trabalhos": trabalhos.ranking(store),
             "fracao_24h": fracao_produto_recente(store), "prefere_produto": prefere_produto(store), **r}
