@@ -50,10 +50,17 @@ pergunta → item → PR quando ela existe. O tipo de cada entrega foi classific
 
 ## Entregas do loop (200 PRs mergeados)
 
-Por tipo: **funcionalidade** 72 · **observabilidade** 43 · **documentacao** 34 · **correcao** 32 · **seguranca** 14 · **velocidade** 5.
+Por tipo: **funcionalidade** 72 · **observabilidade** 41 · **documentacao** 36 · **correcao** 30 · **seguranca** 16 · **velocidade** 5.
 
 | PR | Data | Tipo | Visível | Entrega | Veio de |
 |---|---|---|---|---|---|
+| #380 | 03/11/2026 | seguranca (100%) | sim | Instalar a skill agentic-actions-auditor (segurança) em .claude/skills a partir de… | item #405 (referencia) |
+| #379 | 03/11/2026 | seguranca (99%) | sim | Instalar a skill postgres-best-practices (arquitetura) em .claude/skills a partir de supabase/skills | item #399 (referencia) |
+| #378 | 03/11/2026 | funcionalidade (81%) | sim | Instalar a skill subagent-driven-development (contexto) em .claude/skills a partir de… | item #396 (referencia) |
+| #377 | 03/11/2026 | funcionalidade (86%) | sim | Instalar a skill using-git-worktrees (arquitetura) em .claude/skills a partir de obra/superpowers | item #395 (referencia) |
+| #376 | 03/11/2026 | documentacao (100%) | — | docs: documentação do loop atualizada pelo Redator técnico | — |
+| #375 | 03/11/2026 | documentacao (100%) | — | Instalar a skill brainstorming (arquitetura) em .claude/skills a partir de obra/superpowers | item #394 (referencia) |
+| #373 | 03/11/2026 | funcionalidade (87%) | sim | Instalar a skill webapp-testing (testes) em .claude/skills a partir de anthropics/skills | item #391 (referencia) |
 | #372 | 03/11/2026 | funcionalidade (75%) | — | Instalar a skill frontend-design-review (frontend) em .claude/skills a partir de microsoft/skills | item #389 (referencia) |
 | #371 | 03/11/2026 | funcionalidade (81%) | — | Instalar a skill web-perf (frontend) em .claude/skills a partir de cloudflare/skills | item #390 (referencia) |
 | #370 | 03/11/2026 | funcionalidade (76%) | — | Instalar a skill shadcn-ui (frontend) em .claude/skills a partir de google-labs-code/skills | item #388 (referencia) |
@@ -247,10 +254,3 @@ Por tipo: **funcionalidade** 72 · **observabilidade** 43 · **documentacao** 34
 | #173 | 26/10/2026 | correcao (50%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
 | #172 | 26/10/2026 | correcao (66%) | sim | Lição #60: painel:frescor: painel atrasado: p99 5472 ms em 24 h (meta 3000 ms) | item #138 (erro) |
 | #171 | 26/10/2026 | correcao (65%) | sim | Isolar o teste de paralelismo do Arquiteto: trocar timing por threading.Barrier com timeout | item #214 (sub_item) |
-| #170 | 26/10/2026 | correcao (77%) | — | Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA em toda a esteira de… | pergunta do cassio: “Alinhar o kit do loop ao framework GAIA da Localiza, que padroniza o uso de IA e” |
-| #169 | 26/10/2026 | correcao (76%) | — | Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, notas, prompts)… | pergunta do cassio: “Uma estrutura de pastas padrão no meu Mac por assunto (docs, decisões, links, no” |
-| #168 | 26/10/2026 | funcionalidade (60%) | sim | Exportar contexto enxuto para o Cursor (AGENTS.md e .cursor/rules) a partir da memória do assunto | pergunta do cassio: “Para cada assunto ou repositório, o loop gera e mantém os arquivos de contexto q” |
-| #167 | 26/10/2026 | observabilidade (99%) | — | Gasto diário do Cursor por assunto/tarefa, com projeção de esgotamento dos US$ 250 | pergunta do cassio: “Tenho US$ 250 por mês de IA no Cursor e sempre acabo antes do fim do mês. Quero ” |
-| #166 | 26/10/2026 | observabilidade (56%) | sim | Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsserviço de… | pergunta do cassio: “Quero um espaço de trabalho por ASSUNTO (minha tribo, minha squad, cada microsse” |
-| #165 | 26/10/2026 | funcionalidade (89%) | sim | Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e depois acho em segundos, por pa | pergunta do cassio: “Catálogo de links da empresa por assunto: eu colo o link com um rótulo curto e d” |
-| #164 | 26/10/2026 | funcionalidade (84%) | sim | Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das notas), o que farei hoje (pend | pergunta do cassio: “Toda manhã às 8h quero a pauta da minha daily por assunto: o que fiz ontem (das ” |
