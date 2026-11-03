@@ -374,6 +374,11 @@ class Fabricante:
         self._evidencia(p["id"], "entrega", ok, f"commit {res['commit'][:10]} em {res['branch']}; bloqueado_por={res['bloqueado_por']}\n{res['diff'][-600:]}")
         if not ok:
             return self._vermelho(p, wip, f"etapas do cliente: {res['bloqueado_por'] or 'testes'}")
+        from . import experimentos      # missão Vender resultado, item F: PROMESSA.md ou landing no diff = experimento sobre o resultado do cliente
+        mudados = _git(Path(p["pasta"]), "diff", "--name-only", f"origin/{r['base']}...HEAD").splitlines()
+        if eid := experimentos.abrir_oferta(self.s, p["id"], k.nome, mudados):
+            e = self.s.one("SELECT hipotese, metrica FROM experimentos WHERE id=?", (eid,))
+            self._evidencia(p["id"], "oferta", True, f"experimento #{eid} ({e['metrica']}, {experimentos.JANELA_OFERTA_H // 24} dias): {e['hipotese']}")
         pr = self._pr(k, r, p, item, res)
         todos = self.s.get(KV_WIP) or {}
         todos.pop(str(p["id"]), None)
