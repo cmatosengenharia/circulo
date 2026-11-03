@@ -5,6 +5,7 @@ import urllib.request
 
 from circulo import equipe
 
+from test_fabricante import fabrica  # noqa: F401 — fixture do repositório cliente com um pedido e o Fabricante
 from test_painel import painel  # noqa: F401 — fixture do servidor do painel
 
 
@@ -101,3 +102,27 @@ def test_filtrar_por_pedido_mostra_a_linha_do_tempo_e_onde_esta_agora(circle, pa
         assert json.loads(r.read())["pedido"] is None
     with urllib.request.urlopen(painel + "/api/equipe", timeout=5) as r:
         assert "pedido" not in json.loads(r.read())                             # sem filtro, o retrato de sempre
+
+
+def test_fabricante_mostra_as_fases_do_pedido_e_a_entrega_vira_mensagem_com_o_link_do_pr(fabrica, painel):  # noqa: F811
+    """O Fabricante (`fabricar`) aparece com as fases do pedido em curso lidas de etapas_repo; o pedido entregue vira entrega com o PR."""
+    s, pedido = fabrica["store"], fabrica["pedido"]
+    cur = equipe.cursor_inicial(s)
+    assert fabrica["fab"].run_once()["status"] == "entregue"
+    msgs, cur2 = equipe.mensagens(s, cur)
+    entregas = [m for m in msgs if m["de"] == "fabricar" and m["tom"] == "entrega"]
+    assert len(entregas) == 1 and entregas[0]["para"] == "cassio" and entregas[0]["pedido"] == pedido["id"]
+    assert entregas[0]["link"] == f"pr://circulo/{pedido['id']}" and f"pedido {pedido['id']}" in entregas[0]["texto"]
+    assert not [m for m in equipe.mensagens(s, cur2)[0] if m["de"] == "fabricar"]      # o cursor andou: nada repete
+    fab = next(m for m in equipe.retrato(s)["membros"] if m["id"] == "fabricar")
+    f = fab["fabrica"]
+    assert f["pedido"] == pedido["id"] and f["status"] == "entregue" and f["texto"].startswith("Criar a função subtrair")
+    fases = [x["etapa"] for x in f["fases"]]
+    assert fases.index("plano") < fases.index("implementar") < fases.index("teste_vermelho") < fases.index("teste_verde") < fases.index("tecnicas") < fases.index("validador") < fases.index("entrega") < fases.index("pr")
+    ok = {x["etapa"]: x["ok"] for x in f["fases"]}
+    assert all(ok[e] is True for e in ("plano", "implementar", "teste_vermelho", "teste_verde", "tecnicas", "validador", "entrega", "pr"))
+    assert ok["promessa_md"] is False and all(x["em"] > 0 for x in f["fases"])      # a fase vermelha aparece também (fixture sem PROMESSA.md)
+    assert next(x for x in f["fases"] if x["etapa"] == "pr" and x["comando"] == "pr")["saida"] == f"pr://circulo/{pedido['id']}"
+    assert next(m for m in equipe.retrato(s)["membros"] if m["id"] == "corrigir_codigo").get("fabrica") is None   # só o Fabricante tem fases
+    pagina = urllib.request.urlopen(painel + "/equipe", timeout=5).read().decode()
+    assert 'class="fases"' in pagina and "fabrica" in pagina and "msg.link" in pagina

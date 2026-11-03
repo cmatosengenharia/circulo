@@ -72,11 +72,31 @@ def _msg(em: float, de: str, para: str, tom: str, texto: str, **extra) -> dict[s
 
 
 _PR = re.compile(r"PR #(\d+)")
+_PEDIDO = re.compile(r"pedido (\d+)")
 
 
 def _pr_de(texto: str | None) -> int | None:
     m = _PR.search(texto or "")
     return int(m.group(1)) if m else None
+
+
+def _link_do_pr(store: Store, pedido_id: int) -> str | None:
+    """O PR que o Fabricante abriu para o pedido do repositório cliente (fase `pr` de etapas_repo)."""
+    r = store.one("SELECT saida FROM etapas_repo WHERE pedido_id=? AND etapa='pr' AND comando='pr' AND ok=1 ORDER BY id DESC LIMIT 1", (pedido_id,))
+    return r["saida"] if r else None
+
+
+def _fabrica(store: Store) -> dict | None:
+    """O pedido em curso do Fabricante (o da fase mais recente) com cada fase lida de etapas_repo."""
+    if not store.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='etapas_repo'"):
+        return None
+    p = store.one("SELECT p.id, p.status, p.texto FROM etapas_repo e JOIN pedidos_repo p ON p.id=e.pedido_id ORDER BY e.id DESC LIMIT 1")
+    if p is None:
+        return None
+    from .repo_cliente import evidencias
+    fases = [{"etapa": e["etapa"], "comando": e["comando"], "ok": e["ok"], "em": float(e["em"]), "saida": (e["saida"].strip().splitlines() or [""])[0][:120]}
+             for e in evidencias(store, p["id"])]
+    return {"pedido": p["id"], "status": p["status"], "texto": (p["texto"] or "")[:110], "fases": fases}
 
 
 # ------------------------------------------------------------------ cursor
@@ -229,6 +249,9 @@ def _de_alertas(store, c, out, limite):
             out.append(_msg(a["created_at"], "documentar", "revisar_prs" if "PR #" in msg else "cassio", "entrega", msg))
         elif k == "duvida":
             out.append(_msg(a["created_at"], "estudar_pedido", "indagar", "entrega" if "agora valida" in msg else "status", msg))
+        elif k == "roteiro" and msg.startswith("Fabricante: pedido") and "entregue em" in msg:
+            pid = int(_PEDIDO.search(msg).group(1))
+            out.append(_msg(a["created_at"], "fabricar", "cassio", "entrega", msg, pedido=pid, link=_link_do_pr(store, pid)))
         elif k == "roteiro" and msg.startswith("Estudei"):
             out.append(_msg(a["created_at"], "estudar_pedido", "corrigir_codigo", "status", msg))
         elif k == "roteiro" and "sem item novo" in msg:
@@ -377,9 +400,12 @@ def retrato(store: Store, pedido: str | None = None) -> dict[str, Any]:
             estado = "disponivel"
         c = carga.get(k) or {}
         agora_txt = (faz["o_que"] + (" · " + faz["passo"] if faz.get("passo") else "")) if faz else (detalhe if k == ativo else "")
-        membros.append({"id": k, **d, "estado": estado, "agora": agora_txt, "desde": (faz["desde"] if faz else desde) if estado == "trabalhando" else None,
-                        "fazendo": faz, "ultimo": ultimos.get(k), "capacidade": cargas.get(k),
-                        "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")})
+        m = {"id": k, **d, "estado": estado, "agora": agora_txt, "desde": (faz["desde"] if faz else desde) if estado == "trabalhando" else None,
+             "fazendo": faz, "ultimo": ultimos.get(k), "capacidade": cargas.get(k),
+             "carga": c.get("n", 0), "carga_rotulo": c.get("rotulo", ""), "vagas": c.get("vagas")}
+        if k == "fabricar":
+            m["fabrica"] = _fabrica(store)
+        membros.append(m)
     q = quadro(store)
     motivo.alertar_sem_motivo(store, sorted({k["id"] for col in q for k in col["cards"] if (k.get("motivo") or {}).get("codigo") == "sem_motivo"}))
     r = {"em": time.time(), "rodando": rodando, "ritmo": ritmo.get("modo"), "ativo": ativo, "grupos": GRUPOS, "membros": membros,

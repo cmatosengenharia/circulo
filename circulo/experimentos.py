@@ -8,14 +8,18 @@ inferioridade, janela e n_min de eventos; ao fim da janela o Vigia mede e grava 
   margem (Spotify Confidence: sem margem não há critério objetivo de "piorou"); sem amostra, `inconclusivo` e a janela
   estende uma vez; na segunda, `inconclusivo` é final;
 - `piorou` numa métrica de GUARDA abre o item de reversão (Developer → PR → CI → revisor); fora da guarda o humano decide;
-- `neutro` põe a métrica em descanso por DESCANSO_S: o Planejador não abre outro experimento sobre ela.
+- `neutro` põe a métrica em descanso por DESCANSO_S: o Planejador não abre outro experimento sobre ela;
+- `abrir_oferta` (missão Vender resultado, item F): mudança em PROMESSA.md ou na landing de um produto cliente, vista
+  no diff entregue pelo Fabricante, abre um experimento sobre o resultado do cliente (promessa cumprida, visualizações)
+  com janela de JANELA_OFERTA_H; o item 'feito' que o prende ao roteiro faz o Vigia decidi-lo como os demais.
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 
-from . import norte
+from . import norte, resultado
 from .jardineiro import INDICADORES
 
 H = 3600.0
@@ -24,8 +28,14 @@ DESCANSO_S = 7 * 86400.0
 INCONCLUSIVO = "inconclusivo"
 METRICAS: dict[str, tuple[str, str, bool]] = {          # métrica → (fonte, sentido bom, é guarda)
     **{k: ("norte", sentido, k == "merge_sem_conserto") for k, _d, _m, sentido in norte.RESULTADOS},
+    **{k: ("norte", sentido, False) for k, _d, _m, sentido in resultado.RESULTADOS},     # lado do cliente: norte.medir os inclui
     **{k: ("jardim", "menor", True) for k in INDICADORES},
 }
+OFERTA = (                                               # arquivo da oferta → (métrica de resultado do cliente, margem; None = 10% do baseline, mínimo 1)
+    (re.compile(r"(?i)(^|/)PROMESSA\.md$"), "promessa_cumprida", 0.1),
+    (re.compile(r"(?i)landing|index\.html$"), "visualizacoes_semana", None),
+)
+JANELA_OFERTA_H = 14 * 24
 
 class ExperimentoIncompleto(ValueError):
     """Item sem hipótese, métrica mensurável, margem ou janela: o Planejador não o grava."""
@@ -91,6 +101,30 @@ def gravar(store, item_id: int, exp: Experimento, agora: float | None = None) ->
                    "n_min,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                    (item_id, exp.hipotese, exp.metrica, int(METRICAS[exp.metrica][2]),
                     exp.baseline if medido is None else medido, exp.alvo, exp.margem, exp.janela_s, exp.n_min, agora))
+
+
+def abrir_oferta(store, pedido_id: int, produto: str, arquivos: list[str], agora: float | None = None) -> int | None:
+    """Diff entregue que toca PROMESSA.md ou a landing do produto: experimento sobre o resultado do cliente, janela de
+    JANELA_OFERTA_H, preso a um item já 'feito' (a mudança está entregue). None: nada de oferta no diff, ou a métrica descansa."""
+    agora = agora or time.time()
+    regra = next((r for r in OFERTA if any(r[0].search(a) for a in arquivos)), None)
+    if regra is None:
+        return None
+    padrao, metrica, margem = regra
+    tocados = [a for a in arquivos if padrao.search(a)]
+    baseline = medir(store, metrica, 0, agora)[0] or 0.0
+    margem = margem or max(1.0, 0.1 * baseline)
+    hipotese = f"A mudança em {', '.join(tocados)} de {produto} (pedido {pedido_id}) melhora {metrica}"
+    try:
+        exp = Experimento.de({"hipotese": hipotese, "metrica": metrica, "baseline": baseline, "alvo": baseline + margem, "margem": margem,
+                              "janela_h": JANELA_OFERTA_H, "n_min": 1}, store, agora)
+    except ExperimentoIncompleto:
+        return None
+    from .roadmap import gravar_medido
+    iid = gravar_medido(store, "fabricante", f"oferta:{pedido_id}", f"Oferta de {produto}: {', '.join(tocados)} mudou no pedido {pedido_id}",
+                        hipotese, f"pedido {pedido_id}: {', '.join(tocados)}")
+    store.x("UPDATE roadmap SET status='feito' WHERE id=?", (iid,))
+    return gravar(store, iid, exp, agora)
 
 
 def _reverter(store, e: dict) -> int:

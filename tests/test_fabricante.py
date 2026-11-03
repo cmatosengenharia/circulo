@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -410,3 +411,47 @@ def test_licao_98_escrita_recusada_pelo_agente_bloqueia_o_pedido_sem_queimar_ten
     assert sum("BARRADA" in c["task"] for c in fab.agent.chamadas) == 0                       # nenhuma rodada de correção
     assert not store.q("SELECT 1 FROM licoes WHERE classe='estrutural' AND descricao LIKE '%promessa%'")
     assert fab.run_once()["status"] == "nada"
+
+
+# ---------------------------------------------------------------- experimento universal aplicado à oferta (missão Vender resultado, item F)
+
+PROMESSA = ("# Promessa\n\n## Trabalho que substitui\nSomar e subtrair à mão.\n\n## Resultado prometido\nContas certas toda semana.\n\n"
+            "## Cadência\nSemanal.\n\n## Preço\nR$ 10.\n\n## O cliente nunca precisa\nAbrir planilha.\n")
+
+
+def test_mudanca_em_promessa_md_entregue_abre_experimento_de_oferta_com_janela_de_14_dias(fabrica):
+    """Toda mudança em PROMESSA.md de um produto cliente (vista no diff do Fabricante) é um experimento sobre o resultado
+    do cliente: hipótese, métrica promessa_cumprida, janela de 14 dias; o veredito segue o fluxo do Vigia."""
+    from circulo import experimentos as ex
+    fab, store, pedido = fabrica["fab"], fabrica["store"], fabrica["pedido"]
+    fab.agent.plano = PLANO.replace("Arquivos: tests/teste_sub.py, calc.py", "Arquivos: tests/teste_sub.py, calc.py, PROMESSA.md")
+
+    def implementar(wd, task):
+        (wd / "tests" / "teste_sub.py").write_text(TESTE, encoding="utf-8")
+        (wd / "calc.py").write_text((wd / "calc.py").read_text() + CODIGO, encoding="utf-8")
+        (wd / "PROMESSA.md").write_text(PROMESSA, encoding="utf-8")
+        return {"passos": ["Claude Code: TodoWrite", "Claude Code: escrevendo tests/teste_sub.py", "Claude Code: editando calc.py", "Claude Code: escrevendo PROMESSA.md"],
+                "resposta": "Mudei calc.py, tests/teste_sub.py e PROMESSA.md.\nVerificado: python -m pytest -q → 2 passed."}
+    fab.agent.implementar = implementar
+    assert fab.run_once()["status"] == "entregue"
+    [e] = [dict(r) for r in store.q("SELECT * FROM experimentos")]
+    assert e["metrica"] == "promessa_cumprida" and e["janela_s"] == 14 * 86400 and e["n_min"] >= 1 and e["margem_nao_inferioridade"] > 0
+    assert "PROMESSA.md" in e["hipotese"] and str(pedido["id"]) in e["hipotese"]
+    assert e["baseline"] == 1.0            # medido agora: o próprio pedido, entregue no prazo
+    oferta = [x for x in repo_cliente.evidencias(store, pedido["id"]) if x["etapa"] == "oferta"]
+    assert oferta and oferta[-1]["ok"] and f"#{e['id']}" in oferta[-1]["saida"]
+    # o veredito segue o fluxo já existente: o Vigia abre a janela e, vencida, decide
+    agora = time.time()
+    ex.avaliar(store, None, agora)
+    assert store.one("SELECT fim FROM experimentos")["fim"] == pytest.approx(agora + 14 * 86400)
+    ex.avaliar(store, None, agora + 14 * 86400 + 1)
+    assert store.one("SELECT veredito FROM experimentos")["veredito"] in ("melhorou", "neutro", "piorou", ex.INCONCLUSIVO)
+
+
+def test_diff_sem_oferta_nao_abre_experimento_e_landing_mede_visualizacoes(circle):
+    from circulo import experimentos as ex
+    assert ex.abrir_oferta(circle.store, 7, "calc", ["calc.py", "tests/teste_sub.py"]) is None
+    assert not circle.store.q("SELECT * FROM experimentos")
+    eid = ex.abrir_oferta(circle.store, 7, "calc", ["landing/index.html"])
+    e = circle.store.one("SELECT * FROM experimentos WHERE id=?", (eid,))
+    assert e["metrica"] == "visualizacoes_semana" and e["janela_s"] == 14 * 86400 and "landing/index.html" in e["hipotese"]
