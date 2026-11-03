@@ -9,6 +9,14 @@ Técnicas portadas (reescritas, não copiadas) de projetos de terceiros. Cada um
 - Portado: skill `mom-test` → `circulo/persona_cliente.py` (persona `cliente` do conselho; Noul `mom_test_valida`).
   Só o método (perguntar sobre comportamento passado, não sobre a ideia); nenhum texto ou código da fonte foi copiado.
 
+## Expo skills (oficial)
+
+- Fonte: https://github.com/expo/skills (ADR 0006)
+- Licença: MIT
+- Portado: só as entradas do catálogo em `circulo/skills.py` (área `mobile`: expo-overview, expo-router, expo-ui,
+  expo-data-fetching, expo-web-to-native) e a regra do strangler fig para o futuro app. Nenhum SKILL.md foi copiado:
+  a cópia acontece por PR do item de instalação, com a licença conferida nele.
+
 ## everything-claude-code (ECC)
 
 - Fonte: https://github.com/affaan-m/everything-claude-code (ADR 0001)
