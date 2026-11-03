@@ -41,7 +41,7 @@ CATALOGO = (
     ("web-artifacts-builder", "https://github.com/anthropics/skills", "skills/web-artifacts-builder", "frontend", "páginas e artefatos web completos (React, Tailwind, shadcn)", "Apache-2.0"),
     ("canvas-design", "https://github.com/anthropics/skills", "skills/canvas-design", "frontend", "mockups, pôsteres e diagramas em canvas", "Apache-2.0"),
     ("theme-factory", "https://github.com/anthropics/skills", "skills/theme-factory", "frontend", "temas e paletas consistentes", "Apache-2.0"),
-    ("shadcn-ui", "https://github.com/google-labs-code/skills", "skills/shadcn-ui", "frontend", "componentes shadcn/ui bem usados", "desconhecida"),
+    ("shadcn-ui", "https://github.com/google-labs-code/stitch-skills", "plugins/stitch-build/skills/shadcn-ui", "frontend", "componentes shadcn/ui bem usados", "Apache-2.0"),
     ("frontend-design-review", "https://github.com/microsoft/skills", "skills/frontend-design-review", "frontend", "revisão de design de frontend", "desconhecida"),
     ("web-perf", "https://github.com/cloudflare/skills", "skills/web-perf", "frontend", "auditoria de Core Web Vitals", "desconhecida"),
     # testes e qualidade
