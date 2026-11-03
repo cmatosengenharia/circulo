@@ -17,6 +17,14 @@ Técnicas portadas (reescritas, não copiadas) de projetos de terceiros. Cada um
   expo-data-fetching, expo-web-to-native) e a regra do strangler fig para o futuro app. Nenhum SKILL.md foi copiado:
   a cópia acontece por PR do item de instalação, com a licença conferida nele.
 
+## Supabase agent skills (oficial)
+
+- Fonte: https://github.com/supabase/agent-skills (ADR 0007)
+- Licença: MIT
+- Portado: só a entrada `postgres-best-practices` do catálogo em `circulo/skills.py` (SUPA-2: repositório, caminho
+  `skills/supabase-postgres-best-practices` e licença). Nenhum SKILL.md foi copiado: a cópia acontece por PR do item
+  de instalação, com a licença conferida nele.
+
 ## everything-claude-code (ECC)
 
 - Fonte: https://github.com/affaan-m/everything-claude-code (ADR 0001)
